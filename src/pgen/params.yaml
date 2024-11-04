@@ -1,0 +1,298 @@
+---
+problem(advection):
+  _description: "<problem> block parameters when artemis/problem=advection"
+  amp:
+    _type: Real
+    _description: "Amplitude of perturbation"
+  vflow:
+    _type: Real
+    _default: 0.0
+    _description: "Background velocity parallel to wavevector"
+  nperiod:
+    _type: Real
+    _default: 1.0
+    _description: "Sets new time limit to the specified number of periods"
+  along_x(1,2,3):
+    _type: bool
+    _default: "false"
+    _description: "Wavevctor along x(1,2,3) axis"
+
+problem(blast):
+  _description: "<problem> block parameters when artemis/problem=blast"
+  radius:
+    _type: Real
+    _default: 1.0
+    _description: "Initial radius of blast wave"
+  height:
+    _type: Real
+    _default: 1.0
+    _description: "Initial height of blast wave"
+  internal_energy:
+    _type: Real
+    _default: 1.0
+    _description: "Internal energy of blast wave"
+  p0:
+    _type: Real
+    _default: 1.0
+    _description: "Background presure"
+  d0:
+    _type: Real
+    _default: 1.0
+    _description: "Background density"
+  x(1,2,3):
+    _type: Real
+    _default: 0.0
+    _description: "Coordinates of the blast wave center"
+  samples:
+    _type: int
+    _default: -1
+    _description: "Amount of subsampling to do when setting the initial blast. If < 0, only use the center of the cell."
+  symmetry:
+    _type: string
+    _default: "spherical"
+    _description: "Is this a spherical or cylindrical blast wave?"
+
+problem(conduction):
+  _description: "<problem> block parameters when artemis/problem=conduction"
+  gas_rho:
+    _type: Real
+    _default: 1.0
+    _description: "Background gas density."
+  gas_vx(1,2,3):
+    _type: Real
+    _default: 0.0
+    _description: "Background gas velocity."
+  gas_temp :
+    _type: Real
+    _default: 1.0
+    _description: "Background gas temperature."
+  flux:
+    _type: Real
+    _default: 0.0
+    _description: "The specified heat flux when using conductive boundaries."
+
+problem(constant):
+  _description: "<problem> block parameters when artemis/problem=constant"
+  gas_rho:
+    _type: Real
+    _default: 1.0
+    _description: "Background gas density."
+  gas_vx(1,2,3):
+    _type: Real
+    _default: 0.0
+    _description: "Background gas velocity."
+  gas_temp :
+    _type: Real
+    _default: 1.0
+    _description: "Background gas temperature"
+  dust_rho:
+    _type: Real
+    _default: 1.0
+    _description: "Background dust density."
+  dust_vx(1,2,3):
+    _type: Real
+    _default: 0.0
+    _description: "Background dust velocity."
+
+problem(disk):
+  _description: "<problem> block parameters when artemis/problem=disk"
+  r0:
+    _type: Real
+    _default: 1.0
+    _description: "Reference radius."
+    _units: "au"
+  h0:
+    _type: Real
+    _default: "0.05"
+    _description: "Aspect ratio of the disk at r0"
+  rho0:
+    _type: Real
+    _description: "Density of the disk at r0."
+    _units: "g cm^-3"
+  dslope:
+    _type: Real
+    _default: "-2.25"
+    _description: "Density power law"
+  tslope:
+    _type: Real
+    _default: "-1.0"
+    _description: "Temperature power law. This is mutually exclusive with flare"
+  flare:
+    _type: Real
+    _default: "0.0"
+    _description: "Flaring index. This is mutually exclusive with tslope"
+  rexp:
+    _type: Real
+    _default: "0.0"
+    _description: "Exponential cutoff radius for the density profile"
+  rcav:
+    _type: Real
+    _default: "0.0"
+    _description: "Inner cavity radius for the density profile."
+    _units: "au"
+  l0:
+    _type: Real
+    _default: "0.0"
+    _description: "Guess for the binary eignvalue that reduces the density near the outer boundary"
+  polytropic_index:
+    _type: Real
+    _default: "gas/gamma"
+    _description: "The polytropic index of the initial disk profile. Defaults to the gas adiabatic index"
+  mdot:
+    _type: Real
+    _description: "Specified mass flux through the disk. This is used to set the density normalization and the viscous outer boundary condition inflow rate."
+    _units: "g s^-1"
+  quiet_start:
+    _type: bool
+    _default: "false"
+    _description: "If set to true, the initial radial velocity is set to zero. If set to false, the initial radial velocity is the viscous velocity."
+  dens_min:
+    _type: Real
+    _default: "1e-5"
+    _description: "Floor density."
+    _units: "g cm^-3"
+  pres_min:
+    _type: Real
+    _default: "1e-8"
+    _description: "Floor pressure."
+    _units: "erg cm^-3"
+  dust_to_gas:
+    _type: Real
+    _default: "0.01"
+    _description: "Dust to gas ratio"
+
+problem(gaussian_bump):
+  _description: "<problem> block parameters when artemis/problem=gaussian_bump"
+  x(1,2,3)c:
+    _type: Real
+    _default: 0.0
+    _description: "Center of the bump."
+  sigma:
+    _type: Real
+    _description: "Width of the bump."
+  density_bump:
+    _type: Real
+    _default: 0.0
+    _description: "Density bump value."
+  temperature_bump:
+    _type: Real
+    _default: 0.0
+    _description: "Temperature bump value"
+  vx(1,2,3)_bump:
+    _type: Real
+    _default: 0.0
+    _description: "Velocity of the bump."
+  gas_rho:
+    _type: Real
+    _default: 1.0
+    _description: "Background gas density."
+  gas_vx(1,2,3):
+    _type: Real
+    _default: 0.0
+    _description: "Background gas velocity."
+  gas_pres:
+    _type: Real
+    _default: 1.0
+    _description: "Background gas pressure."
+  dust_rho:
+    _type: Real
+    _default: 1.0
+    _description: "Background dust density."
+  dust_vx(1,2,3):
+    _type: Real
+    _default: 0.0
+    _description: "Background dust velocity."
+
+problem(linear_wave):
+  _description: "<problem> block parameters when artemis/problem=linear_wave"
+  wave_flag:
+    _type: int
+    _description: "Wave flag"
+  amp:
+    _type: Real
+    _description: "Wave amplitude"
+  vflow:
+    _type: Real
+    _default: 0.0
+    _description: "Background velocity parallel to wavevector"
+  nperiod:
+    _type: Real
+    _default: 1.0
+    _description: "Sets new time limit to the specified number of periods"
+  along_x(1,2,3):
+    _type: bool
+    _default: "false"
+    _description: "Wavevctor along x(1,2,3) axis"
+
+problem(shock):
+  _description: "<problem> block parameters when artemis/problem=shock"
+  rhol:
+    _type: Real
+    _default: 1.0
+    _description: "Density (left)."
+  vxl:
+    _type: Real
+    _default: 2.0
+    _description: "X1-velocity (left)."
+  tl:
+    _type: Real
+    _default: 0.6
+    _description: "Temperature (left)."
+  rhor:
+    _type: Real
+    _default: 2.285714
+    _description: "Density (right)."
+  vxr:
+    _type: Real
+    _default: 0.875000
+    _description: "X1-velocity (right)."
+  tr:
+    _type: Real
+    _default: 1.246875
+    _description: "Temperature (right)."
+  xdisc:
+    _type: Real
+    _default: 0.0005
+    _description: "Discontinuity location (X1)."
+
+problem(strat):
+  _description: "<problem> block parameters when artemis/problem=strat"
+  h:
+    _type: Real
+    _default: 1.0
+    _description: "Scale height of the disk"
+  rho0:
+    _type: Real
+    _default: 1.0
+    _description: "Background density."
+  dens_min:
+    _type: Real
+    _default: "1e-5"
+    _description: "Floor density."
+  pres_min:
+    _type: Real
+    _default: "1e-8"
+    _description: "Floor pressure."
+  d2g:
+    _type: Real
+    _default: "0.01"
+    _description: "Dust to gas ratio"
+
+problem(thermalization):
+  _description: "<problem> block parameters when artemis/problem=thermalization"
+  rho:
+    _type: Real
+    _default: 1.0
+    _description: "Background density."
+  vx:
+    _type: Real
+    _default: 0.0
+    _description: "Background X1-velocity."
+  tgas:
+    _type: Real
+    _default: 2.0
+    _description: "Background gas temperature."
+  trad:
+    _type: Real
+    _default: 1.0
+    _description: "Background radiation temperature."

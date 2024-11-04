@@ -1,0 +1,65 @@
+---
+artemis:
+  _description: "The top level artemis configuration options"
+  coordinates:
+    _type: string
+    _description: "Problem coordinate system."
+    cartesian:
+      _type: opt
+      _description: "(x,y,z) Cartesian coordinates"
+    cylindrical:
+      _type: opt
+      _description: "(r,&phi;,z) cylindrical coordinates."
+    spherical:
+      _type: opt
+      _description: "(r,&theta;,&phi;) spherical coordinates."
+    axisymmetric:
+      _type: opt
+      _description: "(r,z,&phi;) axisymmetric coordinates."
+  problem:
+    _type: string
+    _description: "Name of the problem pgen."
+  amr_user:
+    _type: bool
+    _default: "false"
+    _description: "Add user-defined AMR criterion."
+
+
+
+physics:
+  _description: "Toggle on/off the available physics packages"
+  gas:
+    _type: "bool"
+    _default: "true"
+    _description: "Turn on the gas fluid"
+  dust:
+    _type: "bool"
+    _default: "false"
+    _description: "Turn on the dust fluid"
+  gravity:
+    _type: "bool"
+    _default: "false"
+    _description: "Turn on gravity"
+  rotating_frame:
+    _type: "bool"
+    _default: "false"
+    _description: "Turn on the rotating frame"
+  cooling:
+    _type: "bool"
+    _default: "false"
+    _description: "Turn on the cooling for the gas fluid."
+  viscosity:
+    _type: "bool"
+    _default: "false"
+    _description: "Turn on the viscosity for the gas fluid"
+  nbody:
+    _type: "bool"
+    _default: "false"
+    _description: "Turn on N-body particles"
+  conduction:
+    _type: "bool"
+    _default: "false"
+    _description: "Turn on heat conduction in the gas fluid"
+  
+
+

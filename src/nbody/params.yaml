@@ -1,0 +1,498 @@
+---
+nbody:
+  _description: "Parameters controlling the setup and execution of the REBOUND simulation.
+  N-body systems are built up particle-by-particle using the <nbody/particle#> or other aggregate blocks such as <nbody/binary>, <nbody/system>, etc."
+  integrator:
+    _type: string
+    _default: "ias15"
+    _description: "Choice of REBOUND Integrator. We only list the major ones here, but all REBOUND integrators are available."
+    ias15:
+      _type: opt
+      _description: "A 15th order integrator. A good generic integrator that should work in almost all situations."
+    none:
+      _type: opt
+      _description: "Do nothing during the integration. Particles will not move from their starting locations."
+    whfast:
+      _type: opt
+      _description: "A fast, symplectic Wisdom-Holman integrator."
+  mscale:
+    _type: Real
+    _default: "1.0"
+    _description: "Scaling factor applied to the force of the materials on the particles."
+  dt:
+    _type: Real
+    _default: "&infin;"
+    _description: "The timestep passed to REBOUND."
+  refine_type:
+    _type: string
+    _default: "none"
+    _description: "If set to distance, refine on specifid distance to particles"
+  derefine_factor:
+    _type: Real
+    _default: "2.0"
+    _description: "Derefine a cell that is this factor times the refinement distance away from a particle"
+  frame:
+    _type: string
+    _default: "global"
+    _description: "The frame of the N-body simulation in relation to the artemis frame. Typically, this will be global, but in the shearing box can be local."
+  pn:
+    _type: int
+    _default: 0
+    _description: "Post-Newtonian correction order. Valid options are 0, 1, 2, and 2.5"
+  pn2_corr:
+    _type: int
+    _default: 1
+    _description: "Include the 2 PN corrections."
+  light_speed:
+    _type: Real
+    _description: "The speed of light used in the PN evaluation."
+    _units: "cm s^-1"
+  merge_on_collision:
+    _type: bool
+    _default: "true"
+    _description: "Merge two particles together when they have a close encounter."
+  box_size:
+    _type: Real
+    _default: "&infin;"
+    _description: "The REBOUND simulation domain. When particles exit this box, they are deleted. This should be set if there will be ejections."
+  dt_output:
+    _type: Real
+    _default: "&infin;"
+    _description: "Output cadence of the .reb and .orb files."
+  disable_outputs:
+    _type: bool
+    _default: "false"
+    _description: "Disable N-body related outputs"
+
+  particle&#35;:
+    _type: node
+    _description: "This node controls the parameters for individual particles. For example, two particles would have two blocks named <nbody/particle1> and <nbody/particle2>. For many particle systems see the <nbody/planet> nad <nbody/system> blocks."
+    mass:
+      _type: Real
+      _description: "Particle mass <mass>."
+    radius:
+      _type: Real
+      _default: 0.0
+      _description: "Particle size. Used for close encounters"
+    couple:
+      _type: int
+      _default: 1
+      _description: "Couple the particle to the materials."
+    live:
+      _type: int
+      _default: 0
+      _description: "Have the particle move in response to the materials."
+    live_after:
+      _type: Real
+      _default: 0.0
+      _description: "Have the particle go live after this time."
+    refine_distance:
+      _type: Real
+      _default: 0.0
+      _description: "Tag zones that within this distance to the particle for refinement."
+    soft:
+      _type: node
+      _description: "Block controllling the particle softening"
+      radius:
+        _type: Real
+        _description: "The softening radius."
+      type:
+        _type: string
+        _description: "The softening model"
+        none:
+          _type: opt
+          _description: "Do not apply any softening to this particle"
+        spline:
+          _type: opt
+          _description: "Spline softening following Springel (2001). The potential is exactly Keplerian outside the softening distance and transitions to constant rotation rate at zero distance."
+        plummer:
+          _type: opt
+          _description: "Plummer softening. The potential goes like (r^2 + r_s^2)^{-1/2}. The potential never exactly reaches the Keplerian value, but is approximately equal to Keplerian around 2.8 rsoft."
+    sink:
+      _type: node
+      _description: "Block controllling particle accretioni."
+      radius:
+        _type: Real
+        _description: "The accretion radius."
+      gamma:
+        _type: Real
+        _description: "The rate at which mass is removed from the materials."
+      beta:
+        _type: Real
+        _default: 0.0
+        _description: "The rate at which tangential momentum is removed. Normal ranges are betwen 0 and &gamma;. Torque-free sinks have &beta;=0."
+    initialize:
+      _type: node
+      _description: "Parameters controlling the initialization of this particle"
+      x:
+       _type: Real
+       _default: 0.0
+       _description: "Initial X position"
+      y:
+       _type: Real
+       _default: 0.0
+       _description: "Initial Y position"
+      z:
+       _type: Real
+       _default: 0.0
+       _description: "Initial Z position"
+      vx:
+       _type: Real
+       _default: 0.0
+       _description: "Initial X velocity"
+      vy:
+       _type: Real
+       _default: 0.0
+       _description: "Initial Y velocity"
+      vz:
+       _type: Real
+       _default: 0.0
+       _description: "Initial Z velocity"
+
+  binary&#35;:
+    _type: node
+    _description: "This node either creates or initializes a binary system. If no particles are specified, they will be created. Otherwise, this block will initialize the two specified particles on the specified orbit. Multiple binary systems can be specified as <nbody/binary1>, <nbody/binary2>, etc."
+
+    primary:
+      _type: int
+      _default: -1
+      _description: "The name of the primary particle. This is the number of the <nbody/particle#> block."
+    secondary:
+      _type: int
+      _default: -1
+      _description: "The name of the secondary particle. This is the number of the <nbody/particle#> block."
+
+    mass:
+     _type: Real
+     _default: -1.0
+     _description: "If set and the particles have been specified, this will renormalize the particle masses so that the total mass is this value. If the particles have not been specified, they will be created with this total mass."
+    a:
+     _type: Real
+     _description: "Binary semi-major axis"
+     _units: "au"
+    e:
+     _type: Real
+     _default: 0.0
+     _description: "Binary eccentricity"
+    i:
+     _type: Real
+     _default: 0.0
+     _description: "Binary inclination."
+     _units: "degrees"
+    f:
+     _type: Real
+     _default: 180.0
+     _description: "Binary true anomaly."
+     _units: "degrees"
+    o:
+     _type: Real
+     _default: 0.0
+     _description: "Binary argument of pericenter."
+     _units: "degrees"
+    O:
+     _type: Real
+     _default: 0.0
+     _description: "Binary longitude of ascending node."
+     _units: "degrees"
+
+    q:
+      _type: Real
+      _description: "If particles unspecified, mass ratio of the binary."
+    radius:
+      _type: Real
+      _default: 0.0
+      _description: "If particles unspecified, particle size. Used for close encounters"
+      _units: "cm"
+    couple:
+      _type: int
+      _default: 0
+      _description: "If particles unspecified, couple the particle to the materials."
+      _units: "cm"
+    live:
+      _type: int
+      _default: 0
+      _description: "If particles unspecified, have the particle move in response to the materials."
+    live_after:
+      _type: Real
+      _default: 0.0
+      _description: "If particles unspecified, have the particle go live after this time."
+    refine_distance:
+      _type: Real
+      _default: 0.0
+      _description: "If particles unspecified, tag zones that within this distance to the particle for refinement."
+      _units: "au"
+
+    rsink:
+      _type: Real
+      _default: 0.0
+      _description: "If particles unspecified, particle sink radius."
+      _units: "au"
+    beta:
+      _type: Real
+      _default: 0.0
+      _description: "If particles unspecified, sink momentum removal rate."
+      _units: "yr^-1"
+    gamma:
+      _type: Real
+      _default: 0.0
+      _description: "If particles unspecified, sink mass removal rate."
+      _units: "yr^-1"
+
+    rsoft:
+      _type: Real
+      _default: 0.0
+      _description: "If particles unspecified, particle softening radius."
+      _units: "au"
+    stype:
+      _type: string
+      _default: "spline"
+      _description: "If particles unspecified, softening type of the particles. Valid options are none, spline, and plummer"
+
+    x:
+     _type: Real
+     _default: 0.0
+     _description: "Initial COM X position"
+     _units: "au"
+    y:
+     _type: Real
+     _default: 0.0
+     _description: "Initial COM Y position"
+     _units: "au"
+    z:
+     _type: Real
+     _default: 0.0
+     _description: "Initial COM Z position"
+     _units: "au"
+    vx:
+     _type: Real
+     _default: 0.0
+     _description: "Initial COM X velocity"
+     _units: "au yr^-1"
+    vy:
+     _type: Real
+     _default: 0.0
+     _description: "Initial COM Y velocity"
+     _units: "au yr^-1"
+    vz:
+     _type: Real
+     _default: 0.0
+     _description: "Initial COM Z velocity"
+     _units: "au yr^-1"
+
+  triple&#35;:
+    _type: node
+    _description: "This node either creates or initializes a triple system. If no particles are specified, they will be created. Otherwise, this block will initialize the three specified particles on the specified inner and outer orbits. Multiple triple systems can be specified as <nbody/triple1>, <nbody/triple2>, etc."
+
+    primary:
+      _type: int
+      _default: -1
+      _description: "The name of the primary particle. This is the number of the <nbody/particle#> block."
+    secondary:
+      _type: int
+      _default: -1
+      _description: "The name of the secondary particle. This is the number of the <nbody/particle#> block."
+    tertiary:
+      _type: int
+      _default: -1
+      _description: "The name of the tertiary particle. This is the number of the <nbody/particle#> block."
+
+    mass:
+     _type: Real
+     _default: -1.0
+     _description: "If set and the particles have been specified,this will renormalize the particle masses so that the total mass is this value. If the particles have not been specified, they will be created with this total mass."
+     _units: "Mj"
+    a:
+     _type: Real
+     _description: "Inner binary semi-major axis"
+     _units: "au"
+    e:
+     _type: Real
+     _default: 0.0
+     _description: "Inner binary eccentricity"
+    i:
+     _type: Real
+     _default: 0.0
+     _description: "Inner binary inclination."
+     _units: "degrees"
+    f:
+     _type: Real
+     _default: 180.0
+     _description: "Inner binary true anomaly."
+     _units: "degrees"
+    o:
+     _type: Real
+     _default: 0.0
+     _description: "Inner binary argument of pericenter."
+     _units: "degrees"
+    O:
+     _type: Real
+     _default: 0.0
+     _description: "Inner binary longitude of ascending node."
+     _units: "degrees"
+    ao:
+     _type: Real
+     _description: "Outer binary semi-major axis"
+     _units: "au"
+    eo:
+     _type: Real
+     _default: 0.0
+     _description: "Outer binary eccentricity"
+    io:
+     _type: Real
+     _default: 0.0
+     _description: "Outer binary inclination."
+     _units: "degrees"
+    fo:
+     _type: Real
+     _default: 180.0
+     _description: "Outer binary true anomaly."
+     _units: "degrees"
+    oo:
+     _type: Real
+     _default: 0.0
+     _description: "Outer binary arguemnet of pericenter."
+     _units: "degrees"
+    Oo:
+     _type: Real
+     _default: 0.0
+     _description: "Outer binary longitude of ascending node."
+     _units: "degrees"
+
+    q:
+      _type: Real
+      _description: "If particles unspecified, mass ratio of the inner binary."
+    qo:
+      _type: Real
+      _description: "If particles unspecified, mass ratio of the outer binary."
+    radius:
+      _type: Real
+      _default: 0.0
+      _description: "If particles unspecified, particle size. Used for close encounters"
+      _units: "cm"
+    couple:
+      _type: int
+      _default: 0
+      _description: "If particles unspecified, couple the particle to the materials."
+    live:
+      _type: int
+      _default: 0
+      _description: "If particles unspecified, have the particle move in response to the materials."
+    live_after:
+      _type: Real
+      _default: 0.0
+      _description: "If particles unspecified, have the particle go live after this time."
+      _units: "yr"
+    refine_distance:
+      _type: Real
+      _default: 0.0
+      _description: "If particles unspecified, tag zones that within this distance to the particle for refinement."
+      _units: "au"
+
+    rsink:
+      _type: Real
+      _default: 0.0
+      _description: "If particles unspecified, particle sink radius."
+      _units: "km"
+    beta:
+      _type: Real
+      _default: 0.0
+      _description: "If particles unspecified, sink momentum removal rate."
+      _units: "yr^-1"
+    gamma:
+      _type: Real
+      _default: 0.0
+      _description: "If particles unspecified, sink mass removal rate."
+      _units: "yr^-1"
+
+    rsoft:
+      _type: Real
+      _default: 0.0
+      _description: "If particles unspecified, particle softening radius."
+      _units: "km"
+    stype:
+      _type: string
+      _default: "spline"
+      _description: "If particles unspecified, softening type of the particles. Valid options are none, spline, and plummer"
+
+    x:
+     _type: Real
+     _default: 0.0
+     _description: "Initial COM X position"
+     _units: "au"
+    y:
+     _type: Real
+     _default: 0.0
+     _description: "Initial COM Y position"
+     _units: "au"
+    z:
+     _type: Real
+     _default: 0.0
+     _description: "Initial COM Z position"
+     _units: "au"
+    vx:
+     _type: Real
+     _default: 0.0
+     _description: "Initial COM X velocity"
+     _units: "au yr^-1"
+    vy:
+     _type: Real
+     _default: 0.0
+     _description: "Initial COM Y velocity"
+     _units: "au yr^-1"
+    vz:
+     _type: Real
+     _default: 0.0
+     _description: "Initial COM Z velocity"
+     _units: "au yr^-1"
+
+  system&#35;:
+    _type: node
+    _description: "This node creates an N-body system from a file that specifies the masses, positions, and velocities of every particle. Multiple systems can be specified as <nbody/system1>, <nbody/system2>, etc."
+    couple:
+      _type: int
+      _default: 1
+      _description: "Couple all particles to the materials."
+    live:
+      _type: int
+      _default: 0
+      _description: "All particles move in response to the materials."
+    live_after:
+      _type: Real
+      _default: 0.0
+      _description: "All particles go live after this time."
+      _units: "yr"
+    stype:
+      _type: string
+      _default: "spline"
+      _description: "The type of softening applied to all particles. Valid options are none, spline, and plummer."
+    input_file:
+      _type: string
+      _description:
+        "The name of the input file specifying this system. The format of the file should be:
+         mass x y z vx vy vz r-soft r-acc gamma beta target_radius radius."
+
+  planet&#35;:
+    _type: node
+    _description: "This node creates a planetary system from a file that specifies the masses and orbits of any number of planets. The central object is left unspecified and should be added separately. Note that any other input block can be used as the central object, e.g., a particle block, binary block, system block, etc. Note that only single or binary central objects have been tested, though. Multiple planetary systems can be specified as <nbody/system1>, <nbody/system2>, etc."
+    couple:
+      _type: int
+      _default: 1
+      _description: "Couple all particles to the materials."
+    live:
+      _type: int
+      _default: 0
+      _description: "All particles move in response to the materials."
+    live_after:
+      _type: Real
+      _default: 0.0
+      _description: "All particles go live after this time."
+      _units: "yr"
+    stype:
+      _type: string
+      _default: "spline"
+      _description: "The type of softening applied to all particles. Valid options are none, spline, and plummer."
+    input_file:
+      _type: string
+      _description:
+        "The name of the input file specifying this system. The format of the file should be one particle per line and columns:
+         q a e i f o O r-soft r-acc gamma beta target_radius radius. Note that angle are in degrees."

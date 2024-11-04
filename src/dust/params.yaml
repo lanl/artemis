@@ -1,0 +1,85 @@
+---
+dust:
+
+  cfl:
+    _type: Real
+    _default: "0.8"
+    _description:  "CFL number for the dust"
+
+  dfloor:
+    _type: Real
+    _default: "1e-20"
+    _description: "Density floor"
+    _units: "g cm^-3"
+
+  nspecies:
+    _type: int
+    _default: 1
+    _description: "The number of dust species"
+
+  scr_level:
+    _type: int
+    _default: 0
+    _description: "Gas scratch memory level"
+
+  reconstruct:
+    _type: string
+    _default: plm
+    _description: "Reconstruction option."
+    pcm:
+      _type: opt
+      _description: "Piecewise Constant"
+    plm:
+      _type: opt
+      _description: "Piecewise Linear"
+    ppm:
+      _type: opt
+      _description: "Piecewise Parabolic"
+  riemann:
+    _type: string
+    _default: hllc
+    _description: "Riemann solver option."
+    llf:
+      _type: opt
+      _description: "LLF"
+    hlle:
+      _type: opt
+      _description: "HLLE"
+
+  damping:
+    _type: node
+    _description: "Apply a drag force to the material that lowers the normal velocity to the boundary."
+    inner_x(1,2,3):
+      _type: Real
+      _default: "&infin;"
+      _description: "The end of the inner damping layer in the X(1,2,3)-direction"
+      _units: "au"
+    outer_x(1,2,3):
+      _type: Real
+      _default: "&infin;"
+      _description: "The beginning of the outer damping layer in the X(1,2,3)-direction"
+      _units: "au"
+    inner_x(1,2,3)_rate:
+      _type: Real
+      _default: "0.0"
+      _description: "The inner damping rate."
+      _units: "yr^-1"
+    outer_x(1,2,3)_rate:
+      _type: Real
+      _default: "0.0"
+      _description: "The outer damping rate."
+      _units: "yr^-1"
+  stopping_time:
+    _type: node
+    _description: "Dust stopping time model."
+    type:
+      _type: string
+      _description: "What stopping time model to use"
+      constant:
+        _type: opt
+        _description: "Constant stopping times"
+      stokes:
+        _type: opt
+        _description: "Stopping times between the gas and dust fluid are in the Stokes regime"
+      
+     

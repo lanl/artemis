@@ -1,0 +1,157 @@
+# ========================================================================================
+#  (C) (or copyright) 2023-2024. Triad National Security, LLC. All rights reserved.
+#
+#  This program was produced under U.S. Government contract 89233218CNA000001 for Los
+#  Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
+#  for the U.S. Department of Energy/National Nuclear Security Administration. All rights
+#  in the program are reserved by Triad National Security, LLC, and the U.S. Department
+#  of Energy/National Nuclear Security Administration. The Government is granted for
+#  itself and others acting on its behalf a nonexclusive, paid-up, irrevocable worldwide
+#  license in this material to reproduce, prepare derivative works, distribute copies to
+#  the public, perform publicly and display publicly, and to permit others to do so.
+# ========================================================================================
+
+<artemis>
+problem = disk             # name of the pgen
+coordinates = cylindrical  # coordinate system
+
+<parthenon/job>
+problem_id = disk  # problem ID: basename of output filenames
+
+<parthenon/output1>
+variables = gas.prim.density,  &
+            gas.prim.velocity, &
+            gas.prim.pressure
+file_type = hdf5               # HDF5 data dump
+dt        = 6.283185307179586  # time increment between outputs
+
+<parthenon/output2>
+file_type = rst                # Restart
+dt        = 6.283185307179586  # time increment between outputs
+
+<parthenon/time>
+nlim       = -1                 # cycle limit
+tlim       = 6.283185307179586  # time limit
+integrator = rk2                # time integration algorithm
+ncycle_out = 1000               # interval for stdout summary info
+
+<parthenon/mesh>
+nghost = 2
+# refinement = adaptive
+# numlevel = 4
+
+nx1    = 128                # Number of zones in X1-direction
+x1min  = 0.3                # minimum value of X1
+x1max  = 3.0                # maximum value of X1
+ix1_bc = ic                 # Inner-X1 boundary condition flag
+ox1_bc = ic                 # Outer-X1 boundary condition flag
+
+nx2    = 256                # Number of zones in X2-direction
+x2min  = 0.0                # minimum value of X2
+x2max  = 6.283185307179586  # maximum value of X2
+ix2_bc = periodic           # Inner-X2 boundary condition flag
+ox2_bc = periodic           # Outer-X2 boundary condition flag
+
+nx3    = 1                  # Number of zones in X3-direction
+x3min  = -0.5               # minimum value of X3
+x3max  = 0.5                # maximum value of X3
+ix3_bc = periodic           # Inner-X3 boundary condition flag
+ox3_bc = periodic           # Outer-X3 boundary condition flag
+
+<parthenon/meshblock>
+nx1 = 32  # Number of cells in each MeshBlock, X1-dir
+nx2 = 32  # Number of cells in each MeshBlock, X2-dir
+nx3 = 1   # Number of cells in each MeshBlock, X3-dir
+
+<physics>
+gas = true
+# dust = true
+gravity = true
+nbody = true
+drag = true
+# cooling = true
+viscosity = true
+rotating_frame = true
+
+<gas>
+cfl = 0.3
+gamma = 1.00001
+reconstruct = plm
+riemann = hllc
+dfloor = 1.0e-10
+siefloor = 1.0e-10
+refine_field = pressure
+refine_type = gradient
+refine_thr = 3.0
+
+
+<rotating_frame>
+omega = 1.0
+
+<gas/viscosity>
+type = alpha
+alpha = 1e-3
+
+<gravity>
+type = nbody
+gm = 1.0
+
+<nbody>
+dt_reb = 0.01
+integrator = ias15
+
+# central star
+<nbody/particle1>
+mass = 1.0
+couple = 1
+
+<nbody/particle1/soft>
+type = none
+
+# the planet
+<nbody/particle2>
+mass = 1.0e-5
+couple = 1
+
+<nbody/particle2/soft>
+radius = 0.03
+type = spline
+
+<nbody/particle2/sink>
+radius = 0.03
+gamma = 1.0
+# beta = 10.0
+
+# initialize the particles as a binary
+<nbody/binary1>
+mass = 1.0
+primary = 1
+secondary = 2
+a = 1.0
+e = 0.0
+f = 180.0
+
+<gas/damping>
+inner_x1 = 0.45
+outer_x1 = 2.8
+inner_x1_rate = 30.0
+outer_x1_rate = 30.0
+
+<drag>
+type = self
+
+<cooling>
+type = beta
+tref = powerlaw
+beta0 = 1.0e8
+tcyl = 0.0025
+cyl_plaw = -1.0
+
+<problem>
+r0 = 1.0
+rho0 = 1.0
+dslope = -0.5
+tslope = -1.0
+h0 = 0.05
+dens_min = 1.0e-10
+pres_min = 1.0e-13

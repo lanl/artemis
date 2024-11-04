@@ -1,0 +1,96 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 25,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "cpu-debug",
+      "cacheVariables": {
+        "CMAKE_MAKE_PROGRAM": "$env{MAKE_PROGRAM}",
+        "CMAKE_BUILD_TYPE": "Debug",
+        "Kokkos_ENABLE_DEBUG_BOUNDS_CHECK": "ON"
+      }
+    },
+    {
+      "name": "cpu-release",
+      "cacheVariables": {
+        "CMAKE_MAKE_PROGRAM": "$env{MAKE_PROGRAM}",
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo"
+      }
+    },
+    {
+      "name": "darwin-gpu-debug",
+      "cacheVariables": {
+        "CMAKE_MAKE_PROGRAM": "$env{MAKE_PROGRAM}",
+        "CMAKE_BUILD_TYPE": "Debug",
+        "Kokkos_ENABLE_DEBUG_BOUNDS_CHECK": "ON",
+        "CMAKE_CXX_COMPILER": "$env{ARTEMIS_HOME}/external/parthenon/external/Kokkos/bin/nvcc_wrapper",
+        "ARTEMIS_ENABLE_CUDA": "On",
+        "Kokkos_ARCH_VOLTA70": "On"
+      }
+    },
+    {
+      "name": "darwin-gpu-release",
+      "cacheVariables": {
+        "CMAKE_MAKE_PROGRAM": "$env{MAKE_PROGRAM}",
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "CMAKE_CXX_COMPILER": "$env{ARTEMIS_HOME}/external/parthenon/external/Kokkos/bin/nvcc_wrapper",
+        "ARTEMIS_ENABLE_CUDA": "On",
+        "Kokkos_ARCH_VOLTA70": "On"
+      }
+    },
+    {
+      "name": "chicoma-gpu-debug",
+      "cacheVariables": {
+        "CMAKE_MAKE_PROGRAM": "$env{MAKE_PROGRAM}",
+        "CMAKE_BUILD_TYPE": "Debug",
+        "Kokkos_ENABLE_DEBUG_BOUNDS_CHECK": "ON",
+        "CMAKE_CXX_COMPILER": "$env{ARTEMIS_HOME}/external/parthenon/external/Kokkos/bin/nvcc_wrapper",
+        "ARTEMIS_ENABLE_CUDA": "ON",
+        "HDF5_INCLUDE_DIR": "$env{HDF5_ROOT}/include",
+        "PARTHENON_DISABLE_HDF5_COMPRESSION": "ON"
+      }
+    },
+    {
+      "name": "chicoma-gpu-release",
+      "cacheVariables": {
+        "CMAKE_MAKE_PROGRAM": "$env{MAKE_PROGRAM}",
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "CMAKE_CXX_COMPILER": "$env{ARTEMIS_HOME}/external/parthenon/external/Kokkos/bin/nvcc_wrapper",
+        "ARTEMIS_ENABLE_CUDA": "ON",
+        "HDF5_INCLUDE_DIR": "$env{HDF5_ROOT}/include",
+        "PARTHENON_DISABLE_HDF5_COMPRESSION": "ON"
+      }
+    },
+    {
+      "name": "venado-gpu-debug",
+      "cacheVariables": {
+        "CMAKE_MAKE_PROGRAM": "$env{MAKE_PROGRAM}",
+        "CMAKE_BUILD_TYPE": "Debug",
+        "Kokkos_ENABLE_DEBUG_BOUNDS_CHECK": "ON",
+        "CMAKE_CXX_COMPILER": "$env{ARTEMIS_HOME}/external/parthenon/external/Kokkos/bin/nvcc_wrapper",
+        "ARTEMIS_ENABLE_CUDA": "On",
+        "HDF5_INCLUDE_DIR": "$env{HDF5_ROOT}/include",
+        "PARTHENON_DISABLE": "HDF5_COMPRESSION=ON",
+        "Kokkos_ARCH_HOPPER90": "On",
+        "NUM_GPU_DEVICES_PER_NODE": "4"
+      }
+    },
+    {
+      "name": "venado-gpu-release",
+      "cacheVariables": {
+        "CMAKE_MAKE_PROGRAM": "$env{MAKE_PROGRAM}",
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "CMAKE_CXX_COMPILER": "$env{ARTEMIS_HOME}/external/parthenon/external/Kokkos/bin/nvcc_wrapper",
+        "ARTEMIS_ENABLE_CUDA": "On",
+        "HDF5_INCLUDE_DIR": "$env{HDF5_ROOT}/include",
+        "PARTHENON_DISABLE": "HDF5_COMPRESSION=ON",
+        "Kokkos_ARCH_HOPPER90": "On",
+        "NUM_GPU_DEVICES_PER_NODE": "4"
+      }
+    }
+  ]
+}

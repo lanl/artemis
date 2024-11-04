@@ -1,0 +1,186 @@
+---
+parthenon:
+  _description: "Parthenon specific options"
+
+  job:
+    _type: node
+    _description: "Job options"
+    problem_id:
+      _type: string
+      _description: "Problem ID: basename of output filenames"
+
+  mesh:
+    _type: node
+    _description: "Mesh options"
+    nx(1,2,3):
+      _type: int
+      _description: "Number of zones in X(1,2,3)-direction"
+    x(1,2,3)min:
+      _type: Real
+      _description: "minimum value of X(1,2,3)."
+    x(1,2,3)max:
+      _type: Real
+      _description: "maximum value of X(1,2,3)."
+    ix(1,2,3)_bc:
+      _type: string
+      _default: "outflow"
+      _description: "Boundary condition at the inner-X(1,2,3) boundary"
+      outflow:
+        _type: opt
+        _description: "Outflow boundary"
+      periodic:
+        _type: opt
+        _description: "Periodic boundary"
+      reflecting:
+        _type: opt
+        _description: "Reflecting boundary"
+      extrap:
+        _type: opt
+        _description: "Extrapolation boundary. Outflow boundary with density and temperature extrapolation."
+      viscous:
+        _type: opt
+        _description: "Viscous boundary. Fixes mass flux at the outer radial boundary, and maintains the mass flux at the inner radial boundary."
+      conductive:
+        _type: opt
+        _description: "Conductive boundary. Fixes heat flux at the inner boundary and fixes the temperature at the outer boundary."
+      ic:
+        _type: opt
+        _description: "Initial condition boundary"
+      inflow:
+        _type: opt
+        _description: "Inflow/outflow boundary for the shearing box"
+
+    ox(1,2,3)_bc:
+      _type: string
+      _default: "outflow"
+      _description: "Boundary condition at the outer-X(1,2,3)boundary"
+      outflow:
+        _type: opt
+        _description: "Outflow boundary"
+      periodic:
+        _type: opt
+        _description: "Periodic boundary"
+      reflecting:
+        _type: opt
+        _description: "Reflecting boundary"
+      extrap:
+        _type: opt
+        _description: "Extrapolation boundary. Outflow boundary with density and temperature extrapolation."
+      viscous:
+        _type: opt
+        _description: "Viscous boundary. Fixes mass flux at the outer radial boundary, and maintains the mass flux at the inner radial boundary."
+      conductive:
+        _type: opt
+        _description: "Conductive boundary. Fixes heat flux at the inner boundary and fixes the temperature at the outer boundary."
+      ic:
+        _type: opt
+        _description: "Initial condition boundary"
+      inflow:
+        _type: opt
+        _description: "Inflow/outflow boundary for the shearing box"
+    nghost:
+      _type: int
+      _default: "2"
+      _description: "Number of ghost zones"
+    refinement:
+      _type: string
+      _default: "none"
+      _description: "Refinement option"
+      adaptive:
+        _type: opt
+        _description: "Adaptive refinement (AMR)."
+      static:
+        _type: opt
+        _description: "Static refinement (SMR)."
+    numlevel:
+      _type: int
+      _default: "1"
+      _description: "How many refined levels that are allowed"
+    derefine_count:
+      _type: int
+      _default: "10"
+      _description: "How many cycles to go before derefining"
+    pack_size:
+      _type: int
+      _default:  "-1"
+      _description: "How to pack the meshblocks"
+    num_threads:
+      _type: int
+      _default:  "1"
+      _description: "Number of CPU threads"
+
+  swarm:
+    _type: node
+    _description: "Swarm options"
+    ix(1,2,3)_bc:
+      _type: string
+      _default: "mesh/ix(1,2,3)_bc (unless user-defined)"
+      _description: "Swarm boundary condition at the inner-X(1,2,3) boundary"
+      outflow:
+        _type: opt
+        _description: "Outflow boundary"
+      periodic:
+        _type: opt
+        _description: "Periodic boundary"
+      jaybenne_reflecting:
+        _type: opt
+        _description: "Reflecting boundaries (implemented via jaybenne)"
+
+    ox(1,2,3)_bc:
+      _type: string
+      _default: "mesh/ox(1,2,3)_bc (unless user-defined)"
+      _description: "Swarm boundary condition at the outer-X(1,2,3)boundary"
+      outflow:
+        _type: opt
+        _description: "Outflow boundary"
+      periodic:
+        _type: opt
+        _description: "Periodic boundary"
+      jaybenne_reflecting:
+        _type: opt
+        _description: "Reflecting boundaries (implemented via jaybenne)"
+
+  meshblock:
+    _type: node
+    _description: "The meshblock size"
+    nx(1,2,3):
+      _type: int
+      _description: "Number of cells in each meshbloc, X(1,2,3)-dir."
+
+
+  time:
+    _type: node
+    _description: "Parameters controlling the simulation driver"
+    nlim:
+      _type: int
+      _default: "-1"
+      _description: "Cycle Limit"
+    tlim:
+      _type: Real
+      _default: "&infin;"
+      _description: "Time Limit"
+    ncycle_out:
+      _type: int
+      _default: "1"
+      _description: "Cadence of output diagnostics"
+    integrator:
+      _type: string
+      _default: "rk2"
+      _description: "The hydro time integration scheme"
+      rk1:
+        _type: opt
+        _description: "First order Runge-Kutta."
+      rk2:
+        _type: opt
+        _description: "Second order Runge-Kutta."
+      rk3:
+        _type: opt
+        _description: "Third order Runge-Kutta."
+      vl2:
+        _type: opt
+        _description: "Second order Van-Leer predictor-corrector."
+
+
+
+
+

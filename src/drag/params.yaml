@@ -1,0 +1,13 @@
+---
+drag:
+  _description: "Fluid-Fluid drag coupling."
+  type:
+    _type: string
+    _description: "What drag model to use."
+    self:
+      _type: opt
+      _description: "Apply a self-drag force to fluids with damping nodes."
+    simple_dust:
+      _type: opt
+      _description: "Couple the dust and gas together assuming the dust only interacts with the first gas species. There is no direct dust-dust coupling, and there can only be one gas species. This also includes self-drag if defined."
+

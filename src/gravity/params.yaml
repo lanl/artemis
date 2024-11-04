@@ -1,0 +1,28 @@
+---
+gravity:
+  _description: "External gravitational sources"
+  type:
+    _type: string
+    _description: "Type of gravitational source"
+    uniform:
+      _type: opt
+      _description: "Uniform gravitational acceleration"
+    point:
+      _type: opt
+      _description: "Point mass source."
+    binary:
+      _type: opt
+      _description: "Binary mass source."
+    nbody:
+      _type: opt
+      _description: "N point mass sources. Requires an <nbody> node"
+  gm:
+    _type: Real
+    _description: "Normalization parameter setting GM."
+    _units: "dyn cm^2 g^-1"
+  gx(1,2,3):
+    _type: Real
+    _description: "Uniform gravity: acceleration in the x(1,2,3)-dir."
+    _units: "cm s^-2"
+
+

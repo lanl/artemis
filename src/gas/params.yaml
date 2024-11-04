@@ -1,0 +1,313 @@
+---
+gas:
+  _description: "Top level gas package"
+  eos:
+    _type: string
+    _default: ideal
+    _description: "Choice of gas EOS"
+    ideal:
+      _type: opt
+      _description: "Ideal EOS"
+
+  gamma:
+    _type: Real
+    _default: "5/3"
+    _description:  "Adiabatic index for ideal EOS"
+
+  cv:
+    _type: Real
+    _default: "1.5"
+    _description:  "Specific heat for ideal EOS"
+    _units: "erg g^-1 K^-1"
+
+  cfl:
+    _type: Real
+    _default: "0.8"
+    _description:  "CFL number for the gas"
+
+  dfloor:
+    _type: Real
+    _default: "1e-20"
+    _description: "Density floor"
+    _units: "g cm^-3"
+  siefloor:
+    _type: Real
+    _default: "1e-20"
+    _description: "Specific internal energy floor"
+    _units: "erg g^-1"
+
+  nspecies:
+    _type: int
+    _default: 1
+    _description: "The number of gas species"
+
+  scr_level:
+    _type: int
+    _default: 0
+    _description: "Gas scratch memory level"
+
+  de_switch:
+    _type: Real
+    _default: 0.0
+    _description: "Dual energy switch. When internal energy is less than this fraction of the total energy, use the internal energy."
+
+  refine_field:
+    _type: string
+    _default: "none"
+    _description: "Which field to refine on. Options are none, density, and pressure"
+  refine_type:
+    _type: string
+    _description: "What property of the field to refine on. Options are gradient or magnitude"
+  refine_thr:
+    _type: Real
+    _description: "Threshold for refinement"
+  deref_thr:
+    _type: Real
+    _description: "Threshold for derefinement"
+
+  reconstruct:
+    _type: string
+    _default: plm
+    _description: "Reconstruction option."
+    pcm:
+      _type: opt
+      _description: "Piecewise Constant"
+    plm:
+      _type: opt
+      _description: "Piecewise Linear"
+    ppm:
+      _type: opt
+      _description: "Piecewise Parabolic"
+  riemann:
+    _type: string
+    _default: hllc
+    _description: "Riemann solver option."
+    llf:
+      _type: opt
+      _description: "LLF"
+    hlle:
+      _type: opt
+      _description: "HLLE"
+    hllc:
+      _type: opt
+      _description: "HLLC"
+
+  damping:
+    _type: node
+    _description: "Apply a drag force to the material that lowers the normal velocity to the boundary."
+    inner_x(1,2,3):
+      _type: Real
+      _default: "&infin;"
+      _description: "The end of the inner damping layer in the X(1,2,3)-direction"
+      _units: "au"
+    outer_x(1,2,3):
+      _type: Real
+      _default: "&infin;"
+      _description: "The beginning of the outer damping layer in the X(1,2,3)-direction"
+      _units: "au"
+    inner_x(1,2,3)_rate:
+      _type: Real
+      _default: "0.0"
+      _description: "The inner damping rate."
+      _units: "yr^-1"
+    outer_x(1,2,3)_rate:
+      _type: Real
+      _default: "0.0"
+      _description: "The outer damping rate."
+      _units: "yr^-1"
+    damp_to_visc:
+      _type: bool
+      _description: "Damp the gas to the viscous velocity (if defined)."
+
+  viscosity:
+    _type: node
+    _description: "Viscosity models"
+    type:
+      _type: string
+      _default: constant
+      _description: "Viscosity model"
+      alpha:
+        _type: opt
+        _description: "Alpha viscosity"
+      constant:
+        _type: opt
+        _description: "Constant kinematic viscosity"
+    averaging:
+      _type: string
+      _default: "arithmetic"
+      _description: "Averaging method for the face diffusion coefficient"
+      arithmetic:
+        _type: opt
+        _description: "Simple average (L+R)/2"
+      harmonic:
+        _type: opt
+        _description: "Harmonic average 2*(L*R)/(L+R)"
+    alpha:
+      _type: Real
+      _description: "Value of alpha"
+    nu:
+      _type: Real
+      _description: "Value of the kinematic shear viscosity"
+      _units: "cm^2 s^-1"
+    eta_bulk:
+      _type: Real
+      _default: "0.0"
+      _description: "bulk viscosity multiplier on the shear viscosity"
+
+  conductivity:
+    _type: node
+    _description: "Conductivity models"
+    type:
+      _type: string
+      _default: constant
+      _description: "Conductivity model"
+      constant:
+        _type: opt
+        _description: "Constant thermal conductivity"
+      diffusivity_constant:
+        _type: opt
+        _description: "Constant thermal diffusivity"
+    averaging:
+      _type: string
+      _default: "arithmetic"
+      _description: "Averaging method for the face diffusion coefficient"
+      arithmetic:
+        _type: opt
+        _description: "Simple average (L+R)/2"
+      harmonic:
+        _type: opt
+        _description: "Harmonic average 2*(L*R)/(L+R)"
+
+    kappa:
+      _type: Real
+      _description: "Value of thermal diffusivity"
+      _units: "cm^2 s^-1"
+    cond:
+      _type: Real
+      _description: "Value of heat conductivity"
+      _units: "erg cm^-1 s^-1 K^-1"
+
+    averaging:
+      _type: string
+      _default: "arithmetic"
+      _description: "Averaging method for the face diffusion coefficient"
+      arithmetic:
+        _type: opt
+        _description: "Simple average (L+R)/2"
+      harmonic:
+        _type: opt
+        _description: "Harmonic average 2*(L*R)/(L+R)"
+
+    kappa:
+      _type: Real
+      _description: "Value of thermal diffusivity"
+      _units: "cm^2 s^-1"
+    cond:
+      _type: Real
+      _description: "Value of heat conductivity"
+      _units: "erg cm^-1 s^-1 K^-1"
+
+  opacity/absorption:
+    _type: node
+    _description: "Opacity models"
+    opacity_model:
+      _type: string
+      _default: constant
+      _description: "Opacity model"
+      constant:
+        _type: opt
+        _description: "Constant specific absorption opacity"
+      shocktube_a:
+        _type: opt
+        _description: "Shocktube A specific absorption opacity (custom units system)"
+      thermalization:
+        _type: opt
+        _description: "Thermalization specific absorption opacity (custom units system)"
+      none:
+        _type: opt
+        _description: "Zero specific absorption opacity"
+    kappa_a:
+      _type: Real
+      _default: "0.0"
+      _description: "Specific absorption opacity"
+      _units: "cm^2 g^-1 (unless invoking custom opacity model)"
+    coef_kappa_a:
+      _type: Real
+      _default: "0.0"
+      _description: "Coefficient multiplying opacity power law (when invoked)"
+    rho_exp:
+      _type: Real
+      _default: "0.0"
+      _description: "Exponent of density for opacity power law (when invoked)"
+    temp_exp:
+      _type: Real
+      _default: "0.0"
+      _description: "Exponent of temperature for opacity power law (when invoked)"
+
+  opacity/scattering:
+    _type: node
+    _description: "Scattering models"
+    scattering_model:
+      _type: string
+      _default: "none"
+      _description: "Scattering model"
+      constant:
+        _type: opt
+        _description: "Constant specific scattering opacity"
+      none:
+        _type: opt
+        _description: "Zero specific scattering opacity"
+    kappa_s:
+      _type: Real
+      _default: "0.0"
+      _description: "Specific scattering opacity"
+      _units: "cm^2 g^-1 (unless invoking custom scattering model)"
+
+cooling:
+  type:
+    _type: string
+    _description: "Cooling model"
+    beta:
+      _type: opt
+      _description: "Beta cooling"
+  beta0:
+    _type: Real
+    _description: "beta0"
+  beta_min:
+    _type: Real
+    _default: "1e-12"
+    _description: "beta_min"
+  exp_scale:
+    _type: Real
+    _default: "0.0"
+    _description: "escale"
+  tref:
+    _type: string
+    _description: "Model for tempetaure profile to cool to."
+    powerlaw:
+      _type: opt
+      _description: "Powerlaw model: T = Tcyl * R^a  + Tsph * r^b"
+  tfloor:
+    _type: Real
+    _default: "0.0"
+    _description: "Temperature floor."
+    _units: "K"
+  tcyl:
+    _type: Real
+    _default: "0.0"
+    _description: "Normalization for cylindrical power law"
+  cyl_plaw:
+    _type: Real
+    _default: "0.0"
+    _description: "Power law index for cylindrical power law"
+  tsph:
+    _type: Real
+    _default: "0.0"
+    _description: "Normalization for spherical power law"
+  sph_plaw:
+    _type: Real
+    _default: "0.0"
+    _description: "Power law index for spherical power law"
+
+
+

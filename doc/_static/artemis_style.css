@@ -1,0 +1,62 @@
+/*========================================================================================
+** (C) (or copyright) 2024. Triad National Security, LLC. All rights reserved.
+**
+** This program was produced under U.S. Government contract 89233218CNA000001 for Los
+** Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
+** for the U.S. Department of Energy/National Nuclear Security Administration. All rights
+** in the program are reserved by Triad National Security, LLC, and the U.S. Department
+** of Energy/National Nuclear Security Administration. The Government is granted for
+** itself and others acting on its behalf a nonexclusive, paid-up, irrevocable worldwide
+** license in this material to reproduce, prepare derivative works, distribute copies to
+** the public, perform publicly and display publicly, and to permit others to do so.
+**========================================================================================
+*/
+
+
+/* These are the CSS classes defining the different styles in the collapsible documentation */
+
+.art_node {
+  color:#60c; 
+  font-size:20px; 
+  font-family: Arial, sans-serif
+  cursor:pointer;  
+  float:left; 
+  clear:both;
+}
+.art_var {
+  color:#003300; 
+  font-size:18px; 
+  /*font-family:monospace; */
+  font-family: 'Times New Roman', serif
+  cursor:pointer;
+  float:left; 
+  clear:both;
+}
+.art_opt {
+  color:#9900cc; 
+  font-size:16px; 
+  cursor:pointer;  
+  float:left; 
+  clear:both;
+}
+.art_desc {
+  color:#003300; 
+  font-size:16px; 
+  font-family:'Courier New', monospace;;
+  cursor:pointer;  
+  float:left; 
+  clear:both;
+}
+.art_type {
+  color:#003300; 
+  font-size:14px; 
+  cursor:pointer;  
+  float:left; 
+  clear:both;
+}
+.art_hide {
+  display:none
+}
+.art_show {
+  display:block
+}

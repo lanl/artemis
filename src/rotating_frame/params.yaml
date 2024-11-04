@@ -1,0 +1,12 @@
+---
+rotating_frame:
+  _description: "Rotating frame module. This adds the centrifugal, Coriolis forces, and shearing box forces."
+  omega:
+    _type: Real
+    _default: 0.0
+    _description: "Frame rotation rate. Aligned with z."
+    _units: "radian s^-1"
+  qshear:
+    _type: Real
+    _default: 0.0
+    _description: "Shear rate of the shearing box. Set to -1.5 for Keplerian shear."

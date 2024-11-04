@@ -1,0 +1,267 @@
+#!/bin/bash
+# ========================================================================================
+#  (C) (or copyright) 2023-2024. Triad National Security, LLC. All rights reserved.
+#
+#  This program was produced under U.S. Government contract 89233218CNA000001 for Los
+#  Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
+#  for the U.S. Department of Energy/National Nuclear Security Administration. All rights
+#  in the program are reserved by Triad National Security, LLC, and the U.S. Department
+#  of Energy/National Nuclear Security Administration. The Government is granted for
+#  itself and others acting on its behalf a nonexclusive, paid-up, irrevocable worldwide
+#  license in this material to reproduce, prepare derivative works, distribute copies to
+#  the public, perform publicly and display publicly, and to permit others to do so.
+# ========================================================================================
+
+echo "Setting up Artemis development environment..."
+
+exec_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+home_dir="${exec_dir%/env}"
+export ARTEMIS_HOME=${ARTEMIS_HOME:-${home_dir}}
+
+export MAKE_PROGRAM=${MAKE_PROGRAM:-make}
+
+#  Identify partitions based on  SLURM_JOB_PARTITION and HOSTNAME variables
+PARTITION="unknown"
+if [[ $HOSTNAME == ch-fe*  ||  $SLURM_CLUSTER_NAME == "chicoma" ]]; then
+    if [[ $SLURM_JOB_PARTITION == *gpu* ]]; then
+        PARTITION="chicoma-gpu"
+    else
+        PARTITION="chicoma-cpu"
+    fi
+elif [[ "$HOSTNAME" =~ ^ve-rfe[1-3]$ || ( $SLURM_CLUSTER_NAME == "venado" && $SLURM_JOB_PARTITION == "gpu" ) ]]; then
+    PARTITION="venado-gh"
+elif [[ "$HOSTNAME" =~ ^ve-rfe[4-7]$ || ( $SLURM_CLUSTER_NAME == "venado" && $SLURM_JOB_PARTITION == "cpu" ) ]]; then
+    PARTITION="venado-gg"
+else # Catch-all for Darwin
+    if [ -z "$SLURM_JOB_PARTITION" ]; then
+        if [[ $HOSTNAME == darwin-fe* ]]; then
+            echo "Do not compile on Darwin frontend nodes; use a specific partition!"
+            echo "Supported partitions are"
+            echo "  skylake-gold"
+            echo "  volta-x86"
+            echo "...setup FAILED"
+        fi
+    elif [[ $SLURM_JOB_PARTITION == "power9-rhel7" ]]; then
+        PARTITION="darwin-power9-rhel7"
+    elif [[ $SLURM_JOB_PARTITION == "skylake-gold" ]]; then
+        PARTITION="darwin-skylake-gold"
+    elif [[ $SLURM_JOB_PARTITION == "volta-x86" ]]; then
+        PARTITION="darwin-volta-x86"
+    fi
+fi
+
+# Absolute path for conda environment can be too long
+function shorten_prompt {
+    if [[ -v CONDA_PREFIX && -n $CONDA_PREFIX ]]; then
+        local env_name=$(basename "$CONDA_PREFIX")
+        export PS1="(${env_name}) [\u@\h \W]\$ "
+    fi
+}
+
+echo "Partition: $PARTITION"
+if [[ $PARTITION == "unknown" ]]; then
+    echo "Partition is unknown! exiting..."
+elif [[ $PARTITION == "chicoma-gpu" ]]; then
+    module unload cray-libsci
+    module load PrgEnv-gnu cudatoolkit/24.7_12.5
+    module load craype-accel-nvidia80
+    unset OMP_NUM_THREADS
+    unset OMP_PROC_BIND
+    unset OMP_PLACES
+    export MPICH_GPU_SUPPORT_ENABLED=1
+    export MPICH_GPU_MANAGED_MEMORY_SUPPORT_ENABLED=1
+    C_NATIVE=cc
+    CXX_NATIVE=CC
+    module load cray-hdf5-parallel
+    module load python/3.10-anaconda-2023.03
+    source /usr/projects/hpcsoft/common/x86_64/anaconda/2023.03-python-3.10/bin/activate /usr/projects/jovian/dependencies/python/chicoma-frontend
+    shorten_prompt
+    module load cmake
+    export NVCC_WRAPPER_DEFAULT_COMPILER=CC
+    export ARTEMIS_SUITE=chicoma-gpu
+    echo "...setup SUCCEEDED"
+elif [[ $PARTITION == "chicoma-cpu" ]]; then
+    module swap PrgEnv-cray PrgEnv-gnu
+    module load cray-hdf5-parallel
+    module load python/3.10-anaconda-2023.03
+    source /usr/projects/hpcsoft/common/x86_64/anaconda/2023.03-python-3.10/bin/activate /usr/projects/jovian/dependencies/python/chicoma-frontend
+    shorten_prompt
+    module load cmake
+    export ARTEMIS_SUITE=cpu
+    echo "...setup SUCCEEDED"
+elif [[ $PARTITION == "darwin-power9-rhel7" ]]; then
+    echo "darwin-power9-rhel7 partition has been decommissioned! Exiting..."
+elif [[ $PARTITION == "darwin-skylake-gold" ]]; then
+    module purge
+    module use --append /usr/projects/jovian/dependencies/modulefiles
+    module load clang/12.0.1
+    module load gcc/9.4.0
+    module load skylake-gold/openmpi/4.1.6
+    module load skylake-gold/hdf5/1.12.2
+    module load miniconda3/py39_4.12.0
+    source /projects/opt/centos8/x86_64/miniconda3/py39_4.12.0/bin/activate /usr/projects/jovian/dependencies/python/skylake-gold-py39
+    shorten_prompt
+    module load cmake/3.26.3
+    module list
+    export ARTEMIS_SUITE=cpu
+    echo "...setup SUCCEEDED"
+elif [[ $PARTITION == "darwin-volta-x86" ]]; then
+    module purge
+    module load clang/12.0.1
+    module load nvhpc/23.5
+    module load cuda/11.4.2
+    module load gcc/9.4.0 # must load gcc after nvcc so REBOUND uses gcc
+    module load hdf5/1.12.2
+    module load miniconda3
+    source /projects/opt/centos8/x86_64/miniconda3/py39_4.12.0/bin/activate /usr/projects/jovian/dependencies/python/volta-x86-py39
+    shorten_prompt
+    module load cmake/3.26.3
+    module list
+    export ARTEMIS_SUITE=darwin-gpu
+    echo "...setup SUCCEEDED"
+elif [[ $PARTITION == "venado-gh" ]]; then
+  module load PrgEnv-gnu
+  module load cray-mpich cray-hdf5-parallel cudatoolkit
+  export MPICH_OFI_NIC_POLICY=GPU   # GPU NUMA ROUND-ROBIN
+  export MPICH_GPU_SUPPORT_ENABLED=1 # Allows GPU Aware MPI
+  export CRAY_ACCEL_TARGET=nvidia90
+  export MPICH_MALLOC_FALLBACK=1
+  export MPICH_SMP_SINGLE_COPY_MODE=NONE
+  export MPICH_MAX_THREAD_SAFETY=multiple
+  export FI_CXI_RX_MATCH_MODE=hybrid
+  export PMI_MMAP_SYNC_WAIT_TIME=600
+  export ARTEMIS_SUITE=venado-gpu
+  module list
+  echo "...setup SUCCEEDED"
+elif [[ $PARTITION == "venado-gg" ]]; then
+  module load PrgEnv-gnu
+  module load cray-mpich cray-hdf5-parallel
+  export MPICH_MALLOC_FALLBACK=1
+  export MPICH_SMP_SINGLE_COPY_MODE=NONE
+  export MPICH_MAX_THREAD_SAFETY=multiple
+  export FI_CXI_RX_MATCH_MODE=hybrid
+  export PMI_MMAP_SYNC_WAIT_TIME=600
+  export ARTEMIS_SUITE=venado-cpu
+  module list
+  echo "...setup SUCCEEDED"
+fi
+
+echo ""
+echo "To configure and build the code, you can use the function (-h flag for options)"
+echo "  build_artemis"
+echo ""
+
+function build_artemis {
+
+    OPTIND=1 # Reset OPTIND in case getopts is used elsewhere
+
+    BUILD_DIR="build_${PARTITION}" # Directory in which to build (absolute, or relative from base dir)
+    CONFIGURE_BUILD=false # Whether to configure before calling make (automatically done if directory is empty)
+    DEBUG_BUILD=false # Whether to configure for Debug build (default is cmake's RelWithDebInfo)
+    FULL_BUILD=false # Whether to completely wipe the build directory, if non-empty
+    ASAN_BUILD=false # Whether to configure with ASAN support for error checking
+    options='hb:cdfa'
+    while getopts $options opt; do
+        case $opt in
+            h)
+                echo " -- build_artemis script --"
+                echo "  Options:"
+                echo "    -h       : Help information"
+                echo "    -b [dir] : Directory in which to build (absolute, or relative from artemis/)"
+                echo "               Default directory is artemis/build_\$PARTITION"
+                echo "    -c       : Force re-configuration of build"
+                echo "    -d       : Switch to debug build from default RelWithDebInfo"
+                echo "    -f       : Force complete re-build"
+                echo "               WARNING uses rm -rf to remove build directory if it exists"
+                return
+                ;;
+            b)
+                BUILD_DIR="$OPTARG"
+                ;;
+            c)
+                echo "Configuration requested"
+                CONFIGURE_BUILD=true
+                ;;
+            d)
+                echo  "Debug build requested"
+                DEBUG_BUILD=true
+                ;;
+            f)
+                echo "Full build requested"
+                FULL_BUILD=true
+                ;;
+            a)
+                echo "ASAN build requested"
+                ASAN_BUILD=true
+                ;;
+            \?)
+                echo "Invalid option: -$OPTARG" >&2
+                return 1
+                ;;
+            :)
+                echo "Option -$OPTARG requires an argument." >&2
+                return 1
+                ;;
+        esac
+    done
+
+    if [[ "$BUILD_DIR" == /* ]]; then
+        # Use absolute path
+        ABS_BUILD_DIR=${BUILD_DIR}
+    else
+        # Use relative path from artemis/ base directory
+        ABS_BUILD_DIR="${ARTEMIS_HOME}/${BUILD_DIR}"
+    fi
+
+    echo "Using build directory: ${ABS_BUILD_DIR}"
+
+    function configure_artemis {
+
+        if [[ "$DEBUG_BUILD" == true ]]; then
+          ARTEMIS_CONFIGURE_PRESET=$ARTEMIS_SUITE"-debug"
+        else
+          ARTEMIS_CONFIGURE_PRESET=$ARTEMIS_SUITE"-release"
+        fi
+        CMAKE_FLAGS=""
+        if [[ "$ASAN_BUILD" == true ]]; then
+            CMAKE_FLAGS+="-DARTEMIS_ENABLE_ASAN=ON "
+        fi
+        echo "Building "$ARTEMIS_CONFIGURE_PRESET
+        cmake --preset=$ARTEMIS_CONFIGURE_PRESET $CMAKE_FLAGS $ARTEMIS_HOME
+    }
+
+    if [ -d "${ABS_BUILD_DIR}" ]; then
+        echo "Build directory already exists"
+        # Build directory already exists; don't configure unless requested
+        if $FULL_BUILD; then
+            echo ""
+            echo "You are about to FORCE DELETE ${ABS_BUILD_DIR}"
+            while true; do
+                read -p "Are you sure? Type 'Y' to continue: " input
+                case "$input" in
+                    [Yy]) break;;
+                    *) echo "Not deleting ${ABS_BUILD_DIR}; exiting..."; return 1;; # Exit for any other input
+                esac
+            done
+            rm -rf ${ABS_BUILD_DIR}
+            mkdir -p ${ABS_BUILD_DIR}
+            cd ${ABS_BUILD_DIR}
+            configure_artemis
+        elif $CONFIGURE_BUILD; then
+            cd ${ABS_BUILD_DIR}
+            configure_artemis
+        else
+            cd ${ABS_BUILD_DIR}
+        fi
+    else
+        mkdir -p ${ABS_BUILD_DIR}
+        cd ${ABS_BUILD_DIR}
+        configure_artemis
+    fi
+
+    make -j
+    make_status=$?
+
+    echo "${ABS_BUILD_DIR}"
+    return $make_status
+}

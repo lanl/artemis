@@ -12,4 +12,4 @@
 	url = https://github.com/lanl/singularity-opac.git
 [submodule "external/jaybenne"]
 	path = external/jaybenne
-	url = git@gitlab.lanl.gov:jovian/jaybenne.git
+	url = https://github.com/lanl/jaybenne.git

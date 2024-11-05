@@ -145,7 +145,7 @@ ComputeDiskProfile(const struct DiskParams pgen, const parthenon::Coordinates_t 
   const Real Omg = OmKmid * (1 + 0.5 * SQR(H / xcyl[0]) *
                                      (pgen.p + pgen.q + 0.5 * pgen.q * SQR(xcyl[2] / H)));
   const Real vp = Omg * xcyl[0];
-  const Real vr = - pgen.nu0*(6*pgen.p-2*pgen.q+3+(5*pgen.q+9)*SQR(xcyl[2]/H))/(2*cylv[0]);
+  const Real vr = - pgen.nu0*(6*pgen.p-2*pgen.q+3+(5*pgen.q+9)*SQR(xcyl[2]/H))/(2*xcyl[0]);
 
   // Construct the total cylindrical velocity
   const Real vcyl[3] = {vr, vp - pgen.omf * xcyl[0], 0.0};

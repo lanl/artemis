@@ -7,7 +7,7 @@ Software release number O4811
 
 # Documentation
 
-The latest documentation is hosted online at [jovian.pages.lanl.gov/artemis/index.html](http:/jovian.pages.lanl.gov/artemis/index.html)
+The latest documentation is hosted [here](https://lanl.github.io/artemis/index.html)
 
 To build the documentation locally,
 

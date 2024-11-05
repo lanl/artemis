@@ -21,25 +21,19 @@ jobs:
 
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v4
-      with:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
           fetch-depth: 0
-      # Runs a set of commands using the runners shell
       - name: Set system to non-interactive mode
         run: export DEBIAN_FRONTEND=noninteractive
-
       - name: Dependencies
         run: |
           pip install -U sphinx-rtd-theme pyyaml
-
-      # Runs a set of commands using the runners shell
       - name: Build
         run: |
           cd doc/sphinx
           sphinx-build -b html . ../public
-
-      # Publish
       - name: Deploy
         uses: peaceiris/actions-gh-pages@v4
         with:

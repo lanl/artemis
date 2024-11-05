@@ -247,20 +247,20 @@ TaskStatus SelfDragSourceImpl(MeshData<Real> *md, const Real time, const Real dt
             const Real vp = Omg * xcyl[0];
             const Real vR = -nu *
                             (6 * p - 2 * q + 3 + (5 * q + 9) * SQR(xcyl[2] / H)) /
-                            (2 * xv[0]);
+                            (2 * xcyl[0]);
 
-            //const Real vcyl[3] = {vR, vp - omf * xcyl[0], 0.};
+            const Real vcyl[3] = {vR, vp - omf * xcyl[0], 0.};
 
-            //const Real vd[3] = {
-            //  ArtemisUtils::VDot(vcyl, ex1),
-            //  ArtemisUtils::VDot(vcyl, ex2),
-            //  ArtemisUtils::VDot(vcyl, ex3)
-            //};
-            Real vd[3] = {
-              vR,
-              0.,
-              vp - omf * xcyl[0],
+            const Real vd[3] = {
+              ArtemisUtils::VDot(vcyl, ex1),
+              ArtemisUtils::VDot(vcyl, ex2),
+              ArtemisUtils::VDot(vcyl, ex3)
             };
+            //Real vd[3] = {
+            //  vR,
+            //  0.,
+            //  vp - omf * xcyl[0],
+            //};
 
             //if (i==2 && j==2 && k==2) {
             //  std::cout << "(" << i << ", " << j << ", " << k << ")" << std::endl;

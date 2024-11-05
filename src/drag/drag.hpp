@@ -218,16 +218,16 @@ TaskStatus SelfDragSourceImpl(MeshData<Real> *md, const Real time, const Real dt
         // Compute the ramp for this cell
         // Ramps are quadratic, eg. the left regions is SQR( (X - ix)/(ix - xmin) )
         if (do_gas) {
-          const Real H = xv[0] * h0 * std::pow(xv[0] / r0, flare);
+          const Real H = xcyl[0] * h0 * std::pow(xcyl[0] / r0, flare);
           const Real fx1 =
               dt * (gasp.irate[0] * ((xv[0] < gasp.ix[0]) *
                                      SQR((xv[0] - gasp.ix[0]) / (gasp.ix[0] - x1min))) +
                     gasp.orate[0] * ((xv[0] > gasp.ox[0]) *
-                                     SQR((xv[0] - gasp.ox[0]) / (gasp.ox[0] - x1max))) + 
-                    gasp.irate[1] * ((xv[0] >= gasp.ix[0]) * (xcyl[2] > gasp.ix[1]*H) * // pos z
-                                     SQR((xcyl[2] - gasp.ix[1]*H) / (gasp.ix[0]*H - xv[0]*std::cos(x2min)))) +
-                    gasp.orate[1] * ((xv[0] <= gasp.ox[0]) * (xcyl[2] < -gasp.ox[1]*H) * // neg z
-                                     SQR((xcyl[2] + gasp.ox[1]*H) / (-gasp.ox[0]*H - xv[0]*std::cos(x2max)))));
+                                     SQR((xv[0] - gasp.ox[0]) / (gasp.ox[0] - x1max))));// + 
+                    //gasp.irate[1] * ((xv[0] >= gasp.ix[0]) * (xcyl[2] > gasp.ix[1]*H) * // pos z
+                    //                 SQR((xcyl[2] - gasp.ix[1]*H) / (gasp.ix[0]*H - xv[0]*std::cos(x2min)))) +
+                    //gasp.orate[1] * ((xv[0] <= gasp.ox[0]) * (xcyl[2] < -gasp.ox[1]*H) * // neg z
+                    //                 SQR((xcyl[2] + gasp.ox[1]*H) / (-gasp.ox[0]*H - xv[0]*std::cos(x2max)))));
           const Real fx2 = fx1;
           const Real fx3 = fx1;
 

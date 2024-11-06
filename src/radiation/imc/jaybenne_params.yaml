@@ -1,0 +1,65 @@
+---
+jaybenne:
+  _description: "Jaybenne specific options"
+  num_particles:
+    _type: int
+    _description: "Number of particles."
+  dt:
+    _type: Real
+    _description: "Jaybenne enforced timestep limitation (fixed)."
+    _default: "std::numeric_limits<Real>::max()"
+  min_swarm_occupancy:
+    _type: Real
+    _description: "Minimum swarm occupancy (0<=x<=1) below which defrag is triggered."
+    _default: 0.0
+  numin:
+    _type: Real
+    _description: "Minimum photon frequency (currently unused for gray IMC)."
+    _default: "std::numeric_limits<Real>::min()"
+  numax:
+    _type: Real
+    _description: "Maximum photon frequency (currently unused for gray IMC)."
+    _default: "std::numeric_limits<Real>::max()"
+  unique_rank_seeds:
+    _type: bool
+    _description: "Invoke different seeds for each MPI rank."
+    _default: "true"
+  seed:
+    _type: int
+    _description: "RNG seed (for rank=0 when unique_rank_seeds=true)."
+    _default: 123
+  max_transport_iterations:
+    _type: int
+    _description: "Maximum number of iterations for transport."
+    _default: 10000
+  use_ddmc:
+    _type: bool
+    _description: "Enables DDMC."
+    _default: "false"
+  tau_ddmc:
+    _type: Real
+    _description: "Optical depth threshold for DDMC."
+    _default: 5.0
+  source_strategy:
+    _type: string
+    _description: "Method of sourcing for particles."
+    _default: "uniform"
+    uniform:
+      _type: opt
+      _description: "Uniform sampling/sourcing."
+    energy:
+      _type: opt
+      _description: "Energy-based sampling/sourcing."
+  do_emission:
+    _type: bool
+    _description: "Enables thermal emission physics."
+    _default: true
+  do_feedback:
+    _type: bool
+    _description: "Radiation affects host fluid fields."
+    _default: true
+
+
+
+
+

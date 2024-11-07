@@ -83,8 +83,7 @@ beta0 = 0.0
 tcyl = .0025
 cyl_plaw = -1.0
 
-<gravity>
-type = point
+<gravity/point>
 gm = 1.0
 
 <problem>

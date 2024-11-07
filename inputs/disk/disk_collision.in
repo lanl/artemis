@@ -79,8 +79,7 @@ riemann = hllc
 dfloor = 1.0e-10
 siefloor = 1.0e-10
 
-<gravity>
-type = nbody
+<gravity/nbody>
 gm = 1.0
 
 <gas/damping>

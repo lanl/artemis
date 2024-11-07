@@ -81,9 +81,7 @@ siefloor = 1.0e-6
 type = constant
 nu = 1e-3
 
-
-<gravity>
-type = nbody
+<gravity/nbody>
 gm = 1.0
 
 <nbody>

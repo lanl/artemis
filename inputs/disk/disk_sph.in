@@ -81,8 +81,7 @@ omega = 1.0
 type = alpha
 alpha = 1e-3
 
-<gravity>
-type = point
+<gravity/point>
 gm = 1.0
 
 <problem>

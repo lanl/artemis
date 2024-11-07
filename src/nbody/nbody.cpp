@@ -71,7 +71,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("dt_reb", dt_reb);
 
   // Unit system for gravity
-  const Real GM = pin->GetOrAddReal("gravity", "gm", 1.);
+  const Real GM = pin->GetReal("gravity", "gm");
   params.Add("GM", GM);
   params.Add("mscale", pin->GetOrAddReal("nbody", "mscale", 1.0));
 

@@ -228,8 +228,18 @@ TaskStatus SelfDragSourceImpl(MeshData<Real> *md, const Real time, const Real dt
                     //                 SQR((xcyl[2] - gasp.ix[1]*H) / (gasp.ix[0]*H - xv[0]*std::cos(x2min)))) +
                     //gasp.orate[1] * ((xv[0] <= gasp.ox[0]) * (xcyl[2] < -gasp.ox[1]*H) * // neg z
                     //                 SQR((xcyl[2] + gasp.ox[1]*H) / (-gasp.ox[0]*H - xv[0]*std::cos(x2max)))));
-          const Real fx2 = fx1;
-          const Real fx3 = fx1;
+          const Real fx2 =
+              multi_d * dt *
+              (gasp.irate[1] * ((xv[1] < gasp.ix[1]) *
+                                SQR((xv[1] - gasp.ix[1]) / (gasp.ix[1] - x2min))) +
+               gasp.orate[1] * ((xv[1] > gasp.ox[1]) *
+                                SQR((xv[1] - gasp.ox[1]) / (gasp.ox[1] - x2max))));
+          const Real fx3 =
+              three_d * dt *
+              (gasp.irate[2] * ((xv[2] < gasp.ix[2]) *
+                                SQR((xv[2] - gasp.ix[2]) / (gasp.ix[2] - x3min))) +
+               gasp.orate[2] * ((xv[2] > gasp.ox[2]) *
+                                SQR((xv[2] - gasp.ox[2]) / (gasp.ox[2] - x3max))));
 
           for (int n = 0; n < vmesh.GetSize(b, gas::cons::density()); ++n) {
             const Real &dens = vmesh(b, gas::cons::density(n), k, j, i);

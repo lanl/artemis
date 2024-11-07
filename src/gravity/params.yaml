@@ -1,28 +1,142 @@
 ---
 gravity:
   _description: "External gravitational sources"
-  type:
-    _type: string
-    _description: "Type of gravitational source"
-    uniform:
-      _type: opt
-      _description: "Uniform gravitational acceleration"
-    point:
-      _type: opt
-      _description: "Point mass source."
-    binary:
-      _type: opt
-      _description: "Binary mass source."
-    nbody:
-      _type: opt
-      _description: "N point mass sources. Requires an <nbody> node"
   gm:
     _type: Real
     _description: "Normalization parameter setting GM."
+    _default: "0.0"
     _units: "dyn cm^2 g^-1"
-  gx(1,2,3):
+  tstart:
     _type: Real
-    _description: "Uniform gravity: acceleration in the x(1,2,3)-dir."
-    _units: "cm s^-2"
+    _description: "When to turn gravity on."
+    _default: "-&infin;"
+    _units: "s"
+  tstop:
+    _type: Real
+    _description: "When to turn gravity off."
+    _default: "&infin;"
+    _units: "s"
 
+  uniform:
+    _type: node
+    _description: "Uniform graviational acceleration"
+    gx(1,2,3):
+      _type: Real
+      _description: "Uniform gravity: acceleration in the x(1,2,3)-dir."
+      _units: "cm s^-2"
+
+  point:
+    _type: node
+    _description: "Point mass gravity."
+    gm:
+      _type: Real
+      _description: "Normalization parameter setting GM and the mass of the body."
+      _units: "dyn cm^2 g^-1"
+    soft:
+      _type: Real
+      _description: "Plummer softening radius of the body"
+      _default: "0.0"
+      _units: "cm"
+    sink:
+      _type: Real
+      _description: "Accretion radius of the body. Material inside this distance to the point is gradually removed"
+      _default: "0.0"
+      _units: "cm"
+    sink_rate:
+      _type: Real
+      _description: "Mass removal rate."
+      _default: "0.0"
+      _units: "s^-1"
+    x:
+      _type: Real
+      _description: "X position"
+      _default: "0.0"
+      _units: "cm"
+    y:
+      _type: Real
+      _description: "Y position"
+      _default: "0.0"
+      _units: "cm"
+    z:
+      _type: Real
+      _description: "Z position"
+      _default: "0.0"
+      _units: "cm"
+
+  binary:
+    _type: node
+    _description: "Binary mass gravity."
+    gm:
+      _type: Real
+      _description: "Normalization parameter setting GM and the total mass of the binary"
+      _units: "dyn cm^2 g^-1"
+    soft(1,2):
+      _type: Real
+      _description: "Plummer softening radius of the primary/secondary"
+      _default: "0.0"
+      _units: "cm"
+    sink(1,2):
+      _type: Real
+      _description: "Accretion radius of the primary/secondary. Material inside this distance to the point is gradually removed"
+      _default: "0.0"
+      _units: "cm"
+    sink_rate(1,2):
+      _type: Real
+      _description: "Mass removal rate of the primary/secondary."
+      _default: "0.0"
+      _units: "s^-1"
+    x:
+      _type: Real
+      _description: "X position of the center of mass"
+      _default: "0.0"
+      _units: "cm"
+    y:
+      _type: Real
+      _description: "Y position of the center of mass"
+      _default: "0.0"
+      _units: "cm"
+    z:
+      _type: Real
+      _description: "Z position of the center of mass"
+      _default: "0.0"
+      _units: "cm"
+    q:
+      _type: Real
+      _description: "Binary mass ratio"
+    a:
+      _type: Real
+      _description: "Binary semi-major axis"
+      _units: "cm"
+    e:
+      _type: Real
+      _description: "Binary eccentricity"
+      _default: "0.0"
+    i:
+      _type: Real
+      _description: "Binary inclination (deg)."
+      _default: "0.0"
+      _units: "deg"
+    omega:
+      _type: Real
+      _description: "Binary argument of pericenter (deg)."
+      _default: "0.0"
+      _units: "deg"
+    Omega:
+      _type: Real
+      _description: "Binary longitude of ascending node (deg)."
+      _default: "0.0"
+      _units: "deg"
+    f:
+      _type: Real
+      _description: "Binary true anomaly."
+      _default: "0.0"
+      _units: "deg"
+
+  nbody:
+    _type: node
+    _description: "N-body gravity. Requires an <nbody> node to specify the system."
+    gm:
+      _type: Real
+      _description: "Normalization parameter setting GM and the total mass of the N-body system"
+      _units: "dyn cm^2 g^-1"
 

@@ -105,6 +105,8 @@ jobs:
           sudo apt-get install -qq libopenmpi-dev libhdf5-openmpi-dev
           sudo apt-get install -qq openssh-client
           sudo apt-get install -qq python3 python3-numpy python3-h5py python3-matplotlib
+          sudo apt-get install -qq -y cuda
+          sudo apt-get install -qq -y nvidia-driver-525
       - name: Set up environment
         run: |
           source env/bash
@@ -116,7 +118,7 @@ jobs:
             --make_nproc=32 \
             --cmake=-DARTEMIS_ENABLE_CUDA=On \
             --cmake=-DKokkos_ARCH_VOLTA70=On \
-            --cmake=-DCMAKE_CXX_COMPILER=external/parthenon/external/Kokkos/bin/nvcc_wrapper \
+            --cmake=-DCMAKE_CXX_COMPILER=$GITHUB_WORKSPACE/external/parthenon/external/Kokkos/bin/nvcc_wrapper \
             --log_file=ci_gpu_log.txt
       - name: Upload GPU test log
         if: always()

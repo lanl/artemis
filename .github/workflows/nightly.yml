@@ -26,6 +26,15 @@ jobs:
       - uses: actions/checkout@v3
         with:
           submodules: recursive
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -qq --no-install-recommends tzdata
+          sudo apt-get install -qq git
+          sudo apt-get install -qq make cmake g++
+          sudo apt-get install -qq libopenmpi-dev libhdf5-openmpi-dev
+          sudo apt-get install -qq openssh-client
+          sudo apt-get install -qq python3 python3-numpy python3-h5py python3-matplotlib
       - name: Update Parthenon submodule
         run: |
           cd external/parthenon
@@ -58,42 +67,42 @@ jobs:
           path: tst/figs
           retention-days: 3
 
-  ci_nightly_gpu_job:
-    runs-on: ubuntu-latest  # Update to a runner with GPU support if available
-    steps:
-      - uses: actions/checkout@v3
-        with:
-          submodules: recursive
-      - name: Update Parthenon submodule
-        run: |
-          cd external/parthenon
-          git pull origin develop
-          echo "==> Current Parthenon commit hash:"
-          git rev-parse HEAD
-      - name: Set up environment
-        run: |
-          source env/bash
-      - name: Run GPU tests
-        run: |
-          cd tst
-          python3 run_tests.py gpu.suite \
-            --save_build \
-            --make_nproc=32 \
-            --cmake=-DARTEMIS_ENABLE_CUDA=On \
-            --cmake=-DKokkos_ARCH_VOLTA70=On \
-            --cmake=-DCMAKE_CXX_COMPILER=external/parthenon/external/Kokkos/bin/nvcc_wrapper \
-            --log_file=ci_gpu_log.txt
-      - name: Upload GPU test log
-        if: always()
-        uses: actions/upload-artifact@v3
-        with:
-          name: ci_gpu_log.txt
-          path: tst/ci_gpu_log.txt
-          retention-days: 3
-      - name: Upload figures
-        if: always()
-        uses: actions/upload-artifact@v3
-        with:
-          name: figs
-          path: tst/figs
-          retention-days: 3
+#  ci_nightly_gpu_job:
+#    runs-on: ubuntu-latest  # Update to a runner with GPU support if available
+#    steps:
+#      - uses: actions/checkout@v3
+#        with:
+#          submodules: recursive
+#      - name: Update Parthenon submodule
+#        run: |
+#          cd external/parthenon
+#          git pull origin develop
+#          echo "==> Current Parthenon commit hash:"
+#          git rev-parse HEAD
+#      - name: Set up environment
+#        run: |
+#          source env/bash
+#      - name: Run GPU tests
+#        run: |
+#          cd tst
+#          python3 run_tests.py gpu.suite \
+#            --save_build \
+#            --make_nproc=32 \
+#            --cmake=-DARTEMIS_ENABLE_CUDA=On \
+#            --cmake=-DKokkos_ARCH_VOLTA70=On \
+#            --cmake=-DCMAKE_CXX_COMPILER=external/parthenon/external/Kokkos/bin/nvcc_wrapper \
+#            --log_file=ci_gpu_log.txt
+#      - name: Upload GPU test log
+#        if: always()
+#        uses: actions/upload-artifact@v3
+#        with:
+#          name: ci_gpu_log.txt
+#          path: tst/ci_gpu_log.txt
+#          retention-days: 3
+#      - name: Upload figures
+#        if: always()
+#        uses: actions/upload-artifact@v3
+#        with:
+#          name: figs
+#          path: tst/figs
+#          retention-days: 3

@@ -1,0 +1,132 @@
+# ========================================================================================
+#  (C) (or copyright) 2024. Triad National Security, LLC. All rights reserved.
+#
+#  This program was produced under U.S. Government contract 89233218CNA000001 for Los
+#  Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
+#  for the U.S. Department of Energy/National Nuclear Security Administration. All rights
+#  in the program are reserved by Triad National Security, LLC, and the U.S. Department
+#  of Energy/National Nuclear Security Administration. The Government is granted for
+#  itself and others acting on its behalf a nonexclusive, paid-up, irrevocable worldwide
+#  license in this material to reproduce, prepare derivative works, distribute copies to
+#  the public, perform publicly and display publicly, and to permit others to do so.
+# ========================================================================================
+
+# This file was created in part or in whole by one of OpenAI's generative AI models
+
+name: Continuous Integration
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  ci_format_job:
+    if: >
+      ${{ !contains(github.event.pull_request.title, 'Draft:') &&
+          !contains(github.event.pull_request.title, 'WIP:') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: recursive
+      - name: Run format check
+        run: |
+          source env/bash
+          VERBOSE=1 ./style/format.sh
+          git diff --exit-code --ignore-submodules
+
+  ci_cpu_job:
+    if: >
+      ${{ !contains(github.event.pull_request.title, 'Draft:') &&
+          !contains(github.event.pull_request.title, 'WIP:') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: recursive
+      - name: Set up environment
+        run: |
+          source env/bash
+      - name: Run CPU tests
+        run: |
+          cd tst
+          python3 run_tests.py regression.suite \
+            --save_build \
+            --make_nproc=32 \
+            --cmake=-DCMAKE_C_COMPILER=gcc \
+            --cmake=-DCMAKE_CXX_COMPILER=g++ \
+            --log_file=ci_cpu_log.txt
+      - name: Upload CPU test log
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: ci_cpu_log.txt
+          path: tst/ci_cpu_log.txt
+          retention-days: 3
+      - name: Upload figures
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: figs
+          path: tst/figs
+          retention-days: 3
+
+  ci_gpu_job:
+    if: >
+      ${{ !contains(github.event.pull_request.title, 'Draft:') &&
+          !contains(github.event.pull_request.title, 'WIP:') }}
+    runs-on: ubuntu-latest  # Update to a runner with GPU support if available
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: recursive
+      - name: Set up environment
+        run: |
+          source env/bash
+      - name: Run GPU tests
+        run: |
+          cd tst
+          python3 run_tests.py gpu.suite \
+            --save_build \
+            --make_nproc=32 \
+            --cmake=-DARTEMIS_ENABLE_CUDA=On \
+            --cmake=-DKokkos_ARCH_VOLTA70=On \
+            --cmake=-DCMAKE_CXX_COMPILER=external/parthenon/external/Kokkos/bin/nvcc_wrapper \
+            --log_file=ci_gpu_log.txt
+      - name: Upload GPU test log
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: ci_gpu_log.txt
+          path: tst/ci_gpu_log.txt
+          retention-days: 3
+      - name: Upload figures
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: figs
+          path: tst/figs
+          retention-days: 3
+
+  ci_doc_job:
+    if: >
+      ${{ !contains(github.event.pull_request.title, 'Draft:') &&
+          !contains(github.event.pull_request.title, 'WIP:') &&
+          github.event.pull_request.head.ref != github.event.repository.default_branch }}
+    runs-on: ubuntu-latest
+    container:
+      image: python:latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: recursive
+      - name: Build documentation
+        run: |
+          cd doc
+          pip install -U sphinx-rtd-theme pyyaml
+          sphinx-build -b html . ../public
+      - name: Upload documentation
+        uses: actions/upload-artifact@v3
+        with:
+          name: docs
+          path: public

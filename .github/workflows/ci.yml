@@ -68,7 +68,7 @@ jobs:
           cd tst
           python3 run_tests.py regression.suite \
             --save_build \
-            --make_nproc=32 \
+            --make_nproc=4 \
             --cmake=-DCMAKE_C_COMPILER=gcc \
             --cmake=-DCMAKE_CXX_COMPILER=g++ \
             --log_file=ci_cpu_log.txt

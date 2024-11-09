@@ -60,6 +60,9 @@ def run(**kwargs):
                             g, int(10 * gam), b
                         ),
                         "problem/polytropic_index={:.2f}".format(gam),
+                        "parthenon/mesh/nx1=64",
+                        "parthenon/mesh/nx2=64",
+                        "parthenon/mesh/nx3=64",
                     ],
                 )
                 artemis.run(

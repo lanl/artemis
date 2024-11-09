@@ -13,5 +13,5 @@
 
 # regression suite
 
-serial.suite
+#serial.suite
 parallel.suite

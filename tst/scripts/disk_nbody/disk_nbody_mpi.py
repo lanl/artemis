@@ -23,7 +23,7 @@ logger = logging.getLogger("artemis" + __name__[7:])  # set logger name
 logging.getLogger("h5py").setLevel(logging.WARNING)
 logging.getLogger("matplotlib").setLevel(logging.WARNING)
 
-disk._nranks = 2
+disk._nranks = min(max(2, os.cpu_count()), 8)
 disk._file_id = "disk_nbody_mpi"
 
 

@@ -24,7 +24,7 @@ logger = logging.getLogger("artemis" + __name__[7:])  # set logger name
 logging.getLogger("h5py").setLevel(logging.WARNING)
 logging.getLogger("matplotlib").setLevel(logging.WARNING)
 
-viscous_diffusion._nranks = 2
+viscous_diffusion._nranks = min(max(2, os.cpu_count()), 4)
 viscous_diffusion._nd = [2]
 viscous_diffusion._file_id = "viscous_diffusion_mpi"
 

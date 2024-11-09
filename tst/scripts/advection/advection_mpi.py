@@ -24,7 +24,7 @@ import scripts.advection.advection as advection
 
 logger = logging.getLogger("artemis" + __name__[7:])  # set logger name
 
-advection._nranks = min(os.cpu_count(), 4)
+advection._nranks = min(max(2, os.cpu_count()), 4)
 advection._file_id = "advection_mpi"
 
 

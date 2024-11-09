@@ -47,6 +47,13 @@ def run(**kwargs):
     for b in _bc:
         for g in _geom:
             bc_args = []
+            geom_args = []
+            if g == "cart":
+                geom_args = [
+                    "parthenon/mesh/nx1=64",
+                    "parthenon/mesh/nx2=64",
+                    "parthenon/mesh/nx3=64",
+                ]
             for d in directions[g]:
                 bc_args.append("parthenon/mesh/i{}_bc={}".format(d, b))
                 bc_args.append("parthenon/mesh/o{}_bc={}".format(d, b))
@@ -60,10 +67,7 @@ def run(**kwargs):
                             g, int(10 * gam), b
                         ),
                         "problem/polytropic_index={:.2f}".format(gam),
-                        "parthenon/mesh/nx1=64",
-                        "parthenon/mesh/nx2=64",
-                        "parthenon/mesh/nx3=64",
-                    ],
+                    ] + geom_args,
                 )
                 artemis.run(
                     _nranks,

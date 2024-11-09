@@ -24,7 +24,7 @@ logger = logging.getLogger("artemis" + __name__[7:])  # set logger name
 logging.getLogger("h5py").setLevel(logging.WARNING)
 logging.getLogger("matplotlib").setLevel(logging.WARNING)
 
-drag._nranks = min(max(2, os.cpu_count()), 4)
+drag._nranks = 4
 drag._file_id = "drag_mpi"
 
 

@@ -24,7 +24,7 @@ logger = logging.getLogger("artemis" + __name__[7:])  # set logger name
 logging.getLogger("h5py").setLevel(logging.WARNING)
 logging.getLogger("matplotlib").setLevel(logging.WARNING)
 
-blast._nranks = min(max(2, os.cpu_count()), 8)
+blast._nranks = 8
 blast._file_id = "blast_mpi"
 
 

@@ -24,7 +24,7 @@ logger = logging.getLogger("artemis" + __name__[7:])  # set logger name
 logging.getLogger("h5py").setLevel(logging.WARNING)
 logging.getLogger("matplotlib").setLevel(logging.WARNING)
 
-binary._nranks = min(max(2, os.cpu_count()), 16)
+binary._nranks = 16
 binary._file_id = "binary_mpi"
 
 

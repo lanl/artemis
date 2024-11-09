@@ -46,7 +46,9 @@ def get_pr_info(pr_number):
     return response.json()
 
 
-def update_status(commit_sha, state, description, context="Continuous Integration / chicoma-gpu"):
+def update_status(
+    commit_sha, state, description, context="Continuous Integration / chicoma-gpu"
+):
     url = f"https://api.github.com/repos/lanl/artemis/statuses/{commit_sha}"
     headers = {"Authorization": f"token {GITHUB_TOKEN}"}
     data = {"state": state, "description": description, "context": context}
@@ -75,11 +77,17 @@ def run_tests_in_temp_dir(pr_number, head_repo, head_ref, commit_sha):
             ["git", "submodule", "update", "--init", "--recursive"], check=True
         )
 
+        # Set up environment
+
         # Run the tests
         try:
             os.chdir(os.path.join(temp_dir, "tst"))
             test_command = [
-                "python3",
+                "bash",
+                "-c",
+                "source",
+                "../env/bash",
+                "&&" "python3",
                 "run_tests.py",
                 "regression.suite",
                 "--save_build",

@@ -21,7 +21,7 @@ import scripts.collisions.collisions as collisions
 
 logger = logging.getLogger("artemis" + __name__[7:])  # set logger name
 
-collisions._nranks = 16
+collisions._nranks = 2
 collisions._file_id = "collisions_mpi"
 
 

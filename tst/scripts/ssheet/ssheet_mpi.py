@@ -24,7 +24,7 @@ logger = logging.getLogger("artemis" + __name__[7:])  # set logger name
 logging.getLogger("h5py").setLevel(logging.WARNING)
 logging.getLogger("matplotlib").setLevel(logging.WARNING)
 
-ssheet._nranks = 8
+ssheet._nranks = 2
 ssheet._file_id = "ssheet_mpi"
 
 

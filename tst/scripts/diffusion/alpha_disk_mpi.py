@@ -24,7 +24,7 @@ logger = logging.getLogger("artemis" + __name__[7:])  # set logger name
 logging.getLogger("h5py").setLevel(logging.WARNING)
 logging.getLogger("matplotlib").setLevel(logging.WARNING)
 
-alpha_disk._nranks = 4
+alpha_disk._nranks = 2
 alpha_disk._file_id = "alpha_disk_mpi"
 
 

@@ -23,7 +23,7 @@ import scripts.hydro.linwave as linwave
 
 logger = logging.getLogger("artemis" + __name__[7:])  # set logger name
 
-linwave._nranks = 4
+linwave._nranks = 2
 linwave._file_id = "linear_wave_mpi"
 
 

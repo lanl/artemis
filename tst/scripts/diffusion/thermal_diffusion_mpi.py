@@ -24,7 +24,7 @@ logger = logging.getLogger("artemis" + __name__[7:])  # set logger name
 logging.getLogger("h5py").setLevel(logging.WARNING)
 logging.getLogger("matplotlib").setLevel(logging.WARNING)
 
-thermal_diffusion._nranks = 8
+thermal_diffusion._nranks = 2
 thermal_diffusion._file_id = "thermal_diffusion_mpi"
 
 

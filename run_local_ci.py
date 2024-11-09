@@ -77,24 +77,16 @@ def run_tests_in_temp_dir(pr_number, head_repo, head_ref, commit_sha):
             ["git", "submodule", "update", "--init", "--recursive"], check=True
         )
 
-        # Set up environment
-
         # Run the tests
         try:
             os.chdir(os.path.join(temp_dir, "tst"))
             test_command = [
                 "bash",
                 "-c",
-                "source",
-                "../env/bash",
-                "&&",
-                "python3",
-                "run_tests.py",
-                "regression.suite",
-                "--save_build",
-                "--make_nproc=4",
-                "--cmake=-DCMAKE_C_COMPILER=gcc",
-                "--cmake=-DCMAKE_CXX_COMPILER=g++",
+                "source ../env/bash && python3 run_tests.py regression.suite "
+                "--save_build --make_nproc=4 "
+                "--cmake=-DCMAKE_C_COMPILER=gcc "
+                "--cmake=-DCMAKE_CXX_COMPILER=g++ "
                 "--log_file=ci_cpu_log.txt",
             ]
             subprocess.run(test_command, check=True)

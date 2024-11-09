@@ -83,12 +83,13 @@ def run_tests_in_temp_dir(pr_number, head_repo, head_ref, commit_sha):
             test_command = [
                 "bash",
                 "-c",
-                "source ../env/bash && python3 run_tests.py regression.suite "
-                "--save_build --make_nproc=4 "
-                "--cmake=-DCMAKE_C_COMPILER=gcc "
-                "--cmake=-DCMAKE_CXX_COMPILER=g++ "
+                "source ../env/bash && build_artemis -b " + temp_dir + " -j 4 && python3 run_tests.py regression.suite "
+                #"--save_build --make_nproc=4 "
+                #"--cmake=-DCMAKE_C_COMPILER=gcc "
+                #"--cmake=-DCMAKE_CXX_COMPILER=g++ "
                 "--log_file=ci_cpu_log.txt",
             ]
+            print(test_command)
             subprocess.run(test_command, check=True)
             # Update the status to success
             update_status(commit_sha, "success", "All tests passed.")

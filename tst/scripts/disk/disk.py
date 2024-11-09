@@ -199,4 +199,8 @@ def loadf(n, base="disk.out1"):
         w = f["gas.prim.velocity_0"][...][:, 2, :, :, :]
         x = f["Locations/x"][...]
         y = f["Locations/y"][...]
- 
+        z = f["Locations/z"][...]
+        sys = f["Params"].attrs["artemis/coord_sys"]
+        time = f["Info"].attrs["Time"]
+        dt = f["Info"].attrs["dt"]
+    return time, (x, y, z), (d, T, u, v, w), sys, dt

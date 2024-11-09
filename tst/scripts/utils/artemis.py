@@ -66,7 +66,7 @@ def run(nproc, input_filename, arguments, restart=None):
     os.chdir(exe_dir)
     try:
         input_filename_full = "../../" + artemis_rel_path + "inputs/" + input_filename
-        run_command = ["mpiexec", "-n", str(nproc), "./artemis"]
+        run_command = ["mpiexec", "--oversubscribe", "-n", str(nproc), "./artemis"]
         if restart is not None:
             run_command += ["-r", restart]
         run_command += ["-i", input_filename_full]

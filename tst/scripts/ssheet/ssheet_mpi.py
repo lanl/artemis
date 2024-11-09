@@ -29,6 +29,7 @@ def get_mpi_slots():
         result = subprocess.run(['lscpu'], stdout=subprocess.PIPE, text=True, check=True)
         sockets = 0
         for line in result.stdout.split('\n'):
+            print(line)
             if 'Socket(s):' in line:
                 sockets = int(line.split(':')[1].strip())
         return sockets * 2  # Assuming 2 ranks per socket
@@ -37,7 +38,8 @@ def get_mpi_slots():
         return 2  # Default to 2 slots if detection fails
 
 #ssheet._nranks = min(max(2, os.cpu_count()), 8)
-ssheet._nranks = min(max(2, get_mpi_slots()), 8)
+#ssheet._nranks = min(max(2, get_mpi_slots()), 8)
+ssheet._nranks = 8
 print(f'slots: {get_mpi_slots()}')
 print(f'os cpu count: {os.cpu_count()}')
 print(f'ranks: {ssheet._nranks}')

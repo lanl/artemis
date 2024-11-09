@@ -25,7 +25,8 @@ logging.getLogger("h5py").setLevel(logging.WARNING)
 logging.getLogger("matplotlib").setLevel(logging.WARNING)
 
 ssheet._nranks = min(max(2, os.cpu_count()), 8)
-print('ranks: {ssheet._nranks}')
+print(f'os cpu count: {os.cpu_count()}')
+print(f'ranks: {ssheet._nranks}')
 ssheet._file_id = "ssheet_mpi"
 
 

@@ -67,7 +67,8 @@ def run(**kwargs):
                             g, int(10 * gam), b
                         ),
                         "problem/polytropic_index={:.2f}".format(gam),
-                    ] + geom_args,
+                    ]
+                    + geom_args,
                 )
                 artemis.run(
                     _nranks,

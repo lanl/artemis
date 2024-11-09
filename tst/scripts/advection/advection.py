@@ -18,6 +18,7 @@
 # Modules
 import logging
 import numpy as np
+import os
 import scripts.utils.artemis as artemis
 
 logger = logging.getLogger("artemis" + __name__[7:])  # set logger name
@@ -71,8 +72,14 @@ def analyze():
     # error convergence rates, and error identicality between L- and R-going
     # advection.
     logger.debug("Analyzing test " + __name__)
-    data = np.loadtxt("build/src/" + _file_id + "-errs.dat", dtype=np.float64, ndmin=2)
-    history = np.loadtxt("build/src/" + _file_id + ".out0.hst")
+    data = np.loadtxt(
+        os.path.join(artemis.get_run_directory(), _file_id + "-errs.dat"),
+        dtype=np.float64,
+        ndmin=2,
+    )
+    history = np.loadtxt(
+        os.path.join(artemis.get_run_directory(), _file_id + ".out0.hst")
+    )
     analyze_status = True
     if np.isnan(data).any() or np.isnan(history).any():
         logger.warning("NaN encountered")

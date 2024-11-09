@@ -17,6 +17,7 @@
 # Modules
 import logging
 import numpy as np
+import os
 import scripts.utils.artemis as artemis
 
 logger = logging.getLogger("artemis" + __name__[7:])  # set logger name
@@ -98,15 +99,24 @@ def analyze():
             for gam in _gamma:
                 logger.debug("Analyzing test {}_{}".format(__name__, g))
                 logger.debug(
-                    "build/src/disk_{}_{:d}_{}.out1".format(g, int(10 * gam), b)
+                    os.path.join(
+                        artemis.get_run_directory(),
+                        "disk_{}_{:d}_{}.out1".format(g, int(10 * gam), b),
+                    )
                 )
                 _, (x, y, z), (d0, _, _, _, _), sys, _ = loadf(
                     0,
-                    base="build/src/disk_{}_{:d}_{}.out1".format(g, int(10 * gam), b),
+                    base=os.path.join(
+                        artemis.get_run_directory(),
+                        "disk_{}_{:d}_{}.out1".format(g, int(10 * gam), b),
+                    ),
                 )
                 time, (x, y, z), (d, T, u, v, w), sys, dt = loadf(
                     "final",
-                    base="build/src/disk_{}_{:d}_{}.out1".format(g, int(10 * gam), b),
+                    base=os.path.join(
+                        artemis.get_run_directory(),
+                        "disk_{}_{:d}_{}.out1".format(g, int(10 * gam), b),
+                    ),
                 )
                 mybad = False
                 mybad |= np.any(np.isnan(d))
@@ -189,8 +199,4 @@ def loadf(n, base="disk.out1"):
         w = f["gas.prim.velocity_0"][...][:, 2, :, :, :]
         x = f["Locations/x"][...]
         y = f["Locations/y"][...]
-        z = f["Locations/z"][...]
-        sys = f["Params"].attrs["artemis/coord_sys"]
-        time = f["Info"].attrs["Time"]
-        dt = f["Info"].attrs["dt"]
-    return time, (x, y, z), (d, T, u, v, w), sys, dt
+ 

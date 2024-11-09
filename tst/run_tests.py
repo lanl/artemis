@@ -12,6 +12,8 @@
 #  the public, perform publicly and display publicly, and to permit others to do so.
 # ========================================================================================
 
+# This file was created in part by one of OpenAI's generative AI models
+
 # Regression test script for Artemis.
 
 # Usage: From this directory, call this script with python:
@@ -112,6 +114,10 @@ def main(**kwargs):
     test_times = []
     test_results = []
     test_errors = []
+
+    # Extract arguments
+    artemis_exe_path = kwargs.pop("exe")
+
     try:
         # Check that required modules are installed for all test dependencies
         deps_installed = True
@@ -130,8 +136,21 @@ def main(**kwargs):
                 deps_installed = False
         if not deps_installed:
             logger.warning("WARNING! Not all required Python modules " "are available")
+
+        # Set the executable path if provided
+        if artemis_exe_path is not None:
+            artemis.artemis_executable = os.path.abspath(artemis_exe_path)
+            # Check that path is valid
+            if not (
+                os.path.exists(artemis.artemis_executable)
+                and os.access(artemis.artemis_executable, os.X_OK)
+            ):
+                logger.error("Exception occurred", exc_info=True)
+                test_errors.append("make()")
+                raise TestError('Provided executable "{artemis_exe_path}" not found!')
+
         # Build Artemis
-        if not kwargs.pop("reuse_build"):
+        if artemis_exe_path is None and not kwargs.pop("reuse_build"):
             try:
                 os.system("rm -rf {0}/build".format(current_dir))
                 # insert arguments for artemis.make()
@@ -142,6 +161,7 @@ def main(**kwargs):
                 logger.error("Exception occurred", exc_info=True)
                 test_errors.append("make()")
                 raise TestError("Unable to build Artemis")
+
         # Run each test
         for name in test_names:
             t0 = timer()
@@ -178,7 +198,7 @@ def main(**kwargs):
             # For CI, print after every individual test has finished
             logger.info("{} test: run(), analyze() finished".format(name))
     finally:
-        if not kwargs.pop("save_build"):
+        if not kwargs.pop("save_build") and artemis_exe_path is None:
             os.system("rm -rf {0}/build".format(current_dir))
 
     # Report test results
@@ -273,6 +293,13 @@ if __name__ == "__main__":
         "--reuse_build",
         action="store_true",
         help="do not recompile the code and reuse the build directory.",
+    )
+
+    parser.add_argument(
+        "--exe",
+        type=str,
+        default=None,
+        help="path to pre-built executable",
     )
 
     args = parser.parse_args()

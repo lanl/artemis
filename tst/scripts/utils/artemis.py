@@ -20,12 +20,27 @@
 import logging
 import os
 import subprocess
+import datetime
 from timeit import default_timer as timer
 from .log_pipe import LogPipe
 
 # Global variables
-artemis_rel_path = "../"
+current_dir = os.getcwd()
+artemis_dir = os.path.abspath(os.path.join(current_dir, ".."))
+artemis_executable = os.path.join(artemis_dir, "build", "src", "artemis")
+artemis_inputs_dir = os.path.join(artemis_dir, "inputs")
 artemis_fig_dir = "./figs/"
+
+# Create run directory for this invocation of the test framework
+now = datetime.datetime.now()
+run_directory_name = "tests_run_{0:%Y%m%d_%H%M%S}".format(now)
+run_directory = os.path.join(current_dir, run_directory_name)
+os.makedirs(run_directory, exist_ok=True)
+
+
+# Function for returning the path to the run directory for this set of tests
+def get_run_directory():
+    return run_directory
 
 
 # Function for compiling Artemis
@@ -60,27 +75,27 @@ def make(cmake_args, make_nproc):
 
 # Function for running Artemis (with MPI)
 def run(nproc, input_filename, arguments, restart=None):
+    global run_directory
     out_log = LogPipe("artemis.run", logging.INFO)
-    current_dir = os.getcwd()
-    exe_dir = current_dir + "/build/src/"
-    os.chdir(exe_dir)
-    try:
-        input_filename_full = "../../" + artemis_rel_path + "inputs/" + input_filename
-        run_command = ["mpiexec", "--oversubscribe", "-n", str(nproc), "./artemis"]
-        if restart is not None:
-            run_command += ["-r", restart]
-        run_command += ["-i", input_filename_full]
-        try:
-            cmd = run_command + arguments
-            logging.getLogger("artemis.run").debug("Executing: " + " ".join(cmd))
-            subprocess.check_call(cmd, stdout=out_log)
-        except subprocess.CalledProcessError as err:
-            raise ArtemisError(
-                "Return code {0} from command '{1}'".format(
-                    err.returncode, " ".join(err.cmd)
-                )
-            )
 
+    # Build the run command
+    run_command = ["mpiexec", "--oversubscribe", "-n", str(nproc), artemis_executable]
+    if restart is not None:
+        run_command += ["-r", restart]
+    input_filename_full = os.path.join(artemis_inputs_dir, input_filename)
+    run_command += ["-i", input_filename_full]
+
+    try:
+        os.chdir(run_directory)
+        cmd = run_command + arguments
+        logging.getLogger("artemis.run").debug("Executing: " + " ".join(cmd))
+        subprocess.check_call(cmd, stdout=out_log)
+    except subprocess.CalledProcessError as err:
+        raise ArtemisError(
+            "Return code {0} from command '{1}'".format(
+                err.returncode, " ".join(err.cmd)
+            )
+        )
     finally:
         out_log.close()
         os.chdir(current_dir)

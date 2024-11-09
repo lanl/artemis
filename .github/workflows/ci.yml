@@ -60,15 +60,16 @@ jobs:
           sudo apt-get install -qq libopenmpi-dev libhdf5-openmpi-dev
           sudo apt-get install -qq openssh-client
           sudo apt-get install -qq python3 python3-numpy python3-h5py python3-matplotlib
-      - name: Set up environment
-        run: |
-          source env/bash
       - name: Run CPU tests
         run: |
           cd tst
-          build_artemis -b tst/build -j 4 -f
+          mkdir -p build
+          cd build
+          cmake -DCMAKE_CXX_COMPILER=g++ -DCMAKE_C_COMPILER=gcc ../../
+          make -j 4
+          cd ..
           python3 run_tests.py regression.suite \
-            --exe tst/build/artemis
+            --exe build/src/artemis
             --log_file=ci_cpu_log.txt
       - name: Upload CPU test log
         if: always()

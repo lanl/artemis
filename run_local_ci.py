@@ -80,13 +80,14 @@ def run_tests_in_temp_dir(pr_number, head_repo, head_ref, commit_sha):
         # Run the tests
         try:
             os.chdir(os.path.join(temp_dir, "tst"))
+            build_dir = os.path.join(temp_dir, "build")
             test_command = [
                 "bash",
                 "-c",
-                "source ../env/bash && build_artemis -b " + temp_dir + " -j 4 -f && python3 run_tests.py regression.suite "
-                #"--save_build --make_nproc=4 "
-                #"--cmake=-DCMAKE_C_COMPILER=gcc "
-                #"--cmake=-DCMAKE_CXX_COMPILER=g++ "
+                "source ../env/bash && build_artemis -b "
+                + build_dir
+                + " -j 4 -f && python3 run_tests.py regression.suite "
+                "--exe " + build_dir + " "
                 "--log_file=ci_cpu_log.txt",
             ]
             print(test_command)

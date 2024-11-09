@@ -41,15 +41,16 @@ jobs:
           git pull origin develop
           echo "==> Current Parthenon commit hash:"
           git rev-parse HEAD
-      - name: Set up environment
-        run: |
-          source env/bash
       - name: Run CPU tests
         run: |
           cd tst
-          build_artemis -b tst/build -j 4 -f
+          mkdir -p build
+          cd build
+          cmake -DCMAKE_CXX_COMPILER=g++ -DCMAKE_C_COMPILER=gcc ../../
+          make -j 4
+          cd ..
           python3 run_tests.py regression.suite \
-            --exe tst/build/artemis
+            --exe build/src/artemis
             --log_file=ci_cpu_log.txt
       - name: Upload CPU test log
         if: always()

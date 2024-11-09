@@ -47,10 +47,9 @@ jobs:
       - name: Run CPU tests
         run: |
           cd tst
+          build_artemis -b tst/build -j 4 -f
           python3 run_tests.py regression.suite \
-            --make_nproc=32 \
-            --cmake=-DCMAKE_C_COMPILER=gcc \
-            --cmake=-DCMAKE_CXX_COMPILER=g++ \
+            --exe tst/build/artemis
             --log_file=ci_cpu_log.txt
       - name: Upload CPU test log
         if: always()

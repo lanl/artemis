@@ -83,7 +83,7 @@ def run_tests_in_temp_dir(pr_number, head_repo, head_ref, commit_sha):
             test_command = [
                 "bash",
                 "-c",
-                "source ../env/bash && build_artemis -b " + temp_dir + " -j 4 && python3 run_tests.py regression.suite "
+                "source ../env/bash && build_artemis -b " + temp_dir + " -j 4 -f && python3 run_tests.py regression.suite "
                 #"--save_build --make_nproc=4 "
                 #"--cmake=-DCMAKE_C_COMPILER=gcc "
                 #"--cmake=-DCMAKE_CXX_COMPILER=g++ "

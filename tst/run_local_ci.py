@@ -22,10 +22,6 @@ import json
 import tempfile
 import shutil
 
-# Replace with your GitHub username and repository name
-# GITHUB_USER = '<your-github-username>'
-# GITHUB_REPO = '<your-repository-name>'
-
 # The personal access token (PAT) with 'repo:status' permission
 # Store your token securely and do not hardcode it in the script
 GITHUB_TOKEN = os.environ.get("ARTEMIS_GITHUB_TOKEN")

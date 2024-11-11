@@ -60,6 +60,8 @@ def update_status(
 
 
 def run_tests_in_temp_dir(pr_number, head_repo, head_ref, commit_sha):
+    current_dir = os.getcwd()
+
     # Create a temporary directory
     with tempfile.TemporaryDirectory() as temp_dir:
         print(f"Using temporary directory: {temp_dir}")
@@ -86,8 +88,8 @@ def run_tests_in_temp_dir(pr_number, head_repo, head_ref, commit_sha):
                 "-c",
                 "source ../env/bash && build_artemis -b "
                 + build_dir
-                + " -j 4 -f && python3 run_tests.py regression.suite "
-                "--exe " + build_dir + " "
+                + " -j 4 -f && cd " + os.path.join(temp_dir, "tst") + " && python3 run_tests.py regression.suite "
+                "--exe " + os.path.join(build_dir, "src", "artemis") + " "
                 "--log_file=ci_cpu_log.txt",
             ]
             print(test_command)

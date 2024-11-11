@@ -66,7 +66,8 @@ def process_suite(filename):
                         dir_test_names = [
                             name
                             for _, name, _ in iter_modules(
-                                path=["scripts/" + test_name], prefix=test_name + "."
+                                #path=["scripts/" + test_name], prefix=test_name + "."
+                                path=[os.path.join(artemis.get_source_directory(), "tst", "scripts", test_name)], prefix=test_name + "."
                             )
                         ]
                         tests += dir_test_names
@@ -84,7 +85,7 @@ def main(**kwargs):
                 dir_test_names = [
                     name
                     for _, name, _ in iter_modules(
-                        path=["scripts/" + directory], prefix=directory + "."
+                        path=[os.path.join(artemis.get_source_directory(), "tst", "scripts", directory)], prefix=directory + "."
                     )
                 ]
                 test_names.extend(dir_test_names)
@@ -100,7 +101,7 @@ def main(**kwargs):
                 dir_test_names = [
                     name
                     for _, name, _ in iter_modules(
-                        path=["scripts/" + test], prefix=test + "."
+                        path=[os.path.join(artemis.get_source_directory(), "tst", "scripts", test)], prefix=test + "."
                     )
                 ]
                 test_names.extend(dir_test_names)

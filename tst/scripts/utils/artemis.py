@@ -26,7 +26,7 @@ from .log_pipe import LogPipe
 
 # Global variables
 current_dir = os.getcwd()
-artemis_dir = os.path.abspath(os.path.join(current_dir, ".."))
+artemis_dir = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", ".."))
 artemis_executable = os.path.join(artemis_dir, "build", "src", "artemis")
 artemis_inputs_dir = os.path.join(artemis_dir, "inputs")
 artemis_fig_dir = "./figs/"
@@ -34,13 +34,17 @@ artemis_fig_dir = "./figs/"
 # Create run directory for this invocation of the test framework
 now = datetime.datetime.now()
 run_directory_name = "tests_run_{0:%Y%m%d_%H%M%S}".format(now)
-run_directory = os.path.join(current_dir, run_directory_name)
+run_directory = os.path.join(artemis_dir, "tst", run_directory_name)
 os.makedirs(run_directory, exist_ok=True)
 
 
 # Function for returning the path to the run directory for this set of tests
 def get_run_directory():
     return run_directory
+
+# Provide base directory of artemis source tree
+def get_source_directory():
+    return artemis_dir
 
 
 # Function for compiling Artemis
@@ -52,7 +56,7 @@ def make(cmake_args, make_nproc):
         subprocess.check_call(["mkdir", "build"], stdout=out_log)
         build_dir = current_dir + "/build/"
         os.chdir(build_dir)
-        cmake_command = ["cmake", "../" + artemis_rel_path] + cmake_args
+        cmake_command = ["cmake", artemis_dir] + cmake_args
         make_command = ["make", "-j" + str(make_nproc)]
         try:
             t0 = timer()

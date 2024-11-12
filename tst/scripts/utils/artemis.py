@@ -26,7 +26,9 @@ from .log_pipe import LogPipe
 
 # Global variables
 current_dir = os.getcwd()
-artemis_dir = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", ".."))
+artemis_dir = os.path.abspath(
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..")
+)
 artemis_executable = os.path.join(artemis_dir, "build", "src", "artemis")
 artemis_inputs_dir = os.path.join(artemis_dir, "inputs")
 artemis_fig_dir = "./figs/"
@@ -41,6 +43,7 @@ os.makedirs(run_directory, exist_ok=True)
 # Function for returning the path to the run directory for this set of tests
 def get_run_directory():
     return run_directory
+
 
 # Provide base directory of artemis source tree
 def get_source_directory():

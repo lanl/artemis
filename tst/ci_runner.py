@@ -20,10 +20,13 @@ import os
 import subprocess
 import requests
 import sys
+import json
+import tempfile
 
 # The personal access token (PAT) with 'repo:status' permission
 # Store your token securely and do not hardcode it in the script
 GITHUB_TOKEN = os.environ.get("ARTEMIS_GITHUB_TOKEN")
+
 
 def get_pr_info(pr_number):
     url = f"https://api.github.com/repos/lanl/artemis/pulls/{pr_number}"
@@ -35,8 +38,9 @@ def get_pr_info(pr_number):
         sys.exit(1)
     return response.json()
 
+
 def update_status(
-    commit_sha, state, description, context="Continuous Integration / chicoma-gpu"
+    commit_sha, state, description, context="Continuous Integration / darwin_volta-x86"
 ):
     url = f"https://api.github.com/repos/lanl/artemis/statuses/{commit_sha}"
     headers = {"Authorization": f"token {GITHUB_TOKEN}"}
@@ -47,7 +51,8 @@ def update_status(
         print(response.text)
         sys.exit(1)
 
-#def run_tests():
+
+# def run_tests():
 #    try:
 #        subprocess.run(['python3', 'run_tests.py', 'regression.suite',
 #                        '--save_build', '--make_nproc=4',
@@ -86,33 +91,36 @@ def run_tests_in_temp_dir(pr_number, head_repo, head_ref, commit_sha):
                 "-c",
                 "source ../env/bash && build_artemis -b "
                 + build_dir
-                + " -j 4 -f && cd " + os.path.join(temp_dir, "tst") + " && python3 run_tests.py regression.suite "
+                + " -j 4 -f && cd "
+                + os.path.join(temp_dir, "tst")
+                + " && python3 run_tests.py regression.suite "
                 "--exe " + os.path.join(build_dir, "src", "artemis") + " "
                 "--log_file=ci_cpu_log.txt",
             ]
-            #print(test_command)
+            # print(test_command)
             subprocess.run(test_command, check=True)
             return True
             # Update the status to success
-            #update_status(commit_sha, "success", "All tests passed.")
-            #print("Tests passed.")
+            # update_status(commit_sha, "success", "All tests passed.")
+            # print("Tests passed.")
         except subprocess.CalledProcessError:
             return False
             # Update the status to failure
-            #update_status(commit_sha, "failure", "Tests failed.")
-            #print("Tests failed.")
-            #sys.exit(1)
+            # update_status(commit_sha, "failure", "Tests failed.")
+            # print("Tests failed.")
+            # sys.exit(1)
+
 
 def main():
-    if len(sys.argv) != 3:
-        print("Usage: ci_runner.py [PR number] [checkout dir]")
+    if len(sys.argv) != 2:
+        print("Usage: ci_runner.py [PR number]")
         sys.exit(1)
 
     pr_number = sys.argv[1]
 
     # Check that we are on the right system
-    #hostname = socket.gethostname()
-    #if not fnmatch.fnmatch(hostname, "ch-fe*"):
+    # hostname = socket.gethostname()
+    # if not fnmatch.fnmatch(hostname, "ch-fe*"):
     #    print("ERROR script must be run from Chicoma frontend node!")
     #    sys.exit(1)
 
@@ -122,15 +130,16 @@ def main():
     head_ref = pr_info["head"]["ref"]
     commit_sha = pr_info["head"]["sha"]
 
-    update_status(commit_sha, 'pending', 'CI Slurm job running...')
+    update_status(commit_sha, "pending", "CI Slurm job running...")
 
     # Run the tests in a temporary directory
     test_success = run_tests_in_temp_dir(pr_number, head_repo, head_ref, commit_sha)
 
     if test_success:
-        update_status(commit_sha, 'success', 'All tests passed.')
+        update_status(commit_sha, "success", "All tests passed.")
     else:
-        update_status(commit_sha, 'failure', 'Tests failed.')
+        update_status(commit_sha, "failure", "Tests failed.")
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

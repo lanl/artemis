@@ -159,28 +159,29 @@ if __name__ == "__main__":
             )
 
             job_ids = squeue_result.stdout.strip().split()
-            print("Canceling jobs:")
-            for job_id in job_ids:
-                print(f"  {job_id}")
+            if len(job_ids) >= 1:
+                print("Canceling jobs:")
+                for job_id in job_ids:
+                    print(f"  {job_id}")
 
-            # Use scancel to cancel the jobs
-            scancel_command = ["scancel"] + job_ids
-            scancel_result = subprocess.run(scancel_command, universal_newlines=True)
+                # Use scancel to cancel the jobs
+                scancel_command = ["scancel"] + job_ids
+                scancel_result = subprocess.run(scancel_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
 
             sbatch_command = [
                 "sbatch",
                 f"--job-name={job_name}",
                 f"--output={job_name}_%j.out",
-                f"--error={job_name}_%j.err",
+                f"--error={job_name}_%j.out",
                 "--partition=volta-x86",
                 "--time=04:00:00",
                 "--wrap",
-                # f"python3 ci_runner.py {pr_number}",
                 f"python3 {sys.argv[0]} {args.pr_number} --submission",
             ]
             result = subprocess.run(
                 sbatch_command,
                 stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
                 check=True,
                 universal_newlines=True,
             )

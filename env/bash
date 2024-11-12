@@ -266,6 +266,5 @@ function build_artemis {
     make -j$BUILD_RANKS
     make_status=$?
 
-    echo "${ABS_BUILD_DIR}"
     return $make_status
 }

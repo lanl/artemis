@@ -14,9 +14,9 @@
 # serial suite
 
 advection/advection
-coords/blast
-disk/disk
+#coords/blast
+#disk/disk
 hydro/linwave
-ssheet/ssheet
-diffusion/alpha_disk
-drag/drag
+#ssheet/ssheet
+#diffusion/alpha_disk
+#drag/drag

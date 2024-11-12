@@ -88,6 +88,11 @@ def analyze():
     if history.shape != (44, 18):
         analyze_status = False
     history_line = history[-1]
+    # DEBUG
+    print("OK what is in this file")
+    with open(os.path.join(artemis.get_run_directory(), _file_id + ".out0.hst"), 'r') as file:
+        contents = file.read()
+        print(contents)
 
     def history_equiv(a, b, tol=1.0e-4):
         if 2.0 * (np.fabs(a - b)) / (np.fabs(a) + np.fabs(b)) > tol:

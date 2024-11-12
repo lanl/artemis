@@ -272,7 +272,7 @@ def log_init(args):
     c_handler.setFormatter(logging.Formatter("%(message)s"))  # only show msg
     logger.addHandler(c_handler)
     # setup log_file
-    log_fn = kwargs.pop("log_file")
+    log_fn = os.path.join(artemis.artemis_log_dir, kwargs.pop("log_file"))
     if log_fn:
         f_handler = logging.FileHandler(log_fn)
         f_handler.setLevel(0)  # log everything

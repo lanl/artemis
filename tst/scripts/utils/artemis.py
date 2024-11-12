@@ -25,13 +25,15 @@ from timeit import default_timer as timer
 from .log_pipe import LogPipe
 
 # Global variables
-current_dir = os.getcwd()
+# current_dir = os.getcwd()
 artemis_dir = os.path.abspath(
     os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..")
 )
-artemis_executable = os.path.join(artemis_dir, "build", "src", "artemis")
+artemis_executable = os.path.join(artemis_dir, "tst", "build", "src", "artemis")
 artemis_inputs_dir = os.path.join(artemis_dir, "inputs")
-artemis_fig_dir = "./figs/"
+# artemis_fig_dir = "./figs/"
+artemis_fig_dir = os.path.join(artemis_dir, "tst", "figs")
+artemis_log_dir = os.path.join(artemis_dir, "tst")
 
 # Create run directory for this invocation of the test framework
 now = datetime.datetime.now()

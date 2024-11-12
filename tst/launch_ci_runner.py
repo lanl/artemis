@@ -166,7 +166,12 @@ if __name__ == "__main__":
 
                 # Use scancel to cancel the jobs
                 scancel_command = ["scancel"] + job_ids
-                scancel_result = subprocess.run(scancel_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+                scancel_result = subprocess.run(
+                    scancel_command,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    universal_newlines=True,
+                )
 
             sbatch_command = [
                 "sbatch",

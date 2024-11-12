@@ -53,7 +53,6 @@ Currently supported computers/partitions are:
 
     skylake-gold
     volta-x86 (gpu)
-    power9-rhel7 (gpu)
 
 # Installation
 
@@ -96,6 +95,17 @@ We use the gitlab CI for regression testing. The CI will not run if the PR is ma
 with an empty commit, do
 
     git commit --allow-empty -m "trigger pipeline" && git push
+
+A portion of the CI is run on LANL's internal Darwin platform. To launch this CI job, someone with
+Darwin access (usually a LANL employee) must first create a Github Personal Access Token and store
+it securely in their own environment as `ARTEMIS_GITHUB_TOKEN`, e.g. in their `~/.bashrc`:
+
+    export ARTEMIS_GITHUB_TOKEN=[token]
+
+and then log in to Darwin and manually launch the CI runner:
+
+    cd artemis
+    ./tst/launcher_ci_runner.py [Number of the github PR]
 
 ## Release
 

@@ -96,7 +96,7 @@ def analyze():
         yc = 0.5 * (y[1:] + y[:-1])
 
         time0, x0, y0, z0, [dens0, u0, v0, w0, T0] = binary.load_level(
-            0, dir="build/src", base=base + ".out1"
+            0, dir=artemis.get_run_directory(), base=base + ".out1"
         )
 
         vx3 = w[0, :]

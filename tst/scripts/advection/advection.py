@@ -96,10 +96,11 @@ def analyze():
             return True
 
     history_expected = [
-        1.00000e00,
-        1.11612e-02,
-        5.60000e01,
-        1.60000e01,
+        1.00000e00,  # unused
+        -1e100,  # unused
+        1.11612e-02,  # unused
+        5.60000e01,  # unused
+        1.60000e01,  # unused
         6.75000e00,
         2.25000e00,
         4.50000e00,

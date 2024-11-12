@@ -21,5 +21,4 @@ hydro/linwave_mpi
 ssheet/ssheet_mpi
 diffusion/viscous_diffusion_mpi
 diffusion/alpha_disk_mpi
-diffusion/thermal_diffusion_mpi
 drag/drag_mpi

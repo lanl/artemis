@@ -19,6 +19,11 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
 
+# Cancel outdated workflows
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   format:
     if: >

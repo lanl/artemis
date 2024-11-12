@@ -80,7 +80,8 @@ def run(**kwargs):
                             g, int(10 * gam), b
                         ),
                         "problem/polytropic_index={:.2f}".format(gam),
-                    ],
+                    ]
+                    + geom_args,
                     restart="disk_{}_{:d}_{}.out2.final.rhdf".format(
                         g, int(10 * gam), b
                     ),

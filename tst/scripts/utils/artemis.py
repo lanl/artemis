@@ -25,7 +25,7 @@ from timeit import default_timer as timer
 from .log_pipe import LogPipe
 
 # Global variables
-# current_dir = os.getcwd()
+current_dir = os.getcwd()
 artemis_dir = os.path.abspath(
     os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..")
 )

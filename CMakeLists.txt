@@ -17,11 +17,6 @@ project(artemis LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_EXPORT_COMPILE_COMMANDS On)
 
-# Default to make
-if (NOT MAKE_PROGRAM)
-  find_program(MAKE_PROGRAM names make)
-endif()
-
 # Options
 option(ARTEMIS_ENABLE_CUDA "Enable cuda for artemis and all dependencies" OFF)
 option(ARTEMIS_ENABLE_HDF5 "Enable HDF5 for artemis and all dependencies" ON)

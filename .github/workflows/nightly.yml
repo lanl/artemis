@@ -22,6 +22,8 @@ on:
 jobs:
   cpu:
     runs-on: ubuntu-latest
+    env:
+      MAKE_PROGRAM: ${{ env.MAKE_PROGRAM || 'make' }}
     steps:
       - uses: actions/checkout@v3
         with:

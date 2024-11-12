@@ -70,7 +70,7 @@ jobs:
           cd tst
           mkdir -p build
           cd build
-          cmake -DCMAKE_CXX_COMPILER=g++ -DCMAKE_C_COMPILER=gcc ../../
+          cmake --preset=cpu-release ../../
           make -j 4
           cd ..
           python3 run_tests.py regression.suite \

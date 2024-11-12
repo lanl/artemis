@@ -18,7 +18,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_EXPORT_COMPILE_COMMANDS On)
 
 # Default to make
-if not (MAKE_PROGRAM)
+if (NOT MAKE_PROGRAM)
   find_program(MAKE_PROGRAM names make)
 endif()
 

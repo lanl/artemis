@@ -22,6 +22,10 @@ debug*
 doc/_build/*
 doc/src/parameters.rst
 
+# CI files
+artemis_ci_*.out
+tst/figs
+
 # Visualization package files
 .smhist
 

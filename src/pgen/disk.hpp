@@ -147,8 +147,10 @@ ComputeDiskProfile(const struct DiskParams pgen, const parthenon::Coordinates_t 
   const Real vp = Omg * xcyl[0];
   const Real vr = - pgen.nu0*(6*pgen.p-2*pgen.q+3+(5*pgen.q+9)*SQR(xcyl[2]/H))/(2*xcyl[0]);
 
+  const Real vz = (-pgen.p)*xcyl[2]/xcyl[0]*vr;
+
   // Construct the total cylindrical velocity
-  const Real vcyl[3] = {vr, vp - pgen.omf * xcyl[0], 0.0};
+  const Real vcyl[3] = {vr, vp - pgen.omf * xcyl[0], vz};
 
   // and convert it to the problem geometry
   gvel1 = ArtemisUtils::VDot(vcyl, ex1);

@@ -259,7 +259,9 @@ TaskStatus SelfDragSourceImpl(MeshData<Real> *md, const Real time, const Real dt
                             (6 * p - 2 * q + 3 + (5 * q + 9) * SQR(xcyl[2] / H)) /
                             (2 * xcyl[0]);
 
-            const Real vcyl[3] = {vR, vp - omf * xcyl[0], 0.};
+            const Real vz = (-p)*xcyl[2]/xcyl[0]*vR;
+
+            const Real vcyl[3] = {vR, vp - omf * xcyl[0], vz};
 
             const Real vd[3] = {
               ArtemisUtils::VDot(vcyl, ex1),

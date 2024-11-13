@@ -88,7 +88,7 @@ def run(nproc, input_filename, arguments, restart=None):
     out_log = LogPipe("artemis.run", logging.INFO)
 
     # Build the run command
-    run_command = ["mpiexec", "-n", str(nproc), artemis_executable]
+    run_command = ["mpiexec", "--oversubscribe", "-n", str(nproc), artemis_executable]
     if restart is not None:
         run_command += ["-r", restart]
     input_filename_full = os.path.join(artemis_inputs_dir, input_filename)

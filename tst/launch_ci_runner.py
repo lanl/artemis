@@ -67,8 +67,7 @@ def run_tests_in_temp_dir(pr_number, head_repo, head_ref, commit_sha):
         os.chdir(temp_dir)
 
         # Checkout the PR branch
-        subprocess.run(["git", "fetch", "origin", head_ref], check=True)
-        subprocess.run(["git", "checkout", head_ref], check=True)
+        subprocess.run(["git", "pull", "--no-rebase", "origin", head_ref], check=True)
 
         # Update submodules
         subprocess.run(

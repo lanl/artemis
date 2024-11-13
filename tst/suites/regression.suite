@@ -14,4 +14,4 @@
 # regression suite
 
 serial.suite
-#parallel.suite
+parallel.suite

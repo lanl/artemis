@@ -88,8 +88,9 @@ def run_tests_in_temp_dir(pr_number, head_repo, head_ref, commit_sha):
                 + " -j 20 -f && cd "
                 + os.path.join(temp_dir, "tst")
                 + " && python3 run_tests.py gpu.suite "
-                "--exe " + os.path.join(build_dir, "src", "artemis") + " "
-                "--log_file=ci_cpu_log.txt",
+                + "--exe "
+                + os.path.join(build_dir, "src", "artemis")
+                + " --log_file=ci_cpu_log.txt",
             ]
             subprocess.run(test_command, check=True)
 

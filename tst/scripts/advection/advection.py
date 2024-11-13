@@ -21,6 +21,7 @@ import numpy as np
 import os
 import scripts.utils.artemis as artemis
 import sys
+
 sys.path.append(os.path.join(artemis.artemis_dir, "analysis"))
 from ahistory import ahistory
 
@@ -80,7 +81,9 @@ def analyze():
         dtype=np.float64,
         ndmin=2,
     )
-    history = ahistory(os.path.join(artemis.get_run_directory(), _file_id + ".out0.hst"))
+    history = ahistory(
+        os.path.join(artemis.get_run_directory(), _file_id + ".out0.hst")
+    )
     analyze_status = True
     if np.isnan(data).any():
         logger.warning("NaN encountered")
@@ -94,30 +97,30 @@ def analyze():
             return True
 
     history_expected = {
-      "time": 1.0,
-      "dt": 1.11612e-02,
-      "cycle": 56,
-      "nbtotal": 16,
-      "gas_mass_0": 6.75,
-      "gas_momentum_x1_0": 2.25,
-      "gas_momentum_x2_0": 4.5,
-      "gas_momentum_x3_0": 4.5,
-      "gas_energy_0": 9.45,
-      "gas_internal_energy_0": 6.075,
-      "dust_mass_0": 6.75,
-      "dust_mass_1": 6.75,
-      "dust_momentum_x1_0": 2.25,
-      "dust_momentum_x1_1": -2.25,
-      "dust_momentum_x2_0": 4.5,
-      "dust_momentum_x2_1": -4.5,
-      "dust_momentum_x3_0": 4.5,
-      "dust_momentum_x3_1": -4.5
+        "time": 1.0,
+        "dt": 1.11612e-02,
+        "cycle": 56,
+        "nbtotal": 16,
+        "gas_mass_0": 6.75,
+        "gas_momentum_x1_0": 2.25,
+        "gas_momentum_x2_0": 4.5,
+        "gas_momentum_x3_0": 4.5,
+        "gas_energy_0": 9.45,
+        "gas_internal_energy_0": 6.075,
+        "dust_mass_0": 6.75,
+        "dust_mass_1": 6.75,
+        "dust_momentum_x1_0": 2.25,
+        "dust_momentum_x1_1": -2.25,
+        "dust_momentum_x2_0": 4.5,
+        "dust_momentum_x2_1": -4.5,
+        "dust_momentum_x3_0": 4.5,
+        "dust_momentum_x3_1": -4.5,
     }
 
     for key in history_expected.keys():
         values = history.Get(key)
         if len(values) != 11:
-            analyze_status=False
+            analyze_status = False
         for value in values:
             if np.isnan(value):
                 logger.warning("NaN encountered")

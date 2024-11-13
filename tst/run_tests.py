@@ -160,11 +160,10 @@ def main(**kwargs):
             logger.warning("WARNING! Not all required Python modules " "are available")
 
         if artemis_exe_path is not None:
-            print(f'path: {artemis_exe_path}')
             # Check that path is valid
             if not (
-                os.path.exists(artemis.artemis_executable)
-                and os.access(artemis.artemis_executable, os.X_OK)
+                os.path.exists(artemis_exe_path)
+                and os.access(artemis_exe_path, os.X_OK)
             ):
                 logger.error("Exception occurred", exc_info=True)
                 test_errors.append("make()")

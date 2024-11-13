@@ -92,8 +92,6 @@ def run_tests_in_temp_dir(pr_number, head_repo, head_ref, commit_sha):
                 + os.path.join(build_dir, "src", "artemis")
                 + " --log_file=ci_cpu_log.txt",
             ]
-            print("tst cmd:\n")
-            print(test_command)
             ret = subprocess.run(test_command,
             check=True)
 
@@ -132,7 +130,6 @@ if __name__ == "__main__":
         test_success = run_tests_in_temp_dir(
             args.pr_number, head_repo, head_ref, commit_sha
         )
-        printf("now here")
 
         # Update github PR status to indicate that testing has concluded
         if test_success:

@@ -38,17 +38,18 @@ artemis_log_dir = os.path.join(artemis_dir, "tst")
 custom_exe = False
 
 # Create run directory for this invocation of the test framework
-#now = datetime.datetime.now()
-#run_directory_name = "tests_run_{0:%Y%m%d_%H%M%S}".format(now)
-#run_directory = os.path.join(artemis_dir, "tst", run_directory_name)
-#os.makedirs(run_directory, exist_ok=True)
+# now = datetime.datetime.now()
+# run_directory_name = "tests_run_{0:%Y%m%d_%H%M%S}".format(now)
+# run_directory = os.path.join(artemis_dir, "tst", run_directory_name)
+# os.makedirs(run_directory, exist_ok=True)
+
 
 def set_executable(executable_path):
     global artemis_executable
     global artemis_run_dir
     global custom_exe
     artemis_executable = executable_path
-    artemis_run_dir = os.path.join(os.path.dirname(artemis_executable), 'tst')
+    artemis_run_dir = os.path.join(os.path.dirname(artemis_executable), "tst")
     custom_exe = True
 
 
@@ -94,7 +95,7 @@ def make(cmake_args, make_nproc):
 
 # Function for running Artemis (with MPI)
 def run(nproc, input_filename, arguments, restart=None):
-    #global run_directory
+    # global run_directory
     out_log = LogPipe("artemis.run", logging.INFO)
     os.makedirs(artemis_run_dir, exist_ok=True)
 
@@ -106,7 +107,7 @@ def run(nproc, input_filename, arguments, restart=None):
     run_command += ["-i", input_filename_full]
 
     try:
-        #os.chdir(run_directory)
+        # os.chdir(run_directory)
         os.chdir(artemis_run_dir)
         cmd = run_command + arguments
         logging.getLogger("artemis.run").debug("Executing: " + " ".join(cmd))

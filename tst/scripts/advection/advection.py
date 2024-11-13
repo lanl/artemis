@@ -83,9 +83,7 @@ def analyze():
         ndmin=2,
     )
     hist_path = os.path.join(artemis.get_run_directory(), _file_id + ".out0.hst")
-    history = ahistory(
-        hist_path
-    )
+    history = ahistory(hist_path)
     os.system(f"rm {err_path}")
     os.system(f"rm {hist_path}")
     analyze_status = True

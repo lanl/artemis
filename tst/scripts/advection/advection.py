@@ -76,14 +76,18 @@ def analyze():
     # error convergence rates, and error identicality between L- and R-going
     # advection.
     logger.debug("Analyzing test " + __name__)
+    err_path = os.path.join(artemis.get_run_directory(), _file_id + "-errs.dat")
     data = np.loadtxt(
-        os.path.join(artemis.get_run_directory(), _file_id + "-errs.dat"),
+        err_path,
         dtype=np.float64,
         ndmin=2,
     )
+    hist_path = os.path.join(artemis.get_run_directory(), _file_id + ".out0.hst")
     history = ahistory(
-        os.path.join(artemis.get_run_directory(), _file_id + ".out0.hst")
+        hist_path
     )
+    os.system(f"rm {err_path}")
+    os.system(f"rm {hist_path}")
     analyze_status = True
     if np.isnan(data).any():
         logger.warning("NaN encountered")

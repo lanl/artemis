@@ -159,9 +159,7 @@ def main(**kwargs):
         if not deps_installed:
             logger.warning("WARNING! Not all required Python modules " "are available")
 
-        # Set the executable path if provided
         if artemis_exe_path is not None:
-            artemis.artemis_executable = os.path.abspath(artemis_exe_path)
             # Check that path is valid
             if not (
                 os.path.exists(artemis.artemis_executable)
@@ -170,9 +168,17 @@ def main(**kwargs):
                 logger.error("Exception occurred", exc_info=True)
                 test_errors.append("make()")
                 raise TestError('Provided executable "{artemis_exe_path}" not found!')
+            # Set the valid provided executable path
+            artemis.set_executable(os.path.abspath(artemis_exe_path))
+        else:
+            # If we are in a directory with an executable, default to using that
+            local_path = os.path.join(os.getcwd(), "artemis")
+            if os.path.exists(local_path) and os.access(local_path, os.X_OK):
+                print(f"Found local executable {local_path}")
+                artemis.set_executable(local_path)
 
         # Build Artemis
-        if artemis_exe_path is None and not kwargs.pop("reuse_build"):
+        if not artemis.custom_exe and not kwargs.pop("reuse_build"):
             try:
                 os.system("rm -rf {0}/build".format(current_dir))
                 # insert arguments for artemis.make()

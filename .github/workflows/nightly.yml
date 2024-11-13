@@ -52,7 +52,7 @@ jobs:
           make -j 4
           cd ..
           python3 run_tests.py regression.suite \
-            --exe build/src/artemis
+            --exe build/src/artemis \
             --log_file=ci_cpu_log.txt
       - name: Upload CPU test log
         if: always()

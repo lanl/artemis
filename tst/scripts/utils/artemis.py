@@ -32,19 +32,29 @@ artemis_dir = os.path.abspath(
 artemis_executable = os.path.join(artemis_dir, "tst", "build", "src", "artemis")
 artemis_inputs_dir = os.path.join(artemis_dir, "inputs")
 # artemis_fig_dir = "./figs/"
+artemis_run_dir = os.path.join(artemis_dir, "tst", "build", "src", "tst")
 artemis_fig_dir = os.path.join(artemis_dir, "tst", "figs")
 artemis_log_dir = os.path.join(artemis_dir, "tst")
+custom_exe = False
 
 # Create run directory for this invocation of the test framework
-now = datetime.datetime.now()
-run_directory_name = "tests_run_{0:%Y%m%d_%H%M%S}".format(now)
-run_directory = os.path.join(artemis_dir, "tst", run_directory_name)
-os.makedirs(run_directory, exist_ok=True)
+#now = datetime.datetime.now()
+#run_directory_name = "tests_run_{0:%Y%m%d_%H%M%S}".format(now)
+#run_directory = os.path.join(artemis_dir, "tst", run_directory_name)
+#os.makedirs(run_directory, exist_ok=True)
+
+def set_executable(executable_path):
+    global artemis_executable
+    global artemis_run_dir
+    global custom_exe
+    artemis_executable = executable_path
+    artemis_run_dir = os.path.join(os.path.dirname(artemis_executable), 'tst')
+    custom_exe = True
 
 
 # Function for returning the path to the run directory for this set of tests
 def get_run_directory():
-    return run_directory
+    return artemis_run_dir
 
 
 # Provide base directory of artemis source tree
@@ -84,8 +94,9 @@ def make(cmake_args, make_nproc):
 
 # Function for running Artemis (with MPI)
 def run(nproc, input_filename, arguments, restart=None):
-    global run_directory
+    #global run_directory
     out_log = LogPipe("artemis.run", logging.INFO)
+    os.makedirs(artemis_run_dir, exist_ok=True)
 
     # Build the run command
     run_command = ["mpiexec", "--oversubscribe", "-n", str(nproc), artemis_executable]
@@ -95,7 +106,8 @@ def run(nproc, input_filename, arguments, restart=None):
     run_command += ["-i", input_filename_full]
 
     try:
-        os.chdir(run_directory)
+        #os.chdir(run_directory)
+        os.chdir(artemis_run_dir)
         cmd = run_command + arguments
         logging.getLogger("artemis.run").debug("Executing: " + " ".join(cmd))
         subprocess.check_call(cmd, stdout=out_log)

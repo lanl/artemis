@@ -37,13 +37,9 @@ artemis_fig_dir = os.path.join(artemis_dir, "tst", "figs")
 artemis_log_dir = os.path.join(artemis_dir, "tst")
 custom_exe = False
 
-# Create run directory for this invocation of the test framework
-# now = datetime.datetime.now()
-# run_directory_name = "tests_run_{0:%Y%m%d_%H%M%S}".format(now)
-# run_directory = os.path.join(artemis_dir, "tst", run_directory_name)
-# os.makedirs(run_directory, exist_ok=True)
 
-
+# Optionally set custom path for executable, and update other variables related to where
+# we run the code
 def set_executable(executable_path):
     global artemis_executable
     global artemis_run_dir

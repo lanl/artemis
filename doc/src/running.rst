@@ -111,7 +111,7 @@ This example sets up a 2D cylindrical mesh that spans the full :math:`2 \pi` in 
 :ref:`bc` describes all the possible boundary conditions.
 
 The ``refinement`` parameter in the ``<parthenon/mesh>`` block  controls how mesh refinement is handled.
-If ``refinement = none``, not refinement occurs.
+If ``refinement = none``, no refinement occurs.
 Setting ``refinement = adaptive`` activates adaptive mesh refinement.
 The physics packages can control when and where to refine and de-refine the mesh.
 See :ref:`physics` for a description of each package.

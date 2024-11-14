@@ -1,0 +1,70 @@
+# ========================================================================================
+#  (C) (or copyright) 2024. Triad National Security, LLC. All rights reserved.
+#
+#  This program was produced under U.S. Government contract 89233218CNA000001 for Los
+#  Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
+#  for the U.S. Department of Energy/National Nuclear Security Administration. All rights
+#  in the program are reserved by Triad National Security, LLC, and the U.S. Department
+#  of Energy/National Nuclear Security Administration. The Government is granted for
+#  itself and others acting on its behalf a nonexclusive, paid-up, irrevocable worldwide
+#  license in this material to reproduce, prepare derivative works, distribute copies to
+#  the public, perform publicly and display publicly, and to permit others to do so.
+# ========================================================================================
+
+# This file was created in part or in whole by one of OpenAI's generative AI models
+
+name: Nightly Tests
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # Runs daily at midnight; adjust as needed
+
+jobs:
+  cpu:
+    runs-on: ubuntu-latest
+    env:
+      MAKE_PROGRAM: ${{ env.MAKE_PROGRAM || 'make' }}
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: recursive
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -qq --no-install-recommends tzdata
+          sudo apt-get install -qq git
+          sudo apt-get install -qq make cmake g++
+          sudo apt-get install -qq libopenmpi-dev libhdf5-openmpi-dev
+          sudo apt-get install -qq openssh-client
+          sudo apt-get install -qq python3 python3-numpy python3-h5py python3-matplotlib
+      - name: Update Parthenon submodule
+        run: |
+          cd external/parthenon
+          git pull origin develop
+          echo "==> Current Parthenon commit hash:"
+          git rev-parse HEAD
+      - name: Run CPU tests
+        run: |
+          cd tst
+          mkdir -p build
+          cd build
+          cmake -DCMAKE_CXX_COMPILER=g++ -DCMAKE_C_COMPILER=gcc ../../
+          make -j 4
+          cd ..
+          python3 run_tests.py regression.suite \
+            --exe build/src/artemis \
+            --log_file=ci_cpu_log.txt
+      - name: Upload CPU test log
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: ci_cpu_log.txt
+          path: tst/ci_cpu_log.txt
+          retention-days: 3
+      - name: Upload figures
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: figs
+          path: tst/figs
+          retention-days: 3

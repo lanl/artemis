@@ -61,7 +61,7 @@ def analyze():
     analyze_status = True
 
     time, r, phi, z, [d, u, v, w, T] = load_level(
-        "final", base="{}.out1".format(_file_id), dir="build/src"
+        "final", base="{}.out1".format(_file_id), dir=artemis.get_run_directory()
     )
     rc = 0.5 * (r[1:] + r[:-1])
     pc = 0.5 * (phi[1:] + phi[:-1])

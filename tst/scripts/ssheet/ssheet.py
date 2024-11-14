@@ -51,7 +51,7 @@ def analyze():
     analyze_status = True
 
     time, x, y, z, [d, u, v, w, T] = binary.load_level(
-        "final", dir="build/src", base="{}.out1".format(_file_id)
+        "final", dir=artemis.get_run_directory(), base="{}.out1".format(_file_id)
     )
     xc = 0.5 * (x[1:] + x[:-1])
     yc = 0.5 * (y[1:] + y[:-1])

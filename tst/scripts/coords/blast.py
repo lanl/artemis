@@ -117,7 +117,10 @@ def analyze():
             else interp1d(dat3[:, 0], dat3[:, 3])
         )
         res = load_snap(
-            "build/src/" + _file_id + "_{}{:d}.out1.final.phdf".format(g, 2)
+            os.path.join(
+                artemis.get_run_directory(),
+                _file_id + "_{}{:d}.out1.final.phdf".format(g, 2),
+            )
         )
         pres = res[4][-1]
         xc = 0.5 * (res[1][:, 1:] + res[1][:, :-1])

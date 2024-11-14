@@ -90,13 +90,13 @@ def analyze():
         os.makedirs(artemis.artemis_fig_dir, exist_ok=True)
 
         time, x, y, z, [dens, u, v, w, T] = binary.load_level(
-            "final", dir="build/src", base=base + ".out1"
+            "final", dir=artemis.get_run_directory(), base=base + ".out1"
         )
         xc = 0.5 * (x[1:] + x[:-1])
         yc = 0.5 * (y[1:] + y[:-1])
 
         time0, x0, y0, z0, [dens0, u0, v0, w0, T0] = binary.load_level(
-            0, dir="build/src", base=base + ".out1"
+            0, dir=artemis.get_run_directory(), base=base + ".out1"
         )
 
         vx3 = w[0, :]

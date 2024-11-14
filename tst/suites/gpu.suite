@@ -19,4 +19,4 @@ binary/binary
 binary_adi/binary_adi
 nbody/nbody
 diffusion/viscous_diffusion
-diffusion/thermal_diffusion
+#diffusion/thermal_diffusion

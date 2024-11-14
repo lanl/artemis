@@ -69,7 +69,7 @@ def analyze():
             for dv in _de_switch:
                 problem_id = _file_id + "_{}_de{:d}_{}".format(fv, int(10 * dv), cv)
                 time, r, phi, z, [d, u, v, w, T] = load_level(
-                    "final", dir="build/src", base=problem_id + ".out1"
+                    "final", dir=artemis.get_run_directory(), base=problem_id + ".out1"
                 )
                 rc = 0.5 * (r[1:] + r[:-1])
                 pc = 0.5 * (phi[1:] + phi[:-1])

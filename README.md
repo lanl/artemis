@@ -123,15 +123,27 @@ with an empty commit, do
     git commit --allow-empty -m "trigger pipeline" && git push
 
 A portion of the CI is run on LANL's internal Darwin platform. To launch this CI job, someone with
-Darwin access (usually a LANL employee) must first create a Github Personal Access Token and store
-it securely in their own environment as `ARTEMIS_GITHUB_TOKEN`, e.g. in their `~/.bashrc`:
+Darwin access (usually a LANL employee) must first create a Github Personal Access Token, like so:
+
+- `github.com` profile -> `Settings` -> `Developer Settings` -> `Personal Access Tokens` -> `Tokens (classic)`
+- Click the `Generate New Token` button -> `Generate New Token (classic)`
+- Name it something like `artemis_token` in the `Note` box
+- Click the `workflow` checkbox (which will also check the `repo` boxes)
+- `Generate token`
+- You only get to see the token once, so immediately copy it.
+
+Store the token securely in your own environment as `ARTEMIS_GITHUB_TOKEN`, e.g. in your Darwin `~/.bashrc`:
 
     export ARTEMIS_GITHUB_TOKEN=[token]
 
-and then log in to Darwin and manually launch the CI runner:
+and then, again from Darwin, manually launch the CI runner:
 
     cd artemis
-    ./tst/launcher_ci_runner.py [Number of the github PR]
+    ./tst/launch_ci_runner.py [Number of the github PR]
+
+Note that `launch_ci_runner.py` will create a temporary checkout of the current state of the branch associated 
+with this PR according to the `origin` remote, so you don't need to worry about the state of your local checkout 
+of `artemis`.
 
 ## Release
 

@@ -76,8 +76,9 @@ refine_type = magnitude
 refine_thr = 3.0
 deref_thr = 0.8
 
-<gravity/point>
+<gravity>
 gm = 1.0e-5
+<gravity/point>
 soft = 0.03
 x = 0.0
 y = 0.0

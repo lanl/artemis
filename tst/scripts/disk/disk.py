@@ -17,6 +17,7 @@
 # Modules
 import logging
 import numpy as np
+import os
 import scripts.utils.artemis as artemis
 
 logger = logging.getLogger("artemis" + __name__[7:])  # set logger name
@@ -47,6 +48,13 @@ def run(**kwargs):
     for b in _bc:
         for g in _geom:
             bc_args = []
+            geom_args = []
+            if g == "cart":
+                geom_args = [
+                    "parthenon/mesh/nx1=64",
+                    "parthenon/mesh/nx2=64",
+                    "parthenon/mesh/nx3=64",
+                ]
             for d in directions[g]:
                 bc_args.append("parthenon/mesh/i{}_bc={}".format(d, b))
                 bc_args.append("parthenon/mesh/o{}_bc={}".format(d, b))
@@ -60,7 +68,8 @@ def run(**kwargs):
                             g, int(10 * gam), b
                         ),
                         "problem/polytropic_index={:.2f}".format(gam),
-                    ],
+                    ]
+                    + geom_args,
                 )
                 artemis.run(
                     _nranks,
@@ -71,7 +80,8 @@ def run(**kwargs):
                             g, int(10 * gam), b
                         ),
                         "problem/polytropic_index={:.2f}".format(gam),
-                    ],
+                    ]
+                    + geom_args,
                     restart="disk_{}_{:d}_{}.out2.final.rhdf".format(
                         g, int(10 * gam), b
                     ),
@@ -90,15 +100,24 @@ def analyze():
             for gam in _gamma:
                 logger.debug("Analyzing test {}_{}".format(__name__, g))
                 logger.debug(
-                    "build/src/disk_{}_{:d}_{}.out1".format(g, int(10 * gam), b)
+                    os.path.join(
+                        artemis.get_run_directory(),
+                        "disk_{}_{:d}_{}.out1".format(g, int(10 * gam), b),
+                    )
                 )
                 _, (x, y, z), (d0, _, _, _, _), sys, _ = loadf(
                     0,
-                    base="build/src/disk_{}_{:d}_{}.out1".format(g, int(10 * gam), b),
+                    base=os.path.join(
+                        artemis.get_run_directory(),
+                        "disk_{}_{:d}_{}.out1".format(g, int(10 * gam), b),
+                    ),
                 )
                 time, (x, y, z), (d, T, u, v, w), sys, dt = loadf(
                     "final",
-                    base="build/src/disk_{}_{:d}_{}.out1".format(g, int(10 * gam), b),
+                    base=os.path.join(
+                        artemis.get_run_directory(),
+                        "disk_{}_{:d}_{}.out1".format(g, int(10 * gam), b),
+                    ),
                 )
                 mybad = False
                 mybad |= np.any(np.isnan(d))

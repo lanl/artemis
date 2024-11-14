@@ -18,6 +18,7 @@
 # Modules
 import logging
 import numpy as np
+import os
 import scripts.utils.artemis as artemis
 import scripts.advection.advection as advection
 

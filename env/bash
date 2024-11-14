@@ -160,7 +160,7 @@ function build_artemis {
     DEBUG_BUILD=false # Whether to configure for Debug build (default is cmake's RelWithDebInfo)
     FULL_BUILD=false # Whether to completely wipe the build directory, if non-empty
     ASAN_BUILD=false # Whether to configure with ASAN support for error checking
-    options='hb:cdfa'
+    options='hb:cdfaj:'
     while getopts $options opt; do
         case $opt in
             h)
@@ -172,6 +172,7 @@ function build_artemis {
                 echo "    -c       : Force re-configuration of build"
                 echo "    -d       : Switch to debug build from default RelWithDebInfo"
                 echo "    -f       : Force complete re-build"
+                echo "    -j [N]   : Number of ranks N to use for make"
                 echo "               WARNING uses rm -rf to remove build directory if it exists"
                 return
                 ;;
@@ -189,6 +190,9 @@ function build_artemis {
             f)
                 echo "Full build requested"
                 FULL_BUILD=true
+                ;;
+            j)
+                BUILD_RANKS="$OPTARG"
                 ;;
             a)
                 echo "ASAN build requested"
@@ -259,9 +263,8 @@ function build_artemis {
         configure_artemis
     fi
 
-    make -j
+    make -j$BUILD_RANKS
     make_status=$?
 
-    echo "${ABS_BUILD_DIR}"
     return $make_status
 }

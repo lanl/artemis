@@ -10,6 +10,8 @@
       "name": "cpu-debug",
       "cacheVariables": {
         "CMAKE_MAKE_PROGRAM": "$env{MAKE_PROGRAM}",
+        "CMAKE_C_COMPILER": "gcc",
+        "CMAKE_CXX_COMPILER": "g++",
         "CMAKE_BUILD_TYPE": "Debug",
         "Kokkos_ENABLE_DEBUG_BOUNDS_CHECK": "ON"
       }
@@ -18,6 +20,8 @@
       "name": "cpu-release",
       "cacheVariables": {
         "CMAKE_MAKE_PROGRAM": "$env{MAKE_PROGRAM}",
+        "CMAKE_C_COMPILER": "gcc",
+        "CMAKE_CXX_COMPILER": "g++",
         "CMAKE_BUILD_TYPE": "RelWithDebInfo"
       }
     },

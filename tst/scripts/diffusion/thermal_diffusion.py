@@ -90,7 +90,7 @@ def analyze():
     for ax, g in zip(axes, _geom):
         name = "{}_{}".format(_file_id, g[:3])
         time, x, y, z, [d, u, v, w, T] = binary.load_level(
-            "final", dir="build/src", base="{}.out1".format(name)
+            "final", dir=artemis.get_run_directory(), base="{}.out1".format(name)
         )
         xc = 0.5 * (x[1:] + x[:-1])
         ans = Tans(xc.ravel(), f=_flux, T0=_gtemp, x0=1.2, xi=0.2, d=dind[g], k=_kcond)

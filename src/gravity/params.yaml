@@ -19,7 +19,7 @@ gravity:
 
   uniform:
     _type: node
-    _description: "Uniform graviational acceleration"
+    _description: "Uniform gravitational acceleration"
     gx(1,2,3):
       _type: Real
       _description: "Uniform gravity: acceleration in the x(1,2,3)-dir."

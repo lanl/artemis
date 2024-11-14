@@ -54,6 +54,16 @@ Currently supported computers/partitions are:
     skylake-gold
     volta-x86 (gpu)
 
+## Chicoma
+
+    cpu
+    gpu
+
+## Venado
+
+    gg (cpu)
+    gh (gpu)
+
 # Installation
 
     git submodule update --init --recursive
@@ -82,7 +92,23 @@ script:
 
 ## Testing
 
-There is a suite of tests in the `tst/` directory. To run the full regression suite, do
+There is a suite of tests in the `tst/` directory. Tests are run with the included `run_tests.py`
+script. This script can be run in three ways:
+
+1. With default arguments, where the current version of the source will be built. The resulting
+executable can be saved for reuse with `--save_build`, and if saved can be reused in subsequent test
+runs with `--reuse_build`. Note that `--save_build` must continue to be supplied as well to avoid
+the reused build being deleted after the tests are run.
+2. If the `run_tests.py` script is called from a directory with a valid `artemis` executable, that
+executable will be used for testing and will not be cleaned up afterwards.
+3. If the path to an `artemis` executable is provided to the `--exe` option of `run_tests.py`, that
+executable will be used for testing and will not be cleaned up afterwards.
+
+In all cases, the tests will be run from a `tst` directory created in the same folder as the
+executable being used. Figures will be created in `artemis/tst/figs` and the log file in
+`artemis/tst`.
+
+To run the full regression suite, do
 
     python3 run_tests.py regression.suite
 
@@ -90,7 +116,7 @@ You can also pass a list of individual tests to the script, or create your own s
 
 ## CI
 
-We use the gitlab CI for regression testing. The CI will not run if the PR is marked "Draft:" or
+We use the github CI for regression testing. The CI will not run if the PR is marked "Draft:" or
 "WIP:". Removing these labels from the title will not automatically launch the CI. To launch the CI
 with an empty commit, do
 

@@ -167,7 +167,7 @@ def main(**kwargs):
             ):
                 logger.error("Exception occurred", exc_info=True)
                 test_errors.append("make()")
-                raise TestError(f'Provided executable \"{artemis_exe_path}\" not found!')
+                raise TestError(f'Provided executable "{artemis_exe_path}" not found!')
             # Set the valid provided executable path
             artemis.set_executable(os.path.abspath(artemis_exe_path))
         else:

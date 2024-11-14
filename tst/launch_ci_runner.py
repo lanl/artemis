@@ -92,8 +92,7 @@ def run_tests_in_temp_dir(pr_number, head_repo, head_ref, commit_sha):
                 + os.path.join(build_dir, "src", "artemis")
                 + " --log_file=ci_cpu_log.txt",
             ]
-            ret = subprocess.run(test_command,
-            check=True)
+            ret = subprocess.run(test_command, check=True)
 
             # CI apparently succeeded; indicate that
             return True

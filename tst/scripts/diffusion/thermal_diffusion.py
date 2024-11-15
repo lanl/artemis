@@ -45,7 +45,7 @@ def run(**kwargs):
             "artemis/coordinates=" + g,
             "parthenon/time/tlim=50.0",
             "gas/conductivity/cond={:.8f}".format(_kcond),
-            "gravity/gx1={:.8f}".format(_gx1),
+            "gravity/uniform/gx1={:.8f}".format(_gx1),
             "problem/flux={:.8f}".format(_flux),
             "problem/gas_temp={:.8f}".format(_gtemp),
             "parthenon/meshblock/nx1={:d}".format(128 // _nranks),

@@ -116,7 +116,7 @@ def analyze():
 
     fig.tight_layout()
     fig.savefig(
-        os.path.join(artemis.artemis_fig_dir, +base + "_res.png"), bbox_inches="tight"
+        os.path.join(artemis.artemis_fig_dir, base + "_res.png"), bbox_inches="tight"
     )
 
     errors = [

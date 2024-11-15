@@ -108,8 +108,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     gtype = GravityType::nbody;
     block_name = "gravity/nbody";
     const bool do_nbody = pin->GetBoolean("physics", "nbody");
-    PARTHENON_REQUIRE(do_nbody,
-                      "You have gravity/type = nbody but not physics/nbody = true!");
+    PARTHENON_REQUIRE(do_nbody, "You have <gravity/nbody> but not physics/nbody = true!");
   }
 
   PARTHENON_REQUIRE((gm != -Big<Real>()) && (needs_gm),

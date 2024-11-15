@@ -115,7 +115,9 @@ def analyze():
         ax.minorticks_on()
 
     fig.tight_layout()
-    fig.savefig(artemis.artemis_fig_dir + base + "_res.png", bbox_inches="tight")
+    fig.savefig(
+        os.path.join(artemis.artemis_fig_dir, +base + "_res.png"), bbox_inches="tight"
+    )
 
     errors = [
         abs((dens_ans - dens) / dens_ans).mean(),

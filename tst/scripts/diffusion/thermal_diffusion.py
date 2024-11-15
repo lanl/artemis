@@ -107,7 +107,10 @@ def analyze():
         ax.minorticks_on()
 
     fig.tight_layout()
-    fig.savefig(artemis.artemis_fig_dir + _file_id + "_temp.png", bbox_inches="tight")
+    fig.savefig(
+        os.path.join(artemis.artemis_fig_dir, _file_id + "_temp.png"),
+        bbox_inches="tight",
+    )
 
     print(errors)
     analyze_status = all([err <= _tol for err in errors])

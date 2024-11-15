@@ -155,7 +155,9 @@ def analyze():
         ax.set_xlim(0, 0.6)
         ax.minorticks_on()
     fig.tight_layout()
-    fig.savefig(artemis.artemis_fig_dir + _file_id + ".png", bbox_inches="tight")
+    fig.savefig(
+        os.path.join(artemis.artemis_fig_dir, _file_id + ".png"), bbox_inches="tight"
+    )
 
     # Check failure criterion
     for res in L2:
@@ -301,7 +303,7 @@ def sedov_cyl(fcyl_1d, fcart_2d, savefig=None):
     fig.tight_layout()
     if savefig is not None:
         os.makedirs(artemis.artemis_fig_dir, exist_ok=True)
-        fig.savefig(artemis.artemis_fig_dir + savefig, bbox_inches="tight")
+        fig.savefig(os.path.join(artemis.artemis_fig_dir, savefig), bbox_inches="tight")
 
 
 def sedov_sph(fsph_1d, faxi_2d, fcart_3d, savefig=None):
@@ -421,4 +423,4 @@ def sedov_sph(fsph_1d, faxi_2d, fcart_3d, savefig=None):
     fig.tight_layout()
     if savefig is not None:
         os.makedirs(artemis.artemis_fig_dir, exist_ok=True)
-        fig.savefig(artemis.artemis_fig_dir + savefig, bbox_inches="tight")
+        fig.savefig(os.path.join(artemis.artemis_fig_dir, savefig), bbox_inches="tight")

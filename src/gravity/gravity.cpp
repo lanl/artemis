@@ -32,7 +32,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   std::string sys = pin->GetOrAddString("artemis", "coordinates", "cartesian");
   Coordinates coords = geometry::CoordSelect(sys, ndim);
 
-  const Real gm = pin->GetOrAddReal("gravity", "gm", -Big<Real>());
+  const Real gm = pin->GetOrAddReal("gravity", "gm", Null<Real>());
   params.Add("tstart",
              pin->GetOrAddReal("gravity", "tstart", std::numeric_limits<Real>::lowest()));
   params.Add("tstop", pin->GetOrAddReal("gravity", "tstop", Big<Real>()));
@@ -111,8 +111,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     PARTHENON_REQUIRE(do_nbody, "You have <gravity/nbody> but not physics/nbody = true!");
   }
 
-  PARTHENON_REQUIRE((gm != -Big<Real>()) && (needs_gm),
-                    "Please define gm in the <gravity> block!");
+  if (needs_gm) {
+    PARTHENON_REQUIRE(!std::isnan(gm), "Please define gm in the <gravity> block!");
+  }
 
   PARTHENON_REQUIRE((count > 0) && (gtype != GravityType::null), "Unknown gravity node!");
 

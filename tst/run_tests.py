@@ -52,12 +52,14 @@ def read_cmakecache(filename):
     with open(filename, "r") as f:
         for line in f.readlines():
             if "artemis_BINARY_DIR" in line:
-                return line.split("=")[-1].strip() + "/src/artemis"
+                return os.path.join(line.split("=")[-1].strip(), "src", "artemis")
 
 
 def process_suite(filename):
     tests = []
-    with open("suites/" + filename, "r") as f:
+    fname = os.path.join(artemis.get_source_directory(), "tst", "suites", filename)
+
+    with open(fname, "r") as f:
         for line in f.readlines():
             line = line.strip()
             if len(line) > 0:

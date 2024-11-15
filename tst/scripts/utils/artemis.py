@@ -43,9 +43,13 @@ custom_exe = False
 def set_executable(executable_path):
     global artemis_executable
     global artemis_run_dir
+    global artemis_fig_dir
+    global artemis_log_dir
     global custom_exe
     artemis_executable = executable_path
     artemis_run_dir = os.path.join(os.path.dirname(artemis_executable), "tst")
+    artemis_fig_dir = os.path.join(artemis_run_dir, "figs")
+    artemis_log_dir = artemis_run_dir
     custom_exe = True
 
 

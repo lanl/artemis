@@ -139,7 +139,6 @@ def analyze():
     ax.set_yscale("log")
     ax.legend(loc="best", fontsize=12)
     fig.tight_layout()
-    print("FIGURE ", artemis.artemis_fig_dir)
     fig.savefig(
         os.path.join(artemis.artemis_fig_dir, _file_id + "_temp.png"),
         bbox_inches="tight",

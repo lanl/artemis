@@ -48,6 +48,13 @@ import scripts.utils.artemis as artemis  # noqa
 logger = logging.getLogger("artemis")
 
 
+def read_cmakecache(filename):
+    with open(filename, "r") as f:
+        for line in f.readlines():
+            if "artemis_BINARY_DIR" in line:
+                return line.split("=")[-1].strip() + "/src/artemis"
+
+
 def process_suite(filename):
     tests = []
     with open("suites/" + filename, "r") as f:
@@ -176,6 +183,15 @@ def main(**kwargs):
             if os.path.exists(local_path) and os.access(local_path, os.X_OK):
                 print(f"Found local executable {local_path}")
                 artemis.set_executable(local_path)
+            else:
+                # Check if we are one level up from the executable
+                local_path = os.path.join(os.getcwd(), "CMakeCache.txt")
+                if os.path.exists(local_path) and os.access(local_path, os.R_OK):
+                    # Pull out the executable path
+                    exe_path = read_cmakecache(local_path)
+                    if os.path.exists(exe_path) and os.access(exe_path, os.X_OK):
+                        print(f"Found local executable {exe_path}")
+                        artemis.set_executable(exe_path)
 
         # Build Artemis
         if not artemis.custom_exe and not kwargs.pop("reuse_build"):

@@ -147,8 +147,6 @@ def main(**kwargs):
     test_errors = []
 
     # Extract arguments
-    artemis_exe_path = kwargs.pop("exe")
-
     try:
         # Check that required modules are installed for all test dependencies
         deps_installed = True
@@ -167,33 +165,6 @@ def main(**kwargs):
                 deps_installed = False
         if not deps_installed:
             logger.warning("WARNING! Not all required Python modules " "are available")
-
-        if artemis_exe_path is not None:
-            # Check that path is valid
-            if not (
-                os.path.exists(artemis_exe_path)
-                and os.access(artemis_exe_path, os.X_OK)
-            ):
-                logger.error("Exception occurred", exc_info=True)
-                test_errors.append("make()")
-                raise TestError(f'Provided executable "{artemis_exe_path}" not found!')
-            # Set the valid provided executable path
-            artemis.set_executable(os.path.abspath(artemis_exe_path))
-        else:
-            # If we are in a directory with an executable, default to using that
-            local_path = os.path.join(os.getcwd(), "artemis")
-            if os.path.exists(local_path) and os.access(local_path, os.X_OK):
-                print(f"Found local executable {local_path}")
-                artemis.set_executable(local_path)
-            else:
-                # Check if we are one level up from the executable
-                local_path = os.path.join(os.getcwd(), "CMakeCache.txt")
-                if os.path.exists(local_path) and os.access(local_path, os.R_OK):
-                    # Pull out the executable path
-                    exe_path = read_cmakecache(local_path)
-                    if os.path.exists(exe_path) and os.access(exe_path, os.X_OK):
-                        print(f"Found local executable {exe_path}")
-                        artemis.set_executable(exe_path)
 
         # Build Artemis
         if not artemis.custom_exe and not kwargs.pop("reuse_build"):
@@ -244,7 +215,7 @@ def main(**kwargs):
             # For CI, print after every individual test has finished
             logger.info("{} test: run(), analyze() finished".format(name))
     finally:
-        if not kwargs.pop("save_build") and artemis_exe_path is None:
+        if not kwargs.pop("save_build") and not artemis.custom_exe:
             os.system("rm -rf {0}/build".format(current_dir))
 
     # Report test results
@@ -308,6 +279,38 @@ def log_init(args):
     logger.debug("Starting Artemis regression tests")
 
 
+def set_paths(args):
+    kwargs = vars(args)
+    # Set the correct paths
+    artemis_exe_path = kwargs.pop("exe")
+
+    if artemis_exe_path is not None:
+        # Check that path is valid
+        if not (
+            os.path.exists(artemis_exe_path) and os.access(artemis_exe_path, os.X_OK)
+        ):
+            raise TestError(f'Provided executable "{artemis_exe_path}" not found!')
+        # Set the valid provided executable path
+        artemis.set_executable(os.path.abspath(artemis_exe_path))
+    else:
+        # If we are in a directory with an executable, default to using that
+        local_path = os.path.join(os.getcwd(), "artemis")
+        if os.path.exists(local_path) and os.access(local_path, os.X_OK):
+            print(f"Found local executable {local_path}")
+            artemis.set_executable(local_path)
+        else:
+            # Check if we are one level up from the executable
+            local_path = os.path.join(os.getcwd(), "CMakeCache.txt")
+            if os.path.exists(local_path) and os.access(local_path, os.R_OK):
+                # Pull out the executable path
+                exe_path = read_cmakecache(local_path)
+                if os.path.exists(exe_path) and os.access(exe_path, os.X_OK):
+                    print(f"Found local executable {exe_path}")
+                    artemis.set_executable(exe_path)
+                else:
+                    raise TestError(f'Could not find executable in "{exe_path}"')
+
+
 # Execute main function
 if __name__ == "__main__":
     help_msg = "names of tests or suites to run, relative to scripts/ or suites/"
@@ -349,6 +352,7 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
+    set_paths(args)
     log_init(args)
 
     try:

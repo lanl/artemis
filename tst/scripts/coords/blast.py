@@ -99,8 +99,18 @@ def analyze():
     os.makedirs(artemis.artemis_fig_dir, exist_ok=True)
     analyze_status = True
 
-    dat2 = np.loadtxt("./scripts/coords/sedov2d.dat", comments="#")
-    dat3 = np.loadtxt("./scripts/coords/sedov3d.dat", comments="#")
+    dat2 = np.loadtxt(
+        os.path.join(
+            artemis.get_source_directory(), "tst", "scripts", "coords", "sedov2d.dat"
+        ),
+        comments="#",
+    )
+    dat3 = np.loadtxt(
+        os.path.join(
+            artemis.get_source_directory(), "tst", "scripts", "coords", "sedov3d.dat"
+        ),
+        comments="#",
+    )
     tol = 1.0
     fig, axes = plt.subplots(2, 3, figsize=(8 * 3, 6 * 2))
     axes[0, 0].plot(dat2[:, 0], dat2[:, 1], "-k")

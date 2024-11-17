@@ -4,7 +4,7 @@ gravity:
   gm:
     _type: Real
     _description: "Normalization parameter setting GM."
-    _default: "0.0"
+    _default: "NaN"
     _units: "dyn cm^2 g^-1"
   tstart:
     _type: Real
@@ -28,10 +28,6 @@ gravity:
   point:
     _type: node
     _description: "Point mass gravity."
-    gm:
-      _type: Real
-      _description: "Normalization parameter setting GM and the mass of the body."
-      _units: "dyn cm^2 g^-1"
     soft:
       _type: Real
       _description: "Plummer softening radius of the body"
@@ -66,10 +62,6 @@ gravity:
   binary:
     _type: node
     _description: "Binary mass gravity."
-    gm:
-      _type: Real
-      _description: "Normalization parameter setting GM and the total mass of the binary"
-      _units: "dyn cm^2 g^-1"
     soft(1,2):
       _type: Real
       _description: "Plummer softening radius of the primary/secondary"
@@ -135,8 +127,4 @@ gravity:
   nbody:
     _type: node
     _description: "N-body gravity. Requires an <nbody> node to specify the system."
-    gm:
-      _type: Real
-      _description: "Normalization parameter setting GM and the total mass of the N-body system"
-      _units: "dyn cm^2 g^-1"
 

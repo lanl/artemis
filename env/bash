@@ -15,8 +15,7 @@
 echo "Setting up Artemis development environment..."
 
 exec_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-home_dir="${exec_dir%/env}"
-export ARTEMIS_HOME=${ARTEMIS_HOME:-${home_dir}}
+export ARTEMIS_HOME="${exec_dir%/env}"
 
 export MAKE_PROGRAM=${MAKE_PROGRAM:-make}
 

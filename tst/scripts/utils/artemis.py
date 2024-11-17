@@ -106,10 +106,19 @@ def run(nproc, input_filename, arguments, restart=None):
     input_filename_full = os.path.join(artemis_inputs_dir, input_filename)
     run_command += ["-i", input_filename_full]
 
+    print("nproc: {:d}".format(nproc))
+    print("input fname: {}".format(input_filename))
+    print("args: {}".format(arguments))
+    print("Input DIR: {}".format(artemis_run_dir))
+    print("Log DIR: {}".format(artemis_log_dir))
+    print("EXE: {}".format(artemis_executable))
+    print("Input FILENAME: {}".format(input_filename_full))
+    print("base cmd: {}".format(run_command))
+
     try:
-        # os.chdir(run_directory)
         os.chdir(artemis_run_dir)
         cmd = run_command + arguments
+        print("cmd: {}".format(run_command))
         logging.getLogger("artemis.run").debug("Executing: " + " ".join(cmd))
         subprocess.check_call(cmd, stdout=out_log)
     except subprocess.CalledProcessError as err:

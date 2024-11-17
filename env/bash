@@ -17,9 +17,6 @@ echo "Setting up Artemis development environment..."
 exec_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 home_dir="${exec_dir%/env}"
 export ARTEMIS_HOME=${ARTEMIS_HOME:-${home_dir}}
-echo "EXEC DIR: "$exec_dir
-echo "HOME DIR: "$home_dir
-echo "ARTEMIS_HOME: "$ARTEMIS_HOME
 
 export MAKE_PROGRAM=${MAKE_PROGRAM:-make}
 
@@ -234,8 +231,6 @@ function build_artemis {
             CMAKE_FLAGS+="-DARTEMIS_ENABLE_ASAN=ON "
         fi
         echo "Building "$ARTEMIS_CONFIGURE_PRESET
-        echo "CMAKE flags: "$CMAKE_FLAGS
-        echo "CMAKE source: "$ARTEMIS_HOME
         cmake --preset=$ARTEMIS_CONFIGURE_PRESET $CMAKE_FLAGS $ARTEMIS_HOME
     }
 

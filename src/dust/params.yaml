@@ -44,10 +44,12 @@ dust:
     _type: Real
     _description: "Minimum dust size. For use with size_input=linspace or logspace."
     _units: "cm"
+
   max_size:
     _type: Real
     _description: "Maximum dust size. For use with size_input=linspace or logspace."
     _units: "cm"
+
   size_file:
     _type: string 
     _description: "Text file that lists the dust sizes. For use with size_input=file."
@@ -70,6 +72,7 @@ dust:
     ppm:
       _type: opt
       _description: "Piecewise Parabolic"
+
   riemann:
     _type: string
     _default: hlle
@@ -104,6 +107,7 @@ dust:
       _default: "0.0"
       _description: "The outer damping rate."
       _units: "yr^-1"
+
   stopping_time:
     _type: node
     _description: "Dust stopping time model."

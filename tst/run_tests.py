@@ -334,10 +334,6 @@ def set_paths(args):
                     raise TestError(
                         f'Could not find executable in "{exe_path}" or cannot be executed!'
                     )
-            else:
-                raise TestError(
-                    f'Could not find a valid build directory with "{local_path}" or it is not readable!'
-                )
 
 
 # Execute main function

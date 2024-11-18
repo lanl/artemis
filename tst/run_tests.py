@@ -306,7 +306,10 @@ def set_paths(args):
         if output_dir is None:
             output_dir = os.path.dirname(artemis_exe_path)
         # Set the valid provided executable path
-        artemis.set_executable_from_path(os.path.abspath(artemis_exe_path), output_dir)
+        abs_exe_path = os.path.abspath(artemis_exe_path)
+        print(f"Found local executable {abs_exe_path}")
+        print(f"Outputting results to {output_dir}")
+        artemis.set_executable_from_path(abs_exe_path, output_dir)
     else:
         # If no output_dir was passed, set it to the cwd
         if output_dir is None:
@@ -315,6 +318,7 @@ def set_paths(args):
         local_path = os.path.join(os.getcwd(), "artemis")
         if os.path.exists(local_path) and os.access(local_path, os.X_OK):
             print(f"Found local executable {local_path}")
+            print(f"Outputting results to {output_dir}")
             artemis.set_executable(local_path, output_dir)
         else:
             # Check if we are one level up from the executable
@@ -324,6 +328,7 @@ def set_paths(args):
                 exe_path = read_cmakecache(local_path)
                 if os.path.exists(exe_path) and os.access(exe_path, os.X_OK):
                     print(f"Found local executable {exe_path}")
+                    print(f"Outputting results to {output_dir}")
                     artemis.set_executable(exe_path, output_dir)
                 else:
                     raise TestError(

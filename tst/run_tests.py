@@ -309,7 +309,7 @@ def set_paths(args):
         abs_exe_path = os.path.abspath(artemis_exe_path)
         print(f"Found local executable {abs_exe_path}")
         print(f"Outputting results to {output_dir}")
-        artemis.set_executable_from_path(abs_exe_path, output_dir)
+        artemis.set_executable(abs_exe_path, output_dir)
     else:
         # If no output_dir was passed, set it to the cwd
         if output_dir is None:

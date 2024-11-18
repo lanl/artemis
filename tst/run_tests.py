@@ -283,21 +283,39 @@ def set_paths(args):
     kwargs = vars(args)
     # Set the correct paths
     artemis_exe_path = kwargs.pop("exe")
+    output_dir = kwargs.pop("output_dir")
+
+    # Check that path is valid
+    if output_dir is not None:
+        if not (os.path.exists(output_dir) and os.access(output_dir, os.W_OK)):
+            raise TestError(
+                f'Provided output directory "{output_dir}" not found or it is not writeable!'
+            )
+    # output_dir is a valid path or None
 
     if artemis_exe_path is not None:
         # Check that path is valid
         if not (
             os.path.exists(artemis_exe_path) and os.access(artemis_exe_path, os.X_OK)
         ):
-            raise TestError(f'Provided executable "{artemis_exe_path}" not found!')
+            raise TestError(
+                f'Provided executable "{artemis_exe_path}" not found or cannot be executed!'
+            )
+
+        # If no output_dir was passed, set it to the exe path
+        if output_dir is None:
+            output_dir = os.path.dirname(artemis_exe_path)
         # Set the valid provided executable path
-        artemis.set_executable_from_path(os.path.abspath(artemis_exe_path), False)
+        artemis.set_executable_from_path(os.path.abspath(artemis_exe_path), output_dir)
     else:
+        # If no output_dir was passed, set it to the cwd
+        if output_dir is None:
+            output_dir = os.getcwd()
         # If we are in a directory with an executable, default to using that
         local_path = os.path.join(os.getcwd(), "artemis")
         if os.path.exists(local_path) and os.access(local_path, os.X_OK):
             print(f"Found local executable {local_path}")
-            artemis.set_executable(local_path, True)
+            artemis.set_executable(local_path, output_dir)
         else:
             # Check if we are one level up from the executable
             local_path = os.path.join(os.getcwd(), "CMakeCache.txt")
@@ -306,9 +324,15 @@ def set_paths(args):
                 exe_path = read_cmakecache(local_path)
                 if os.path.exists(exe_path) and os.access(exe_path, os.X_OK):
                     print(f"Found local executable {exe_path}")
-                    artemis.set_executable(exe_path, True)
+                    artemis.set_executable(exe_path, output_dir)
                 else:
-                    raise TestError(f'Could not find executable in "{exe_path}"')
+                    raise TestError(
+                        f'Could not find executable in "{exe_path}" or cannot be executed!'
+                    )
+            else:
+                raise TestError(
+                    f'Could not find a valid build directory with "{local_path}" or it is not readable!'
+                )
 
 
 # Execute main function
@@ -349,6 +373,12 @@ if __name__ == "__main__":
         type=str,
         default=None,
         help="path to pre-built executable",
+    )
+    parser.add_argument(
+        "--output_dir",
+        type=str,
+        default=None,
+        help="path to output directory",
     )
 
     args = parser.parse_args()

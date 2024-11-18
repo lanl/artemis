@@ -39,15 +39,14 @@ custom_exe = False
 
 # Optionally set custom path for executable, and update other variables related to where
 # we run the code
-def set_executable(executable_path, use_current):
+def set_executable(executable_path, output_dir):
     global artemis_executable
     global artemis_run_dir
     global artemis_fig_dir
     global artemis_log_dir
     global custom_exe
     artemis_executable = executable_path
-    artemis_run_dir = os.path.join(os.path.dirname(artemis_executable), "tst")
-    output_dir = current_dir if use_current else artemis_run_dir
+    artemis_run_dir = os.path.join(output_dir, "tst")
     artemis_fig_dir = os.path.join(output_dir, "figs")
     artemis_log_dir = output_dir
     custom_exe = True

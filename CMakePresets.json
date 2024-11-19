@@ -47,6 +47,27 @@
       }
     },
     {
+      "name": "chicoma-cpu-debug",
+      "cacheVariables": {
+        "CMAKE_MAKE_PROGRAM": "$env{MAKE_PROGRAM}",
+        "CMAKE_BUILD_TYPE": "Debug",
+        "Kokkos_ENABLE_DEBUG_BOUNDS_CHECK": "ON",
+        "CMAKE_CXX_COMPILER": "CC",
+        "HDF5_INCLUDE_DIR": "$env{HDF5_ROOT}/include",
+        "PARTHENON_DISABLE_HDF5_COMPRESSION": "ON"
+      }
+    },
+    {
+      "name": "chicoma-cpu-release",
+      "cacheVariables": {
+        "CMAKE_MAKE_PROGRAM": "$env{MAKE_PROGRAM}",
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "CMAKE_CXX_COMPILER": "CC",
+        "HDF5_INCLUDE_DIR": "$env{HDF5_ROOT}/include",
+        "PARTHENON_DISABLE_HDF5_COMPRESSION": "ON"
+      }
+    },
+    {
       "name": "chicoma-gpu-debug",
       "cacheVariables": {
         "CMAKE_MAKE_PROGRAM": "$env{MAKE_PROGRAM}",

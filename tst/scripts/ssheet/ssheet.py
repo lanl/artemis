@@ -51,7 +51,7 @@ def analyze():
     analyze_status = True
 
     time, x, y, z, [d, u, v, w, T] = binary.load_level(
-        "final", dir="build/src", base="{}.out1".format(_file_id)
+        "final", dir=artemis.get_run_directory(), base="{}.out1".format(_file_id)
     )
     xc = 0.5 * (x[1:] + x[:-1])
     yc = 0.5 * (y[1:] + y[:-1])
@@ -105,7 +105,10 @@ def analyze():
     axes[0].set_ylabel("$y$", fontsize=20)
     binary.create_colorbar(axes[0], norm=norm)
     fig.tight_layout()
-    fig.savefig(artemis.artemis_fig_dir + _file_id + "_spiral.png", bbox_inches="tight")
+    fig.savefig(
+        os.path.join(artemis.artemis_fig_dir, _file_id + "_spiral.png"),
+        bbox_inches="tight",
+    )
 
     # Check failure criterion
     for name, res, tol in zip(names, errs, tols):

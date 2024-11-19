@@ -60,7 +60,9 @@ def analyze():
     mom_tot = []
     errors = []
     for n in range(1, int(_tlim / 0.05)):
-        fname = "build/src/{}.out1.{:05d}.phdf".format(_file_id, n)
+        fname = os.path.join(
+            artemis.get_run_directory(), "{}.out1.{:05d}.phdf".format(_file_id, n)
+        )
         with h5py.File(fname, "r") as f:
             t = f["Info"].attrs["Time"]
             vg = f["gas.prim.velocity_0"][...][:, 0, :].ravel()
@@ -114,7 +116,10 @@ def analyze():
     axes[1].set_ylabel("$v_d - v_g$ Error", fontsize=18)
     axes[2].set_ylabel("Momentum Error", fontsize=18)
     fig.tight_layout()
-    fig.savefig(artemis.artemis_fig_dir + _file_id + "_drag.png", bbox_inches="tight")
+    fig.savefig(
+        os.path.join(artemis.artemis_fig_dir, _file_id + "_drag.png"),
+        bbox_inches="tight",
+    )
 
     errors = np.array(errors).ravel()
     fail = np.any(errors > _tol)

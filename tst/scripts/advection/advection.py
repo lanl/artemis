@@ -18,7 +18,12 @@
 # Modules
 import logging
 import numpy as np
+import os
 import scripts.utils.artemis as artemis
+import sys
+
+sys.path.append(os.path.join(artemis.artemis_dir, "analysis"))
+from ahistory import ahistory
 
 logger = logging.getLogger("artemis" + __name__[7:])  # set logger name
 
@@ -71,16 +76,21 @@ def analyze():
     # error convergence rates, and error identicality between L- and R-going
     # advection.
     logger.debug("Analyzing test " + __name__)
-    data = np.loadtxt("build/src/" + _file_id + "-errs.dat", dtype=np.float64, ndmin=2)
-    history = np.loadtxt("build/src/" + _file_id + ".out0.hst")
+    err_path = os.path.join(artemis.get_run_directory(), _file_id + "-errs.dat")
+    data = np.loadtxt(
+        err_path,
+        dtype=np.float64,
+        ndmin=2,
+    )
+    hist_path = os.path.join(artemis.get_run_directory(), _file_id + ".out0.hst")
+    history = ahistory(hist_path)
+    os.system(f"rm {err_path}")
+    os.system(f"rm {hist_path}")
     analyze_status = True
-    if np.isnan(data).any() or np.isnan(history).any():
+    if np.isnan(data).any():
         logger.warning("NaN encountered")
         analyze_status = False
         raise FloatingPointError("NaN encountered")
-    if history.shape != (44, 18):
-        analyze_status = False
-    history_line = history[-1]
 
     def history_equiv(a, b, tol=1.0e-4):
         if 2.0 * (np.fabs(a - b)) / (np.fabs(a) + np.fabs(b)) > tol:
@@ -88,37 +98,42 @@ def analyze():
         else:
             return True
 
-    history_expected = [
-        1.00000e00,
-        1.11612e-02,
-        5.60000e01,
-        1.60000e01,
-        6.75000e00,
-        2.25000e00,
-        4.50000e00,
-        4.50000e00,
-        9.45000e00,
-        6.07500e00,
-        6.75000e00,
-        6.75000e00,
-        2.25000e00,
-        -2.25000e00,
-        4.50000e00,
-        -4.50000e00,
-        4.50000e00,
-        -4.50000e00,
-    ]
-    if len(history_line) != len(history_expected):
-        print(
-            f"Number of history rows ({len(history_line)}) do not equal expectation ({len(history_expected)})!"
-        )
-        analyze_status = False
-    for n, val in enumerate(history_expected):
-        if not history_equiv(history_line[n], val):
+    history_expected = {
+        "time": 1.0,
+        "dt": 1.11612e-02,
+        "cycle": 56,
+        "nbtotal": 16,
+        "gas_mass_0": 6.75,
+        "gas_momentum_x1_0": 2.25,
+        "gas_momentum_x2_0": 4.5,
+        "gas_momentum_x3_0": 4.5,
+        "gas_energy_0": 9.45,
+        "gas_internal_energy_0": 6.075,
+        "dust_mass_0": 6.75,
+        "dust_mass_1": 6.75,
+        "dust_momentum_x1_0": 2.25,
+        "dust_momentum_x1_1": -2.25,
+        "dust_momentum_x2_0": 4.5,
+        "dust_momentum_x2_1": -4.5,
+        "dust_momentum_x3_0": 4.5,
+        "dust_momentum_x3_1": -4.5,
+    }
+
+    for key in history_expected.keys():
+        values = history.Get(key)
+        if len(values) != 11:
+            analyze_status = False
+        for value in values:
+            if np.isnan(value):
+                logger.warning("NaN encountered")
+                analyze_status = False
+                raise FloatingPointError("NaN encountered")
+        if not history_equiv(values[-1], history_expected[key]):
             print(
-                f"History entry {n} = {history_line[n]} does not match expectation = {val}!"
+                f"History entry {key} = {values[-1]} does not match expectation = {history_expected[key]}!"
             )
             analyze_status = False
+
     data = data.reshape([len(_int), len(_recon), len(_flux), 2, data.shape[-1]])
     for ii, iv in enumerate(_int):
         for ri, rv in enumerate(_recon):

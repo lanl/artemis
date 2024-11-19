@@ -18,6 +18,7 @@
 # Modules
 import logging
 import numpy as np
+import os
 import scripts.utils.artemis as artemis
 
 logger = logging.getLogger("artemis" + __name__[7:])  # set logger name
@@ -58,7 +59,9 @@ def analyze():
 
     logger.debug("Analyzing test " + __name__)
 
-    fname = "build/src/{}_{:d}.reb".format(_file_id, _nranks)
+    fname = os.path.join(
+        artemis.get_run_directory(), "{}_{:d}.reb".format(_file_id, _nranks)
+    )
     logger.debug("Reading" + fname)
     d = np.loadtxt(fname)
     with open(fname, "r") as f:

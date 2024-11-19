@@ -45,7 +45,7 @@ def run(**kwargs):
             "artemis/coordinates=" + g,
             "parthenon/time/tlim=50.0",
             "gas/conductivity/cond={:.8f}".format(_kcond),
-            "gravity/gx1={:.8f}".format(_gx1),
+            "gravity/uniform/gx1={:.8f}".format(_gx1),
             "problem/flux={:.8f}".format(_flux),
             "problem/gas_temp={:.8f}".format(_gtemp),
             "parthenon/meshblock/nx1={:d}".format(128 // _nranks),
@@ -90,7 +90,7 @@ def analyze():
     for ax, g in zip(axes, _geom):
         name = "{}_{}".format(_file_id, g[:3])
         time, x, y, z, [d, u, v, w, T] = binary.load_level(
-            "final", dir="build/src", base="{}.out1".format(name)
+            "final", dir=artemis.get_run_directory(), base="{}.out1".format(name)
         )
         xc = 0.5 * (x[1:] + x[:-1])
         ans = Tans(xc.ravel(), f=_flux, T0=_gtemp, x0=1.2, xi=0.2, d=dind[g], k=_kcond)
@@ -107,7 +107,10 @@ def analyze():
         ax.minorticks_on()
 
     fig.tight_layout()
-    fig.savefig(artemis.artemis_fig_dir + _file_id + "_temp.png", bbox_inches="tight")
+    fig.savefig(
+        os.path.join(artemis.artemis_fig_dir, _file_id + "_temp.png"),
+        bbox_inches="tight",
+    )
 
     print(errors)
     analyze_status = all([err <= _tol for err in errors])

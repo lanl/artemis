@@ -83,7 +83,7 @@ def analyze():
     os.makedirs(artemis.artemis_fig_dir, exist_ok=True)
 
     time, x, y, z, [dens, u, v, w, T] = binary.load_level(
-        "final", dir="build/src", base=base + ".out1"
+        "final", dir=artemis.get_run_directory(), base=base + ".out1"
     )
     r = 0.5 * (x[1:] + x[:-1])
 
@@ -115,7 +115,9 @@ def analyze():
         ax.minorticks_on()
 
     fig.tight_layout()
-    fig.savefig(artemis.artemis_fig_dir + base + "_res.png", bbox_inches="tight")
+    fig.savefig(
+        os.path.join(artemis.artemis_fig_dir, base + "_res.png"), bbox_inches="tight"
+    )
 
     errors = [
         abs((dens_ans - dens) / dens_ans).mean(),

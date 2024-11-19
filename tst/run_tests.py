@@ -12,6 +12,8 @@
 #  the public, perform publicly and display publicly, and to permit others to do so.
 # ========================================================================================
 
+# This file was created in part by one of OpenAI's generative AI models
+
 # Regression test script for Artemis.
 
 # Usage: From this directory, call this script with python:
@@ -46,9 +48,18 @@ import scripts.utils.artemis as artemis  # noqa
 logger = logging.getLogger("artemis")
 
 
+def read_cmakecache(filename):
+    with open(filename, "r") as f:
+        for line in f.readlines():
+            if "artemis_BINARY_DIR" in line:
+                return os.path.join(line.split("=")[-1].strip(), "src", "artemis")
+
+
 def process_suite(filename):
     tests = []
-    with open("suites/" + filename, "r") as f:
+    fname = os.path.join(artemis.get_source_directory(), "tst", "suites", filename)
+
+    with open(fname, "r") as f:
         for line in f.readlines():
             line = line.strip()
             if len(line) > 0:
@@ -64,7 +75,16 @@ def process_suite(filename):
                         dir_test_names = [
                             name
                             for _, name, _ in iter_modules(
-                                path=["scripts/" + test_name], prefix=test_name + "."
+                                # path=["scripts/" + test_name], prefix=test_name + "."
+                                path=[
+                                    os.path.join(
+                                        artemis.get_source_directory(),
+                                        "tst",
+                                        "scripts",
+                                        test_name,
+                                    )
+                                ],
+                                prefix=test_name + ".",
                             )
                         ]
                         tests += dir_test_names
@@ -82,7 +102,15 @@ def main(**kwargs):
                 dir_test_names = [
                     name
                     for _, name, _ in iter_modules(
-                        path=["scripts/" + directory], prefix=directory + "."
+                        path=[
+                            os.path.join(
+                                artemis.get_source_directory(),
+                                "tst",
+                                "scripts",
+                                directory,
+                            )
+                        ],
+                        prefix=directory + ".",
                     )
                 ]
                 test_names.extend(dir_test_names)
@@ -98,7 +126,12 @@ def main(**kwargs):
                 dir_test_names = [
                     name
                     for _, name, _ in iter_modules(
-                        path=["scripts/" + test], prefix=test + "."
+                        path=[
+                            os.path.join(
+                                artemis.get_source_directory(), "tst", "scripts", test
+                            )
+                        ],
+                        prefix=test + ".",
                     )
                 ]
                 test_names.extend(dir_test_names)
@@ -112,6 +145,8 @@ def main(**kwargs):
     test_times = []
     test_results = []
     test_errors = []
+
+    # Extract arguments
     try:
         # Check that required modules are installed for all test dependencies
         deps_installed = True
@@ -130,8 +165,9 @@ def main(**kwargs):
                 deps_installed = False
         if not deps_installed:
             logger.warning("WARNING! Not all required Python modules " "are available")
+
         # Build Artemis
-        if not kwargs.pop("reuse_build"):
+        if not artemis.custom_exe and not kwargs.pop("reuse_build"):
             try:
                 os.system("rm -rf {0}/build".format(current_dir))
                 # insert arguments for artemis.make()
@@ -142,6 +178,7 @@ def main(**kwargs):
                 logger.error("Exception occurred", exc_info=True)
                 test_errors.append("make()")
                 raise TestError("Unable to build Artemis")
+
         # Run each test
         for name in test_names:
             t0 = timer()
@@ -178,7 +215,7 @@ def main(**kwargs):
             # For CI, print after every individual test has finished
             logger.info("{} test: run(), analyze() finished".format(name))
     finally:
-        if not kwargs.pop("save_build"):
+        if not kwargs.pop("save_build") and not artemis.custom_exe:
             os.system("rm -rf {0}/build".format(current_dir))
 
     # Report test results
@@ -232,7 +269,7 @@ def log_init(args):
     # setup log_file
     log_fn = kwargs.pop("log_file")
     if log_fn:
-        f_handler = logging.FileHandler(log_fn)
+        f_handler = logging.FileHandler(os.path.join(artemis.artemis_log_dir, log_fn))
         f_handler.setLevel(0)  # log everything
         f_format = logging.Formatter(
             "%(asctime)s|%(levelname)s" ":%(name)s: %(message)s"
@@ -240,6 +277,63 @@ def log_init(args):
         f_handler.setFormatter(f_format)
         logger.addHandler(f_handler)
     logger.debug("Starting Artemis regression tests")
+
+
+def set_paths(args):
+    kwargs = vars(args)
+    # Set the correct paths
+    artemis_exe_path = kwargs.pop("exe")
+    output_dir = kwargs.pop("output_dir")
+
+    # Check that path is valid
+    if output_dir is not None:
+        if not (os.path.exists(output_dir) and os.access(output_dir, os.W_OK)):
+            raise TestError(
+                f'Provided output directory "{output_dir}" not found or it is not writeable!'
+            )
+    # output_dir is a valid path or None
+
+    if artemis_exe_path is not None:
+        # Check that path is valid
+        if not (
+            os.path.exists(artemis_exe_path) and os.access(artemis_exe_path, os.X_OK)
+        ):
+            raise TestError(
+                f'Provided executable "{artemis_exe_path}" not found or cannot be executed!'
+            )
+
+        # If no output_dir was passed, set it to the exe path
+        if output_dir is None:
+            output_dir = os.path.dirname(artemis_exe_path)
+        # Set the valid provided executable path
+        abs_exe_path = os.path.abspath(artemis_exe_path)
+        print(f"Found local executable {abs_exe_path}")
+        print(f"Outputting results to {output_dir}")
+        artemis.set_executable(abs_exe_path, output_dir)
+    else:
+        # If no output_dir was passed, set it to the cwd
+        if output_dir is None:
+            output_dir = os.getcwd()
+        # If we are in a directory with an executable, default to using that
+        local_path = os.path.join(os.getcwd(), "artemis")
+        if os.path.exists(local_path) and os.access(local_path, os.X_OK):
+            print(f"Found local executable {local_path}")
+            print(f"Outputting results to {output_dir}")
+            artemis.set_executable(local_path, output_dir)
+        else:
+            # Check if we are one level up from the executable
+            local_path = os.path.join(os.getcwd(), "CMakeCache.txt")
+            if os.path.exists(local_path) and os.access(local_path, os.R_OK):
+                # Pull out the executable path
+                exe_path = read_cmakecache(local_path)
+                if os.path.exists(exe_path) and os.access(exe_path, os.X_OK):
+                    print(f"Found local executable {exe_path}")
+                    print(f"Outputting results to {output_dir}")
+                    artemis.set_executable(exe_path, output_dir)
+                else:
+                    raise TestError(
+                        f'Could not find executable in "{exe_path}" or cannot be executed!'
+                    )
 
 
 # Execute main function
@@ -275,7 +369,21 @@ if __name__ == "__main__":
         help="do not recompile the code and reuse the build directory.",
     )
 
+    parser.add_argument(
+        "--exe",
+        type=str,
+        default=None,
+        help="path to pre-built executable",
+    )
+    parser.add_argument(
+        "--output_dir",
+        type=str,
+        default=None,
+        help="path to output directory",
+    )
+
     args = parser.parse_args()
+    set_paths(args)
     log_init(args)
 
     try:

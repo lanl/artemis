@@ -88,8 +88,8 @@ type = alpha
 alpha = 1e-3
 
 <gravity>
-type = binary
 gm = 1.0
+<gravity/binary>
 q = 1.0e-5
 a = 1.0
 e = 0.0

@@ -105,7 +105,10 @@ def analyze():
     axes[0].set_ylabel("$y$", fontsize=20)
     binary.create_colorbar(axes[0], norm=norm)
     fig.tight_layout()
-    fig.savefig(artemis.artemis_fig_dir + _file_id + "_spiral.png", bbox_inches="tight")
+    fig.savefig(
+        os.path.join(artemis.artemis_fig_dir, _file_id + "_spiral.png"),
+        bbox_inches="tight",
+    )
 
     # Check failure criterion
     for name, res, tol in zip(names, errs, tols):

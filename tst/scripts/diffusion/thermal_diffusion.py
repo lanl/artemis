@@ -45,7 +45,7 @@ def run(**kwargs):
             "artemis/coordinates=" + g,
             "parthenon/time/tlim=50.0",
             "gas/conductivity/cond={:.8f}".format(_kcond),
-            "gravity/gx1={:.8f}".format(_gx1),
+            "gravity/uniform/gx1={:.8f}".format(_gx1),
             "problem/flux={:.8f}".format(_flux),
             "problem/gas_temp={:.8f}".format(_gtemp),
             "parthenon/meshblock/nx1={:d}".format(128 // _nranks),
@@ -107,7 +107,10 @@ def analyze():
         ax.minorticks_on()
 
     fig.tight_layout()
-    fig.savefig(artemis.artemis_fig_dir + _file_id + "_temp.png", bbox_inches="tight")
+    fig.savefig(
+        os.path.join(artemis.artemis_fig_dir, _file_id + "_temp.png"),
+        bbox_inches="tight",
+    )
 
     print(errors)
     analyze_status = all([err <= _tol for err in errors])

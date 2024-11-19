@@ -48,9 +48,18 @@ import scripts.utils.artemis as artemis  # noqa
 logger = logging.getLogger("artemis")
 
 
+def read_cmakecache(filename):
+    with open(filename, "r") as f:
+        for line in f.readlines():
+            if "artemis_BINARY_DIR" in line:
+                return os.path.join(line.split("=")[-1].strip(), "src", "artemis")
+
+
 def process_suite(filename):
     tests = []
-    with open("suites/" + filename, "r") as f:
+    fname = os.path.join(artemis.get_source_directory(), "tst", "suites", filename)
+
+    with open(fname, "r") as f:
         for line in f.readlines():
             line = line.strip()
             if len(line) > 0:
@@ -138,8 +147,6 @@ def main(**kwargs):
     test_errors = []
 
     # Extract arguments
-    artemis_exe_path = kwargs.pop("exe")
-
     try:
         # Check that required modules are installed for all test dependencies
         deps_installed = True
@@ -158,24 +165,6 @@ def main(**kwargs):
                 deps_installed = False
         if not deps_installed:
             logger.warning("WARNING! Not all required Python modules " "are available")
-
-        if artemis_exe_path is not None:
-            # Check that path is valid
-            if not (
-                os.path.exists(artemis_exe_path)
-                and os.access(artemis_exe_path, os.X_OK)
-            ):
-                logger.error("Exception occurred", exc_info=True)
-                test_errors.append("make()")
-                raise TestError(f'Provided executable "{artemis_exe_path}" not found!')
-            # Set the valid provided executable path
-            artemis.set_executable(os.path.abspath(artemis_exe_path))
-        else:
-            # If we are in a directory with an executable, default to using that
-            local_path = os.path.join(os.getcwd(), "artemis")
-            if os.path.exists(local_path) and os.access(local_path, os.X_OK):
-                print(f"Found local executable {local_path}")
-                artemis.set_executable(local_path)
 
         # Build Artemis
         if not artemis.custom_exe and not kwargs.pop("reuse_build"):
@@ -226,7 +215,7 @@ def main(**kwargs):
             # For CI, print after every individual test has finished
             logger.info("{} test: run(), analyze() finished".format(name))
     finally:
-        if not kwargs.pop("save_build") and artemis_exe_path is None:
+        if not kwargs.pop("save_build") and not artemis.custom_exe:
             os.system("rm -rf {0}/build".format(current_dir))
 
     # Report test results
@@ -290,6 +279,63 @@ def log_init(args):
     logger.debug("Starting Artemis regression tests")
 
 
+def set_paths(args):
+    kwargs = vars(args)
+    # Set the correct paths
+    artemis_exe_path = kwargs.pop("exe")
+    output_dir = kwargs.pop("output_dir")
+
+    # Check that path is valid
+    if output_dir is not None:
+        if not (os.path.exists(output_dir) and os.access(output_dir, os.W_OK)):
+            raise TestError(
+                f'Provided output directory "{output_dir}" not found or it is not writeable!'
+            )
+    # output_dir is a valid path or None
+
+    if artemis_exe_path is not None:
+        # Check that path is valid
+        if not (
+            os.path.exists(artemis_exe_path) and os.access(artemis_exe_path, os.X_OK)
+        ):
+            raise TestError(
+                f'Provided executable "{artemis_exe_path}" not found or cannot be executed!'
+            )
+
+        # If no output_dir was passed, set it to the exe path
+        if output_dir is None:
+            output_dir = os.path.dirname(artemis_exe_path)
+        # Set the valid provided executable path
+        abs_exe_path = os.path.abspath(artemis_exe_path)
+        print(f"Found local executable {abs_exe_path}")
+        print(f"Outputting results to {output_dir}")
+        artemis.set_executable(abs_exe_path, output_dir)
+    else:
+        # If no output_dir was passed, set it to the cwd
+        if output_dir is None:
+            output_dir = os.getcwd()
+        # If we are in a directory with an executable, default to using that
+        local_path = os.path.join(os.getcwd(), "artemis")
+        if os.path.exists(local_path) and os.access(local_path, os.X_OK):
+            print(f"Found local executable {local_path}")
+            print(f"Outputting results to {output_dir}")
+            artemis.set_executable(local_path, output_dir)
+        else:
+            # Check if we are one level up from the executable
+            local_path = os.path.join(os.getcwd(), "CMakeCache.txt")
+            if os.path.exists(local_path) and os.access(local_path, os.R_OK):
+                # Pull out the executable path
+                exe_path = read_cmakecache(local_path)
+                if os.path.exists(exe_path) and os.access(exe_path, os.X_OK):
+                    print(f"Found local executable {exe_path}")
+                    print(f"Outputting results to {output_dir}")
+                    artemis.set_executable(exe_path, output_dir)
+                else:
+                    raise TestError(
+                        f'Could not find executable in "{exe_path}" or cannot be executed!'
+                    )
+
+
 # Execute main function
 if __name__ == "__main__":
     help_msg = "names of tests or suites to run, relative to scripts/ or suites/"
@@ -329,8 +375,15 @@ if __name__ == "__main__":
         default=None,
         help="path to pre-built executable",
     )
+    parser.add_argument(
+        "--output_dir",
+        type=str,
+        default=None,
+        help="path to output directory",
+    )
 
     args = parser.parse_args()
+    set_paths(args)
     log_init(args)
 
     try:

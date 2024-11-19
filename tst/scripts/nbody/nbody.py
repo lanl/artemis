@@ -115,7 +115,10 @@ def analyze():
     axes[0].set_ylabel("$\\phi$", fontsize=20)
     create_colorbar(axes[0], norm=norm)
     fig.tight_layout()
-    fig.savefig(artemis.artemis_fig_dir + _file_id + "_spiral.png", bbox_inches="tight")
+    fig.savefig(
+        os.path.join(artemis.artemis_fig_dir, _file_id + "_spiral.png"),
+        bbox_inches="tight",
+    )
 
     # Cooling check
 
@@ -144,7 +147,10 @@ def analyze():
     ax.set_yscale("log")
     ax.legend(loc="best", fontsize=12)
     fig.tight_layout()
-    fig.savefig(artemis.artemis_fig_dir + _file_id + "_temp.png", bbox_inches="tight")
+    fig.savefig(
+        os.path.join(artemis.artemis_fig_dir, _file_id + "_temp.png"),
+        bbox_inches="tight",
+    )
 
     # Check failure criterion
     for name, res, tol in zip(names, errs, tols):

@@ -124,7 +124,7 @@ def analyze():
                 create_colorbar(axes[0], norm=norm)
                 fig.tight_layout()
                 fig.savefig(
-                    artemis.artemis_fig_dir + problem_id + "_spiral.png",
+                    os.path.join(artemis.artemis_fig_dir, problem_id + "_spiral.png"),
                     bbox_inches="tight",
                 )
 

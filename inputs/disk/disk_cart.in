@@ -112,8 +112,8 @@ dfloor = 1.0e-10
 pfloor = 1.0e-15
 
 <gravity>
-type = point
 gm = 1.0
+<gravity/point>
 
 <problem>
 r0 = 1.0

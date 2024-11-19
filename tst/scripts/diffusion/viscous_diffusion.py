@@ -140,7 +140,10 @@ def analyze():
             create_colorbar(axes[0], norm=norm)
 
         fig.tight_layout()
-        fig.savefig(artemis.artemis_fig_dir + base + "_vx3.png", bbox_inches="tight")
+        fig.savefig(
+            os.path.join(artemis.artemis_fig_dir, base + "_vx3.png"),
+            bbox_inches="tight",
+        )
         errors.append((d, err))
 
     print(errors)

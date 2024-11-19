@@ -290,7 +290,7 @@ Dust
 ^^^^
 
 The ``<dust>`` input block adds a dust fluid to the simulation.
-Dust in |code| is modeled as a pressure-less fluid. As such, it an EOS is not required.
+Dust in |code| is modeled as a pressure-less fluid. As such, an EOS is not required.
 Just as with gas fluids, dust fluids require specification of the number of species, Riemann solver, and reconstruction scheme.
 An example dust input block reads:
 
@@ -298,11 +298,14 @@ An example dust input block reads:
 
    <dust>
    cfl = 0.3
-   nspecies = 20
-   riemann = hlle     # llf, hlle
-   reconstruct = plm  # pcm, plm, ppm
+   nspecies = 3
+   riemann = hlle       # llf, hlle
+   reconstruct = plm    # pcm, plm, ppm
+   grain_density = 1.7  # g/cc
+   sizes = 1e-4, 1e-2, 1e-1  # cm
 
-By default, each dust species represents a dust fluid at a fixed particle size.
+By default, each dust species represents a dust fluid at a fixed particle size. 
+To specify the sizes of each species, |code| offers several options including direct specification (as in the previous example), reading a text file, or uniform and log-uniform distrubtions.
 
 
 N-Body Dynamics
@@ -626,11 +629,12 @@ Specifically, |code|, adds the body force,
 
 To activate external gravity, there must be a ``<gravity>`` node and ``gravity = true`` under the ``<physics>`` node.
 The ``<gravity>`` requires setting the parameter ``gm``, typically this is set to ``gm = 1.0``.
+In addition to ``gm``, the ``tstart`` and ``tstop`` parameters control when gravity is active.
 
-The specific model for the gravitational acceleration, :math:`\mathbf{g}`, is controlled by the ``type`` parameter.
+The specific model for the gravitational acceleration, :math:`\mathbf{g}`, is controlled by adding the appropriate subnode.
 Available options are:
 
-* ``type = constant``
+* ``<gravity/constant>``
 
   This specifies a constant gravitational acceleration. The components of :math:`\mathbf{g}` in each direction are required.
   An example input block that sets :math:`\mathbf{g}=-1.0 \mathbf{\hat{z}}` is,
@@ -638,13 +642,13 @@ Available options are:
   ::
 
    <gravity>
-   type = constant
    gm = 1.0
+   <gravity/constant>
    gx1 = 0.0
    gx2 = 0.0
    gx3 = -1.0
 
-* ``type = point``
+* ``<gravity/point>``
 
   This adds the gravitational acceleration, :math:`\mathbf{g} = - GM /r^2`, from a point mass.
   The potential can be (optionally) softened by adding a fixed number to the distance of a cell to the point mass.
@@ -654,8 +658,8 @@ Available options are:
   ::
 
    <gravity>
-   type = point
    gm = 1.0
+   <gravity/point>
    x = 0.0
    y = 0.0
    z = 0.0
@@ -663,7 +667,7 @@ Available options are:
    sink = 1e-3        # Mass accretion radius
    sink_rate = 30.0   # Mass removal rate
 
-* ``type = binary``
+* ``<gravity/binary>``
 
   This adds two point masses in a fixed binary orbit.
   In addition to the softening and accretion prescriptions described above, there are also parameters that describe the binary orbit.
@@ -672,8 +676,8 @@ Available options are:
   ::
 
    <gravity>
-   type = binary
    gm = 1.0            # Binary total GM
+   <gravity/binary>
    x = 0.0             # Binary x center of mass
    y = 0.0             # Binary y center of mass
    z = 0.0             # Binary z center of mass
@@ -692,18 +696,18 @@ Available options are:
    f = 0.0             # Binary true anomaly (in degrees)
 
 
-* ``type = nbody``
+* ``<gravity/nbody>``
 
   This indicates that the gravitational force will be calculated by the N-body system defined in the ``<nbody>`` input block.
-  The only parameter required when ``type = nbody`` is the ``gm`` parameter.
+  The only parameter required is the ``gm`` parameter.
   Note that the total mass of the system defined in the ``<nbody>`` block will be rescaled to ``gm``.
   An example input block would thus read:
 
   ::
 
    <gravity>
-   type = nbody
    gm = 1.0
+   <gravity/nbody>
 
 See `N-Body Dynamics`_ for a description of how to set up the N-body system.
 

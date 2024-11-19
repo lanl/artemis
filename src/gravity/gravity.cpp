@@ -20,6 +20,7 @@
 using namespace parthenon::package::prelude;
 
 namespace Gravity {
+
 //----------------------------------------------------------------------------------------
 //! \fn  StateDescriptor Gravity::Initialize
 //! \brief Adds intialization function for gravity package
@@ -31,22 +32,38 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   std::string sys = pin->GetOrAddString("artemis", "coordinates", "cartesian");
   Coordinates coords = geometry::CoordSelect(sys, ndim);
 
-  std::string grav_type = pin->GetString("gravity", "type");
+  const Real gm = pin->GetOrAddReal("gravity", "gm", Null<Real>());
+  params.Add("tstart",
+             pin->GetOrAddReal("gravity", "tstart", std::numeric_limits<Real>::lowest()));
+  params.Add("tstop", pin->GetOrAddReal("gravity", "tstop", Big<Real>()));
+
+  // Find which gravity type is requested
+  // Note that we do not use if-elif statements to detect multiple gravity blocks
+  int count = 0;
   GravityType gtype = GravityType::null;
-  if (grav_type == "uniform") {
+  std::string block_name = "none";
+
+  bool needs_gm = true;
+  // params specific to the gravity type
+  if (pin->DoesBlockExist("gravity/uniform")) {
+    needs_gm = false;
+    count++;
+    block_name = "gravity/uniform";
     gtype = GravityType::uniform;
-    params.Add("gx1", pin->GetReal("gravity", "gx1"));
-    params.Add("gx2", pin->GetReal("gravity", "gx2"));
-    params.Add("gx3", pin->GetReal("gravity", "gx3"));
-  } else if (grav_type == "point") {
+    params.Add("gx1", pin->GetReal(block_name, "gx1"));
+    params.Add("gx2", pin->GetReal(block_name, "gx2"));
+    params.Add("gx3", pin->GetReal(block_name, "gx3"));
+  }
+  if (pin->DoesBlockExist("gravity/point")) {
+    count++;
     gtype = GravityType::point;
-    params.Add("gm", pin->GetReal("gravity", "gm"));
-    params.Add("soft", pin->GetOrAddReal("gravity", "soft", 0.0));
-    params.Add("sink", pin->GetOrAddReal("gravity", "sink", 0.0));
-    params.Add("sink_rate", pin->GetOrAddReal("gravity", "sink_rate", 0.0));
-    const Real x = pin->GetOrAddReal("gravity", "x", 0.0);
-    const Real y = pin->GetOrAddReal("gravity", "y", 0.0);
-    const Real z = pin->GetOrAddReal("gravity", "z", 0.0);
+    block_name = "gravity/point";
+    params.Add("soft", pin->GetOrAddReal(block_name, "soft", 0.0));
+    params.Add("sink", pin->GetOrAddReal(block_name, "sink", 0.0));
+    params.Add("sink_rate", pin->GetOrAddReal(block_name, "sink_rate", 0.0));
+    const Real x = pin->GetOrAddReal(block_name, "x", 0.0);
+    const Real y = pin->GetOrAddReal(block_name, "y", 0.0);
+    const Real z = pin->GetOrAddReal(block_name, "z", 0.0);
 
     if (geometry::is_axisymmetric(coords)) {
       PARTHENON_REQUIRE(
@@ -56,51 +73,54 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     params.Add("x", x);
     params.Add("y", y);
     params.Add("z", z);
+  }
+  if (pin->DoesBlockExist("gravity/binary")) {
+    count++;
+    gtype = GravityType::binary;
+    block_name = "gravity/binary";
 
-  } else if (grav_type == "binary") {
     PARTHENON_REQUIRE(!geometry::is_axisymmetric(coords),
                       "Binary gravity is not compatable with axisymmetric coordinates!");
-    gtype = GravityType::binary;
-    params.Add("soft1", pin->GetOrAddReal("gravity", "soft1", 0.0));
-    params.Add("soft2", pin->GetOrAddReal("gravity", "soft2", 0.0));
-    params.Add("sink1", pin->GetOrAddReal("gravity", "sink1", 0.0));
-    params.Add("sink2", pin->GetOrAddReal("gravity", "sink2", 0.0));
-    params.Add("sink_rate1", pin->GetOrAddReal("gravity", "sink_rate1", 0.0));
-    params.Add("sink_rate2", pin->GetOrAddReal("gravity", "sink_rate2", 0.0));
-    params.Add("x", pin->GetOrAddReal("gravity", "x", 0.0));
-    params.Add("y", pin->GetOrAddReal("gravity", "y", 0.0));
-    params.Add("z", pin->GetOrAddReal("gravity", "z", 0.0));
 
-    const Real gm = pin->GetReal("gravity", "gm");
-    const Real qbin = pin->GetReal("gravity", "q");
-    const Real abin = pin->GetReal("gravity", "a");
-    const Real ebin = pin->GetOrAddReal("gravity", "e", 0.0);
-    const Real ibin = pin->GetOrAddReal("gravity", "i", 0.0) * M_PI / 180.;
-    const Real obin = pin->GetOrAddReal("gravity", "omega", 0.0) * M_PI / 180.;
-    const Real Obin = pin->GetOrAddReal("gravity", "Omega", 0.0) * M_PI / 180.;
-    const Real fbin = pin->GetOrAddReal("gravity", "f", 180.0) * M_PI / 180.;
+    params.Add("soft1", pin->GetOrAddReal(block_name, "soft1", 0.0));
+    params.Add("soft2", pin->GetOrAddReal(block_name, "soft2", 0.0));
+    params.Add("sink1", pin->GetOrAddReal(block_name, "sink1", 0.0));
+    params.Add("sink2", pin->GetOrAddReal(block_name, "sink2", 0.0));
+    params.Add("sink_rate1", pin->GetOrAddReal(block_name, "sink_rate1", 0.0));
+    params.Add("sink_rate2", pin->GetOrAddReal(block_name, "sink_rate2", 0.0));
+    params.Add("x", pin->GetOrAddReal(block_name, "x", 0.0));
+    params.Add("y", pin->GetOrAddReal(block_name, "y", 0.0));
+    params.Add("z", pin->GetOrAddReal(block_name, "z", 0.0));
+
+    const Real qbin = pin->GetReal(block_name, "q");
+    const Real abin = pin->GetReal(block_name, "a");
+    const Real ebin = pin->GetOrAddReal(block_name, "e", 0.0);
+    const Real ibin = pin->GetOrAddReal(block_name, "i", 0.0) * M_PI / 180.;
+    const Real obin = pin->GetOrAddReal(block_name, "omega", 0.0) * M_PI / 180.;
+    const Real Obin = pin->GetOrAddReal(block_name, "Omega", 0.0) * M_PI / 180.;
+    const Real fbin = pin->GetOrAddReal(block_name, "f", 180.0) * M_PI / 180.;
     Orbit orb(gm, abin, ebin, ibin, obin, Obin, fbin);
-    params.Add("gm", gm);
     params.Add("q", qbin);
     params.Add("orb", orb);
-  } else if (grav_type == "nbody") {
-    gtype = GravityType::nbody;
-    params.Add("gm", pin->GetReal("gravity", "gm"));
-    const bool do_nbody = pin->GetBoolean("physics", "nbody");
-    PARTHENON_REQUIRE(do_nbody,
-                      "You have gravity/type = nbody but not physics/nbody = true!");
-  } else {
-    PARTHENON_FAIL("Unknown gravity type");
   }
-  params.Add("type", gtype);
+  if (pin->DoesBlockExist("gravity/nbody")) {
+    count++;
+    gtype = GravityType::nbody;
+    block_name = "gravity/nbody";
+    const bool do_nbody = pin->GetBoolean("physics", "nbody");
+    PARTHENON_REQUIRE(do_nbody, "You have <gravity/nbody> but not physics/nbody = true!");
+  }
 
-  // Time start/stop controllers for gravity?
-  const Real tstart =
-      pin->GetOrAddReal("gravity", "tstart", std::numeric_limits<Real>::lowest());
-  const Real tstop =
-      pin->GetOrAddReal("gravity", "tstop", std::numeric_limits<Real>::max());
-  params.Add("tstart", tstart);
-  params.Add("tstop", tstop);
+  if (needs_gm) {
+    PARTHENON_REQUIRE(!std::isnan(gm), "Please define gm in the <gravity> block!");
+  }
+
+  PARTHENON_REQUIRE((count > 0) && (gtype != GravityType::null), "Unknown gravity node!");
+
+  PARTHENON_REQUIRE(count == 1, "artemis only supports 1 gravity type at this time");
+
+  params.Add("gm", gm);
+  params.Add("type", gtype);
 
   return gravity;
 }

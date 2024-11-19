@@ -31,7 +31,6 @@ artemis_dir = os.path.abspath(
 )
 artemis_executable = os.path.join(artemis_dir, "tst", "build", "src", "artemis")
 artemis_inputs_dir = os.path.join(artemis_dir, "inputs")
-# artemis_fig_dir = "./figs/"
 artemis_run_dir = os.path.join(artemis_dir, "tst", "build", "src", "tst")
 artemis_fig_dir = os.path.join(artemis_dir, "tst", "figs")
 artemis_log_dir = os.path.join(artemis_dir, "tst")
@@ -40,12 +39,16 @@ custom_exe = False
 
 # Optionally set custom path for executable, and update other variables related to where
 # we run the code
-def set_executable(executable_path):
+def set_executable(executable_path, output_dir):
     global artemis_executable
     global artemis_run_dir
+    global artemis_fig_dir
+    global artemis_log_dir
     global custom_exe
     artemis_executable = executable_path
-    artemis_run_dir = os.path.join(os.path.dirname(artemis_executable), "tst")
+    artemis_run_dir = os.path.join(output_dir, "tst")
+    artemis_fig_dir = os.path.join(output_dir, "figs")
+    artemis_log_dir = output_dir
     custom_exe = True
 
 

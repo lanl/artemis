@@ -82,8 +82,8 @@ type = alpha
 alpha = 1e-3
 
 <gravity>
-type = point
 gm = 1.0
+<gravity/point>
 
 <problem>
 r0 = 1.0

@@ -86,7 +86,7 @@ elif [[ $PARTITION == "chicoma-cpu" ]]; then
     source /usr/projects/hpcsoft/common/x86_64/anaconda/2023.03-python-3.10/bin/activate /usr/projects/jovian/dependencies/python/chicoma-frontend
     shorten_prompt
     module load cmake
-    export ARTEMIS_SUITE=cpu
+    export ARTEMIS_SUITE=chicoma-cpu
     echo "...setup SUCCEEDED"
 elif [[ $PARTITION == "darwin-power9-rhel7" ]]; then
     echo "darwin-power9-rhel7 partition has been decommissioned! Exiting..."

@@ -119,30 +119,35 @@ elif [[ $PARTITION == "darwin-volta-x86" ]]; then
     export ARTEMIS_SUITE=darwin-gpu
     echo "...setup SUCCEEDED"
 elif [[ $PARTITION == "venado-gh" ]]; then
-  module load PrgEnv-gnu
-  module load cray-mpich cray-hdf5-parallel cudatoolkit
-  export MPICH_OFI_NIC_POLICY=GPU   # GPU NUMA ROUND-ROBIN
-  export MPICH_GPU_SUPPORT_ENABLED=1 # Allows GPU Aware MPI
-  export CRAY_ACCEL_TARGET=nvidia90
-  export MPICH_MALLOC_FALLBACK=1
-  export MPICH_SMP_SINGLE_COPY_MODE=NONE
-  export MPICH_MAX_THREAD_SAFETY=multiple
-  export FI_CXI_RX_MATCH_MODE=hybrid
-  export PMI_MMAP_SYNC_WAIT_TIME=600
-  export ARTEMIS_SUITE=venado-gpu
-  module list
-  echo "...setup SUCCEEDED"
+    module load PrgEnv-gnu
+    module load cray-mpich
+    #module load cray-hdf5-parallel # Compiler wrappers fail to find hdf5.h 2024/11/8
+    export HDF5_ROOT=/opt/cray/pe/hdf5-parallel/1.14.3.1/gnu/12.3
+    module load cudatoolkit
+    module load cmake
+    export MPICH_OFI_NIC_POLICY=GPU   # GPU NUMA ROUND-ROBIN
+    export MPICH_GPU_SUPPORT_ENABLED=1 # Allows GPU Aware MPI
+    export CRAY_ACCEL_TARGET=nvidia90
+    export MPICH_MALLOC_FALLBACK=1
+    export MPICH_SMP_SINGLE_COPY_MODE=NONE
+    export MPICH_MAX_THREAD_SAFETY=multiple
+    export FI_CXI_RX_MATCH_MODE=hybrid
+    export PMI_MMAP_SYNC_WAIT_TIME=600
+    export NVCC_WRAPPER_DEFAULT_COMPILER=g++
+    export ARTEMIS_SUITE=venado-gpu
+    module list
+    echo "...setup SUCCEEDED"
 elif [[ $PARTITION == "venado-gg" ]]; then
-  module load PrgEnv-gnu
-  module load cray-mpich cray-hdf5-parallel
-  export MPICH_MALLOC_FALLBACK=1
-  export MPICH_SMP_SINGLE_COPY_MODE=NONE
-  export MPICH_MAX_THREAD_SAFETY=multiple
-  export FI_CXI_RX_MATCH_MODE=hybrid
-  export PMI_MMAP_SYNC_WAIT_TIME=600
-  export ARTEMIS_SUITE=venado-cpu
-  module list
-  echo "...setup SUCCEEDED"
+    module load PrgEnv-gnu
+    module load cray-mpich cray-hdf5-parallel
+    export MPICH_MALLOC_FALLBACK=1
+    export MPICH_SMP_SINGLE_COPY_MODE=NONE
+    export MPICH_MAX_THREAD_SAFETY=multiple
+    export FI_CXI_RX_MATCH_MODE=hybrid
+    export PMI_MMAP_SYNC_WAIT_TIME=600
+    export ARTEMIS_SUITE=venado-cpu
+    module list
+    echo "...setup SUCCEEDED"
 fi
 
 echo ""

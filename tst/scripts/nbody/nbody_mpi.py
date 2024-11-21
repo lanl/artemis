@@ -14,16 +14,13 @@
 # Regression to test a nbody in a 2D disk with rebound
 
 # Modules
+import importlib
 import logging
-import numpy as np
-import os
-import scripts.utils.artemis as artemis
 import scripts.nbody.nbody as nbody
 
 logger = logging.getLogger("artemis" + __name__[7:])  # set logger name
-logging.getLogger("h5py").setLevel(logging.WARNING)
-logging.getLogger("matplotlib").setLevel(logging.WARNING)
 
+importlib.reload(nbody)
 nbody._nranks = 8
 nbody._file_id = "nbody_mpi"
 

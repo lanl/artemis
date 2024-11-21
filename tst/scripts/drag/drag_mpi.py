@@ -14,16 +14,13 @@
 # Regression to test simple dust-gas drag
 
 # Modules
+import importlib
 import logging
-import numpy as np
-import os
-import scripts.utils.artemis as artemis
 import scripts.drag.drag as drag
 
 logger = logging.getLogger("artemis" + __name__[7:])  # set logger name
-logging.getLogger("h5py").setLevel(logging.WARNING)
-logging.getLogger("matplotlib").setLevel(logging.WARNING)
 
+importlib.reload(drag)
 drag._nranks = 4
 drag._file_id = "drag_mpi"
 

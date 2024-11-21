@@ -20,11 +20,14 @@ import logging
 import numpy as np
 import os
 import scripts.utils.artemis as artemis
-import scripts.binary.binary as binary  # loads the
+from scipy.interpolate import interp1d
+
 
 logger = logging.getLogger("artemis" + __name__[7:])  # set logger name
 logging.getLogger("h5py").setLevel(logging.WARNING)
 logging.getLogger("matplotlib").setLevel(logging.WARNING)
+import matplotlib.colors as colors
+import matplotlib.pyplot as plt
 
 _nranks = 1
 _file_id = "ssheet"
@@ -42,16 +45,12 @@ def run(**kwargs):
 
 # Analyze outputs
 def analyze():
-    from scipy.interpolate import interp1d
-    import matplotlib.colors as colors
-    import matplotlib.pyplot as plt
-
     logger.debug("Analyzing test " + __name__)
-    os.makedirs(artemis.artemis_fig_dir, exist_ok=True)
+    os.makedirs(artemis.get_fig_dir(), exist_ok=True)
     analyze_status = True
 
-    time, x, y, z, [d, u, v, w, T] = binary.load_level(
-        "final", dir=artemis.get_run_directory(), base="{}.out1".format(_file_id)
+    time, x, y, z, [d, u, v, w, T] = artemis.load_level(
+        "final", dir=artemis.get_data_dir(), base="{}.out1".format(_file_id)
     )
     xc = 0.5 * (x[1:] + x[:-1])
     yc = 0.5 * (y[1:] + y[:-1])
@@ -67,8 +66,8 @@ def analyze():
     axes[0].pcolormesh(xc, yc, sig, norm=norm)
     ri = np.linspace(-0.4, -2.0 / 3 * h, 20)
     ro = np.linspace(2.0 / 3 * h, 0.4, 20)
-    axes[0].plot(ri, [spiral_pos(dx) for dx in ri], "--w")
-    axes[0].plot(ro, [spiral_pos(dx) for dx in ro], "--w")
+    axes[0].plot(ri, [ssheet_spiral_pos(dx) for dx in ri], "--w")
+    axes[0].plot(ro, [ssheet_spiral_pos(dx) for dx in ro], "--w")
 
     axes[0].set_xlim(-0.4, 0.4)
     axes[0].set_ylim(-0.4, 0.4)
@@ -83,8 +82,8 @@ def analyze():
     po = yc[np.argwhere(sig[:, io] == sig[:, io].max())[0][0]]
 
     # the analytic answers
-    p0i = spiral_pos(-0.1)
-    p0o = spiral_pos(0.1)
+    p0i = ssheet_spiral_pos(-0.1)
+    p0o = ssheet_spiral_pos(0.1)
 
     # the errors
     names = ["Inner location", "Outer Location"]
@@ -103,10 +102,10 @@ def analyze():
     axes[1].legend(loc="best", fontsize=12)
     axes[1].set_ylabel("$\\Sigma - \\langle \\Sigma \\rangle$", fontsize=20)
     axes[0].set_ylabel("$y$", fontsize=20)
-    binary.create_colorbar(axes[0], norm=norm)
+    artemis.create_colorbar(axes[0], norm=norm)
     fig.tight_layout()
     fig.savefig(
-        os.path.join(artemis.artemis_fig_dir, _file_id + "_spiral.png"),
+        os.path.join(artemis.get_fig_dir(), _file_id + "_spiral.png"),
         bbox_inches="tight",
     )
 
@@ -122,10 +121,9 @@ def analyze():
     return analyze_status
 
 
-def spiral_pos(x, h=0.05):
+def ssheet_spiral_pos(x, h=0.05):
     # Analytic spiral position from Ogilvie & Lubow (2002)
     # 3/4 x^2 / h
-
     if x > 0:
         return -0.75 * x**2 / h
     if x < 0:

@@ -16,14 +16,13 @@
 # softwares.
 
 # Modules
+import importlib
 import logging
-import numpy as np
-import os
-import scripts.utils.artemis as artemis
 import scripts.hydro.linwave as linwave
 
 logger = logging.getLogger("artemis" + __name__[7:])  # set logger name
 
+importlib.reload(linwave)
 linwave._nranks = 4
 linwave._file_id = "linear_wave_mpi"
 

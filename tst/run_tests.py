@@ -48,16 +48,9 @@ import scripts.utils.artemis as artemis  # noqa
 logger = logging.getLogger("artemis")
 
 
-def read_cmakecache(filename):
-    with open(filename, "r") as f:
-        for line in f.readlines():
-            if "artemis_BINARY_DIR" in line:
-                return os.path.join(line.split("=")[-1].strip(), "src", "artemis")
-
-
 def process_suite(filename):
     tests = []
-    fname = os.path.join(artemis.get_source_directory(), "tst", "suites", filename)
+    fname = os.path.join(artemis.get_artemis_dir(), "tst", "suites", filename)
 
     with open(fname, "r") as f:
         for line in f.readlines():
@@ -78,7 +71,7 @@ def process_suite(filename):
                                 # path=["scripts/" + test_name], prefix=test_name + "."
                                 path=[
                                     os.path.join(
-                                        artemis.get_source_directory(),
+                                        artemis.get_artemis_dir(),
                                         "tst",
                                         "scripts",
                                         test_name,
@@ -104,7 +97,7 @@ def main(**kwargs):
                     for _, name, _ in iter_modules(
                         path=[
                             os.path.join(
-                                artemis.get_source_directory(),
+                                artemis.get_artemis_dir(),
                                 "tst",
                                 "scripts",
                                 directory,
@@ -128,7 +121,7 @@ def main(**kwargs):
                     for _, name, _ in iter_modules(
                         path=[
                             os.path.join(
-                                artemis.get_source_directory(), "tst", "scripts", test
+                                artemis.get_artemis_dir(), "tst", "scripts", test
                             )
                         ],
                         prefix=test + ".",
@@ -164,10 +157,10 @@ def main(**kwargs):
                 logger.warning("Unable to " 'import "{:}".'.format(missing_module))
                 deps_installed = False
         if not deps_installed:
-            logger.warning("WARNING! Not all required Python modules " "are available")
+            logger.warning("WARNING! Not all required Python modules are available")
 
         # Build Artemis
-        if not artemis.custom_exe and not kwargs.pop("reuse_build"):
+        if not artemis.get_supplied_exe() and not kwargs.pop("reuse_build"):
             try:
                 os.system("rm -rf {0}/build".format(current_dir))
                 # insert arguments for artemis.make()
@@ -215,7 +208,7 @@ def main(**kwargs):
             # For CI, print after every individual test has finished
             logger.info("{} test: run(), analyze() finished".format(name))
     finally:
-        if not kwargs.pop("save_build") and not artemis.custom_exe:
+        if not kwargs.pop("save_build") and not artemis.get_supplied_exe():
             os.system("rm -rf {0}/build".format(current_dir))
 
     # Report test results
@@ -269,7 +262,7 @@ def log_init(args):
     # setup log_file
     log_fn = kwargs.pop("log_file")
     if log_fn:
-        f_handler = logging.FileHandler(os.path.join(artemis.artemis_log_dir, log_fn))
+        f_handler = logging.FileHandler(os.path.join(artemis.get_log_dir(), log_fn))
         f_handler.setLevel(0)  # log everything
         f_format = logging.Formatter(
             "%(asctime)s|%(levelname)s" ":%(name)s: %(message)s"
@@ -279,61 +272,72 @@ def log_init(args):
     logger.debug("Starting Artemis regression tests")
 
 
-def set_paths(args):
+def read_cmakecache(filename):
+    with open(filename, "r") as f:
+        for line in f.readlines():
+            if "artemis_BINARY_DIR" in line:
+                return os.path.join(line.split("=")[-1].strip(), "src", "artemis")
+
+
+def set_globals(args):
     kwargs = vars(args)
+
+    # Set MPI oversubscribe
+    if kwargs.pop("use_oversubscribe"):
+        artemis.set_mpi_oversubscribe(True)
+
+    # Check for executable path and output directory args
+    exe_path = kwargs.pop("exe")
+    out_dir = kwargs.pop("output_dir")
+
     # Set the correct paths
-    artemis_exe_path = kwargs.pop("exe")
-    output_dir = kwargs.pop("output_dir")
-
-    # Check that path is valid
-    if output_dir is not None:
-        if not (os.path.exists(output_dir) and os.access(output_dir, os.W_OK)):
-            raise TestError(
-                f'Provided output directory "{output_dir}" not found or it is not writeable!'
-            )
-    # output_dir is a valid path or None
-
-    if artemis_exe_path is not None:
-        # Check that path is valid
-        if not (
-            os.path.exists(artemis_exe_path) and os.access(artemis_exe_path, os.X_OK)
-        ):
-            raise TestError(
-                f'Provided executable "{artemis_exe_path}" not found or cannot be executed!'
-            )
+    if exe_path is not None:
+        if not (os.path.exists(exe_path) and os.access(exe_path, os.X_OK)):
+            raise TestError(f'Provided exe "{exe_path}" not found or cannot be run!')
 
         # If no output_dir was passed, set it to the exe path
-        if output_dir is None:
-            output_dir = os.path.dirname(artemis_exe_path)
+        if out_dir is None:
+            out_dir = os.path.dirname(exe_path)
+
         # Set the valid provided executable path
-        abs_exe_path = os.path.abspath(artemis_exe_path)
-        print(f"Found local executable {abs_exe_path}")
-        print(f"Outputting results to {output_dir}")
-        artemis.set_executable(abs_exe_path, output_dir)
+        abs_exe_path = os.path.abspath(exe_path)
+        abs_out_path = os.path.abspath(out_dir)
+        artemis.set_paths(os.path.dirname(abs_exe_path), abs_out_path)
+        artemis.set_supplied_exe(True)
     else:
-        # If no output_dir was passed, set it to the cwd
-        if output_dir is None:
-            output_dir = os.getcwd()
         # If we are in a directory with an executable, default to using that
         local_path = os.path.join(os.getcwd(), "artemis")
         if os.path.exists(local_path) and os.access(local_path, os.X_OK):
-            print(f"Found local executable {local_path}")
-            print(f"Outputting results to {output_dir}")
-            artemis.set_executable(local_path, output_dir)
+            # If no out_dir was passed, set it to the cwd
+            if out_dir is None:
+                out_dir = os.getcwd()
+            abs_out_path = os.path.abspath(out_dir)
+            artemis.set_paths(os.getcwd(), abs_out_path)
+            artemis.set_supplied_exe(True)
         else:
             # Check if we are one level up from the executable
             local_path = os.path.join(os.getcwd(), "CMakeCache.txt")
             if os.path.exists(local_path) and os.access(local_path, os.R_OK):
+                # If no out_dir was passed, set it to the cwd
+                if out_dir is None:
+                    out_dir = os.getcwd()
+                abs_out_path = os.path.abspath(out_dir)
                 # Pull out the executable path
                 exe_path = read_cmakecache(local_path)
                 if os.path.exists(exe_path) and os.access(exe_path, os.X_OK):
-                    print(f"Found local executable {exe_path}")
-                    print(f"Outputting results to {output_dir}")
-                    artemis.set_executable(exe_path, output_dir)
+                    artemis.set_paths(os.path.dirname(exe_path), abs_out_path)
+                    artemis.set_supplied_exe(True)
                 else:
-                    raise TestError(
-                        f'Could not find executable in "{exe_path}" or cannot be executed!'
-                    )
+                    raise TestError(f'No exe in "{exe_path}" or cannot be run!')
+            else:
+                # If no out_dir was passed, set it to the cwd
+                default_base = os.path.join(artemis.get_artemis_dir(), "tst/build/src")
+                if out_dir is None:
+                    out_dir = os.path.join(artemis.get_artemis_dir(), "tst")
+                abs_out_path = os.path.abspath(out_dir)
+                exe_path = os.path.join(default_base, "artemis")
+                artemis.set_paths(os.path.dirname(exe_path), abs_out_path)
+                artemis.set_supplied_exe(False)
 
 
 # Execute main function
@@ -351,6 +355,12 @@ if __name__ == "__main__":
 
     parser.add_argument(
         "--make_nproc", type=int, default=8, help="set nproc N for make -jN"
+    )
+
+    parser.add_argument(
+        "--use_oversubscribe",
+        action="store_true",
+        help="use MPI oversubscribe",
     )
 
     parser.add_argument(
@@ -383,7 +393,7 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
-    set_paths(args)
+    set_globals(args)
     log_init(args)
 
     try:

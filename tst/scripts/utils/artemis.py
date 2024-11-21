@@ -126,9 +126,8 @@ def run(nproc, input_filename, arguments, restart=None):
         run_command += ["--oversubscribe"]
     run_command += ["-n", str(nproc), os.path.join(artemis_exe_dir, "artemis")]
     if restart is not None:
-        run_command += ["-r", restart]
-    input_filename_full = os.path.join(artemis_inputs_dir, input_filename)
-    run_command += ["-i", input_filename_full]
+        run_command += ["-r", os.path.join(artemis_data_dir, restart)]
+    run_command += ["-i", os.path.join(artemis_inputs_dir, input_filename)]
     run_command += ["-d", artemis_data_dir]
 
     try:

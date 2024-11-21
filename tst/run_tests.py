@@ -166,7 +166,7 @@ def main(**kwargs):
                 # insert arguments for artemis.make()
                 artemis_cmake_args = kwargs.pop("cmake")
                 artemis_make_nproc = kwargs.pop("make_nproc")
-                module.artemis.make(artemis_cmake_args, artemis_make_nproc)
+                artemis.make(artemis_cmake_args, artemis_make_nproc)
             except Exception:
                 logger.error("Exception occurred", exc_info=True)
                 test_errors.append("make()")
@@ -308,7 +308,7 @@ def set_globals(args):
     else:
         # If we are in a directory with an executable, default to using that
         local_path = os.path.join(os.getcwd(), "artemis")
-        if os.path.exists(local_path) and os.access(local_path, os.X_OK):
+        if os.path.isfile(local_path) and os.access(local_path, os.X_OK):
             # If no out_dir was passed, set it to the cwd
             if out_dir is None:
                 out_dir = os.getcwd()

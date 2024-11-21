@@ -47,6 +47,8 @@ def set_mpi_oversubscribe(use_oversubscribe):
 def set_supplied_exe(use_exe):
     global use_supplied_exe
     use_supplied_exe = use_exe
+    custom_msg = "use pre-existing" if use_exe else "build"
+    print("...Regression will " + custom_msg + " executable...\n")
 
 
 # Optionally set custom path for executable, and update other variables related to where
@@ -252,7 +254,6 @@ def create_colorbar(ax, norm, where="top", cax=None, cmap="viridis", **kargs):
 
 # Shared function to compute analytic Ogilvie & Lubow (2002) spiral positions
 def spiral_pos(r, r0=1.0, p0=np.pi, h=0.05):
-    # Analytic spiral position from
     def mod_2pi(p):
         while p > 2 * np.pi:
             p -= 2 * np.pi

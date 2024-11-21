@@ -262,6 +262,7 @@ def log_init(args):
     # setup log_file
     log_fn = kwargs.pop("log_file")
     if log_fn:
+        os.makedirs(artemis.get_log_dir(), exist_ok=True)
         f_handler = logging.FileHandler(os.path.join(artemis.get_log_dir(), log_fn))
         f_handler.setLevel(0)  # log everything
         f_format = logging.Formatter(

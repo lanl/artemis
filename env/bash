@@ -1,0 +1,251 @@
+#!/bin/bash
+# ========================================================================================
+#  (C) (or copyright) 2023-2024. Triad National Security, LLC. All rights reserved.
+#
+#  This program was produced under U.S. Government contract 89233218CNA000001 for Los
+#  Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
+#  for the U.S. Department of Energy/National Nuclear Security Administration. All rights
+#  in the program are reserved by Triad National Security, LLC, and the U.S. Department
+#  of Energy/National Nuclear Security Administration. The Government is granted for
+#  itself and others acting on its behalf a nonexclusive, paid-up, irrevocable worldwide
+#  license in this material to reproduce, prepare derivative works, distribute copies to
+#  the public, perform publicly and display publicly, and to permit others to do so.
+# ========================================================================================
+
+echo "Setting up jovian development environment..."
+
+JOVIAN_ENV_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+
+#  Identify partitions based on  SLURM_JOB_PARTITION and HOSTNAME variables
+PARTITION="unknown"
+if [ $HOSTNAME == ch-fe* ] || [ $SLURM_CLUSTER_NAME == "chicoma" ]; then
+    if [[ $SLURM_JOB_PARTITION == *gpu* ]]; then
+        PARTITION="chicoma-gpu"
+    else
+        PARTITION="chicoma-cpu"
+    fi
+else # Catch-all for Darwin
+    if [ -z "$SLURM_JOB_PARTITION" ]; then
+        if [[ $HOSTNAME == darwin-fe* ]]; then
+            echo "Do not compile on Darwin frontend nodes; use a specific partition!"
+            echo "Supported partitions are"
+            echo "  skylake-gold"
+            echo "  volta-x86"
+            echo "...setup FAILED"
+        fi
+    elif [[ $SLURM_JOB_PARTITION == "power9-rhel7" ]]; then
+        PARTITION="darwin-power9-rhel7"
+    elif [[ $SLURM_JOB_PARTITION == "skylake-gold" ]]; then
+        PARTITION="darwin-skylake-gold"
+    elif [[ $SLURM_JOB_PARTITION == "volta-x86" ]]; then
+        PARTITION="darwin-volta-x86"
+    fi
+fi
+
+# Absolute path for conda environment can be too long
+function shorten_prompt {
+    if [[ -v CONDA_PREFIX && -n $CONDA_PREFIX ]]; then
+        local env_name=$(basename "$CONDA_PREFIX")
+        export PS1="(${env_name}) [\u@\h \W]\$ "
+    fi
+}
+
+echo "Partition: $PARTITION"
+if [[ $PARTITION == "unknown" ]]; then
+    echo "Partition is unknown! exiting..."
+elif [[ $PARTITION == "chicoma-gpu" ]]; then
+    module swap PrgEnv-cray PrgEnv-nvhpc
+    module load craype-accel-nvidia80
+    export CRAY_ACCEL_TARGET=nvidia80
+    export MPICH_GPU_SUPPORT_ENABLED=1
+    export NVCC_WRAPPER_DEFAULT_COMPILER=CC
+    export CC=$(which cc) # not sure why these are necessary but they appear to be
+    export CXX=$(which CC)
+    export FC=$(which ftn)
+    module load cray-hdf5-parallel
+    module load python/3.10-anaconda-2023.03
+    source /usr/projects/hpcsoft/common/x86_64/anaconda/2023.03-python-3.10/bin/activate /usr/projects/jovian/dependencies/python/chicoma-frontend
+    shorten_prompt
+    module load cmake/3.25.1
+    export FI_CXI_RX_MATCH_MODE=hybrid
+    export FI_CXI_RDZV_THRESHOLD=128000
+    echo "...setup SUCCEEDED"
+elif [[ $PARTITION == "chicoma-cpu" ]]; then
+    module swap PrgEnv-cray PrgEnv-gnu
+    module load cray-hdf5-parallel
+    module load python/3.10-anaconda-2023.03
+    source /usr/projects/hpcsoft/common/x86_64/anaconda/2023.03-python-3.10/bin/activate /usr/projects/jovian/dependencies/python/chicoma-frontend
+    shorten_prompt
+    module load cmake
+    echo "...setup SUCCEEDED"
+elif [[ $PARTITION == "darwin-power9-rhel7" ]]; then
+    echo "darwin-power9-rhel7 partition has been decommissioned! Exiting..."
+elif [[ $PARTITION == "darwin-skylake-gold" ]]; then
+    module purge
+    module use --append /usr/projects/jovian/dependencies/modulefiles
+    module load clang/12.0.1
+    module load gcc/9.4.0
+    module load skylake-gold/openmpi/4.1.6
+    module load skylake-gold/hdf5/1.12.2
+    module load miniconda3/py39_4.12.0
+    source /projects/opt/centos8/x86_64/miniconda3/py39_4.12.0/bin/activate /usr/projects/jovian/dependencies/python/skylake-gold-py39
+    shorten_prompt
+    module load cmake/3.26.3
+    module list
+    echo "...setup SUCCEEDED"
+elif [[ $PARTITION == "darwin-volta-x86" ]]; then
+    module purge
+    module load clang/12.0.1
+    module load nvhpc/23.5
+    module load cuda/11.4.2
+    module load gcc/9.4.0 # must load gcc after nvcc so REBOUND uses gcc
+    module load hdf5/1.12.2
+    module load miniconda3
+    source /projects/opt/centos8/x86_64/miniconda3/py39_4.12.0/bin/activate /usr/projects/jovian/dependencies/python/volta-x86-py39
+    shorten_prompt
+    module load cmake/3.26.3
+    module list
+    echo "...setup SUCCEEDED"
+fi
+
+echo ""
+echo "To configure and build the code, you can use the function (-h flag for options)"
+echo "  build_artemis"
+echo ""
+
+function build_artemis {
+
+    OPTIND=1 # Reset OPTIND in case getopts is used elsewhere
+
+    BUILD_DIR="build_${PARTITION}" # Directory in which to build (absolute, or relative from base dir)
+    CONFIGURE_BUILD=false # Whether to configure before calling make (automatically done if directory is empty)
+    DEBUG_BUILD=false # Whether to configure for Debug build (default is cmake's RelWithDebInfo)
+    FULL_BUILD=false # Whether to completely wipe the build directory, if non-empty
+    ASAN_BUILD=false # Whether to configure with ASAN support for error checking
+    options='hb:cdfa'
+    while getopts $options opt; do
+        case $opt in
+            h)
+                echo " -- build_artemis script --"
+                echo "  Options:"
+                echo "    -h       : Help information"
+                echo "    -b [dir] : Directory in which to build (absolute, or relative from artemis/)"
+                echo "               Default directory is artemis/build_\$PARTITION"
+                echo "    -c       : Force re-configuration of build"
+                echo "    -d       : Switch to debug build from default RelWithDebInfo"
+                echo "    -f       : Force complete re-build"
+                echo "               WARNING uses rm -rf to remove build directory if it exists"
+                return
+                ;;
+            b)
+                BUILD_DIR="$OPTARG"
+                ;;
+            c)
+                echo "Configuration requested"
+                CONFIGURE_BUILD=true
+                ;;
+            d)
+                echo  "Debug build requested"
+                DEBUG_BUILD=true
+                ;;
+            f)
+                echo "Full build requested"
+                FULL_BUILD=true
+                ;;
+            a)
+                echo "ASAN build requested"
+                ASAN_BUILD=true
+                ;;
+            \?)
+                echo "Invalid option: -$OPTARG" >&2
+                return 1
+                ;;
+            :)
+                echo "Option -$OPTARG requires an argument." >&2
+                return 1
+                ;;
+        esac
+    done
+
+    if [[ "$BUILD_DIR" == /* ]]; then
+        # Use absolute path
+        ABS_BUILD_DIR=${BUILD_DIR}
+    else
+        # Use relative path from artemis/ base directory
+        ABS_BUILD_DIR="${JOVIAN_ENV_DIR%/env}/${BUILD_DIR}"
+    fi
+
+    echo "Using build directory: ${ABS_BUILD_DIR}"
+
+    function configure_artemis {
+        if [[ "$DEBUG_BUILD" == true ]]; then
+            CMAKE_FLAGS+="-DCMAKE_BUILD_TYPE=Debug "
+            CMAKE_FLAGS+="-DKokkos_ENABLE_DEBUG_BOUNDS_CHECK=ON "
+        fi
+        if [[ "$ASAN_BUILD" == true ]]; then
+            CMAKE_FLAGS+="-DARTEMIS_ENABLE_ASAN=ON "
+        fi
+        if [[ $PARTITION == "darwin-volta-x86" ]]; then
+            cmake -DARTEMIS_ENABLE_CUDA=On \
+                  -DKokkos_ARCH_VOLTA70=On \
+                  -DCMAKE_CXX_COMPILER=${JOVIAN_ENV_DIR}/nvcc_wrapper \
+                  $CMAKE_FLAGS \
+                  ${JOVIAN_ENV_DIR%/env}
+        elif [[ $PARTITION == "darwin-power9-rhel7" ]]; then
+            echo "darwin-power9-rhel7 partition has been decommissioned! Exiting..."
+            return 1
+        elif [[ $PARTITION == "darwin-skylake-gold" ]]; then
+            cmake -DCMAKE_C_COMPILER=gcc \
+                  -DCMAKE_CXX_COMPILER=g++ \
+                  $CMAKE_FLAGS \
+                  ${JOVIAN_ENV_DIR%/env}
+        elif [[ $PARTITION == "chicoma-cpu" ]]; then
+            cmake ${JOVIAN_ENV_DIR%/env}
+        elif [[ $PARTITION == "chicoma-gpu" ]]; then
+            cmake -DARTEMIS_ENABLE_CUDA=On \
+                  -DCMAKE_CXX_COMPILER=${JOVIAN_ENV_DIR}/nvcc_wrapper \
+                  -DHDF5_INCLUDE_DIR=${HDF5_ROOT}/include \
+                  -DPARTHENON_DISABLE_HDF5_COMPRESSION=ON \
+                  $CMAKE_FLAGS \
+                  ${JOVIAN_ENV_DIR%/env}
+        else
+            echo "No configuration implemented for partition ${PARTITION}!"
+            return 1
+        fi
+    }
+
+    if [ -d "${ABS_BUILD_DIR}" ]; then
+        echo "Build directory already exists"
+        # Build directory already exists; don't configure unless requested
+        if $FULL_BUILD; then
+            echo ""
+            echo "You are about to FORCE DELETE ${ABS_BUILD_DIR}"
+            while true; do
+                read -p "Are you sure? Type 'Y' to continue: " input
+                case "$input" in
+                    [Yy]) break;;
+                    *) echo "Not deleting ${ABS_BUILD_DIR}; exiting..."; return 1;; # Exit for any other input
+                esac
+            done
+            rm -rf ${ABS_BUILD_DIR}
+            mkdir -p ${ABS_BUILD_DIR}
+            cd ${ABS_BUILD_DIR}
+            configure_artemis
+        elif $CONFIGURE_BUILD; then
+            cd ${ABS_BUILD_DIR}
+            configure_artemis
+        else
+            cd ${ABS_BUILD_DIR}
+        fi
+    else
+        mkdir -p ${ABS_BUILD_DIR}
+        cd ${ABS_BUILD_DIR}
+        configure_artemis
+    fi
+
+    make -j
+    make_status=$?
+
+    echo "${ABS_BUILD_DIR}"
+    return $make_status
+}

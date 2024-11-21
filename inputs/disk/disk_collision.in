@@ -1,0 +1,128 @@
+# ========================================================================================
+#  (C) (or copyright) 2023-2024. Triad National Security, LLC. All rights reserved.
+#
+#  This program was produced under U.S. Government contract 89233218CNA000001 for Los
+#  Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
+#  for the U.S. Department of Energy/National Nuclear Security Administration. All rights
+#  in the program are reserved by Triad National Security, LLC, and the U.S. Department
+#  of Energy/National Nuclear Security Administration. The Government is granted for
+#  itself and others acting on its behalf a nonexclusive, paid-up, irrevocable worldwide
+#  license in this material to reproduce, prepare derivative works, distribute copies to
+#  the public, perform publicly and display publicly, and to permit others to do so.
+# ========================================================================================
+
+<artemis>
+problem = disk             # name of the pgen
+coordinates = cylindrical  # coordinate system
+
+<parthenon/job>
+problem_id = disk_cyl  # problem ID: basename of output filenames
+
+<parthenon/output1>
+variables = gas.prim.density,  &
+            gas.prim.velocity, &
+            gas.prim.pressure
+file_type = hdf5  # HDF5 data dump
+dt        = 1.0   # time increment between outputs
+
+<parthenon/output2>
+file_type = rst
+dt = 6.28
+
+<parthenon/time>
+nlim       = -1    # cycle limit
+tlim       = 6.28  # time limit
+integrator = rk2   # time integration algorithm
+ncycle_out = 100   # interval for stdout summary info
+
+<parthenon/mesh>
+nghost = 2
+refinement = adaptive
+numlevel = 2
+
+nx1    = 128                 # Number of zones in X1-direction
+x1min  = 0.3                 # minimum value of X1
+x1max  = 5.0                 # maximum value of X1
+ix1_bc = ic                  # Inner-X1 boundary condition flag
+ox1_bc = ic                  # Outer-X1 boundary condition flag
+
+nx2    = 256                 # Number of zones in X2-direction
+x2min  = -3.141592653589793  # minimum value of X2
+x2max  = 3.141592653589793   # maximum value of X2
+ix2_bc = periodic            # Inner-X2 boundary condition flag
+ox2_bc = periodic            # Outer-X2 boundary condition flag
+
+nx3    = 1                   # Number of zones in X3-direction
+x3min  = -0.5                # minimum value of X3
+x3max  = 0.5                 # maximum value of X3
+ix3_bc = periodic            # Inner-X3 boundary condition flag
+ox3_bc = periodic            # Outer-X3 boundary condition flag
+
+<parthenon/meshblock>
+nx1 = 32  # Number of cells in each MeshBlock, X1-dir
+nx2 = 32  # Number of cells in each MeshBlock, X2-dir
+nx3 = 1   # Number of cells in each MeshBlock, X3-dir
+
+<physics>
+gas = true
+# dust = true
+gravity = true
+damping = true
+nbody = true
+cooling = true
+
+<gas>
+cfl = 0.3
+gamma = 1.4
+reconstruct = plm
+riemann = hllc
+dfloor = 1.0e-10
+siefloor = 1.0e-10
+
+<gravity>
+type = nbody
+gm = 1.0
+
+<damping>
+inner_x1 = 0.45
+inner_x1_rate = 1.0
+
+<cooling>
+type = beta
+tref = powerlaw
+beta0 = 0.0
+tcyl = 0.0025
+cyl_plaw = -1.0
+
+<nbody>
+dt_reb = 0.01
+integrator = ias15
+refine_type = distance
+derefine_factor = 2.0
+merge_on_collision = true
+box_size = 10.0
+dt_output = 0.05
+mscale = 1.0e-4
+
+<nbody/particle1>
+mass = 1.0
+couple = 1
+
+<nbody/particle1/soft>
+type = none
+
+<nbody/planets>
+couple = 1
+input_file = planet_inputs/n20_sys.txt
+live = 1
+live_after = 0.5
+
+<problem>
+r0 = 1.0
+rho0 = 1.0
+dslope = -0.5
+flare = 0.0
+h0 = 0.05
+dens_min = 1.0e-10
+pres_min = 1.0e-15
+polytropic_index = 1

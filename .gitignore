@@ -1,0 +1,63 @@
+# ========================================================================================
+#  (C) (or copyright) 2023. Triad National Security, LLC. All rights reserved.
+#
+#  This program was produced under U.S. Government contract 89233218CNA000001 for Los
+#  Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
+#  for the U.S. Department of Energy/National Nuclear Security Administration. All rights
+#  in the program are reserved by Triad National Security, LLC, and the U.S. Department
+#  of Energy/National Nuclear Security Administration. The Government is granted for
+#  itself and others acting on its behalf a nonexclusive, paid-up, irrevocable worldwide
+#  license in this material to reproduce, prepare derivative works, distribute copies to
+#  the public, perform publicly and display publicly, and to permit others to do so.
+# ========================================================================================
+
+# NOTE(@pdmullen): the following is largely borrowed from the open source parthenon
+# software.
+
+# Object and binary directories
+build*/
+bin/
+debug*
+.cache/
+
+# Visualization package files
+.smhist
+
+# Mac OS metadata
+.DS_Store
+
+# editor temp files
+*~
+*.swp
+\#*\#
+
+# Gcov: GCC coverage testing tool- data files
+*.gcno
+*.gcda
+
+# Gcov log files
+*.gcov
+
+# Lcov: graphical frontend for Gcov- tracefiles
+*.info
+
+# genhtml test case description format produced by gendesc
+*.desc
+
+# User editor files
+.vscode
+compile_commands.json
+.clangd
+
+# HDF5/Output Files
+*.phdf
+*.phdf.xdmf
+*.dat
+
+# Files created by bad CMake hygiene
+a.out
+cmake_hdf5_test.o
+
+# Python artifacts
+*.pyc
+*.egg-info

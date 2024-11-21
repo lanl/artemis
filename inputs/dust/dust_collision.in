@@ -1,0 +1,86 @@
+# ========================================================================================
+#  (C) (or copyright) 2023-2024. Triad National Security, LLC. All rights reserved.
+#
+#  This program was produced under U.S. Government contract 89233218CNA000001 for Los
+#  Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
+#  for the U.S. Department of Energy/National Nuclear Security Administration. All rights
+#  in the program are reserved by Triad National Security, LLC, and the U.S. Department
+#  of Energy/National Nuclear Security Administration. The Government is granted for
+#  itself and others acting on its behalf a nonexclusive, paid-up, irrevocable worldwide
+#  license in this material to reproduce, prepare derivative works, distribute copies to
+#  the public, perform publicly and display publicly, and to permit others to do so.
+# ========================================================================================
+
+<artemis>
+problem = dust_collision           # name of the pgen
+coordinates = cartesian  # coordinate system
+
+<parthenon/job>
+problem_id = dc_B  # problem ID: basename of output filenames
+
+<parthenon/output1>
+variables = gas.prim.density,   &
+            gas.prim.velocity,  &
+            gas.prim.pressure,  &
+            dust.prim.density,  &
+            dust.prim.velocity
+file_type = hdf5     # tab data dump
+dt        = 0.05  # time increment between outputs
+
+<parthenon/time>
+nlim       = -1     # cycle limit
+tlim       = 0.05  # time limit
+integrator = rk2    # time integration algorithm
+ncycle_out = 1      # interval for stdout summary info
+
+<parthenon/mesh>
+nghost = 2
+refinement = none
+# numlevel = 1
+
+nx1    = 16        # Number of zones in X1-direction
+x1min  = 0.0      # minimum value of X1
+x1max  = 1.0       # maximum value of X1
+ix1_bc = periodic   # Inner-X1 boundary condition flag
+ox1_bc = periodic   # Outer-X1 boundary condition flag
+
+nx2    = 1        # Number of zones in X2-direction
+x2min  = -0.5      # minimum value of X2
+x2max  =  0.5       # maximum value of X2
+ix2_bc = periodic   # Inner-X2 boundary condition flag
+ox2_bc = periodic   # Outer-X2 boundary condition flag
+
+nx3    = 1        # Number of zones in X3-direction
+x3min  = -0.5      # minimum value of X3
+x3max  =  0.5       # maximum value of X3
+ix3_bc = periodic   # Inner-X3 boundary condition flag
+ox3_bc = periodic   # Outer-X3 boundary condition flag
+
+<parthenon/meshblock>
+nx1 = 16  # Number of cells in each MeshBlock, X1-dir
+nx2 = 1  # Number of cells in each MeshBlock, X2-dir
+nx3 = 1   # Number of cells in each MeshBlock, X3-dir
+
+<physics>
+gas = true
+dust = true
+
+<gas>
+cfl = 0.9
+gamma = 1.4
+iso_sound_speed = 0.1
+
+<dust>
+cfl = 0.9
+nspecies = 2
+const_stopping_time = true
+enable_dust_drag = true
+enable_dust_feedback = true
+drag_method = implicit
+user_dt = 0.005
+
+stopping_time_1  = 0.01
+stopping_time_2  = 0.002
+
+<problem>
+iprob = 1

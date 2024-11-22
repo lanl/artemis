@@ -27,9 +27,9 @@ if [[ $HOSTNAME == ch-fe*  ||  $SLURM_CLUSTER_NAME == "chicoma" ]]; then
     else
         PARTITION="chicoma-cpu"
     fi
-elif [[ "$HOSTNAME" =~ ^ve-rfe[1-3]$ || ( $SLURM_CLUSTER_NAME == "venado" && $SLURM_JOB_PARTITION == "gpu" ) ]]; then
+elif [[ "$HOSTNAME" =~ ^ve-rfe[1-3]$ || "$HOSTNAME" =~ ^ve-fe[1-3]$ || ( $SLURM_CLUSTER_NAME == "venado" && $SLURM_JOB_PARTITION == "gpu" ) ]]; then
     PARTITION="venado-gh"
-elif [[ "$HOSTNAME" =~ ^ve-rfe[4-7]$ || ( $SLURM_CLUSTER_NAME == "venado" && $SLURM_JOB_PARTITION == "cpu" ) ]]; then
+elif [[ "$HOSTNAME" =~ ^ve-rfe[4-7]$ || "$HOSTNAME" =~ ^ve-fe[4-7]$ || ( $SLURM_CLUSTER_NAME == "venado" && $SLURM_JOB_PARTITION == "cpu" ) ]]; then
     PARTITION="venado-gg"
 else # Catch-all for Darwin
     if [ -z "$SLURM_JOB_PARTITION" ]; then
@@ -150,10 +150,12 @@ elif [[ $PARTITION == "venado-gg" ]]; then
     echo "...setup SUCCEEDED"
 fi
 
-echo ""
-echo "To configure and build the code, you can use the function (-h flag for options)"
-echo "  build_artemis"
-echo ""
+if [[ $PARTITION != "unknown" ]]; then
+    echo ""
+    echo "To configure and build the code, you can use the function (-h flag for options)"
+    echo "  build_artemis"
+    echo ""
+fi
 
 function build_artemis {
 

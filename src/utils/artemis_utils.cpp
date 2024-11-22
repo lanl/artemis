@@ -55,6 +55,7 @@ void PrintArtemisConfiguration(Packages_t &packages) {
 //! \fn void ArtemisUtils::EnrollArtemisRefinementOps
 //! \brief Registers custom prolongation and restriction operators on provided Metadata
 void EnrollArtemisRefinementOps(parthenon::Metadata &m, Coordinates coords) {
+  return;
   typedef Coordinates C;
   if (coords == C::cartesian) {
     m.RegisterRefinementOps<ArtemisUtils::ProlongateSharedMinMod<C::cartesian>,

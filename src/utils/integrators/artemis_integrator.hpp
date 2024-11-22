@@ -28,6 +28,7 @@ namespace ArtemisUtils {
 //! \fn  TaskStatus ArtemisUtils::DeepCopyConservedData
 //! \brief
 inline TaskStatus DeepCopyConservedData(MeshData<Real> *to, MeshData<Real> *from) {
+  printf("%s:%i\n", __FILE__, __LINE__);
   using parthenon::MakePackDescriptor;
   using parthenon::variable_names::any;
 
@@ -47,6 +48,8 @@ inline TaskStatus DeepCopyConservedData(MeshData<Real> *to, MeshData<Real> *from
           vt(b, n, k, j, i) = vf(b, n, k, j, i);
         }
       });
+      Kokkos::fence();
+  printf("%s:%i\n", __FILE__, __LINE__);
   return TaskStatus::complete;
 }
 

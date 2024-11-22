@@ -370,6 +370,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 //! \brief Compute gas hydrodynamics timestep
 template <Coordinates GEOM>
 Real EstimateTimestepMesh(MeshData<Real> *md) {
+  printf("%s:%i\n", __FILE__, __LINE__);
   using parthenon::MakePackDescriptor;
   auto pm = md->GetParentPointer();
   auto &resolved_pkgs = pm->resolved_packages;
@@ -444,6 +445,7 @@ Real EstimateTimestepMesh(MeshData<Real> *md) {
   Real diff_dt = std::min(visc_dt, cond_dt);
 
   const auto cfl_number = params.template Get<Real>("cfl");
+  printf("%s:%i\n", __FILE__, __LINE__);
   return cfl_number * std::min(min_dt, diff_dt);
 }
 
@@ -451,6 +453,7 @@ Real EstimateTimestepMesh(MeshData<Real> *md) {
 //! \fn  TaskStatus Gas::CalculateFluxes
 //! \brief Evaluates advective fluxes for gas evolution
 TaskStatus CalculateFluxes(MeshData<Real> *md, const bool pcm) {
+  printf("%s:%i\n", __FILE__, __LINE__);
   auto pm = md->GetParentPointer();
   auto &resolved_pkgs = pm->resolved_packages;
 
@@ -477,6 +480,7 @@ TaskStatus CalculateFluxes(MeshData<Real> *md, const bool pcm) {
 //! \fn  TaskStatus Gas::FluxSource
 //! \brief Evaluates coordinate terms from advective fluxes for gas evolution
 TaskStatus FluxSource(MeshData<Real> *md, const Real dt) {
+  printf("%s:%i\n", __FILE__, __LINE__);
   auto pm = md->GetParentPointer();
   auto &resolved_pkgs = pm->resolved_packages;
 
@@ -503,6 +507,7 @@ TaskStatus FluxSource(MeshData<Real> *md, const Real dt) {
 //  \brief Evaluates viscous flux
 template <Coordinates GEOM>
 TaskStatus ViscousFlux(MeshData<Real> *md) {
+  printf("%s:%i\n", __FILE__, __LINE__);
   auto pm = md->GetParentPointer();
   auto &pkg = pm->packages.Get("gas");
 
@@ -542,6 +547,7 @@ TaskStatus ViscousFlux(MeshData<Real> *md) {
 //  \brief Evaluates thermal flux
 template <Coordinates GEOM>
 TaskStatus ThermalFlux(MeshData<Real> *md) {
+  printf("%s:%i\n", __FILE__, __LINE__);
   auto pm = md->GetParentPointer();
   auto &pkg = pm->packages.Get("gas");
 
@@ -579,6 +585,7 @@ TaskStatus ThermalFlux(MeshData<Real> *md) {
 //! \fn  TaskStatus Gas::ZeroDiffusionFlux
 //  \brief Resets the diffusion flux
 TaskStatus ZeroDiffusionFlux(MeshData<Real> *md) {
+  printf("%s:%i\n", __FILE__, __LINE__);
   auto pm = md->GetParentPointer();
   auto &pkg = pm->packages.Get("gas");
 
@@ -596,6 +603,7 @@ TaskStatus ZeroDiffusionFlux(MeshData<Real> *md) {
 //  \brief Applies the diffusion fluxes to update the momenta and energy
 template <Coordinates GEOM>
 TaskStatus DiffusionUpdate(MeshData<Real> *md, const Real dt) {
+  printf("%s:%i\n", __FILE__, __LINE__);
   auto pm = md->GetParentPointer();
   auto &pkg = pm->packages.Get("gas");
 
@@ -626,6 +634,7 @@ TaskStatus DiffusionUpdate(MeshData<Real> *md, const Real dt) {
 //! \brief Add history outputs for gas quantities for generic coordinate system
 template <Coordinates GEOM>
 void AddHistoryImpl(Params &params) {
+  printf("%s:%i\n", __FILE__, __LINE__);
   using namespace ArtemisUtils;
   auto HstSum = parthenon::UserHistoryOperation::sum;
   using parthenon::HistoryOutputVar;
@@ -659,6 +668,7 @@ void AddHistoryImpl(Params &params) {
 //! \fn  void Gas::AddHistory
 //! \brief Add history outputs for gas quantities
 void AddHistory(Coordinates coords, Params &params) {
+  printf("%s:%i\n", __FILE__, __LINE__);
   if (coords == Coordinates::cartesian) {
     AddHistoryImpl<Coordinates::cartesian>(params);
   } else if (coords == Coordinates::cylindrical) {

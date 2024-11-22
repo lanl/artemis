@@ -78,8 +78,8 @@ def analyze():
     axes[0].pcolormesh(rc, pc, sig, norm=norm)
     ri = np.linspace(r.min(), 1 - 2.0 / 3 * h, 50)
     ro = np.linspace(1 + 2.0 / 3 * h, r.max(), 50)
-    axes[0].plot(ri, [analytic.spiral_pos(x) for x in ri], "--w")
-    axes[0].plot(ro, [analytic.spiral_pos(x) for x in ro], "--w")
+    axes[0].plot(ri, [analysis.spiral_pos(x) for x in ri], "--w")
+    axes[0].plot(ro, [analysis.spiral_pos(x) for x in ro], "--w")
 
     axes[0].set_xlim(0.6, 1.4)
     axes[0].set_ylim(np.pi - 0.8, np.pi + 0.8)
@@ -94,8 +94,8 @@ def analyze():
     po = pc[np.argwhere(sig[:, io] == sig[:, io].max())[0][0]]
 
     # the analytic answers
-    p0i = analytic.spiral_pos(1 - 0.1)
-    p0o = analytic.spiral_pos(1 + 0.1)
+    p0i = analysis.spiral_pos(1 - 0.1)
+    p0o = analysis.spiral_pos(1 + 0.1)
 
     # the errors
     names = ["Inner location", "Outer Location"]

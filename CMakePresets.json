@@ -99,7 +99,7 @@
         "CMAKE_CXX_COMPILER": "$env{ARTEMIS_HOME}/external/parthenon/external/Kokkos/bin/nvcc_wrapper",
         "ARTEMIS_ENABLE_CUDA": "On",
         "HDF5_INCLUDE_DIR": "$env{HDF5_ROOT}/include",
-        "PARTHENON_DISABLE": "HDF5_COMPRESSION=ON",
+        "PARTHENON_DISABLE_HDF5_COMPRESSION": "On",
         "Kokkos_ARCH_HOPPER90": "On",
         "NUM_GPU_DEVICES_PER_NODE": "4"
       }
@@ -112,7 +112,7 @@
         "CMAKE_CXX_COMPILER": "$env{ARTEMIS_HOME}/external/parthenon/external/Kokkos/bin/nvcc_wrapper",
         "ARTEMIS_ENABLE_CUDA": "On",
         "HDF5_INCLUDE_DIR": "$env{HDF5_ROOT}/include",
-        "PARTHENON_DISABLE": "HDF5_COMPRESSION=ON",
+        "PARTHENON_DISABLE_HDF5_COMPRESSION": "ON",
         "Kokkos_ARCH_HOPPER90": "On",
         "NUM_GPU_DEVICES_PER_NODE": "4"
       }

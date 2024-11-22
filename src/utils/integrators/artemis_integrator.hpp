@@ -47,7 +47,6 @@ inline TaskStatus DeepCopyConservedData(MeshData<Real> *to, MeshData<Real> *from
           vt(b, n, k, j, i) = vf(b, n, k, j, i);
         }
       });
-      Kokkos::fence();
   return TaskStatus::complete;
 }
 

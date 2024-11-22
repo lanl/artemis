@@ -530,12 +530,6 @@ class Coords<Coordinates::spherical1D>
     // volume average (r,theta)
     const Real rv = x1v();
 
-    // face averaged r on the X2 face
-    const Real rf =
-        2.0 / 3.0 *
-        (bnds.x1[0] * bnds.x1[0] + bnds.x1[0] * bnds.x1[1] + bnds.x1[1] * bnds.x1[1]) /
-        (bnds.x1[0] + bnds.x1[1]);
-
     const Real r2cyl = SQR(rv);
 
     std::array<Real, 2> bx1{r2cyl - SQR(bnds.x1[0]), SQR(bnds.x1[1]) - r2cyl};

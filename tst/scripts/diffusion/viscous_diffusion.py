@@ -23,6 +23,7 @@ from scipy.interpolate import interp1d
 logger = logging.getLogger("artemis" + __name__[7:])  # set logger name
 logging.getLogger("h5py").setLevel(logging.WARNING)
 logging.getLogger("matplotlib").setLevel(logging.WARNING)
+import scripts.utils.analysis as analysis
 import matplotlib.colors as colors
 import matplotlib.pyplot as plt
 
@@ -87,13 +88,13 @@ def analyze():
         logger.debug("Analyzing test " + __name__ + " {:d}D".format(d))
         os.makedirs(artemis.get_fig_dir(), exist_ok=True)
 
-        time, x, y, z, [dens, u, v, w, T] = artemis.load_level(
+        time, x, y, z, [dens, u, v, w, T] = analysis.load_level(
             "final", dir=artemis.get_data_dir(), base=base + ".out1"
         )
         xc = 0.5 * (x[1:] + x[:-1])
         yc = 0.5 * (y[1:] + y[:-1])
 
-        time0, x0, y0, z0, [dens0, u0, v0, w0, T0] = artemis.load_level(
+        time0, x0, y0, z0, [dens0, u0, v0, w0, T0] = analysis.load_level(
             0, dir=artemis.get_data_dir(), base=base + ".out1"
         )
 
@@ -135,7 +136,7 @@ def analyze():
             axes[1].set_ylabel("$V_3$", fontsize=18)
             axes[0].set_xlabel("x", fontsize=16)
             axes[0].set_ylabel("y", fontsize=16)
-            artemis.create_colorbar(axes[0], norm=norm)
+            analysis.create_colorbar(axes[0], norm=norm)
 
         fig.tight_layout()
         fig.savefig(

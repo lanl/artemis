@@ -24,6 +24,7 @@ from scipy.interpolate import interp1d
 logger = logging.getLogger("artemis" + __name__[7:])  # set logger name
 logging.getLogger("h5py").setLevel(logging.WARNING)
 logging.getLogger("matplotlib").setLevel(logging.WARNING)
+import scripts.utils.analysis as analysis
 import matplotlib.colors as colors
 import matplotlib.pyplot as plt
 
@@ -88,7 +89,7 @@ def analyze():
     errors = []
     for ax, g in zip(axes, _geom):
         name = "{}_{}".format(_file_id, g[:3])
-        time, x, y, z, [d, u, v, w, T] = artemis.load_level(
+        time, x, y, z, [d, u, v, w, T] = analysis.load_level(
             "final", dir=artemis.get_data_dir(), base="{}.out1".format(name)
         )
         xc = 0.5 * (x[1:] + x[:-1])

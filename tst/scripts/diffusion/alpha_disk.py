@@ -24,6 +24,7 @@ from scipy.interpolate import interp1d
 logger = logging.getLogger("artemis" + __name__[7:])  # set logger name
 logging.getLogger("h5py").setLevel(logging.WARNING)
 logging.getLogger("matplotlib").setLevel(logging.WARNING)
+import scripts.utils.analysis as analysis
 import matplotlib.colors as colors
 import matplotlib.pyplot as plt
 
@@ -81,7 +82,7 @@ def analyze():
     logger.debug("Analyzing test " + __name__ + " {:d}D".format(d))
     os.makedirs(artemis.get_fig_dir(), exist_ok=True)
 
-    time, x, y, z, [dens, u, v, w, T] = artemis.load_level(
+    time, x, y, z, [dens, u, v, w, T] = analysis.load_level(
         "final", dir=artemis.get_data_dir(), base=base + ".out1"
     )
     r = 0.5 * (x[1:] + x[:-1])

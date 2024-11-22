@@ -27,6 +27,7 @@ from scipy.interpolate import interp1d
 logger = logging.getLogger("artemis" + __name__[7:])  # set logger name
 logging.getLogger("h5py").setLevel(logging.WARNING)
 logging.getLogger("matplotlib").setLevel(logging.WARNING)
+import scripts.utils.analysis as analysis
 import matplotlib.colors as colors
 import matplotlib.pyplot as plt
 
@@ -67,7 +68,7 @@ def analyze():
         for fv in _flux:
             for dv in _de_switch:
                 problem_id = _file_id + "_{}_de{:d}_{}".format(fv, int(10 * dv), cv)
-                time, r, phi, z, [d, u, v, w, T] = artemis.load_level(
+                time, r, phi, z, [d, u, v, w, T] = analysis.load_level(
                     "final", dir=artemis.get_data_dir(), base=problem_id + ".out1"
                 )
                 rc = 0.5 * (r[1:] + r[:-1])
@@ -84,8 +85,8 @@ def analyze():
                 axes[0].pcolormesh(rc, pc, sig, norm=norm)
                 ri = np.linspace(r.min(), 1 - 2.0 / 3 * h, 50)
                 ro = np.linspace(1 + 2.0 / 3 * h, r.max(), 50)
-                axes[0].plot(ri, [artemis.spiral_pos(x) for x in ri], "--w")
-                axes[0].plot(ro, [artemis.spiral_pos(x) for x in ro], "--w")
+                axes[0].plot(ri, [analysis.spiral_pos(x) for x in ri], "--w")
+                axes[0].plot(ro, [analysis.spiral_pos(x) for x in ro], "--w")
 
                 axes[0].set_xlim(0.6, 1.4)
                 axes[0].set_ylim(np.pi - 0.8, np.pi + 0.8)
@@ -100,8 +101,8 @@ def analyze():
                 po = pc[np.argwhere(sig[:, io] == sig[:, io].max())[0][0]]
 
                 # the analytic answers
-                p0i = artemis.spiral_pos(1 - 0.1)
-                p0o = artemis.spiral_pos(1 + 0.1)
+                p0i = analysis.spiral_pos(1 - 0.1)
+                p0o = analysis.spiral_pos(1 + 0.1)
 
                 # the errors
                 names = ["Inner location", "Outer Location"]
@@ -120,7 +121,7 @@ def analyze():
                 axes[1].legend(loc="best", fontsize=12)
                 axes[1].set_ylabel("$\\Sigma - \\langle \\Sigma \\rangle$", fontsize=20)
                 axes[0].set_ylabel("$\\phi$", fontsize=20)
-                artemis.create_colorbar(axes[0], norm=norm)
+                analysis.create_colorbar(axes[0], norm=norm)
                 fig.tight_layout()
                 fig.savefig(
                     os.path.join(artemis.get_fig_dir(), problem_id + "_spiral.png"),

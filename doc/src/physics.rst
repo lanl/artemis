@@ -404,13 +404,22 @@ One example is:
    beta  = 0.0     # = torque-free mass removal
 
 There are three softening models available: ``none`` does nothing, ``spline`` is the spline softening used in Gadget (Springel 2001), and ``plummer`` modifies :math:`r^2 \rightarrow r^2 + r_s^2`.
-Spline softening is exactly Kepelerian outside the softening radius, whereas Plummer softening asymptoically approaches Keplerian outside the softening radius.
+Spline softening is exactly Keplerian outside the softening radius, whereas Plummer softening asymptoically approaches Keplerian outside the softening radius.
 Roughly, the Plummer softening radius is :math:`\sim 2.8 \times` the spline softening radius.
 
 Mass accretion is handled by a particle's ``<../sink>`` attribute.
-Two types of removal rates are avaible.
+|code| implements mass accretion by solving:
+
+.. math::
+   \frac{\partial \rho}{\partial t} = - \gamma \rho \\
+   \frac{\partial (\rho v_r)}{\partial t} = - \gamma \rho v_r \\
+   \frac{\partial (\rho v_\theta)}{\partial t} = - \gamma \rho v_\theta \\
+   \frac{\partial (\rho v_\phi)}{\partial t} = - \beta \rho v_\phi \\
+where :math:`(r,\theta,\phi)` refers to a spherical coordinate system coordinate system centered on the particle. 
+
+Two types of removal rates are available.
 The first, ``gamma``, sets the rate of mass removal for cells inside the particle's sink radius.
-The second, ``beta``, controls the amount of momentum removed from the fluid.
+The second, ``beta``, controls the amount of angular momentum removed from the fluid.
 Typically ``beta`` will either be zero -- corresponding to angular-momentum conserving mass removal -- or equal to ``gamma`` -- corresponding to isotropic momentum removal.
 
 

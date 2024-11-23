@@ -287,9 +287,8 @@ def set_globals(args):
 
     # Set the correct paths
     if exe_path is not None:
-        out_dir = (
-            os.path.join(artemis_dir, "tst/testing") if out_dir is None else out_dir
-        )
+        adir = os.path.join(artemis.get_artemis_dir(), "tst")
+        out_dir = os.path.join(adir, "testing") if out_dir is None else out_dir
         reb_path = os.path.join(os.path.dirname(exe_path), "librebound.so")
 
         if not (os.path.exists(exe_path) and os.access(exe_path, os.X_OK)):

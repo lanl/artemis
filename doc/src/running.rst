@@ -78,6 +78,7 @@ Typically, there are three types of outputs specified here, history, hdf5 snapsh
 
 The next blocks define the simulation mesh dimensions, boundary conditions, and meshblock size.
 This example sets up a 2D cylindrical mesh that spans the full :math:`2 \pi` in azimuth.
+
 ::
 
   <parthenon/mesh>
@@ -161,8 +162,8 @@ For more details see the :ref:`physics` and :ref:`parameters` sections
   alpha = 1e-3
 
   <gravity>
-  type = binary
   gm = 1.0
+  <gravity/binary>
   q = 1e-3
   a = 1.0
   sft2 = .06
@@ -191,7 +192,7 @@ Run |code|
 The exact command to launch it depends on the system it is run on.
 This example will assume a SLURM-like cluster.
 
-To launch a fresh |code| on ``$NPROCS`` CPUs with ``srun``,
+To launch a fresh |code| simulation on ``$NPROCS`` CPUs with ``srun``,
 
 ::
 
@@ -205,6 +206,15 @@ To restart a previous run, use the ``-r`` argument
 
 A modified input file can optionally still be passed with the ``-i`` argument.
 
+When launching |code| on GPUs with ``srun``, the application passed to ``srun`` should not be |code|, but instead a script that 
+determines how to bind the CPU cores to the available GPUs. 
+One such script that comes with ``Kokkos`` is ``hpcbind``. 
+Assuming the |code| source code lives in ``$ARTEMIS_HOME``, the following will launch |code| on the available number of GPUs
+
+::
+
+  srun -n $NPROCS $ARTEMIS_HOME/external/parthenon/external/Kokkos/bin/hpcbind -- artemis -i input.par
+
 Return codes
 ^^^^^^^^^^^^
 
@@ -212,7 +222,7 @@ When using batch submissions, it is possible to set up a self-restarting job.
 The easiest way to do this is to take advantage of SLURM interrupt signals and the |code| return code.
 |code|
 
-An example batch submission script, ``run.sh``, would look like:
+An example CPU batch submission script, ``run.sh``, would look like:
 
 ::
 

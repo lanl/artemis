@@ -40,8 +40,7 @@ KOKKOS_INLINE_FUNCTION std::array<Real, 3> RotationVelocity(const std::array<Rea
 
   const Real vp = omf * xcyl[0];
 
-  std::array<Real, 3> vrot{ex1[1] * vp, ex2[1] * vp, ex3[1] * vp};
-  return vrot;
+  return {ex1[1] * vp, ex2[1] * vp, ex3[1] * vp};
 }
 
 } // namespace RotatingFrame

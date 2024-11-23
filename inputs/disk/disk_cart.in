@@ -96,7 +96,6 @@ reconstruct = plm
 riemann = hllc
 dfloor = 1.0e-10
 siefloor = 1.0e-15
-de_switch = 1.0
 
 <gas/viscosity>
 type = alpha

@@ -35,7 +35,7 @@ TaskStatus PointMassGravity(MeshData<Real> *md, const Real time, const Real dt) 
   const bool do_dust = artemis_pkg->template Param<bool>("do_dust");
 
   auto &gravity_pkg = pm->packages.Get("gravity");
-  const Real gm = gravity_pkg->template Param<Real>("gm");
+  const Real gm_ = gravity_pkg->template Param<Real>("gm");
   const Real sink_rate = dt * (gravity_pkg->template Param<Real>("sink_rate"));
   const Real sink_rad = gravity_pkg->template Param<Real>("sink");
 
@@ -67,6 +67,9 @@ TaskStatus PointMassGravity(MeshData<Real> *md, const Real time, const Real dt) 
         geometry::Coords<GEOM> coords(vmesh.GetCoordinates(b), k, j, i);
         const auto &dx = coords.GetCellCenter();
         const auto &hx = coords.GetScaleFactors();
+
+        // Capture outside constexpr if
+        const Real &gm = gm_;
 
         Real gx1 = 0.0, gx2 = 0.0, gx3 = 0.0;
         Real dr = Null<Real>();

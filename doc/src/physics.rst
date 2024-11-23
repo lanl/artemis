@@ -340,7 +340,7 @@ For example, if there is only a single, stationary, particle in the domain or if
 The ``frame`` parameter is typically set to its default value of ``global``.
 This means that the REBOUND simulation is in the global frame of reference.
 Note that this can be a different frame than the |code| frame if the rotating frame is active.
-Setting ``frame=local`` means that |code| artemis will not apply corrections to the REBOUND frame, but caution should be used with this option.
+Setting ``frame=local`` means that |code| will not apply corrections to the REBOUND frame, but caution should be used with this option.
 
 |code| can also make full use of the collision functionality in REBOUND.
 Particles can be given radii defining their collisional cross-section.

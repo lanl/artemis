@@ -73,7 +73,6 @@ reconstruct = plm
 riemann = hllc
 dfloor = 1.0e-10
 siefloor = 1.0e-10
-de_switch = 1.0
 
 <rotating_frame>
 omega = 1.0

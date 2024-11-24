@@ -68,6 +68,7 @@ def run(**kwargs):
                             g, int(10 * gam), b
                         ),
                         "problem/polytropic_index={:.2f}".format(gam),
+                        "gas/de_switch=" + str(0.0 if g != "sph" else 1e-2),
                     ]
                     + geom_args,
                 )

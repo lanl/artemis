@@ -283,13 +283,16 @@ def set_globals(args):
     out_dir = kwargs.pop("output_dir")
     out_dir = os.path.join(out_dir, "testing") if out_dir is not None else None
     exe_path = kwargs.pop("exe")
-    cwd = os.getcwd()
+    use_cwd = kwargs.pop("cwd")
 
     # Set the correct paths
     if exe_path is not None:
         adir = os.path.join(artemis.get_artemis_dir(), "tst")
         out_dir = os.path.join(adir, "testing") if out_dir is None else out_dir
         reb_path = os.path.join(os.path.dirname(exe_path), "librebound.so")
+
+        if use_cwd:
+            raise TestError("--cwd and --exe=PATH cannot be passed together!")
 
         if not (os.path.exists(exe_path) and os.access(exe_path, os.X_OK)):
             raise TestError(f'Provided exe "{exe_path}" not found or cannot be run!')
@@ -302,25 +305,26 @@ def set_globals(args):
         artemis.set_paths(abs_exe_dir, abs_out_dir)
         artemis.set_supplied_exe(True)
     else:
-        # If we are in a directory with an executable, default to using that
-        local_path = os.path.join(cwd, "artemis")
-        if os.path.isfile(local_path) and os.access(local_path, os.X_OK):
-            exe_path = local_path
-            out_dir = os.path.join(cwd, "testing") if out_dir is None else out_dir
-            reb_path = os.path.join(os.path.dirname(exe_path), "librebound.so")
+        cwd = os.getcwd()
+        lpath_exe = os.path.join(cwd, "artemis")
+        lpath_cache = os.path.join(cwd, "CMakeCache.txt")
+        if use_cwd:
+            # If we are in a directory with an executable, default to using that
+            if os.path.isfile(lpath_exe) and os.access(lpath_exe, os.X_OK):
+                exe_path = lpath_exe
+                out_dir = os.path.join(cwd, "testing") if out_dir is None else out_dir
+                reb_path = os.path.join(os.path.dirname(exe_path), "librebound.so")
 
-            if not os.path.exists(reb_path):
-                raise TestError(f'librebound.so not found at "{reb_path}"!')
+                if not os.path.exists(reb_path):
+                    raise TestError(f'librebound.so not found at "{reb_path}"!')
 
-            abs_out_dir = os.path.abspath(out_dir)
-            abs_exe_dir = os.path.abspath(os.path.dirname(exe_path))
-            artemis.set_paths(abs_exe_dir, abs_out_dir)
-            artemis.set_supplied_exe(True)
-        else:
-            # Check if we are one level up from the executable
-            local_path = os.path.join(cwd, "CMakeCache.txt")
-            if os.path.exists(local_path) and os.access(local_path, os.R_OK):
-                exe_path = read_cmakecache(local_path)
+                abs_out_dir = os.path.abspath(out_dir)
+                abs_exe_dir = os.path.abspath(os.path.dirname(exe_path))
+                artemis.set_paths(abs_exe_dir, abs_out_dir)
+                artemis.set_supplied_exe(True)
+            elif os.path.exists(lpath_cache) and os.access(lpath_cache, os.R_OK):
+                # Check if we are one level up from the executable
+                exe_path = read_cmakecache(lpath_cache)
                 out_dir = os.path.join(cwd, "testing") if out_dir is None else out_dir
                 reb_path = os.path.join(os.path.dirname(exe_path), "librebound.so")
 
@@ -335,13 +339,15 @@ def set_globals(args):
                 artemis.set_paths(abs_exe_dir, abs_out_dir)
                 artemis.set_supplied_exe(True)
             else:
-                adir = os.path.join(artemis.get_artemis_dir(), "tst")
-                exe_path = os.path.join(adir, "build/src/artemis")
-                out_dir = os.path.join(adir, "testing") if out_dir is None else out_dir
-                abs_out_dir = os.path.abspath(out_dir)
-                abs_exe_dir = os.path.abspath(os.path.dirname(exe_path))
-                artemis.set_paths(abs_exe_dir, abs_out_dir)
-                artemis.set_supplied_exe(False)
+                raise TestError("Unable to find executable via --cwd")
+        else:
+            adir = os.path.join(artemis.get_artemis_dir(), "tst")
+            exe_path = os.path.join(adir, "build/src/artemis")
+            out_dir = os.path.join(adir, "testing") if out_dir is None else out_dir
+            abs_out_dir = os.path.abspath(out_dir)
+            abs_exe_dir = os.path.abspath(os.path.dirname(exe_path))
+            artemis.set_paths(abs_exe_dir, abs_out_dir)
+            artemis.set_supplied_exe(False)
 
 
 # Execute main function
@@ -389,11 +395,18 @@ if __name__ == "__main__":
         default=None,
         help="path to pre-built executable",
     )
+
     parser.add_argument(
         "--output_dir",
         type=str,
         default=None,
         help="path to output directory",
+    )
+
+    parser.add_argument(
+        "--cwd",
+        action="store_true",
+        help="search local path for preexisting executable",
     )
 
     args = parser.parse_args()

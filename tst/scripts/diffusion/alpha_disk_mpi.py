@@ -14,16 +14,13 @@
 # Regression to test an alpha_disk
 
 # Modules
+import importlib
 import logging
-import numpy as np
-import os
-import scripts.utils.artemis as artemis
 import scripts.diffusion.alpha_disk as alpha_disk
 
 logger = logging.getLogger("artemis" + __name__[7:])  # set logger name
-logging.getLogger("h5py").setLevel(logging.WARNING)
-logging.getLogger("matplotlib").setLevel(logging.WARNING)
 
+importlib.reload(alpha_disk)
 alpha_disk._nranks = 4
 alpha_disk._file_id = "alpha_disk_mpi"
 

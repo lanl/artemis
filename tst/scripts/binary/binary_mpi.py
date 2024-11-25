@@ -14,16 +14,13 @@
 # Regression to test a binary in a 2D disk
 
 # Modules
+import importlib
 import logging
-import numpy as np
-import os
-import scripts.utils.artemis as artemis
 import scripts.binary.binary as binary
 
 logger = logging.getLogger("artemis" + __name__[7:])  # set logger name
-logging.getLogger("h5py").setLevel(logging.WARNING)
-logging.getLogger("matplotlib").setLevel(logging.WARNING)
 
+importlib.reload(binary)
 binary._nranks = 16
 binary._file_id = "binary_mpi"
 

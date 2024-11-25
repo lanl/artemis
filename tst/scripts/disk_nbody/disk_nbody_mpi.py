@@ -14,25 +14,22 @@
 # Regression to test a 3D disk with REBOUND particles and MPI
 
 # Modules
+import importlib
 import logging
-import numpy as np
-import os
-import scripts.utils.artemis as artemis
-import scripts.disk_nbody.disk_nbody as disk
+import scripts.disk_nbody.disk_nbody as disk_nbody
 
 logger = logging.getLogger("artemis" + __name__[7:])  # set logger name
-logging.getLogger("h5py").setLevel(logging.WARNING)
-logging.getLogger("matplotlib").setLevel(logging.WARNING)
 
-disk._nranks = 8
-disk._file_id = "disk_nbody_mpi"
+importlib.reload(disk_nbody)
+disk_nbody._nranks = 8
+disk_nbody._file_id = "disk_nbody_mpi"
 
 
 # Run Artemis
 def run(**kwargs):
-    return disk.run(**kwargs)
+    return disk_nbody.run(**kwargs)
 
 
 # Analyze outputs
 def analyze():
-    return disk.analyze()
+    return disk_nbody.analyze()

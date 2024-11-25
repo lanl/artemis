@@ -18,10 +18,15 @@ import logging
 import numpy as np
 import os
 import scripts.utils.artemis as artemis
+from scipy.interpolate import interp1d
+
 
 logger = logging.getLogger("artemis" + __name__[7:])  # set logger name
 logging.getLogger("h5py").setLevel(logging.WARNING)
 logging.getLogger("matplotlib").setLevel(logging.WARNING)
+import h5py
+import matplotlib.colors as colors
+import matplotlib.pyplot as plt
 
 _nranks = 1
 _file_id = "drag"
@@ -42,13 +47,8 @@ def run(**kwargs):
 
 # Analyze outputs
 def analyze():
-    import h5py
-    from scipy.interpolate import interp1d
-    import matplotlib.colors as colors
-    import matplotlib.pyplot as plt
-
     logger.debug("Analyzing test " + __name__)
-    os.makedirs(artemis.artemis_fig_dir, exist_ok=True)
+    os.makedirs(artemis.get_fig_dir(), exist_ok=True)
     analyze_status = True
 
     dv0 = -1.0
@@ -61,7 +61,7 @@ def analyze():
     errors = []
     for n in range(1, int(_tlim / 0.05)):
         fname = os.path.join(
-            artemis.get_run_directory(), "{}.out1.{:05d}.phdf".format(_file_id, n)
+            artemis.get_data_dir(), "{}.out1.{:05d}.phdf".format(_file_id, n)
         )
         with h5py.File(fname, "r") as f:
             t = f["Info"].attrs["Time"]
@@ -117,7 +117,7 @@ def analyze():
     axes[2].set_ylabel("Momentum Error", fontsize=18)
     fig.tight_layout()
     fig.savefig(
-        os.path.join(artemis.artemis_fig_dir, _file_id + "_drag.png"),
+        os.path.join(artemis.get_fig_dir(), _file_id + "_drag.png"),
         bbox_inches="tight",
     )
 

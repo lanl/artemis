@@ -24,7 +24,9 @@ doc/src/parameters.rst
 
 # CI files
 artemis_ci_*.out
+tst/logs
 tst/figs
+**/testing/
 
 # Visualization package files
 .smhist

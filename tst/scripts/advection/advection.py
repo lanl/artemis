@@ -19,10 +19,10 @@
 import logging
 import numpy as np
 import os
-import scripts.utils.artemis as artemis
 import sys
+import scripts.utils.artemis as artemis
 
-sys.path.append(os.path.join(artemis.artemis_dir, "analysis"))
+sys.path.append(os.path.join(artemis.get_artemis_dir(), "analysis"))
 from ahistory import ahistory
 
 logger = logging.getLogger("artemis" + __name__[7:])  # set logger name
@@ -72,17 +72,16 @@ def run(**kwargs):
 
 # Analyze outputs
 def analyze():
-    # NOTE(@pdmullen):  In the below, we check the magnitude of the error,
-    # error convergence rates, and error identicality between L- and R-going
-    # advection.
+    # NOTE(@pdmullen):  In the below, we check the magnitude of the error, error
+    # convergence rates, and error identicality between L- and R-going advection.
     logger.debug("Analyzing test " + __name__)
-    err_path = os.path.join(artemis.get_run_directory(), _file_id + "-errs.dat")
+    err_path = os.path.join(artemis.get_data_dir(), _file_id + "-errs.dat")
     data = np.loadtxt(
         err_path,
         dtype=np.float64,
         ndmin=2,
     )
-    hist_path = os.path.join(artemis.get_run_directory(), _file_id + ".out0.hst")
+    hist_path = os.path.join(artemis.get_data_dir(), _file_id + ".out0.hst")
     history = ahistory(hist_path)
     os.system(f"rm {err_path}")
     os.system(f"rm {hist_path}")

@@ -138,9 +138,13 @@ if __name__ == "__main__":
     else:
         # Check that we are on the right system
         hostname = socket.gethostname()
+        cluster = os.getenv("SLURM_CLUSTER_NAME")
+
         if not fnmatch.fnmatch(hostname, "darwin-fe*"):
-            print("ERROR script must be run from Darwin frontend node!")
-            sys.exit(1)
+            # if we are on a backend
+            if cluster.lower() != "darwin":
+                print("ERROR script must be run from Darwin!")
+                sys.exit(1)
 
         # Execute the sbatch command
         try:

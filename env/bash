@@ -114,7 +114,7 @@ elif [[ $PARTITION == "darwin-volta-x86" ]]; then
     module load gcc/9.4.0 # must load gcc after nvcc so REBOUND uses gcc
     module load hdf5/1.12.2
     module load miniconda3/py311_23.11.0
-    source /usr/projects/jovian/dependencies/python/volta-x86-py311
+    source /usr/projects/jovian/dependencies/python/volta-x86-py311/bin/activate
     shorten_prompt
     module load cmake/3.26.3
     module list

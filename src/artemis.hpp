@@ -68,6 +68,20 @@ ARTEMIS_VARIABLE(dust.prim, density);
 ARTEMIS_VARIABLE(dust.prim, velocity);
 } // namespace prim
 } // namespace dust
+
+namespace rad {
+namespace cons {
+ARTEMIS_VARIABLE(rad.cons, energy);
+ARTEMIS_VARIABLE(rad.cons, flux);
+} // namespace cons
+namespace prim {
+ARTEMIS_VARIABLE(rad.prim, energy);
+ARTEMIS_VARIABLE(rad.prim, pressure);
+ARTEMIS_VARIABLE(rad.prim, flux);
+ARTEMIS_VARIABLE(rad.prim, edd);
+} // namespace prim
+}
+
 #undef ARTEMIS_VARIABLE
 
 // TaskCollection function pointer for operator split tasks
@@ -89,7 +103,7 @@ enum class RSolver { hllc, hlle, llf, null };
 // ...Reconstrution algorithms
 enum class ReconstructionMethod { pcm, plm, ppm, null };
 // ...Fluid types
-enum class Fluid { gas, dust, null };
+enum class Fluid { gas, dust, radiation, null };
 // ...Boundary conditions
 enum class ArtemisBC {
   reflect,
@@ -103,6 +117,8 @@ enum class ArtemisBC {
   periodic,
   none
 };
+
+enum class TensIdx {X11=0, X22=1, X33=2, X23=3, X13=4, X12=5};
 
 // Floating point limits
 template <typename T = Real>

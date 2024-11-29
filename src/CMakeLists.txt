@@ -60,6 +60,7 @@ set (SRC_LIST
   nbody/particle_base.hpp
 
   pgen/advection.hpp
+  pgen/beam.hpp
   pgen/blast.hpp
   pgen/conduction.hpp
   pgen/constant.hpp
@@ -73,6 +74,8 @@ set (SRC_LIST
   pgen/thermalization.hpp
 
   radiation/imc/imc.hpp
+  radiation/moment/radiation.cpp
+  radiation/moment/radiation.hpp
 
   utils/artemis_utils.cpp
   utils/artemis_utils.hpp
@@ -119,6 +122,24 @@ target_include_directories(artemislib PUBLIC
 
 # Compile options
 target_compile_features(artemislib PUBLIC cxx_std_17)
+if (APPLE) 
+  message("Turning off deprecated declarations")
+  target_compile_options(artemislib PUBLIC -Wno-deprecated-declarations)
+
+  # Enable RPATH on macOS
+  set(CMAKE_MACOSX_RPATH ON)
+
+  # Set RPATH for shared library
+  set_target_properties(rebound PROPERTIES
+      INSTALL_RPATH "@rpath"
+  )
+
+  # Set RPATH for executable
+  set_target_properties(artemislib PROPERTIES
+      INSTALL_RPATH "@loader_path"
+  )
+
+endif()
 if (CMAKE_CXX_COMPILER_ID STREQUAL "XL")
   target_compile_options(artemislib PUBLIC -std=c++1y -qxflag=disable__cplusplusOverride)
 endif()
@@ -142,6 +163,7 @@ add_dependencies(artemislib rebound)
 if (CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
    message(STATUS "Standalone mode. Adding artemis executable")
    add_executable(artemis main.cpp)
+   set_target_properties(artemis PROPERTIES BUILD_WITH_INSTALL_RPATH ON)
    target_link_libraries(artemis PRIVATE artemislib)
    add_custom_command(TARGET artemis POST_BUILD
                       COMMAND ${CMAKE_COMMAND} -E copy

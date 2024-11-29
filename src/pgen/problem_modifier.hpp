@@ -126,6 +126,13 @@ void ProblemModifier(parthenon::ParthenonManager *pman) {
                                                strat::ExtrapInnerX3<G>);
     pman->app_input->RegisterBoundaryCondition(BF::outer_x3, "extrap",
                                                strat::ExtrapOuterX3<G>);
+  } else if (artemis_problem == "beam") {
+    pman->app_input->InitMeshBlockUserData = beam::InitBeamParams;
+
+    pman->app_input->RegisterBoundaryCondition(BF::inner_x1, "beam",
+                                               beam::BeamInnerX1<G>);
+    pman->app_input->RegisterBoundaryCondition(BF::inner_x2, "beam",
+                                               beam::BeamInnerX2<G>);
   }
 
   // Register jaybenne swarm boundary conditions

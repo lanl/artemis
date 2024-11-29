@@ -15,6 +15,7 @@
 #include "fill_derived.hpp"
 #include "artemis.hpp"
 #include "geometry/geometry.hpp"
+#include "radiation/moment/radiation.hpp"
 #include "utils/artemis_utils.hpp"
 #include "utils/eos/eos.hpp"
 
@@ -88,6 +89,7 @@ void ConsToPrim(MeshData<Real> *md) {
   auto &artemis_pkg = pm->packages.Get("artemis");
   const bool do_gas = artemis_pkg->template Param<bool>("do_gas");
   const bool do_dust = artemis_pkg->template Param<bool>("do_dust");
+  const bool do_rad = artemis_pkg->template Param<bool>("do_moment");
 
   // Extract gas parameters
   Real dflr_gas = Null<Real>();
@@ -104,13 +106,19 @@ void ConsToPrim(MeshData<Real> *md) {
     dflr_dust = pm->packages.Get("dust").get()->template Param<Real>("dfloor");
   }
 
+  Real eflr_rad = Null<Real>();
+  Real c = Null<Real>();
+  if (do_rad) {
+    eflr_rad = pm->packages.Get("radiation").get()->template Param<Real>("efloor");
+    c = pm->packages.Get("radiation").get()->template Param<Real>("c");
+  }
+
   // Packing and indexing
-  static auto desc =
-      MakePackDescriptor<gas::cons::density, gas::cons::momentum,
-                         gas::cons::internal_energy, gas::prim::density,
-                         gas::prim::velocity, gas::prim::sie, dust::cons::density,
-                         dust::cons::momentum, dust::prim::density, dust::prim::velocity>(
-          resolved_pkgs.get());
+  static auto desc = MakePackDescriptor<
+      gas::cons::density, gas::cons::momentum, gas::cons::internal_energy,
+      gas::prim::density, gas::prim::velocity, gas::prim::sie, dust::cons::density,
+      dust::cons::momentum, dust::prim::density, dust::prim::velocity, rad::cons::energy,
+      rad::cons::flux, rad::prim::energy, rad::prim::flux>(resolved_pkgs.get());
   auto vmesh = desc.GetPack(md);
   const int nblocks = md->NumBlocks();
   IndexRange ib = md->GetBoundsI(IndexDomain::interior);
@@ -163,6 +171,25 @@ void ConsToPrim(MeshData<Real> *md) {
             vel3 = vmesh(b, dust::cons::momentum(VI(n, 2)), k, j, i) / (w_d * hx[2]);
           }
         }
+        if (do_rad) {
+          for (int n = 0; n < vmesh.GetSize(b, rad::prim::energy()); ++n) {
+            // Set primitive density
+            const Real u_d = vmesh(b, rad::cons::energy(n), k, j, i);
+            Real &w_d = vmesh(b, rad::prim::energy(n), k, j, i);
+            w_d = (u_d > eflr_rad) ? u_d : eflr_rad;
+
+            // set primitive velocity
+            const Real hfx1 = vmesh(b, rad::cons::flux(VI(n, 0)), k, j, i) / (c * w_d);
+            const Real hfx2 = vmesh(b, rad::cons::flux(VI(n, 1)), k, j, i) / (c * w_d);
+            const Real hfx3 = vmesh(b, rad::cons::flux(VI(n, 2)), k, j, i) / (c * w_d);
+            const auto &fx =
+                Radiation::NormalizeFlux(hfx1 / hx[0], hfx2 / hx[1], hfx3 / hx[2]);
+            for (int d = 0; d < 3; d++) {
+              vmesh(b, rad::cons::flux(VI(n, d)), k, j, i) = (fx[d] * c * w_d) * hx[d];
+              vmesh(b, rad::prim::flux(VI(n, d)), k, j, i) = fx[d];
+            }
+          }
+        }
       });
 }
 
@@ -179,6 +206,7 @@ void PrimToCons(T *md) {
   auto &artemis_pkg = pm->packages.Get("artemis");
   const bool do_gas = artemis_pkg->template Param<bool>("do_gas");
   const bool do_dust = artemis_pkg->template Param<bool>("do_dust");
+  const bool do_rad = artemis_pkg->template Param<bool>("do_moment");
 
   // Extract gas parameters
   Real dflr_gas = Null<Real>();
@@ -197,13 +225,22 @@ void PrimToCons(T *md) {
     dflr_dust = pm->packages.Get("dust").get()->template Param<Real>("dfloor");
   }
 
+  Real eflr_rad = Null<Real>();
+  Real c = Null<Real>();
+  if (do_rad) {
+    eflr_rad = pm->packages.Get("radiation").get()->template Param<Real>("efloor");
+    c = pm->packages.Get("radiation").get()->template Param<Real>("c");
+  }
+
   // Packing and indexing
   static auto desc =
       MakePackDescriptor<gas::cons::density, gas::cons::momentum, gas::cons::total_energy,
                          gas::cons::internal_energy, gas::prim::density,
                          gas::prim::velocity, gas::prim::pressure, gas::prim::sie,
                          dust::cons::density, dust::cons::momentum, dust::prim::density,
-                         dust::prim::velocity>(resolved_pkgs.get());
+                         dust::prim::velocity, rad::cons::energy, rad::cons::flux,
+                         rad::prim::energy, rad::prim::flux, rad::prim::pressure>(
+          resolved_pkgs.get());
   auto vmesh = desc.GetPack(md);
   IndexRange ibe = md->GetBoundsI(IndexDomain::entire);
   IndexRange jbe = md->GetBoundsJ(IndexDomain::entire);
@@ -271,6 +308,27 @@ void PrimToCons(T *md) {
             mom1 = w_d * vel1 * hx[0];
             mom2 = w_d * vel2 * hx[1];
             mom3 = w_d * vel3 * hx[2];
+          }
+        }
+        if (do_rad) {
+          for (int n = 0; n < vmesh.GetSize(b, rad::prim::energy()); ++n) {
+            // Sync conserved and primitive density
+            Real &w_d = vmesh(b, rad::prim::energy(n), k, j, i);
+            Real &u_d = vmesh(b, rad::cons::energy(n), k, j, i);
+            w_d = (w_d > eflr_rad) ? w_d : eflr_rad;
+            u_d = w_d;
+            vmesh(b, rad::prim::pressure(n), k, j, i) = w_d / 3.0;
+
+            // Sync conserved momenta and primitive velocity
+            const Real fx1 = vmesh(b, rad::prim::flux(VI(n, 0)), k, j, i);
+            const Real fx2 = vmesh(b, rad::prim::flux(VI(n, 1)), k, j, i);
+            const Real fx3 = vmesh(b, rad::prim::flux(VI(n, 2)), k, j, i);
+            const Real conv[3] = {c * w_d * hx[0], c * w_d * hx[1], c * w_d * hx[2]};
+            const auto &fx = Radiation::NormalizeFlux(fx1, fx2, fx3);
+            for (int d = 0; d < 3; d++) {
+              vmesh(b, rad::cons::flux(VI(n, d)), k, j, i) = fx[d] * conv[d];
+              vmesh(b, rad::prim::flux(VI(n, d)), k, j, i) = fx[d];
+            }
           }
         }
       });

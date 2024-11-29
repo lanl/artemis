@@ -36,7 +36,8 @@ void PrintArtemisConfiguration(Packages_t &packages) {
     if (params.Get<bool>("do_viscosity")) msg += hfill + "Viscosity\n";
     if (params.Get<bool>("do_drag")) msg += hfill + "Drag\n";
     if (params.Get<bool>("do_nbody")) msg += hfill + "N-body\n";
-    if (params.Get<bool>("do_radiation")) msg += hfill + "IMC radiation\n";
+    if (params.Get<bool>("do_imc")) msg += hfill + "IMC radiation\n";
+    if (params.Get<bool>("do_moment")) msg += hfill + "Moment radiation\n";
     printf("\n=====================================================\n");
     printf("  ARTEMIS\n");
     printf("    name:            %s\n", params.Get<std::string>("job_name").c_str());

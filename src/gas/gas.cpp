@@ -495,7 +495,7 @@ TaskStatus FluxSource(MeshData<Real> *md, const Real dt) {
   auto vcons = desc_cons.GetPack(md);
   auto vface = desc_face.GetPack(md);
 
-  return ArtemisUtils::FluxSource(md, pkg, vprim, vcons, vface, dt);
+  return ArtemisUtils::FluxSource<Fluid::gas>(md, pkg, vprim, vcons, vface, dt);
 }
 
 //----------------------------------------------------------------------------------------

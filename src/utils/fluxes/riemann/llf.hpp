@@ -44,7 +44,7 @@ class RiemannSolver<RSolver::llf, FLUID_TYPE> {
  public:
   template <typename V1, typename V2, typename V3>
   KOKKOS_INLINE_FUNCTION void
-  solve(const EOS &eos, parthenon::team_mbr_t const &member, const int b, const int k,
+  solve(const EOS &eos, const Real chat, parthenon::team_mbr_t const &member, const int b, const int k,
         const int j, const int il, const int iu, const int dir,
         const parthenon::ScratchPad2D<Real> &wl, const parthenon::ScratchPad2D<Real> &wr,
         const V1 &p, const V2 &q, const V3 &vf) const {

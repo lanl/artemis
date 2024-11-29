@@ -42,6 +42,7 @@
 
 // Artemis headers
 #include "artemis.hpp"
+#include "radiation/moment/radiation.hpp"
 #include "utils/eos/eos.hpp"
 
 namespace ArtemisUtils {
@@ -53,8 +54,8 @@ class RiemannSolver<RSolver::hlle, FLUID_TYPE> {
  public:
   template <typename V1, typename V2, typename V3>
   KOKKOS_INLINE_FUNCTION void
-  solve(const EOS &eos, parthenon::team_mbr_t const &member, const int b, const int k,
-        const int j, const int il, const int iu, const int dir,
+  solve(const EOS &eos, const Real chat, parthenon::team_mbr_t const &member, const int b,
+        const int k, const int j, const int il, const int iu, const int dir,
         const parthenon::ScratchPad2D<Real> &wl, const parthenon::ScratchPad2D<Real> &wr,
         const V1 &p, const V2 &q, const V3 &vf) const {
     using TE = parthenon::TopologicalElement;
@@ -64,13 +65,15 @@ class RiemannSolver<RSolver::hlle, FLUID_TYPE> {
 
     // TODO(BRR) temporary
     const Real gm1 = eos.GruneisenParamFromDensityTemperature(Null<Real>(), Null<Real>());
-
+    const Real c = 1.0; // FIX
     // Obtain number of species
     int nvar = Null<int>();
     if constexpr (FLUID_TYPE == Fluid::gas) {
       nvar = 6;
     } else if constexpr (FLUID_TYPE == Fluid::dust) {
       nvar = 4;
+    } else if constexpr (FLUID_TYPE == Fluid::radiation) {
+      nvar = 5;
     }
     const int nspecies = p.GetMaxNumberOfVars() / nvar;
 
@@ -114,6 +117,9 @@ class RiemannSolver<RSolver::hlle, FLUID_TYPE> {
               wl_ise = wl(ISE, i);
               wr_ipr = wr(IPR, i);
               wr_ise = wr(ISE, i);
+            } else if constexpr (FLUID_TYPE == Fluid::radiation) {
+              // wl_ipr = wl(IPR,i);
+              //  wr_ipr = wr(IPR,i);
             }
 
             // Compute Roe-averaged state
@@ -150,6 +156,12 @@ class RiemannSolver<RSolver::hlle, FLUID_TYPE> {
             [[maybe_unused]] Real sr = Null<Real>();
             [[maybe_unused]] Real al = Null<Real>();
             [[maybe_unused]] Real ar = Null<Real>();
+            Real scalel = 1.0;
+            Real scaler = 1.0;
+            Real qscale = 1.0;
+            [[maybe_unused]] Real pscalel = Null<Real>();
+            [[maybe_unused]] Real pscaler = Null<Real>();
+
             if constexpr (FLUID_TYPE == Fluid::gas) {
               Real a = hroe - 0.5 * (SQR(wroe_ivx) + SQR(wroe_ivy) + SQR(wroe_ivz));
               a = (a < 0.0) ? 0.0 : sqrt(gm1 * a);
@@ -164,6 +176,26 @@ class RiemannSolver<RSolver::hlle, FLUID_TYPE> {
             } else if constexpr (FLUID_TYPE == Fluid::dust) {
               sl = std::min(wroe_ivx, wl_ivx);
               sr = std::max(wroe_ivx, wr_ivx);
+            } else if constexpr (FLUID_TYPE == Fluid::radiation) {
+              Real fl = std::sqrt(SQR(wl_ivx) + SQR(wl_ivy) + SQR(wl_ivz));
+              Real fr = std::sqrt(SQR(wr_ivx) + SQR(wr_ivy) + SQR(wr_ivz));
+              const Real nlx = wl_ivx / (fl + Fuzz<Real>());
+              const Real nrx = wr_ivx / (fr + Fuzz<Real>());
+              fl = std::min(1.0, fl);
+              fr = std::min(1.0, fr);
+              const Real chil = Radiation::EddingtonFactor(fl);
+              const Real chir = Radiation::EddingtonFactor(fr);
+              const auto [sla, slb] = Radiation::WaveSpeed(nlx, fl);
+              const auto [sra, srb] = Radiation::WaveSpeed(nrx, fr);
+              qscale = chat;
+              sl = std::min(sla, slb);
+              sr = std::max(sra, srb);
+              pscalel = 0.5 * (1.0 - chil); // 1.5*chil - 0.5;
+              pscaler = 0.5 * (1.0 - chir); // 1.5*chir - 0.5;
+              scalel = 0.5 * (3. * chil - 1.) /
+                       (fl * fl + Fuzz<Real>()); // pscalel/(fl*fl + Fuzz<Real>());
+              scaler = 0.5 * (3. * chir - 1.) /
+                       (fr * fr + Fuzz<Real>()); // pscaler/(fr*fr + Fuzz<Real>());
             }
 
             // following min/max set to TINY_NUMBER to fix bug found in converging
@@ -172,20 +204,24 @@ class RiemannSolver<RSolver::hlle, FLUID_TYPE> {
             Real bm = (sl < 0.0) ? sl : -1.0e-20;
 
             // Compute L/R fluxes along lines bm/bp: F_L - (S_L)U_L; F_R - (S_R)U_R
-            qa = wl_ivx - bm;
-            qb = wr_ivx - bp;
+            qa = qscale * (wl_ivx - bm);
+            qb = qscale * (wr_ivx - bp);
 
             Real fl_d = wl_idn * qa;
             Real fr_d = wr_idn * qb;
 
-            Real fl_mx = wl_idn * wl_ivx * qa;
-            Real fr_mx = wr_idn * wr_ivx * qb;
+            Real fl_mx = scalel * wl_idn * wl_ivx * qa;
+            Real fr_mx = scaler * wr_idn * wr_ivx * qb;
+            // if constexpr(FLUID_TYPE == Fluid::radiation) {
+            //   fl_mx -= pscalel * wl_ipr;
+            //   fr_mx -= pscaler * wr_ipr;
+            // }
 
-            Real fl_my = wl_idn * wl_ivy * qa;
-            Real fr_my = wr_idn * wr_ivy * qb;
+            Real fl_my = scalel * wl_idn * wl_ivy * qa;
+            Real fr_my = scaler * wr_idn * wr_ivy * qb;
 
-            Real fl_mz = wl_idn * wl_ivz * qa;
-            Real fr_mz = wr_idn * wr_ivz * qb;
+            Real fl_mz = scalel * wl_idn * wl_ivz * qa;
+            Real fr_mz = scaler * wr_idn * wr_ivz * qb;
 
             [[maybe_unused]] Real fl_e = Null<Real>();
             [[maybe_unused]] Real fr_e = Null<Real>();
@@ -199,6 +235,11 @@ class RiemannSolver<RSolver::hlle, FLUID_TYPE> {
             qa = 0.0;
             if (bp != bm) qa = 0.5 * (bp + bm) / (bp - bm);
             if constexpr (FLUID_TYPE == Fluid::gas) {
+              p.flux(b, dir, IPR, k, j, i) =
+                  0.5 * (wl_ipr + wr_ipr) + qa * (wl_ipr - wr_ipr);
+            } else if constexpr (FLUID_TYPE == Fluid::radiation) {
+              wl_ipr = pscalel * wl_idn;
+              wr_ipr = pscaler * wr_idn;
               p.flux(b, dir, IPR, k, j, i) =
                   0.5 * (wl_ipr + wr_ipr) + qa * (wl_ipr - wr_ipr);
             }

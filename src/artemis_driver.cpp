@@ -28,6 +28,7 @@
 #include "gravity/gravity.hpp"
 #include "nbody/nbody.hpp"
 #include "radiation/imc/imc.hpp"
+#include "radiation/moment/radiation.hpp"
 #include "rotating_frame/rotating_frame.hpp"
 #include "utils/integrators/artemis_integrator.hpp"
 
@@ -65,8 +66,8 @@ ArtemisDriver<GEOM>::ArtemisDriver(ParameterInput *pin, ApplicationInput *app_in
   do_conduction = artemis_pkg->template Param<bool>("do_conduction");
   do_nbody = artemis_pkg->template Param<bool>("do_nbody");
   do_diffusion = do_viscosity || do_conduction;
-  do_radiation = artemis_pkg->template Param<bool>("do_radiation");
-
+  do_imc = artemis_pkg->template Param<bool>("do_imc");
+  do_moment = artemis_pkg->template Param<bool>("do_moment");
   // NBody initialization tasks
   if (do_nbody) {
     // NBody coupling integrator (not to be confused with the rebound integrator)
@@ -108,7 +109,8 @@ TaskListStatus ArtemisDriver<GEOM>::Step() {
   if (status != TaskListStatus::complete) return status;
 
   // Execute operator split physics
-  if (do_radiation) status = IMC::JaybenneIMC<GEOM>(pmesh, tm.time, tm.dt);
+  if (do_imc) status = IMC::JaybenneIMC<GEOM>(pmesh, tm.time, tm.dt);
+  if (do_moment) status = RadiationDriver();
   if (status != TaskListStatus::complete) return status;
 
   // Compute new dt, (de)refine, and handle sparse (if enabled)
@@ -266,6 +268,113 @@ TaskCollection ArtemisDriver<GEOM>::StepTasks() {
         nbadv = tl.AddTask(TQ::once_per_region, c2p, NBody::Advance, pmesh, time, stage,
                            nbody_integrator.get());
       }
+    }
+  }
+
+  return tc;
+}
+
+template <Coordinates GEOM>
+TaskListStatus ArtemisDriver<GEOM>::RadiationDriver() {
+  TaskListStatus status = TaskListStatus::complete;
+  // Execute a series of substeps
+  trad = tm.time;
+  Real tend = tm.time + tm.dt;
+  int step = 1;
+  // Loop over all meshblocks and get the minimum dx
+  // min(dx) = min(<hi>) * dxi
+  // Likely doesn't need a kernel
+  dtr = Radiation::EstimateTimeStep<GEOM>(pmesh);
+
+  printf("%lg %lg\n", tm.dt, dtr);
+  while (trad < tend) {
+    if (trad + dtr > tend) dtr = tend - trad;
+    printf("Executing %d %lg\n", step, dtr);
+    status = RadiationTasks().Execute();
+    if (status != TaskListStatus::complete) {
+      return status;
+    }
+    trad += dtr;
+    step++;
+  }
+  return status;
+}
+
+template <Coordinates GEOM>
+TaskCollection ArtemisDriver<GEOM>::RadiationTasks() {
+  using TQ = TaskQualifier;
+  TaskCollection tc;
+  // Return empty TaskCollection if all unsplit physics disabled
+  if (not do_moment) return tc;
+
+  using namespace ::parthenon::Update;
+  TaskID none(0);
+  const auto any = parthenon::BoundaryType::any;
+  const int num_partitions = pmesh->DefaultNumPartitions();
+
+  // Deep copy u0 into u1 for integrator logic
+  auto &init_region = tc.AddRegion(num_partitions);
+  for (int i = 0; i < num_partitions; i++) {
+    auto &tl = init_region[i];
+    auto &u0 = pmesh->mesh_data.GetOrAdd("u0", i);
+    auto &u1 = pmesh->mesh_data.GetOrAdd("u1", i);
+    tl.AddTask(none, ArtemisUtils::DeepCopyConservedData, u1.get(), u0.get());
+  }
+  const int nstages = 2;
+  const std::array<Real, 2> beta{1.0, 0.5};
+  const std::array<Real, 2> gam0{0.0, 0.5};
+  const std::array<Real, 2> gam1{1.0, 0.5};
+  // Now do explicit integration of unsplit physics
+  for (int stage = 1; stage <= nstages; stage++) {
+    const Real time = trad;
+    const Real bdt = beta[stage - 1] * dtr;
+
+    TaskRegion &tr = tc.AddRegion(num_partitions);
+    for (int i = 0; i < num_partitions; i++) {
+      auto &tl = tr[i];
+      auto &u0 = pmesh->mesh_data.GetOrAdd("u0", i);
+      auto &u1 = pmesh->mesh_data.GetOrAdd("u1", i);
+
+      // Start looking for incoming messages (including for flux correction)
+      auto start_recv = tl.AddTask(none, parthenon::StartReceiveBoundBufs<any>, u0);
+      auto start_flx_recv = tl.AddTask(none, parthenon::StartReceiveFluxCorrections, u0);
+
+      // Compute hydrodynamic fluxes
+      // NOTE(AMD): 1st stage of VL2 uses piecewise constant reconstruction
+      const bool do_pcm = false; //((stage == 1) && (integrator->GetName() == "vl2"));
+      TaskID rad_flx = tl.AddTask(none, Radiation::CalculateFluxes, u0.get(), do_pcm);
+
+      // Communicate and set fluxes
+      auto send_flx = tl.AddTask(
+          rad_flx, parthenon::SendBoundBufs<parthenon::BoundaryType::flxcor_send>, u0);
+      auto recv_flx = tl.AddTask(start_flx_recv, parthenon::ReceiveFluxCorrections, u0);
+      auto set_flx = tl.AddTask(recv_flx, parthenon::SetFluxCorrections, u0);
+
+      // Apply flux divergence
+      auto update = tl.AddTask(rad_flx | set_flx, Radiation::ApplyUpdate<GEOM>, u0.get(),
+                               u1.get(), stage, gam0[stage - 1], gam1[stage - 1], bdt);
+
+      // Apply "coordinate source terms"
+      TaskID coord_src = tl.AddTask(update, Radiation::FluxSource, u0.get(), bdt);
+
+      // Apply rotating frame source term
+      // TaskID rframe_src = coord_src;
+      // if (do_rotating_frame) {
+      //   rframe_src = tl.AddTask(gravity_src, RotatingFrame::RotatingFrameForce,
+      //   u0.get(),
+      //                           time, bdt);
+      // }
+
+      // Apply matter-coupling step
+
+      // Set fields to be communicated
+      auto pre_comm = tl.AddTask(coord_src, PreCommFillDerived<MeshData<Real>>, u0.get());
+
+      // Set boundary conditions (both physical and logical)
+      auto bcs = parthenon::AddBoundaryExchangeTasks(pre_comm, tl, u0, pmesh->multilevel);
+
+      // Update primitive variables
+      auto c2p = tl.AddTask(TQ::local_sync, bcs, FillDerived<MeshData<Real>>, u0.get());
     }
   }
 

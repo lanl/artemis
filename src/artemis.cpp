@@ -52,6 +52,21 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
                         pin->GetInteger("parthenon/meshblock", "nx3")};
   artemis->AddParam("mb_dim", nb);
 
+  // Determine input file unit system
+  const std::string units_str = pin->GetOrAddString("artemis/units", "type", "code");
+  if (units_str == "code") {
+    Units units(1., 1., 1.);
+    artemis->AddParam("units", units);
+  } else if (units_str == "custom") {
+    const Real length_unit = pin->GetReal("artemis/units", "length");
+    const Real time_unit = pin->GetReal("artemis/units", "time");
+    const Real mass_unit = pin->GetReal("artemis/units", "mass");
+    Units units(length_unit, time_unit, mass_unit);
+    artemis->AddParam("units", units);
+  } else {
+    PARTHENON_FAIL("\"artemis/units/type\" not recognized!");
+  }
+
   // Determine input file specified physics
   const bool do_gas = pin->GetOrAddBoolean("physics", "gas", true);
   const bool do_dust = pin->GetOrAddBoolean("physics", "dust", false);

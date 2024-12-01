@@ -23,6 +23,10 @@ artemis:
     _type: bool
     _default: "false"
     _description: "Add user-defined AMR criterion."
+  units:
+    _type: string
+    _default: "code"
+    _description: "Unit conversions between code and cgs."
 
 
 
@@ -60,6 +64,6 @@ physics:
     _type: "bool"
     _default: "false"
     _description: "Turn on heat conduction in the gas fluid"
-  
+
 
 

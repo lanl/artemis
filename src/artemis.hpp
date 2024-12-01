@@ -74,7 +74,6 @@ ARTEMIS_VARIABLE(dust.prim, velocity);
 using TaskCollectionFnPtr = TaskCollection (*)(Mesh *pm, const Real time, const Real dt);
 
 // Constants that enumerate...
-namespace artemis {
 // ...Coordinate systems
 enum class Coordinates {
   cartesian,
@@ -107,18 +106,19 @@ enum class ArtemisBC {
 
 // Unit conversion struct
 struct Units {
-  Units = delete;
+  Units() = delete;
   Units(const int L_unit_in, const int M_unit_in, const int T_unit_in)
       : L_unit(L_unit_in), M_unit(M_unit_in), T_unit(T_unit_in) {}
 
+  // Units(enum unitsys)?
+
   // "1" in code units corresponds to this number in cgs units
-  const L_unit;
-  const M_unit;
-  const T_unit;
+  const Real L_unit;
+  const Real M_unit;
+  const Real T_unit;
 
   // cgs -> code and code -> cgs methods
-}
-} // namespace artemis
+};
 
 // Floating point limits
 template <typename T = Real>

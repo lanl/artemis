@@ -114,8 +114,10 @@ struct Units {
 
   // "1" in code units corresponds to this number in cgs units
   const Real L_unit;
-  const Real M_unit;
+  const Real M_unit; // Used for both planet masses and RHO_unit...
   const Real T_unit;
+
+  // GM = ... units?
 
   // cgs -> code and code -> cgs methods
 };

@@ -25,7 +25,7 @@ import subprocess
 import argparse
 import tempfile
 import shlex
-import datetime
+from datetime import datetime
 
 # The personal access token (PAT) with 'repo:status' permission
 # Store your token securely and do not hardcode it in the script

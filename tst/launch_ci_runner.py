@@ -75,33 +75,33 @@ def run_tests_in_temp_dir(pr_number, head_repo, head_ref, output_dir):
         )
 
         # Run the tests
-        try:
-            os.chdir(os.path.join(temp_dir, "tst"))
-            build_dir = os.path.join(temp_dir, "build")
+        os.chdir(os.path.join(temp_dir, "tst"))
+        build_dir = os.path.join(temp_dir, "build")
 
-            # Run subprocess command to compile code and launch run_tests.py
-            test_command = [
-                "bash",
-                "-c",
-                "source ../env/bash && build_artemis -b "
-                + build_dir
-                + " -j 20 -f && cd "
-                + os.path.join(temp_dir, "tst")
-                + " && python3 run_tests.py gpu.suite "
-                + "--exe "
-                + os.path.join(build_dir, "src", "artemis")
-                + f" --output_dir={output_dir}"
-                + " --log_file=darwin_log.txt",
-            ]
-            ret = subprocess.run(test_command, check=True)
+        # Run subprocess command to compile code and launch run_tests.py
+        test_command = [
+            "bash",
+            "-c",
+            "source ../env/bash && build_artemis -b "
+            + build_dir
+            + " -j 20 -f && cd "
+            + os.path.join(temp_dir, "tst")
+            + " && python3 run_tests.py gpu.suite "
+            + "--exe "
+            + os.path.join(build_dir, "src", "artemis")
+            + f" --output_dir={output_dir}"
+            + " --log_file=darwin_log.txt",
+        ]
+        ret = subprocess.run(test_command, check=True)
 
-            # Set permissions to output files
-            subprocess.run(["chgrp", "-R", "jovian", output_dir], check=True)
-            subprocess.run(["chmod", "-R", "750", output_dir], check=True)
+        # Set permissions to output files
+        subprocess.run(["chgrp", "-R", "jovian", output_dir], check=True)
+        subprocess.run(["chmod", "-R", "750", output_dir], check=True)
 
+        if ret.returncode == 0:
             # CI apparently succeeded; indicate that
             return True
-        except subprocess.CalledProcessError:
+        else:
             # If CI failed, indicate that
             return False
 

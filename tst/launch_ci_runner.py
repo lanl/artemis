@@ -56,7 +56,7 @@ def update_status(
         sys.exit(1)
 
 
-def run_tests_in_temp_dir(pr_number, head_repo, head_ref):
+def run_tests_in_temp_dir(pr_number, head_repo, head_ref, output_dir):
     current_dir = os.getcwd()
 
     # Create a temporary directory
@@ -74,17 +74,6 @@ def run_tests_in_temp_dir(pr_number, head_repo, head_ref):
         subprocess.run(
             ["git", "submodule", "update", "--init", "--recursive"], check=True
         )
-
-        # Build output path and create directory if necessary
-        output_dir = os.path.join(
-            "usr",
-            "projects",
-            "jovian",
-            "ci",
-            f"{platform.system.lower()}",
-            f"pr_{pr_number}",
-        )
-        subprocess.run(["mkdir", "-p", output_dir], check=True)
 
         # Run the tests
         try:
@@ -130,6 +119,12 @@ if __name__ == "__main__":
         action="store_true",
         help="Flag to indicate the script is running as a Slurm submission job.",
     )
+    parser.add_argument(
+        "--output_dir",
+        type=str,
+        default=None,
+        help="Output directory created when launching submission script",
+    )
     args = parser.parse_args()
 
     # Fetch PR information
@@ -143,7 +138,9 @@ if __name__ == "__main__":
         update_status(commit_sha, "pending", "CI Slurm job running...")
 
         # Run the tests in a temporary directory
-        test_success = run_tests_in_temp_dir(args.pr_number, head_repo, head_ref)
+        test_success = run_tests_in_temp_dir(
+            args.pr_number, head_repo, head_ref, args.output_dir
+        )
 
         # Update github PR status to indicate that testing has concluded
         if test_success:
@@ -198,7 +195,7 @@ if __name__ == "__main__":
                 "projects",
                 "jovian",
                 "ci",
-                f"{platform.system.lower()}",
+                f"{platform.system().lower()}",
                 f"pr_{args.pr_number}",
             )
             subprocess.run(["mkdir", "-p", output_dir], check=True)
@@ -212,7 +209,7 @@ if __name__ == "__main__":
                 "--partition=volta-x86",
                 "--time=04:00:00",
                 "--wrap",
-                f"python3 {sys.argv[0]} {args.pr_number} --submission",
+                f"python3 {sys.argv[0]} {args.pr_number} --submission --output_dir {output_dir}",
             ]
             result = subprocess.run(
                 sbatch_command,

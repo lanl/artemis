@@ -192,11 +192,23 @@ if __name__ == "__main__":
                     universal_newlines=True,
                 )
 
+            # Build output path and create directory if necessary
+            output_dir = os.path.join(
+                "usr",
+                "projects",
+                "jovian",
+                "ci",
+                f"{platform.system.lower()}",
+                f"pr_{args.pr_number}",
+            )
+            subprocess.run(["mkdir", "-p", output_dir], check=True)
+
+            # Create subprocess command for submitting CI job, and submit
             sbatch_command = [
                 "sbatch",
                 f"--job-name={job_name}",
-                f"--output={job_name}_%j.out",
-                f"--error={job_name}_%j.out",
+                f"--output={os.path.join(output_dir, job_name)}_%j.out",
+                f"--error={os.path.join(output_dir, job_name)}_%j.out",
                 "--partition=volta-x86",
                 "--time=04:00:00",
                 "--wrap",

@@ -25,7 +25,6 @@ import subprocess
 import argparse
 import tempfile
 import shlex
-import platform
 
 # The personal access token (PAT) with 'repo:status' permission
 # Store your token securely and do not hardcode it in the script
@@ -190,12 +189,13 @@ if __name__ == "__main__":
                 )
 
             # Build output path and create directory if necessary
+            username = os.getenv("USER")
             output_dir = os.path.join(
-                "usr",
+                "/usr",
                 "projects",
                 "jovian",
                 "ci",
-                f"{platform.system().lower()}",
+                username,
                 f"pr_{args.pr_number}",
             )
             subprocess.run(["mkdir", "-p", output_dir], check=True)

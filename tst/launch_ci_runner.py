@@ -25,6 +25,7 @@ import subprocess
 import argparse
 import tempfile
 import shlex
+import platform
 
 # The personal access token (PAT) with 'repo:status' permission
 # Store your token securely and do not hardcode it in the script
@@ -55,7 +56,7 @@ def update_status(
         sys.exit(1)
 
 
-def run_tests_in_temp_dir(pr_number, head_repo, head_ref, commit_sha):
+def run_tests_in_temp_dir(pr_number, head_repo, head_ref):
     current_dir = os.getcwd()
 
     # Create a temporary directory
@@ -74,6 +75,17 @@ def run_tests_in_temp_dir(pr_number, head_repo, head_ref, commit_sha):
             ["git", "submodule", "update", "--init", "--recursive"], check=True
         )
 
+        # Build output path and create directory if necessary
+        output_dir = os.path.join(
+            "usr",
+            "projects",
+            "jovian",
+            "ci",
+            f"{platform.system.lower()}",
+            f"pr_{pr_number}",
+        )
+        subprocess.run(["mkdir", "-p", output_dir], check=True)
+
         # Run the tests
         try:
             os.chdir(os.path.join(temp_dir, "tst"))
@@ -90,9 +102,14 @@ def run_tests_in_temp_dir(pr_number, head_repo, head_ref, commit_sha):
                 + " && python3 run_tests.py gpu.suite "
                 + "--exe "
                 + os.path.join(build_dir, "src", "artemis")
-                + " --log_file=ci_cpu_log.txt",
+                + f" --output_dir={output_dir}"
+                + " --log_file=darwin_log.txt",
             ]
             ret = subprocess.run(test_command, check=True)
+
+            # Set permissions to output files
+            subprocess.run(["chgrp", "-R", "jovian", output_dir], check=True)
+            subprocess.run(["chmod", "-R", "750", output_dir], check=True)
 
             # CI apparently succeeded; indicate that
             return True
@@ -126,9 +143,7 @@ if __name__ == "__main__":
         update_status(commit_sha, "pending", "CI Slurm job running...")
 
         # Run the tests in a temporary directory
-        test_success = run_tests_in_temp_dir(
-            args.pr_number, head_repo, head_ref, commit_sha
-        )
+        test_success = run_tests_in_temp_dir(args.pr_number, head_repo, head_ref)
 
         # Update github PR status to indicate that testing has concluded
         if test_success:

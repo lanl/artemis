@@ -98,12 +98,8 @@ def run_tests_in_temp_dir(pr_number, head_repo, head_ref, output_dir):
         subprocess.run(["chgrp", "-R", "jovian", output_dir], check=True)
         subprocess.run(["chmod", "-R", "750", output_dir], check=True)
 
-        if ret.returncode == 0:
-            # CI apparently succeeded; indicate that
-            return True
-        else:
-            # If CI failed, indicate that
-            return False
+        # Return true if the test script succeeded
+        return ret.returncode == 0
 
 
 if __name__ == "__main__":

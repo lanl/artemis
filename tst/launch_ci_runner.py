@@ -142,7 +142,7 @@ if __name__ == "__main__":
 
         if not fnmatch.fnmatch(hostname, "darwin-fe*"):
             # if we are on a backend
-            if cluster.lower() != "darwin":
+            if cluster is None or cluster.lower() != "darwin":
                 print("ERROR script must be run from Darwin!")
                 sys.exit(1)
 

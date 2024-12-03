@@ -104,24 +104,6 @@ enum class ArtemisBC {
   none
 };
 
-// Unit conversion struct
-struct Units {
-  Units() = delete;
-  Units(const int L_unit_in, const int M_unit_in, const int T_unit_in)
-      : L_unit(L_unit_in), M_unit(M_unit_in), T_unit(T_unit_in) {}
-
-  // Units(enum unitsys)?
-
-  // "1" in code units corresponds to this number in cgs units
-  const Real L_unit;
-  const Real M_unit; // Used for both planet masses and RHO_unit...
-  const Real T_unit;
-
-  // GM = ... units?
-
-  // cgs -> code and code -> cgs methods
-};
-
 // Floating point limits
 template <typename T = Real>
 KOKKOS_FORCEINLINE_FUNCTION constexpr auto Big() {

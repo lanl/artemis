@@ -59,8 +59,6 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   // TODO(BRR) store unit parameters for analysis usage? Pass artemis StateDescriptor to
   // units class?
 
-  // Custom constants optionally, otherwise default to true values but in code units
-
   // Determine input file specified physics
   const bool do_gas = pin->GetOrAddBoolean("physics", "gas", true);
   const bool do_dust = pin->GetOrAddBoolean("physics", "dust", false);

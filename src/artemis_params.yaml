@@ -24,9 +24,64 @@ artemis:
     _default: "false"
     _description: "Add user-defined AMR criterion."
   units:
-    _type: string
-    _default: "code"
     _description: "Unit conversions between code and cgs."
+    type:
+      _type: "string"
+      _default: "code"
+      _description: "What unit system to use for physical units"
+      code:
+        _type: opt
+        _description: "Native code units; no conversions"
+      cgs:
+        _type: opt
+        _description: "CGS unit system"
+    specifier:
+      _type: "string"
+      _default: "base"
+      _description: "How to provide unit conversions between code and physical units (base, orbit)"
+      base:
+        _type: opt
+        _description: "Provide base unit conversions (length, time, mass)"
+      orbit:
+        _type: opt
+        _description: "Provide central object mass and characteristic orbital radius for unit conversions"
+    length:
+      _type: "Real"
+      _description: "Physical units value of length equal to 1 code unit"
+    time:
+      _type: "Real"
+      _description: "Physical units value of time equal to 1 code unit"
+    mass:
+      _type: "Real"
+      _description: "Physical units value of mass equal to 1 code unit"
+    star_mass:
+      _type: "Real"
+      _description: "Physical units value of mass of central object"
+      _units: "Solar mass"
+    orbit_radius:
+      _type: "Real"
+      _description: "Physical units value of characteristic orbital radius"
+      _units: "AU"
+    constants:
+      _description: "Optional custom values for physical constants in physical units"
+      G:
+        _type: "Real"
+        _description: "Gravitational constant"
+      kb:
+        _type: "Real"
+        _description: "Boltzmann constant"
+      c:
+        _type: "Real"
+        _description: "Speed of light"
+      h:
+        _type: "Real"
+        _description: "Planck constant"
+      Msolar:
+        _type: "Real"
+        _description: "Solar mass"
+      AU:
+        _type: "Real"
+        _description: "Astronomical unit"
 
 
 

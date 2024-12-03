@@ -92,6 +92,7 @@ def run_tests_in_temp_dir(pr_number, head_repo, head_ref, output_dir):
             + os.path.join(build_dir, "src", "artemis")
             + f" --output_dir={output_dir}"
             + " --log_file=darwin_log.txt",
+            +" --erase_data",
         ]
         ret = subprocess.run(test_command, check=True)
 

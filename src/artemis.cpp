@@ -24,6 +24,7 @@
 #include "rotating_frame/rotating_frame.hpp"
 #include "utils/artemis_utils.hpp"
 #include "utils/history.hpp"
+#include "utils/units.hpp"
 
 // Jaybenne includes
 #include "jaybenne.hpp"
@@ -66,6 +67,10 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   } else {
     PARTHENON_FAIL("\"artemis/units/type\" not recognized!");
   }
+
+  ArtemisUtils::Units units(pin.get());
+
+  // Custom constants optionally, otherwise default to true values but in code units
 
   // Determine input file specified physics
   const bool do_gas = pin->GetOrAddBoolean("physics", "gas", true);

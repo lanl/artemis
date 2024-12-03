@@ -53,22 +53,11 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
                         pin->GetInteger("parthenon/meshblock", "nx3")};
   artemis->AddParam("mb_dim", nb);
 
-  // Determine input file unit system
-  const std::string units_str = pin->GetOrAddString("artemis/units", "type", "code");
-  if (units_str == "code") {
-    Units units(1., 1., 1.);
-    artemis->AddParam("units", units);
-  } else if (units_str == "custom") {
-    const Real length_unit = pin->GetReal("artemis/units", "length");
-    const Real time_unit = pin->GetReal("artemis/units", "time");
-    const Real mass_unit = pin->GetReal("artemis/units", "mass");
-    Units units(length_unit, time_unit, mass_unit);
-    artemis->AddParam("units", units);
-  } else {
-    PARTHENON_FAIL("\"artemis/units/type\" not recognized!");
-  }
-
+  // Set up unit conversions for this problem
   ArtemisUtils::Units units(pin.get());
+  artemis->AddParam("units", units);
+  // TODO(BRR) store unit parameters for analysis usage? Pass artemis StateDescriptor to
+  // units class?
 
   // Custom constants optionally, otherwise default to true values but in code units
 

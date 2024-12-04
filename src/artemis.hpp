@@ -67,11 +67,13 @@ namespace prim {
 ARTEMIS_VARIABLE(dust.prim, density);
 ARTEMIS_VARIABLE(dust.prim, velocity);
 } // namespace prim
+ARTEMIS_VARIABLE(dust, stopping_time);
 } // namespace dust
 #undef ARTEMIS_VARIABLE
 
 // TaskCollection function pointer for operator split tasks
-using TaskCollectionFnPtr = TaskCollection (*)(Mesh *pm, const Real time, const Real dt);
+using TaskCollectionFnPtr = TaskCollection (*)(Mesh *pm, parthenon::SimTime &tm,
+                                               const Real dt);
 
 // Constants that enumerate...
 // ...Coordinate systems
@@ -90,6 +92,14 @@ enum class RSolver { hllc, hlle, llf, null };
 enum class ReconstructionMethod { pcm, plm, ppm, null };
 // ...Fluid types
 enum class Fluid { gas, dust, null };
+// constants that enumerate dust drag method
+enum class DragMethod {
+  explicitNoFeedback,
+  explicitFeedback,
+  implicitNoFeedback,
+  implicitFeedback,
+  null
+};
 // ...Boundary conditions
 enum class ArtemisBC {
   reflect,
@@ -148,6 +158,7 @@ inline int ProblemDimension(parthenon::ParameterInput *pin) {
 
 namespace artemis {
 extern std::function<AmrTag(MeshBlockData<Real> *mbd)> ProblemCheckRefinementBlock;
+extern std::vector<TaskCollectionFnPtr> OperatorSplitTasks;
 } // namespace artemis
 
 #endif // ARTEMIS_ARTEMIS_HPP_

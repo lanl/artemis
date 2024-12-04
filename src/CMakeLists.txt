@@ -27,6 +27,8 @@ set (SRC_LIST
 
   dust/dust.cpp
   dust/dust.hpp
+  dust/coagulation/coagulation.cpp
+  dust/coagulation/coagulation.hpp
 
   gas/gas.cpp
   gas/gas.hpp

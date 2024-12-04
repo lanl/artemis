@@ -53,11 +53,12 @@ class ArtemisDriver : public EvolutionDriver {
   IntegratorPtr_t integrator, nbody_integrator;
   StateDescriptor *artemis_pkg;
   bool do_gas, do_dust, do_gravity, do_rotating_frame, do_cooling, do_drag, do_viscosity,
-      do_nbody, do_conduction, do_diffusion, do_radiation;
+      do_nbody, do_conduction, do_diffusion, do_radiation, do_coagulation;
   const bool is_restart;
 };
 
-using TaskCollectionFnPtr = TaskCollection (*)(Mesh *pm, const Real time, const Real dt);
+// using TaskCollectionFnPtr = TaskCollection (*)(Mesh *pm, const Real time, const Real
+// dt);
 
 Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin);
 

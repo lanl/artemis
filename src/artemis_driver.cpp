@@ -66,6 +66,7 @@ ArtemisDriver<GEOM>::ArtemisDriver(ParameterInput *pin, ApplicationInput *app_in
   do_nbody = artemis_pkg->template Param<bool>("do_nbody");
   do_diffusion = do_viscosity || do_conduction;
   do_radiation = artemis_pkg->template Param<bool>("do_radiation");
+  do_coagulation = artemis_pkg->template Param<bool>("do_coagulation");
 
   // NBody initialization tasks
   if (do_nbody) {
@@ -110,6 +111,12 @@ TaskListStatus ArtemisDriver<GEOM>::Step() {
   // Execute operator split physics
   if (do_radiation) status = IMC::JaybenneIMC<GEOM>(pmesh, tm.time, tm.dt);
   if (status != TaskListStatus::complete) return status;
+
+  // Execute operator split physics
+  for (auto &fn : OperatorSplitTasks) {
+    status = fn(pmesh, tm, integrator->dt).Execute();
+    if (status != TaskListStatus::complete) return status;
+  }
 
   // Compute new dt, (de)refine, and handle sparse (if enabled)
   status = PostStepTasks().Execute();
@@ -182,7 +189,13 @@ TaskCollection ArtemisDriver<GEOM>::StepTasks() {
       const bool do_pcm = ((stage == 1) && (integrator->GetName() == "vl2"));
       TaskID gas_flx = none, dust_flx = none;
       if (do_gas) gas_flx = tl.AddTask(none, Gas::CalculateFluxes, u0.get(), do_pcm);
-      if (do_dust) dust_flx = tl.AddTask(none, Dust::CalculateFluxes, u0.get(), do_pcm);
+      if (do_dust) {
+        // update dust stopping time and dust diffusivity
+        TaskID dust_stopping_time =
+            tl.AddTask(none, Dust::UpdateDustStoppingTime<GEOM>, u0.get());
+        dust_flx =
+            tl.AddTask(dust_stopping_time, Dust::CalculateFluxes, u0.get(), do_pcm);
+      }
 
       // Compute (gas) diffusive fluxes
       TaskID diff_flx = none;
@@ -247,9 +260,15 @@ TaskCollection ArtemisDriver<GEOM>::StepTasks() {
             tl.AddTask(drag_src, Gas::Cooling::CoolingSource<GEOM>, u0.get(), time, bdt);
       }
 
+      // Add dust drag force
+      TaskID dust_drag_src = cooling_src;
+      if (do_dust) {
+        dust_drag_src = tl.AddTask(cooling_src, Dust::ApplyDragForce, u0.get(), bdt);
+      }
+
       // Set auxillary fields
       auto set_aux =
-          tl.AddTask(cooling_src, ArtemisDerived::SetAuxillaryFields<GEOM>, u0.get());
+          tl.AddTask(dust_drag_src, ArtemisDerived::SetAuxillaryFields<GEOM>, u0.get());
 
       // Set (remaining) fields to be communicated
       auto pre_comm = tl.AddTask(set_aux, PreCommFillDerived<MeshData<Real>>, u0.get());

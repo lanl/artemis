@@ -15,6 +15,7 @@
 #include "artemis.hpp"
 #include "artemis_driver.hpp"
 #include "drag/drag.hpp"
+#include "dust/coagulation/coagulation.hpp"
 #include "dust/dust.hpp"
 #include "gas/cooling/cooling.hpp"
 #include "gas/gas.hpp"
@@ -29,6 +30,8 @@
 #include "jaybenne.hpp"
 
 namespace artemis {
+
+std::vector<TaskCollectionFnPtr> OperatorSplitTasks;
 
 //----------------------------------------------------------------------------------------
 //! \fn  Packages_t Artemis::ProcessPackages
@@ -63,6 +66,7 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   const bool do_viscosity = pin->GetOrAddBoolean("physics", "viscosity", false);
   const bool do_conduction = pin->GetOrAddBoolean("physics", "conduction", false);
   const bool do_radiation = pin->GetOrAddBoolean("physics", "radiation", false);
+  const bool do_coagulation = pin->GetOrAddBoolean("physics", "coagulation", false);
   artemis->AddParam("do_gas", do_gas);
   artemis->AddParam("do_dust", do_dust);
   artemis->AddParam("do_gravity", do_gravity);
@@ -74,6 +78,7 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   artemis->AddParam("do_conduction", do_conduction);
   artemis->AddParam("do_diffusion", do_conduction || do_viscosity);
   artemis->AddParam("do_radiation", do_radiation);
+  artemis->AddParam("do_coagulation", do_coagulation);
   PARTHENON_REQUIRE(!(do_cooling) || (do_cooling && do_gas),
                     "Cooling requires the gas package, but there is not gas!");
   PARTHENON_REQUIRE(!(do_viscosity) || (do_viscosity && do_gas),
@@ -82,6 +87,8 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
                     "Conduction requires the gas package, but there is not gas!");
   PARTHENON_REQUIRE(!(do_radiation) || (do_radiation && do_gas),
                     "Radiation requires the gas package, but there is not gas!");
+  PARTHENON_REQUIRE(!(do_coagulation) || (do_coagulation && do_dust),
+                    "Coagulation requires the dust package, but there is not dust!");
 
   // Set coordinate system
   const int ndim = ProblemDimension(pin.get());
@@ -98,6 +105,7 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   if (do_cooling) packages.Add(Gas::Cooling::Initialize(pin.get()));
   if (do_drag) packages.Add(Drag::Initialize(pin.get()));
   if (do_nbody) packages.Add(NBody::Initialize(pin.get()));
+  if (do_coagulation) packages.Add(Dust::Coagulation::Initialize(pin.get()));
   if (do_radiation) {
     auto eos_h = packages.Get("gas")->Param<EOS>("eos_h");
     auto opacity_h = packages.Get("gas")->Param<Opacity>("opacity_h");
@@ -137,6 +145,25 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   // Add optionally enrollable operator split Metadata flag
   parthenon::MetadataFlag MetadataOperatorSplit =
       parthenon::Metadata::AddUserFlag("OperatorSplit");
+
+  if (do_coagulation) {
+    typedef Coordinates C;
+    if (coords == C::cartesian) {
+      OperatorSplitTasks.push_back(&Dust::OperatorSplitDust<C::cartesian>);
+    } else if (coords == C::spherical1D) {
+      OperatorSplitTasks.push_back(&Dust::OperatorSplitDust<C::spherical1D>);
+    } else if (coords == C::spherical2D) {
+      OperatorSplitTasks.push_back(&Dust::OperatorSplitDust<C::spherical2D>);
+    } else if (coords == C::spherical3D) {
+      OperatorSplitTasks.push_back(&Dust::OperatorSplitDust<C::spherical3D>);
+    } else if (coords == C::cylindrical) {
+      OperatorSplitTasks.push_back(&Dust::OperatorSplitDust<C::cylindrical>);
+    } else if (coords == C::axisymmetric) {
+      OperatorSplitTasks.push_back(&Dust::OperatorSplitDust<C::axisymmetric>);
+    } else {
+      PARTHENON_FAIL("Invalid artemis/coordinate system!");
+    }
+  }
 
   // Add in user-defined AMR criterion callback
   const bool amr_user = pin->GetOrAddBoolean("artemis", "amr_user", false);

@@ -25,6 +25,7 @@ import subprocess
 import argparse
 import tempfile
 import shlex
+from datetime import datetime
 
 # The personal access token (PAT) with 'repo:status' permission
 # Store your token securely and do not hardcode it in the script
@@ -55,7 +56,7 @@ def update_status(
         sys.exit(1)
 
 
-def run_tests_in_temp_dir(pr_number, head_repo, head_ref, commit_sha):
+def run_tests_in_temp_dir(pr_number, head_repo, head_ref, output_dir):
     current_dir = os.getcwd()
 
     # Create a temporary directory
@@ -75,30 +76,40 @@ def run_tests_in_temp_dir(pr_number, head_repo, head_ref, commit_sha):
         )
 
         # Run the tests
-        try:
-            os.chdir(os.path.join(temp_dir, "tst"))
-            build_dir = os.path.join(temp_dir, "build")
+        os.chdir(os.path.join(temp_dir, "tst"))
+        build_dir = os.path.join(temp_dir, "build")
 
-            # Run subprocess command to compile code and launch run_tests.py
-            test_command = [
-                "bash",
-                "-c",
-                "source ../env/bash && build_artemis -b "
-                + build_dir
-                + " -j 20 -f && cd "
-                + os.path.join(temp_dir, "tst")
-                + " && python3 run_tests.py gpu.suite "
-                + "--exe "
-                + os.path.join(build_dir, "src", "artemis")
-                + " --log_file=ci_cpu_log.txt",
-            ]
-            ret = subprocess.run(test_command, check=True)
+        # Run subprocess command to compile code and launch run_tests.py
+        test_command = [
+            "bash",
+            "-c",
+            "source ../env/bash && build_artemis -b "
+            + build_dir
+            + " -j 20 -f && cd "
+            + os.path.join(temp_dir, "tst")
+            + " && python3 run_tests.py gpu.suite "
+            + "--exe "
+            + os.path.join(build_dir, "src", "artemis")
+            + f" --output_dir={output_dir}"
+            + " --log_file=darwin_log.txt"
+            + " --erase_data",
+        ]
+        ret = subprocess.run(test_command, check=True)
 
-            # CI apparently succeeded; indicate that
-            return True
-        except subprocess.CalledProcessError:
-            # If CI failed, indicate that
-            return False
+        # Set permissions for directories
+        subprocess.run(
+            ["find", output_dir, "-type", "d", "-exec", "chmod", "750", "{}", "+"],
+            check=True,
+        )
+
+        # Set permissions for files
+        subprocess.run(
+            ["find", output_dir, "-type", "f", "-exec", "chmod", "640", "{}", "+"],
+            check=True,
+        )
+
+        # Return true if the test script succeeded
+        return ret.returncode == 0
 
 
 if __name__ == "__main__":
@@ -112,6 +123,12 @@ if __name__ == "__main__":
         "--submission",
         action="store_true",
         help="Flag to indicate the script is running as a Slurm submission job.",
+    )
+    parser.add_argument(
+        "--output_dir",
+        type=str,
+        default=None,
+        help="Output directory created when launching submission script",
     )
     args = parser.parse_args()
 
@@ -127,7 +144,7 @@ if __name__ == "__main__":
 
         # Run the tests in a temporary directory
         test_success = run_tests_in_temp_dir(
-            args.pr_number, head_repo, head_ref, commit_sha
+            args.pr_number, head_repo, head_ref, args.output_dir
         )
 
         # Update github PR status to indicate that testing has concluded
@@ -138,9 +155,13 @@ if __name__ == "__main__":
     else:
         # Check that we are on the right system
         hostname = socket.gethostname()
+        cluster = os.getenv("SLURM_CLUSTER_NAME")
+
         if not fnmatch.fnmatch(hostname, "darwin-fe*"):
-            print("ERROR script must be run from Darwin frontend node!")
-            sys.exit(1)
+            # if we are on a backend
+            if cluster is None or cluster.lower() != "darwin":
+                print("ERROR script must be run from Darwin!")
+                sys.exit(1)
 
         # Execute the sbatch command
         try:
@@ -173,15 +194,29 @@ if __name__ == "__main__":
                     universal_newlines=True,
                 )
 
+            # Build output path and create directory if necessary
+            username = os.getenv("USER")
+            current_date_time = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
+            output_dir = os.path.join(
+                "/usr",
+                "projects",
+                "jovian",
+                "ci",
+                f"pr_{args.pr_number}",
+                current_date_time,
+            )
+            subprocess.run(["mkdir", "-p", output_dir], check=True)
+
+            # Create subprocess command for submitting CI job, and submit
             sbatch_command = [
                 "sbatch",
                 f"--job-name={job_name}",
-                f"--output={job_name}_%j.out",
-                f"--error={job_name}_%j.out",
+                f"--output={os.path.join(output_dir, job_name)}_%j.out",
+                f"--error={os.path.join(output_dir, job_name)}_%j.out",
                 "--partition=volta-x86",
                 "--time=04:00:00",
                 "--wrap",
-                f"python3 {sys.argv[0]} {args.pr_number} --submission",
+                f"python3 {sys.argv[0]} {args.pr_number} --submission --output_dir {output_dir}",
             ]
             result = subprocess.run(
                 sbatch_command,

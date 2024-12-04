@@ -12,6 +12,8 @@
 //========================================================================================
 
 // C++ headers
+#include <fstream>
+
 #include "artemis_utils.hpp"
 
 namespace ArtemisUtils {

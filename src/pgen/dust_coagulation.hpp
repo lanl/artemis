@@ -100,7 +100,6 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
     Dust::cgsunit->SetCGSUnit(pin);
   }
 
-  //bool isurface_den = Dust::cgsunit->isurface_den;
   dcv.length0 = Dust::cgsunit->length0;
   dcv.mass0 = Dust::cgsunit->mass0;
   dcv.time0 = Dust::cgsunit->time0;

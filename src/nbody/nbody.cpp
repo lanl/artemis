@@ -372,7 +372,8 @@ void InitializeFromRestart(Mesh *pm) {
   }
 
   // Send restarted rebound particles to all nodes
-  SyncWithRebound(reb_sim, particle_id, particles);
+  auto reb_sim_rst = nbody_pkg->Param<struct reb_simulation *>("reb_sim");
+  SyncWithRebound(reb_sim_rst, particle_id, particles);
 }
 
 //----------------------------------------------------------------------------------------

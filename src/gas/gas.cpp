@@ -447,6 +447,15 @@ Real EstimateTimestepMesh(MeshData<Real> *md) {
   return cfl_number * std::min(min_dt, diff_dt);
 }
 
+// The data for one meshblock
+struct FARGhost {
+  int original_rank;
+  Real bounds[6]; // After advection step, absolute min and max including shear
+  // TODO(BRR) instead phi_min, phi_max for low and high r?
+  // View of data to send (include ghosts? ND view with tensor indices flattened?)
+  ParArrayND<Real> data;
+};
+
 //----------------------------------------------------------------------------------------
 //! \fn  TaskStatus Gas::CalculateFluxes
 //! \brief Evaluates advective fluxes for gas evolution
@@ -469,6 +478,58 @@ TaskStatus CalculateFluxes(MeshData<Real> *md, const bool pcm) {
   auto vprim = desc_prim.GetPack(md);
   auto vflux = desc_flux.GetPack(md);
   auto vface = desc_face.GetPack(md);
+
+  // Play around with FARGO
+  const int orbit_dir = 1; // 1 for cylindrical, 2 for spherical
+  std::map<int, std::vector<int>>
+      rank_sends; // lid blocks we need to send to each neighbor rank
+  std::map<int, std::vector<int>>
+      rank_receives; // lid blocks we need to receive from each neighbor rank
+  for (auto &mbd : md->GetAllBlockData()) {
+    const auto *block = mbd->GetBlockPointer();
+    printf("[%i] gid: %i X3 bcs: %i %i\n", Globals::my_rank, block->gid,
+           static_cast<int>(block->boundary_flag[4]),
+           static_cast<int>(block->boundary_flag[5]));
+    for (auto &nb : block->neighbors) {
+      printf("  neighbor rank: %i gid: %i off: %i %i %i\n", nb.rank, nb.gid,
+             nb.offsets[0], nb.offsets[1], nb.offsets[2]);
+      if (static_cast<int>(nb.offsets[orbit_dir]) == 1) {
+        rank_sends[nb.rank].push_back(block->lid);
+      } else if (static_cast<int>(nb.offsets[orbit_dir]) == -1) {
+        rank_receives[nb.rank].push_back(block->lid);
+      }
+    }
+  }
+  printf("rank: %i\n", Globals::my_rank);
+  printf("send:\n");
+  for (auto &key : rank_sends) {
+    printf("  neighbor rank: %i\n", key.first);
+    for (auto &val : key.second) {
+      printf("    lid: %i\n", val);
+    }
+  }
+  printf("receive:\n");
+  for (auto &key : rank_receives) {
+    printf("  neighbor rank: %i\n", key.first);
+    for (auto &val : key.second) {
+      printf("    lid: %i\n", val);
+    }
+  }
+  // Also count what to receive? Have array of ghost blocks, just pointers to existing
+  // blocks where possible, otherwise create a block and share the pointer with this
+  // array / Have each meshblock also store a list of neighbors it will need
+  //     ? / Maintain /
+  //          send and receive buffers that grow dynamically as necessary.One buffer per /
+  //         rank./ Interpolate directly from receive buffers,
+  //   don't deep copy? Mismatch with ghost / /
+  //       cells between recv buffers and existing meshblock data fields
+  //   ? / auto comm_label = / v->label();
+  /// mpi_comm_t comm = pmesh->GetMPIComm(comm_label);
+  /// / std::shared_ptr<MPI_Comm> pcomm;
+  auto pcomm = std::make_shared<MPI_Comm>();
+  PARTHENON_MPI_CHECK(MPI_Comm_dup(MPI_COMM_WORLD, pcomm.get()));
+  PARTHENON_MPI_CHECK(MPI_Isend(buffer_ptr, send_size, MPI_PARTHENON_REAL, receiver_rank,
+                                send_tag, pcomm.get(), &request))
 
   return ArtemisUtils::CalculateFluxes<Fluid::gas>(md, pkg, vprim, vflux, vface, pcm);
 }

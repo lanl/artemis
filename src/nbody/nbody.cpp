@@ -346,6 +346,7 @@ void UserWorkBeforeRestartOutputMesh(Mesh *pmesh, ParameterInput *, SimTime &,
 
   // Store current rebound output as restartable parameter.  Every rank must store a
   // matching buffer parameter or else I/O will hang
+  printf("p[%i] buff: %s\n", Globals::my_rank, reb_sim_buffer.data());
   nbody_pkg->UpdateParam<std::vector<char>>("reb_sim_buffer", reb_sim_buffer);
 }
 

@@ -149,7 +149,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   // Build the rebound sim
   const Real box_size = pin->GetOrAddReal("nbody", "box_size", Big<Real>());
   RebSim reb_sim;
-  reb_sim.get() = reb_simulation_create();
+  reb_sim.set(reb_simulation_create());
   if (parthenon::Globals::my_rank == 0) {
     for (int i = 0; i < npart; i++) {
       struct reb_particle pl = {0};
@@ -215,6 +215,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     SetReboundPtrs(reb_sim);
   }
   params.Add("reb_sim", reb_sim, true);
+  printf("%i %i v: %i\n", __FILE__, __LINE__, reb_sim.get()->simulationarchive_version);
 
   // Hydro integrator
   LowStorageIntegrator hydro_integ(pin);
@@ -311,6 +312,7 @@ void UserWorkBeforeRestartOutputMesh(Mesh *pmesh, ParameterInput *, SimTime &,
   // Extract Rebound simulation
   auto &nbody_pkg = pmesh->packages.Get("nbody");
   auto reb_sim = nbody_pkg->Param<RebSim>("reb_sim");
+  printf("%s %i v: %i\n", __FILE__, __LINE__, reb_sim.get()->simulationarchive_version);
 
   // Write native Rebound restart
   if (Globals::my_rank == 0) {
@@ -321,8 +323,12 @@ void UserWorkBeforeRestartOutputMesh(Mesh *pmesh, ParameterInput *, SimTime &,
         PARTHENON_FAIL("Unable to delete temporary REBOUND file!");
       }
     }
+    printf("%s:%i\n", __FILE__, __LINE__);
+    printf("v: %i\n", reb_sim.get()->simulationarchive_version);
     reb_simulation_save_to_file(reb_sim.get(), NBody::rebound_filename.c_str());
+    printf("%s:%i\n", __FILE__, __LINE__);
   }
+  printf("%s:%i\n", __FILE__, __LINE__);
 
 #ifdef MPI_PARALLEL
   // Ensure the file is available for all ranks
@@ -330,11 +336,13 @@ void UserWorkBeforeRestartOutputMesh(Mesh *pmesh, ParameterInput *, SimTime &,
 #endif
 
   // Read Rebound restart back into string
+  printf("fnam: %s\n", NBody::rebound_filename.c_str());
   std::ifstream file(NBody::rebound_filename, std::ios::binary);
   PARTHENON_REQUIRE(file.is_open(), "Error opening temporary rebound output file!");
   std::vector<char> reb_sim_buffer((std::istreambuf_iterator<char>(file)),
                                    std::istreambuf_iterator<char>());
   file.close();
+  printf("READING BACK!\n");
 
   // Store current rebound output as restartable parameter.  Every rank must store a
   // matching buffer parameter or else I/O will hang
@@ -351,6 +359,7 @@ void InitializeFromRestart(Mesh *pm) {
   // Extract Rebound parameters
   auto &nbody_pkg = pm->packages.Get("nbody");
   auto reb_sim = nbody_pkg->Param<RebSim>("reb_sim");
+  printf("%i %i v: %i\n", __FILE__, __LINE__, reb_sim.get()->simulationarchive_version);
   auto particle_id = nbody_pkg->Param<std::vector<int>>("particle_id");
   auto particles = nbody_pkg->Param<ParArray1D<NBody::Particle>>("particles");
 
@@ -366,8 +375,10 @@ void InitializeFromRestart(Mesh *pm) {
     char *reb_filename = new char[NBody::rebound_filename.size() + 1];
     std::strcpy(reb_filename, NBody::rebound_filename.c_str());
     RebSim new_reb_sim;
-    new_reb_sim.get() = reb_simulation_create_from_file(reb_filename, -1);
-    reb_simulation_free(reb_sim.get());
+    new_reb_sim.set(reb_simulation_create_from_file(reb_filename, -1));
+    printf("%s:%i\n", __FILE__, __LINE__);
+    printf("v? %i\n", new_reb_sim.get()->simulationarchive_version);
+    // reb_simulation_free(reb_sim.get());
     SetReboundPtrs(new_reb_sim);
     nbody_pkg->UpdateParam<RebSim>("reb_sim", new_reb_sim);
   }

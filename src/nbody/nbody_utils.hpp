@@ -13,6 +13,8 @@
 #ifndef NBODY_NBODY_UTILS_HPP_
 #define NBODY_NBODY_UTILS_HPP_
 
+// This file was created in part by one of OpenAI's generative AI models
+
 // C++/C includes
 #include <cstdio>
 #include <fcntl.h>
@@ -36,20 +38,45 @@ extern int collision_resolution(struct reb_simulation *const r, struct reb_colli
 
 // Container for reb_simulation pointer that allows it to be stored in Params with
 // automatic cleanup
+// struct RebSim {
+//
+//  struct reb_simulation *&get() {
+//    return reb_sim;
+//  }
+//
+//  ~RebSim() {
+//    if (reb_sim != nullptr) {
+//      reb_simulation_free(reb_sim);
+//    }
+//  }
+//
+// private:
+//  struct reb_simulation *reb_sim = nullptr;
+//};
+
 struct RebSim {
+  // Shared pointer with a custom deleter
+  std::shared_ptr<struct reb_simulation> reb_sim;
 
-  struct reb_simulation *&get() {
-    return reb_sim;
+  // Constructor to initialize the shared_ptr with a custom deleter
+  RebSim()
+      : reb_sim(nullptr, [](struct reb_simulation *p) {
+          printf("Destructor!\n");
+          if (p != nullptr) {
+            reb_simulation_free(p);
+          }
+        }) {}
+
+  // Function to get a reference to the shared_ptr
+  struct reb_simulation *get() {
+    PARTHENON_REQUIRE(reb_sim, "Internal pointer is null!");
+    return reb_sim.get();
   }
 
-  ~RebSim() {
-    if (reb_sim != nullptr) {
-      reb_simulation_free(reb_sim);
-    }
+  void set(struct reb_simulation *ptr) {
+    PARTHENON_REQUIRE(ptr != nullptr, "Passing a null pointer!");
+    reb_sim.reset(ptr);
   }
-
- private:
-  struct reb_simulation *reb_sim = nullptr;
 };
 
 //----------------------------------------------------------------------------------------

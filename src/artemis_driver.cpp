@@ -260,15 +260,9 @@ TaskCollection ArtemisDriver<GEOM>::StepTasks() {
             tl.AddTask(drag_src, Gas::Cooling::CoolingSource<GEOM>, u0.get(), time, bdt);
       }
 
-      // Add dust drag force
-      TaskID dust_drag_src = cooling_src;
-      if (do_dust) {
-        dust_drag_src = tl.AddTask(cooling_src, Dust::ApplyDragForce, u0.get(), bdt);
-      }
-
       // Set auxillary fields
       auto set_aux =
-          tl.AddTask(dust_drag_src, ArtemisDerived::SetAuxillaryFields<GEOM>, u0.get());
+          tl.AddTask(cooling_src, ArtemisDerived::SetAuxillaryFields<GEOM>, u0.get());
 
       // Set (remaining) fields to be communicated
       auto pre_comm = tl.AddTask(set_aux, PreCommFillDerived<MeshData<Real>>, u0.get());

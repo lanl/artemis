@@ -103,40 +103,11 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   for (int n = 0; n < nspecies; ++n)
     dustids.push_back(n);
 
-  // dust stopping time flag
-  bool const_stopping_time = pin->GetOrAddBoolean("dust", "const_stopping_time", true);
-  params.Add("const_stopping_time", const_stopping_time);
-
-  bool enable_dust_drag = pin->GetOrAddBoolean("dust", "enable_dust_drag", false);
-  params.Add("enable_dust_drag", enable_dust_drag);
-
   bool hst_out_d2g = pin->GetOrAddBoolean("dust", "hst_out_d2g", false);
   params.Add("hst_out_d2g", hst_out_d2g);
 
   // coagulation flag
   bool enable_dust_coagulation = pin->GetOrAddBoolean("physics", "coagulation", false);
-
-  DragMethod drag_method = DragMethod::null;
-  if (enable_dust_drag) {
-    bool enable_dust_feedback = pin->GetBoolean("dust", "enable_dust_feedback");
-    std::string drag_method1 = pin->GetOrAddString("dust", "drag_method", "implicit");
-
-    if (drag_method1 == "implicit") {
-      if (enable_dust_feedback) {
-        drag_method = DragMethod::implicitFeedback;
-      } else {
-        drag_method = DragMethod::implicitNoFeedback;
-      }
-    } else {
-      if (enable_dust_feedback) {
-        drag_method = DragMethod::explicitFeedback;
-      } else {
-        drag_method = DragMethod::explicitNoFeedback;
-      }
-    }
-
-    params.Add("drag_method", drag_method);
-  } // end if (enable_dust_drag)
 
   // Dust sizes
   auto size_dist = pin->GetOrAddString("dust", "size_input", "direct");
@@ -212,7 +183,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     sizes.DeepCopy(h_sizes);
     params.Add("sizes", sizes);
     params.Add("h_sizes", h_sizes);
-  } else if (!const_stopping_time) {
+  } else {
     PARTHENON_FAIL("dust/size_input not recognized!");
   }
 
@@ -220,18 +191,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   const Real rho_p_orig = pin->GetOrAddReal("dust", "grain_density", 1.0);
   params.Add("grain_density", rho_p_orig);
 
-  if (const_stopping_time) {
-    if (enable_dust_drag) {
-      ParArray1D<Real> stopping_time("dust_stopping_time", nspecies);
-      auto stopping_time_host = stopping_time.GetHostMirror();
-      auto stopping_v = pin->GetVector<Real>("dust", "stopping_time");
-      for (int n = 0; n < nspecies; ++n) {
-        stopping_time_host(n) = stopping_v[n];
-      }
-      stopping_time.DeepCopy(stopping_time_host);
-      params.Add("stopping_time", stopping_time);
-    }
-  } else {
+  if (enable_dust_coagulation) {
     if (cgsunit == NULL) {
       cgsunit = new CGSUnit;
     }
@@ -336,8 +296,7 @@ TaskStatus UpdateDustStoppingTime(MeshData<Real> *md) {
   auto pm = md->GetParentPointer();
 
   auto &dust_pkg = pm->packages.Get("dust");
-  if ((!dust_pkg->template Param<bool>("enable_dust_drag")) &&
-      (!dust_pkg->template Param<bool>("enable_coagulation"))) {
+  if ((!dust_pkg->template Param<bool>("enable_coagulation"))) {
     return TaskStatus::complete;
   }
 
@@ -349,75 +308,54 @@ TaskStatus UpdateDustStoppingTime(MeshData<Real> *md) {
 
   const int nspecies = dust_pkg->template Param<int>("nspecies");
 
-  const bool const_stopping_time = dust_pkg->template Param<bool>("const_stopping_time");
+  const bool isurf_den = cgsunit->isurface_den;
+  ParArray1D<Real> dust_size = dust_pkg->template Param<ParArray1D<Real>>("sizes");
+  static auto desc =
+      MakePackDescriptor<gas::prim::density, gas::prim::pressure, dust::stopping_time>(
+          resolved_pkgs.get());
 
-  if (const_stopping_time) {
-    ParArray1D<Real> stoppingTime =
-        dust_pkg->template Param<ParArray1D<Real>>("stopping_time");
-    static auto desc = MakePackDescriptor<dust::stopping_time>(resolved_pkgs.get());
+  auto vmesh = desc.GetPack(md);
 
-    auto vmesh = desc.GetPack(md);
-    parthenon::par_for(
-        DEFAULT_LOOP_PATTERN, "Dust::DustStoppingTime", parthenon::DevExecSpace(), 0,
-        md->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
-        KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
-          // usually the stopping time depends gas density, unless constant is used
-          // constant stopping time
-          for (int n = 0; n < nspecies; ++n) {
-            vmesh(b, dust::stopping_time(n), k, j, i) = stoppingTime(n);
-          }
-        });
-  } else {
-    const bool isurf_den = cgsunit->isurface_den;
-    ParArray1D<Real> dust_size = dust_pkg->template Param<ParArray1D<Real>>("sizes");
-    static auto desc =
-        MakePackDescriptor<gas::prim::density, gas::prim::pressure, dust::stopping_time>(
-            resolved_pkgs.get());
+  auto &gas_pkg = pm->packages.Get("gas");
 
-    auto vmesh = desc.GetPack(md);
+  const Real gamma = gas_pkg->template Param<Real>("adiabatic_index");
+  const Real rho_p = dust_pkg->template Param<Real>("rho_p");
 
-    auto &gas_pkg = pm->packages.Get("gas");
+  parthenon::par_for(
+      DEFAULT_LOOP_PATTERN, "Dust::DustStoppingTime2", parthenon::DevExecSpace(), 0,
+      md->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+        const Real dens_g = vmesh(b, gas::prim::density(0), k, j, i);
+        // usually the Stokes number depends gas density, unless constant is used
+        // stopping_time = Stokes_number/Omega_k
 
-    const Real gamma = gas_pkg->template Param<Real>("adiabatic_index");
-    const Real rho_p = dust_pkg->template Param<Real>("rho_p");
-
-    parthenon::par_for(
-        DEFAULT_LOOP_PATTERN, "Dust::DustStoppingTime2", parthenon::DevExecSpace(), 0,
-        md->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
-        KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
-          const Real dens_g = vmesh(b, gas::prim::density(0), k, j, i);
-          // usually the Stokes number depends gas density, unless constant is used
-          // stopping_time = Stokes_number/Omega_k
-
-          if (isurf_den) {
-            geometry::Coords<GEOM> coords(vmesh.GetCoordinates(b), k, j, i);
-            // for surface denstiy, Stokes number = Pi/2*rho_p*s_p/sigma_g
-            // calculate the Keplerian Omega at mid-plane
-            // const auto &hx = coords.GetScaleFactors();
-            Real rad;
-            if constexpr (GEOM == Coordinates::cylindrical) {
-              rad = coords.hx2v(); // cylindrical-rad
-            } else {
-              rad = coords.hx3v();
-            }
-            Real Omega_k = 1.0 / std::sqrt(rad) / rad;
-            for (int n = 0; n < nspecies; ++n) {
-              const Real St = rho_p * dust_size(n) / dens_g;
-              vmesh(b, dust::stopping_time(n), k, j, i) = St / Omega_k;
-            }
-
+        if (isurf_den) {
+          geometry::Coords<GEOM> coords(vmesh.GetCoordinates(b), k, j, i);
+          // for surface denstiy, Stokes number = Pi/2*rho_p*s_p/sigma_g
+          // calculate the Keplerian Omega at mid-plane
+          Real rad;
+          if constexpr (GEOM == Coordinates::cylindrical) {
+            rad = coords.hx2v(); // cylindrical-rad
           } else {
-
-            // for density (g/cc), Stokes number = sqrt(Pi/8)*rho_p*s_p*Omega_k/rho_g/Cs
-            const Real pres = vmesh(b, gas::prim::pressure(0), k, j, i);
-            const Real cs = std::sqrt(gamma * pres / dens_g);
-            for (int n = 0; n < nspecies; ++n) {
-              const Real StOme = rho_p * dust_size(n) / dens_g;
-              vmesh(b, dust::stopping_time(n), k, j, i) = StOme / cs;
-            }
+            rad = coords.hx3v();
           }
-        });
-  }
+          Real Omega_k = 1.0 / std::sqrt(rad) / rad;
+          for (int n = 0; n < nspecies; ++n) {
+            const Real St = rho_p * dust_size(n) / dens_g;
+            vmesh(b, dust::stopping_time(n), k, j, i) = St / Omega_k;
+          }
+
+        } else {
+
+          // for density (g/cc), Stokes number = sqrt(Pi/8)*rho_p*s_p*Omega_k/rho_g/Cs
+          const Real pres = vmesh(b, gas::prim::pressure(0), k, j, i);
+          const Real cs = std::sqrt(gamma * pres / dens_g);
+          for (int n = 0; n < nspecies; ++n) {
+            const Real StOme = rho_p * dust_size(n) / dens_g;
+            vmesh(b, dust::stopping_time(n), k, j, i) = StOme / cs;
+          }
+        }
+      });
 
   return TaskStatus::complete;
 }
@@ -434,19 +372,8 @@ Real EstimateTimestepMesh(MeshData<Real> *md) {
   auto &dust_pkg = pm->packages.Get("dust");
   auto &params = dust_pkg->AllParams();
 
-  auto dragDt = params.template Get<Real>("user_dt");
+  auto userDt = params.template Get<Real>("user_dt");
   auto nspecies = params.template Get<int>("nspecies");
-
-  bool dt_stoppingTime = false;
-  if (params.template Get<bool>("enable_dust_drag")) {
-    UpdateDustStoppingTime<GEOM>(md);
-    if ((params.template Get<DragMethod>("drag_method") ==
-         DragMethod::explicitFeedback) ||
-        (params.template Get<DragMethod>("drag_method") ==
-         DragMethod::explicitNoFeedback)) {
-      dt_stoppingTime = true;
-    }
-  }
 
   const auto cfl_number = params.template Get<Real>("cfl");
   static auto desc =
@@ -474,15 +401,10 @@ Real EstimateTimestepMesh(MeshData<Real> *md) {
           }
           ldt = std::min(ldt, 1.0 / denom * cfl_number);
         }
-        if (dt_stoppingTime) {
-          for (int n = 0; n < nspecies; ++n) {
-            ldt = std::min(ldt, vmesh(b, dust::stopping_time(n), k, j, i));
-          }
-        }
       },
       Kokkos::Min<Real>(min_dt));
 
-  return std::min(dragDt, min_dt);
+  return std::min(userDt, min_dt);
 }
 
 //----------------------------------------------------------------------------------------
@@ -533,211 +455,6 @@ TaskStatus FluxSource(MeshData<Real> *md, const Real dt) {
   }
 
   return TaskStatus::complete;
-}
-
-//----------------------------------------------------------------------------------------
-//! \fn  TaskStatus Dust::ApplyDragForceSelect
-//  \brief Wrapper function for dust-drag froce based on different drag-method
-template <Coordinates GEOM>
-TaskStatus ApplyDragForceSelect(MeshData<Real> *md, const Real dt) {
-
-  using parthenon::MakePackDescriptor;
-
-  auto pm = md->GetParentPointer();
-  auto &dust_pkg = pm->packages.Get("dust");
-  IndexRange ib = md->GetBoundsI(IndexDomain::interior);
-  IndexRange jb = md->GetBoundsJ(IndexDomain::interior);
-  IndexRange kb = md->GetBoundsK(IndexDomain::interior);
-
-  auto &resolved_pkgs = pm->resolved_packages;
-  auto &DUST_DRAG = dust_pkg->template Param<DragMethod>("drag_method");
-
-  static auto desc =
-      MakePackDescriptor<gas::cons::density, gas::cons::momentum, gas::cons::total_energy,
-                         gas::prim::density, gas::prim::velocity, dust::cons::density,
-                         dust::cons::momentum, dust::prim::density, dust::prim::velocity,
-                         dust::stopping_time>(resolved_pkgs.get());
-
-  auto vmesh = desc.GetPack(md);
-
-  if ((DUST_DRAG == DragMethod::explicitFeedback) ||
-      (DUST_DRAG == DragMethod::explicitNoFeedback)) {
-    parthenon::par_for(
-        DEFAULT_LOOP_PATTERN, "Dust::DustDrag", parthenon::DevExecSpace(), 0,
-        md->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
-        KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
-          const Real dens_g = vmesh(b, gas::prim::density(0), k, j, i);
-          const int nspecies = vmesh.GetUpperBound(b, dust::prim::density()) -
-                               vmesh.GetLowerBound(b, dust::prim::density()) + 1;
-          geometry::Coords<GEOM> coords(vmesh.GetCoordinates(b), k, j, i);
-          const auto &hx = coords.GetScaleFactors();
-
-          for (int n = 0; n < nspecies; ++n) {
-            const Real dens_d = vmesh(b, dust::prim::density(n), k, j, i);
-            const Real tst = vmesh(b, dust::stopping_time(n), k, j, i);
-            const Real cj = dt * dens_d / tst;
-
-            vmesh(b, dust::cons::momentum(VI(n, 0)), k, j, i) +=
-                cj * hx[0] *
-                (vmesh(b, gas::prim::velocity(0), k, j, i) -
-                 vmesh(b, dust::prim::velocity(VI(n, 0)), k, j, i));
-
-            vmesh(b, dust::cons::momentum(VI(n, 1)), k, j, i) +=
-                cj * hx[1] *
-                (vmesh(b, gas::prim::velocity(1), k, j, i) -
-                 vmesh(b, dust::prim::velocity(VI(n, 1)), k, j, i));
-
-            vmesh(b, dust::cons::momentum(VI(n, 2)), k, j, i) +=
-                cj * hx[2] *
-                (vmesh(b, gas::prim::velocity(2), k, j, i) -
-                 vmesh(b, dust::prim::velocity(VI(n, 2)), k, j, i));
-          }
-          if (DUST_DRAG == DragMethod::explicitFeedback) {
-            const Real dens_g = vmesh(b, gas::cons::density(0), k, j, i);
-            Real delta_mom1 = 0.0;
-            Real delta_mom2 = 0.0;
-            Real delta_mom3 = 0.0;
-            for (int n = 0; n < nspecies; ++n) {
-              const Real dens_d = vmesh(b, dust::prim::density(n), k, j, i);
-              const Real tst = vmesh(b, dust::stopping_time(n), k, j, i);
-              Real cj = dt * dens_d / tst;
-              delta_mom1 -= cj * (vmesh(b, gas::prim::velocity(0), k, j, i) -
-                                  vmesh(b, dust::prim::velocity(VI(n, 0)), k, j, i));
-              delta_mom2 -= cj * (vmesh(b, gas::prim::velocity(1), k, j, i) -
-                                  vmesh(b, dust::prim::velocity(VI(n, 1)), k, j, i));
-              delta_mom3 -= cj * (vmesh(b, gas::prim::velocity(2), k, j, i) -
-                                  vmesh(b, dust::prim::velocity(VI(n, 2)), k, j, i));
-            }
-            vmesh(b, gas::cons::momentum(0), k, j, i) += delta_mom1 * hx[0];
-            vmesh(b, gas::cons::momentum(1), k, j, i) += delta_mom2 * hx[1];
-            vmesh(b, gas::cons::momentum(2), k, j, i) += delta_mom3 * hx[2];
-
-            // gas energy update: delta_E = delta_mom*(M_new - 0.5*delta_mom)/rho_g
-            //                    delta_E = 0.5*rhog*(V_new^2 - V_old^2)
-
-            vmesh(b, gas::cons::total_energy(0), k, j, i) +=
-                (delta_mom1 * (vmesh(b, gas::cons::momentum(0), k, j, i) / hx[0] -
-                               delta_mom1 * 0.5) +
-                 delta_mom2 * (vmesh(b, gas::cons::momentum(1), k, j, i) / hx[1] -
-                               delta_mom2 * 0.5) +
-                 delta_mom3 * (vmesh(b, gas::cons::momentum(2), k, j, i) / hx[2] -
-                               delta_mom3 * 0.5)) /
-                dens_g;
-          }
-        });
-
-  } else if ((DUST_DRAG == DragMethod::implicitFeedback) ||
-             (DUST_DRAG == DragMethod::implicitNoFeedback)) {
-    auto &dfloor = dust_pkg->template Param<Real>("dfloor");
-    parthenon::par_for(
-        DEFAULT_LOOP_PATTERN, "Dust::DustDragImp", parthenon::DevExecSpace(), 0,
-        md->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
-        KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
-          geometry::Coords<GEOM> coords(vmesh.GetCoordinates(b), k, j, i);
-          const auto &hx = coords.GetScaleFactors();
-          const int nspecies = vmesh.GetUpperBound(b, dust::prim::density()) -
-                               vmesh.GetLowerBound(b, dust::prim::density()) + 1;
-
-          const Real dens_g = vmesh(b, gas::cons::density(0), k, j, i);
-          Real mom1_g = vmesh(b, gas::cons::momentum(0), k, j, i);
-          Real mom2_g = vmesh(b, gas::cons::momentum(1), k, j, i);
-          Real mom3_g = vmesh(b, gas::cons::momentum(2), k, j, i);
-
-          Real vel1_g = mom1_g / (dens_g * hx[0]);
-          Real vel2_g = mom2_g / (dens_g * hx[1]);
-          Real vel3_g = mom3_g / (dens_g * hx[2]);
-          const Real coef1 = dens_g / vmesh(b, gas::prim::density(0), k, j, i);
-
-          if (DUST_DRAG == DragMethod::implicitFeedback) {
-
-            Real tmp1 = dens_g;
-            const Real vel1_go = vel1_g;
-            const Real vel2_go = vel2_g;
-            const Real vel3_go = vel3_g;
-            for (int n = 0; n < nspecies; ++n) {
-              const Real dens_d = vmesh(b, dust::cons::density(n), k, j, i);
-              const Real tst = vmesh(b, dust::stopping_time(n), k, j, i);
-              const Real cj = dt * dens_d / tst * coef1; // use updated dens_g
-              const Real bj1 = vmesh(b, dust::cons::momentum(VI(n, 0)), k, j, i);
-              const Real bj2 = vmesh(b, dust::cons::momentum(VI(n, 1)), k, j, i);
-              const Real bj3 = vmesh(b, dust::cons::momentum(VI(n, 2)), k, j, i);
-              const Real dj = dens_d + cj;
-
-              const Real cjOdj = cj / dj;
-              tmp1 += (cj - cj * cjOdj);
-              mom1_g += bj1 * cjOdj;
-              mom2_g += bj2 * cjOdj;
-              mom3_g += bj3 * cjOdj;
-            }
-
-            vel1_g = mom1_g / (tmp1 * hx[0]);
-            vel2_g = mom2_g / (tmp1 * hx[1]);
-            vel3_g = mom3_g / (tmp1 * hx[2]);
-            vmesh(b, gas::cons::momentum(0), k, j, i) = dens_g * vel1_g * hx[0];
-            vmesh(b, gas::cons::momentum(1), k, j, i) = dens_g * vel2_g * hx[1];
-            vmesh(b, gas::cons::momentum(2), k, j, i) = dens_g * vel3_g * hx[2];
-
-            // gas energy update: delta_E = 0.5*(v_new^2 - v_old^2)*rho_g
-            vmesh(b, gas::cons::total_energy(0), k, j, i) +=
-                0.5 *
-                (SQR(vel1_g) - SQR(vel1_go) + SQR(vel2_g) - SQR(vel2_go) + SQR(vel3_g) -
-                 SQR(vel3_go)) *
-                dens_g;
-          } // end if (DUST_DRAG == DragMethod::implicitFeedback)
-
-          // update the dust
-          for (int n = 0; n < nspecies; ++n) {
-            const Real dens_d =
-                std::max(dfloor, vmesh(b, dust::cons::density(n), k, j, i));
-            const Real tst = vmesh(b, dust::stopping_time(n), k, j, i);
-            const Real cj = dt * dens_d / tst * coef1; // use updated dens_g
-            const Real bj1 = vmesh(b, dust::cons::momentum(VI(n, 0)), k, j, i);
-            const Real bj2 = vmesh(b, dust::cons::momentum(VI(n, 1)), k, j, i);
-            const Real bj3 = vmesh(b, dust::cons::momentum(VI(n, 2)), k, j, i);
-            const Real dj = dens_d + cj;
-            vmesh(b, dust::cons::momentum(VI(n, 0)), k, j, i) =
-                dens_d * (bj1 + cj * vel1_g * hx[0]) / dj;
-            vmesh(b, dust::cons::momentum(VI(n, 1)), k, j, i) =
-                dens_d * (bj2 + cj * vel2_g * hx[1]) / dj;
-            vmesh(b, dust::cons::momentum(VI(n, 2)), k, j, i) =
-                dens_d * (bj3 + cj * vel3_g * hx[2]) / dj;
-          }
-        });
-  }
-
-  return TaskStatus::complete;
-}
-
-//----------------------------------------------------------------------------------------
-//! \fn  TaskStatus Dust::ApplyDragForce
-//  \brief Wrapper function for dust-drag froce
-TaskStatus ApplyDragForce(MeshData<Real> *md, const Real dt) {
-
-  using parthenon::MakePackDescriptor;
-
-  auto pm = md->GetParentPointer();
-  auto &dust_pkg = pm->packages.Get("dust");
-  if (!dust_pkg->template Param<bool>("enable_dust_drag")) {
-    return TaskStatus::complete;
-  }
-
-  const Coordinates GEOM = dust_pkg->template Param<Coordinates>("coords");
-
-  if (GEOM == Coordinates::cartesian) {
-    return ApplyDragForceSelect<Coordinates::cartesian>(md, dt);
-  } else if (GEOM == Coordinates::spherical1D) {
-    return ApplyDragForceSelect<Coordinates::spherical1D>(md, dt);
-  } else if (GEOM == Coordinates::spherical2D) {
-    return ApplyDragForceSelect<Coordinates::spherical2D>(md, dt);
-  } else if (GEOM == Coordinates::spherical3D) {
-    return ApplyDragForceSelect<Coordinates::spherical3D>(md, dt);
-  } else if (GEOM == Coordinates::cylindrical) {
-    return ApplyDragForceSelect<Coordinates::cylindrical>(md, dt);
-  } else if (GEOM == Coordinates::axisymmetric) {
-    return ApplyDragForceSelect<Coordinates::axisymmetric>(md, dt);
-  } else {
-    PARTHENON_FAIL("Coordinate type not recognized!");
-  }
 }
 
 //#define COAG_DEBUG

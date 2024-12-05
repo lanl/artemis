@@ -83,8 +83,6 @@ extern CGSUnit *cgsunit;
 template <Coordinates GEOM>
 TaskStatus UpdateDustStoppingTime(MeshData<Real> *md);
 
-TaskStatus ApplyDragForce(MeshData<Real> *md, const Real dt);
-
 // OperatorSplit tasks
 template <Coordinates GEOM>
 TaskCollection OperatorSplitDust(Mesh *pm, parthenon::SimTime &tm, const Real dt);

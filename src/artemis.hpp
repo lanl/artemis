@@ -92,14 +92,6 @@ enum class RSolver { hllc, hlle, llf, null };
 enum class ReconstructionMethod { pcm, plm, ppm, null };
 // ...Fluid types
 enum class Fluid { gas, dust, null };
-// constants that enumerate dust drag method
-enum class DragMethod {
-  explicitNoFeedback,
-  explicitFeedback,
-  implicitNoFeedback,
-  implicitFeedback,
-  null
-};
 // ...Boundary conditions
 enum class ArtemisBC {
   reflect,

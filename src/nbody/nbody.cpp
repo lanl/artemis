@@ -148,8 +148,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
   // Build the rebound sim
   const Real box_size = pin->GetOrAddReal("nbody", "box_size", Big<Real>());
-  struct reb_simulation *reb_sim = nullptr;
-  reb_sim = reb_simulation_create();
+  RebSim reb_sim;
+  reb_sim.get() = reb_simulation_create();
   if (parthenon::Globals::my_rank == 0) {
     for (int i = 0; i < npart; i++) {
       struct reb_particle pl = {0};
@@ -162,10 +162,10 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
       pl.vx = particles_v[i].vel[0];
       pl.vy = particles_v[i].vel[1];
       pl.vz = particles_v[i].vel[2];
-      reb_simulation_add(reb_sim, pl);
+      reb_simulation_add(reb_sim.get(), pl);
 
       // Verify that what we added still lives
-      struct reb_particle *pl2 = reb_simulation_particle_by_hash(reb_sim, i + 1);
+      struct reb_particle *pl2 = reb_simulation_particle_by_hash(reb_sim.get(), i + 1);
       PARTHENON_REQUIRE(pl2->r == particles_v[i].radius,
                         "Particle radius is inconsistent at setup!");
       PARTHENON_REQUIRE(pl2->m == particles_v[i].GM,
@@ -184,27 +184,27 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
                         "Particle vz is inconsistent at setup!");
     }
 
-    reb_simulation_configure_box(reb_sim, box_size, 1, 1, 1);
-    reb_sim->boundary = reb_simulation::REB_BOUNDARY_OPEN;
-    reb_sim->collision = reb_simulation::REB_COLLISION_LINE;
-    reb_sim->dt = dt_reb;
-    if (RebAttrs::extras) reb_sim->force_is_velocity_dependent = 1;
+    reb_simulation_configure_box(reb_sim.get(), box_size, 1, 1, 1);
+    reb_sim.get()->boundary = reb_simulation::REB_BOUNDARY_OPEN;
+    reb_sim.get()->collision = reb_simulation::REB_COLLISION_LINE;
+    reb_sim.get()->dt = dt_reb;
+    if (RebAttrs::extras) reb_sim.get()->force_is_velocity_dependent = 1;
     if (integrator == "whfast") {
-      reb_sim->integrator = reb_simulation::REB_INTEGRATOR_WHFAST;
+      reb_sim.get()->integrator = reb_simulation::REB_INTEGRATOR_WHFAST;
     } else if (integrator == "leapfrog") {
-      reb_sim->integrator = reb_simulation::REB_INTEGRATOR_LEAPFROG;
+      reb_sim.get()->integrator = reb_simulation::REB_INTEGRATOR_LEAPFROG;
     } else if (integrator == "janus") {
-      reb_sim->integrator = reb_simulation::REB_INTEGRATOR_JANUS;
+      reb_sim.get()->integrator = reb_simulation::REB_INTEGRATOR_JANUS;
     } else if (integrator == "mercurius") {
-      reb_sim->integrator = reb_simulation::REB_INTEGRATOR_MERCURIUS;
+      reb_sim.get()->integrator = reb_simulation::REB_INTEGRATOR_MERCURIUS;
     } else if (integrator == "saba") {
-      reb_sim->integrator = reb_simulation::REB_INTEGRATOR_SABA;
+      reb_sim.get()->integrator = reb_simulation::REB_INTEGRATOR_SABA;
     } else if (integrator == "bs") {
-      reb_sim->integrator = reb_simulation::REB_INTEGRATOR_BS;
+      reb_sim.get()->integrator = reb_simulation::REB_INTEGRATOR_BS;
     } else if (integrator == "ias15") {
-      reb_sim->integrator = reb_simulation::REB_INTEGRATOR_IAS15;
+      reb_sim.get()->integrator = reb_simulation::REB_INTEGRATOR_IAS15;
     } else if (integrator == "none") {
-      reb_sim->integrator = reb_simulation::REB_INTEGRATOR_NONE;
+      reb_sim.get()->integrator = reb_simulation::REB_INTEGRATOR_NONE;
     } else {
       std::stringstream msg;
       msg << integrator << " is an invalid REBOUND integrator!";
@@ -310,7 +310,7 @@ void UserWorkBeforeRestartOutputMesh(Mesh *pmesh, ParameterInput *, SimTime &,
 
   // Extract Rebound simulation
   auto &nbody_pkg = pmesh->packages.Get("nbody");
-  auto reb_sim = nbody_pkg->Param<struct reb_simulation *>("reb_sim");
+  auto reb_sim = nbody_pkg->Param<RebSim>("reb_sim");
 
   // Write native Rebound restart
   if (Globals::my_rank == 0) {
@@ -321,7 +321,7 @@ void UserWorkBeforeRestartOutputMesh(Mesh *pmesh, ParameterInput *, SimTime &,
         PARTHENON_FAIL("Unable to delete temporary REBOUND file!");
       }
     }
-    reb_simulation_save_to_file(reb_sim, NBody::rebound_filename.c_str());
+    reb_simulation_save_to_file(reb_sim.get(), NBody::rebound_filename.c_str());
   }
 
 #ifdef MPI_PARALLEL
@@ -350,7 +350,7 @@ void InitializeFromRestart(Mesh *pm) {
 
   // Extract Rebound parameters
   auto &nbody_pkg = pm->packages.Get("nbody");
-  auto reb_sim = nbody_pkg->Param<struct reb_simulation *>("reb_sim");
+  auto reb_sim = nbody_pkg->Param<RebSim>("reb_sim");
   auto particle_id = nbody_pkg->Param<std::vector<int>>("particle_id");
   auto particles = nbody_pkg->Param<ParArray1D<NBody::Particle>>("particles");
 
@@ -365,14 +365,16 @@ void InitializeFromRestart(Mesh *pm) {
     // Create rebound simulation from new save file
     char *reb_filename = new char[NBody::rebound_filename.size() + 1];
     std::strcpy(reb_filename, NBody::rebound_filename.c_str());
-    auto new_reb_sim = reb_simulation_create_from_file(reb_filename, -1);
-    reb_simulation_free(reb_sim);
+    RebSim new_reb_sim;
+    new_reb_sim.get() = reb_simulation_create_from_file(reb_filename, -1);
+    reb_simulation_free(reb_sim.get());
     SetReboundPtrs(new_reb_sim);
-    nbody_pkg->UpdateParam<struct reb_simulation *>("reb_sim", new_reb_sim);
+    nbody_pkg->UpdateParam<RebSim>("reb_sim", new_reb_sim);
   }
 
   // Send restarted rebound particles to all nodes
-  auto reb_sim_rst = nbody_pkg->Param<struct reb_simulation *>("reb_sim");
+  RebSim reb_sim_rst;
+  reb_sim_rst = nbody_pkg->Param<RebSim>("reb_sim");
   SyncWithRebound(reb_sim_rst, particle_id, particles);
 }
 

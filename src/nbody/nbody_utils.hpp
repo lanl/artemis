@@ -34,12 +34,30 @@ namespace NBody {
 extern void reb_extra_forces(struct reb_simulation *rsim);
 extern int collision_resolution(struct reb_simulation *const r, struct reb_collision c);
 
+// Container for reb_simulation pointer that allows it to be stored in Params with
+// automatic cleanup
+struct RebSim {
+
+  struct reb_simulation *&get() {
+    return reb_sim;
+  }
+
+  ~RebSim() {
+    if (reb_sim != nullptr) {
+      reb_simulation_free(reb_sim);
+    }
+  }
+
+ private:
+  struct reb_simulation *reb_sim = nullptr;
+};
+
 //----------------------------------------------------------------------------------------
 //! \fn  void NBody::SetReboundPtrs
 //! \brief
-static void SetReboundPtrs(struct reb_simulation *reb_sim) {
-  reb_sim->collision_resolve = collision_resolution;
-  if (RebAttrs::extras) reb_sim->additional_forces = reb_extra_forces;
+static void SetReboundPtrs(RebSim &reb_sim) {
+  reb_sim.get()->collision_resolve = collision_resolution;
+  if (RebAttrs::extras) reb_sim.get()->additional_forces = reb_extra_forces;
 }
 
 //----------------------------------------------------------------------------------------
@@ -75,7 +93,7 @@ static void PrintSystem(const int npart, ParArray1D<Particle> particles) {
 //----------------------------------------------------------------------------------------
 //! \fn  void NBody::SyncWithRebound
 //! \brief Copy the positions and velocities from the rebound sim to the Particles list
-static void SyncWithRebound(struct reb_simulation *r_sim, std::vector<int> particle_id,
+static void SyncWithRebound(RebSim r_sim, std::vector<int> particle_id,
                             ParArray1D<Particle> particles) {
   const auto npart = particle_id.size();
   auto particles_h = particles.GetHostMirrorAndCopy();
@@ -84,7 +102,7 @@ static void SyncWithRebound(struct reb_simulation *r_sim, std::vector<int> parti
   std::vector<int> alive(npart);
   if (parthenon::Globals::my_rank == 0) {
     for (int n = 0; n < npart; n++) {
-      struct reb_particle *p = reb_simulation_particle_by_hash(r_sim, n + 1);
+      struct reb_particle *p = reb_simulation_particle_by_hash(r_sim.get(), n + 1);
       if (p == nullptr) {
         alive[n] = 0;
       } else {

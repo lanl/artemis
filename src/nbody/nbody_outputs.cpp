@@ -23,8 +23,7 @@ extern "C" {
 // Artemis includes
 #include "artemis.hpp"
 #include "nbody.hpp"
-
-using namespace parthenon::package::prelude;
+#include "nbody_utils.hpp"
 
 namespace NBody {
 //----------------------------------------------------------------------------------------
@@ -44,7 +43,7 @@ void Outputs(parthenon::Mesh *pm, const Real time) {
   auto npart = nbody->Param<int>("npart");
   auto particle_id = nbody->Param<std::vector<int>>("particle_id");
   auto *output_count = nbody->MutableParam<int>("output_count");
-  auto r_sim = nbody->Param<struct reb_simulation *>("reb_sim");
+  auto r_sim = nbody->Param<RebSim>("reb_sim");
   auto base = nbody->Param<std::string>("output_base");
   auto particles = nbody->Param<ParArray1D<Particle>>("particles");
   auto pforce_tot = nbody->Param<ParArray2D<Real>>("particle_force_tot");
@@ -96,7 +95,7 @@ void Outputs(parthenon::Mesh *pm, const Real time) {
     // print the data
     for (int i = 0; i < npart; i++) {
       // info
-      std::fprintf(pfile, "%.8e\t", r_sim->t);
+      std::fprintf(pfile, "%.8e\t", r_sim.get()->t);
       std::fprintf(pfile, "%d\t", i + 1);
       std::fprintf(pfile, "%d\t", particles_h(i).alive);
       // data
@@ -210,13 +209,13 @@ void Outputs(parthenon::Mesh *pm, const Real time) {
               const int ip = (m1 >= m2) ? i : j;
               const int is = (m1 >= m2) ? j : i;
               struct reb_particle *primary =
-                  reb_simulation_particle_by_hash(r_sim, ip + 1);
+                  reb_simulation_particle_by_hash(r_sim.get(), ip + 1);
               struct reb_particle *secondary =
-                  reb_simulation_particle_by_hash(r_sim, is + 1);
+                  reb_simulation_particle_by_hash(r_sim.get(), is + 1);
               struct reb_orbit o =
-                  reb_orbit_from_particle(r_sim->G, *secondary, *primary);
+                  reb_orbit_from_particle(r_sim.get()->G, *secondary, *primary);
 
-              std::fprintf(pfile, "%.8e\t", r_sim->t);
+              std::fprintf(pfile, "%.8e\t", r_sim.get()->t);
               std::fprintf(pfile, "%.8e\t", mb);
               std::fprintf(pfile, "%.8e\t", mu1 * primary->x + mu2 * secondary->x);
               std::fprintf(pfile, "%.8e\t", mu1 * primary->y + mu2 * secondary->y);

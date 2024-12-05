@@ -38,7 +38,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   cpars.mom_coag = pin->GetOrAddBoolean("dust", "coag_mom_preserve", true);
   cpars.nCall_mx = pin->GetOrAddInteger("dust", "coag_nsteps_mx", 1000);
   // dust particle internal density g/cc
-  const Real rho_p = pin->GetOrAddReal("dust", "rho_p", 1.25);
+  const Real rho_p = pin->GetOrAddReal("dust", "grain_density", 1.25);
   cpars.rho_p = rho_p;
 
   cpars.ibounce = pin->GetOrAddBoolean("dust", "coag_bounce", false);

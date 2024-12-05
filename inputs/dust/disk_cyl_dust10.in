@@ -102,4 +102,4 @@ h0 = 0.05
 dens_min = 1.0e-10
 pres_min = 1.0e-13
 mstar = 1.0	# Msun
-r0_length = 10.0	# AU
+r0_length = 50.0	# AU

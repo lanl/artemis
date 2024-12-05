@@ -255,6 +255,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
       rho_p /= cgsunit->length0;
     }
 
+    if (parthenon::Globals::my_rank == 0) {
+      std::cout << "rho_p, rho_g0=" << rho_p << " " << rho_g0 << std::endl;
+    }
     params.Add("rho_p", rho_p);
   }
   // Scratch for dust flux
@@ -390,7 +393,13 @@ TaskStatus UpdateDustStoppingTime(MeshData<Real> *md) {
             geometry::Coords<GEOM> coords(vmesh.GetCoordinates(b), k, j, i);
             // for surface denstiy, Stokes number = Pi/2*rho_p*s_p/sigma_g
             // calculate the Keplerian Omega at mid-plane
-            Real rad = coords.x1v();
+            // const auto &hx = coords.GetScaleFactors();
+            Real rad;
+            if constexpr (GEOM == Coordinates::cylindrical) {
+              rad = coords.hx2v(); // cylindrical-rad
+            } else {
+              rad = coords.hx3v();
+            }
             Real Omega_k = 1.0 / std::sqrt(rad) / rad;
             for (int n = 0; n < nspecies; ++n) {
               const Real St = rho_p * dust_size(n) / dens_g;
@@ -832,8 +841,11 @@ TaskStatus CoagulationOneStep(MeshData<Real> *md, const Real time, const Real dt
 
           geometry::Coords<GEOM> coords(vmesh.GetCoordinates(b), k, j, i);
           const auto &hx = coords.GetScaleFactors();
-          const Real rad = hx[2]; // cylindrical R_cyl
-          const Real Omega_k = 1.0 / std::sqrt(rad) / rad;
+          Real rad = hx[2];
+          if constexpr (GEOM == Coordinates::cylindrical) {
+            rad = hx[1];
+          }
+          const Real Omega_k = 1.0 / std::sqrt(rad) / rad; // code unit
           // const Real vol1 = coords.Volume() * vol0;
 
           int nCall1 = 0;
@@ -998,6 +1010,15 @@ TaskCollection OperatorSplitDust(Mesh *pm, parthenon::SimTime &tm, const Real dt
   TaskID none(0);
 
   // Assemble tasks
+  auto &coag = coag_pkg->template Param<Dust::Coagulation::CoagParams>("coag_pars");
+  const int nspecies = coag.nm;
+  std::vector<std::string> dust_var_names;
+  for (int n = 0; n < nspecies; n++) {
+    dust_var_names.push_back(dust::prim::density::name() + '_' + std::to_string(n));
+    dust_var_names.push_back(dust::prim::velocity::name() + '_' + std::to_string(n));
+  }
+  auto &dust_subset =
+      pm->mesh_data.AddShallow("dust_subset", pm->mesh_data.Get(), dust_var_names);
   using namespace ::parthenon::Update;
   const int num_partitions = pm->DefaultNumPartitions();
   TaskRegion &tr = tc.AddRegion(num_partitions);
@@ -1011,7 +1032,9 @@ TaskCollection OperatorSplitDust(Mesh *pm, parthenon::SimTime &tm, const Real dt
     auto pre_comm = tl.AddTask(coag_step, PreCommFillDerived<MeshData<Real>>, base.get());
 
     // Set boundary conditions (both physical and logical)
-    auto bcs = parthenon::AddBoundaryExchangeTasks(pre_comm, tl, base, pm->multilevel);
+    // auto bcs = parthenon::AddBoundaryExchangeTasks(pre_comm, tl, base, pm->multilevel);
+    auto &md_coag = pm->mesh_data.GetOrAdd("dust_subset", i);
+    auto bcs = parthenon::AddBoundaryExchangeTasks(pre_comm, tl, md_coag, pm->multilevel);
 
     // Update primitive variables
     auto c2p = tl.AddTask(bcs, FillDerived<MeshData<Real>>, base.get());

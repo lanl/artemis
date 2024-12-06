@@ -43,7 +43,7 @@ class RebSim {
 
   // Constructor that accepts a preexisting pointer
   RebSim(const RebSim &existing_reb_sim)
-      : reb_sim(reb_simulation_copy(existing_reb_sim.get()), reb_sim_deleter) {}
+      : reb_sim(reb_simulation_copy(existing_reb_sim), reb_sim_deleter) {}
 
   // Constructor that accepts a rebound filename
   RebSim(std::string reb_filename)
@@ -78,8 +78,8 @@ class RebSim {
 //! \fn  void NBody::SetReboundPtrs
 //! \brief
 static void SetReboundPtrs(RebSim &reb_sim) {
-  reb_sim.get()->collision_resolve = collision_resolution;
-  if (RebAttrs::extras) reb_sim.get()->additional_forces = reb_extra_forces;
+  reb_sim->collision_resolve = collision_resolution;
+  if (RebAttrs::extras) reb_sim->additional_forces = reb_extra_forces;
 }
 
 //----------------------------------------------------------------------------------------
@@ -124,7 +124,7 @@ static void SyncWithRebound(RebSim &r_sim, std::vector<int> particle_id,
   std::vector<int> alive(npart);
   if (parthenon::Globals::my_rank == 0) {
     for (int n = 0; n < npart; n++) {
-      struct reb_particle *p = reb_simulation_particle_by_hash(r_sim.get(), n + 1);
+      struct reb_particle *p = reb_simulation_particle_by_hash(r_sim, n + 1);
       if (p == nullptr) {
         alive[n] = 0;
       } else {

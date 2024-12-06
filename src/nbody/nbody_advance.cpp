@@ -93,7 +93,6 @@ TaskStatus Advance(Mesh *pm, const Real time, const int stage,
   auto pforce_tot = nbody_pkg->Param<ParArray2D<Real>>("particle_force_tot");
   auto pforce_step = nbody_pkg->Param<ParArray2D<Real>>("particle_force_step");
   auto reb_sim = nbody_pkg->Param<RebSim>("reb_sim");
-  printf("%s:%i v: %i\n", __FILE__, __LINE__, reb_sim.get()->simulationarchive_version);
 
   // Extract integrators/weights
   // NOTE(PDM): reb_integ is the rebound integrator pushing particles.  nbody_integ is the
@@ -152,7 +151,7 @@ TaskStatus Advance(Mesh *pm, const Real time, const int stage,
           (time >= particles_h(id).live_after) && (reb_integ != "none")) {
         // Apply the gravitational force
         // NOTE(ADM): pforce already contains factor of dt
-        struct reb_particle *pl = reb_simulation_particle_by_hash(r_sim.get(), n + 1);
+        struct reb_particle *pl = reb_simulation_particle_by_hash(r_sim, n + 1);
         if (pl != nullptr) {
           const Real mp = pl->m;
           pl->vx += mscale * pforce_step_h(n, 1) / mp;
@@ -164,14 +163,14 @@ TaskStatus Advance(Mesh *pm, const Real time, const int stage,
 
     // Integrate to the end of the stage. If the user set reb_integ = none, do nothing
     if (reb_integ != "none") {
-      reb_simulation_integrate(r_sim.get(), time + dt_stage);
+      reb_simulation_integrate(r_sim, time + dt_stage);
     }
 
     // If we are in a rotating frame, correct the rebound simulation
     if (omegaf != 0.0) {
       struct reb_vec3d axis = {.x = 0.0, .y = 0.0, .z = 1.0};
       struct reb_rotation r1 = reb_rotation_init_angle_axis(-omegaf * dt_stage, axis);
-      reb_simulation_irotate(r_sim.get(), r1);
+      reb_simulation_irotate(r_sim, r1);
     }
   }
 

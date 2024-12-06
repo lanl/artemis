@@ -38,8 +38,7 @@ extern int collision_resolution(struct reb_simulation *const r, struct reb_colli
 
 class RebSim {
  public:
-  // Constructor to initialize the shared_ptr with a custom deleter
-  // RebSim() : reb_sim(nullptr, reb_sim_deleter) {}
+  // Constructor to initialize the shared_ptr
   RebSim() : reb_sim(reb_simulation_create(), reb_sim_deleter) {}
 
   // Constructor that accepts a preexisting pointer
@@ -48,7 +47,8 @@ class RebSim {
 
   // Constructor that accepts a rebound filename
   RebSim(std::string reb_filename)
-      : reb_sim(reb_simulation_create_from_file(reb_filename.data(), -1)) {}
+      : reb_sim(reb_simulation_create_from_file(reb_filename.data(), -1),
+                reb_sim_deleter) {}
 
   // Function to get a reference to the shared_ptr
   struct reb_simulation *get() const {
@@ -56,10 +56,11 @@ class RebSim {
     return reb_sim.get();
   }
 
-  void set(struct reb_simulation *ptr) {
-    PARTHENON_REQUIRE(ptr != nullptr, "Passing a null pointer!");
-    reb_sim.reset(ptr);
-  }
+  // Conversion operator to return the raw pointer
+  operator struct reb_simulation *() const { return reb_sim.get(); }
+
+  // Overloaded -> operator
+  reb_simulation *operator->() const { return reb_sim.get(); }
 
  private:
   // Shared pointer which will use a custom deleter

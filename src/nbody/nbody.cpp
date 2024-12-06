@@ -161,10 +161,10 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
       pl.vx = particles_v[i].vel[0];
       pl.vy = particles_v[i].vel[1];
       pl.vz = particles_v[i].vel[2];
-      reb_simulation_add(reb_sim.get(), pl);
+      reb_simulation_add(reb_sim, pl);
 
       // Verify that what we added still lives
-      struct reb_particle *pl2 = reb_simulation_particle_by_hash(reb_sim.get(), i + 1);
+      struct reb_particle *pl2 = reb_simulation_particle_by_hash(reb_sim, i + 1);
       PARTHENON_REQUIRE(pl2->r == particles_v[i].radius,
                         "Particle radius is inconsistent at setup!");
       PARTHENON_REQUIRE(pl2->m == particles_v[i].GM,
@@ -183,27 +183,27 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
                         "Particle vz is inconsistent at setup!");
     }
 
-    reb_simulation_configure_box(reb_sim.get(), box_size, 1, 1, 1);
-    reb_sim.get()->boundary = reb_simulation::REB_BOUNDARY_OPEN;
-    reb_sim.get()->collision = reb_simulation::REB_COLLISION_LINE;
-    reb_sim.get()->dt = dt_reb;
-    if (RebAttrs::extras) reb_sim.get()->force_is_velocity_dependent = 1;
+    reb_simulation_configure_box(reb_sim, box_size, 1, 1, 1);
+    reb_sim->boundary = reb_simulation::REB_BOUNDARY_OPEN;
+    reb_sim->collision = reb_simulation::REB_COLLISION_LINE;
+    reb_sim->dt = dt_reb;
+    if (RebAttrs::extras) reb_sim->force_is_velocity_dependent = 1;
     if (integrator == "whfast") {
-      reb_sim.get()->integrator = reb_simulation::REB_INTEGRATOR_WHFAST;
+      reb_sim->integrator = reb_simulation::REB_INTEGRATOR_WHFAST;
     } else if (integrator == "leapfrog") {
-      reb_sim.get()->integrator = reb_simulation::REB_INTEGRATOR_LEAPFROG;
+      reb_sim->integrator = reb_simulation::REB_INTEGRATOR_LEAPFROG;
     } else if (integrator == "janus") {
-      reb_sim.get()->integrator = reb_simulation::REB_INTEGRATOR_JANUS;
+      reb_sim->integrator = reb_simulation::REB_INTEGRATOR_JANUS;
     } else if (integrator == "mercurius") {
-      reb_sim.get()->integrator = reb_simulation::REB_INTEGRATOR_MERCURIUS;
+      reb_sim->integrator = reb_simulation::REB_INTEGRATOR_MERCURIUS;
     } else if (integrator == "saba") {
-      reb_sim.get()->integrator = reb_simulation::REB_INTEGRATOR_SABA;
+      reb_sim->integrator = reb_simulation::REB_INTEGRATOR_SABA;
     } else if (integrator == "bs") {
-      reb_sim.get()->integrator = reb_simulation::REB_INTEGRATOR_BS;
+      reb_sim->integrator = reb_simulation::REB_INTEGRATOR_BS;
     } else if (integrator == "ias15") {
-      reb_sim.get()->integrator = reb_simulation::REB_INTEGRATOR_IAS15;
+      reb_sim->integrator = reb_simulation::REB_INTEGRATOR_IAS15;
     } else if (integrator == "none") {
-      reb_sim.get()->integrator = reb_simulation::REB_INTEGRATOR_NONE;
+      reb_sim->integrator = reb_simulation::REB_INTEGRATOR_NONE;
     } else {
       std::stringstream msg;
       msg << integrator << " is an invalid REBOUND integrator!";
@@ -310,7 +310,6 @@ void UserWorkBeforeRestartOutputMesh(Mesh *pmesh, ParameterInput *, SimTime &,
   // Extract Rebound simulation
   auto &nbody_pkg = pmesh->packages.Get("nbody");
   auto reb_sim = nbody_pkg->Param<RebSim>("reb_sim");
-  printf("%s %i v: %i\n", __FILE__, __LINE__, reb_sim.get()->simulationarchive_version);
 
   // Write native Rebound restart
   if (Globals::my_rank == 0) {
@@ -321,9 +320,8 @@ void UserWorkBeforeRestartOutputMesh(Mesh *pmesh, ParameterInput *, SimTime &,
         PARTHENON_FAIL("Unable to delete temporary REBOUND file!");
       }
     }
-    reb_simulation_save_to_file(reb_sim.get(), NBody::rebound_filename.c_str());
+    reb_simulation_save_to_file(reb_sim, NBody::rebound_filename.c_str());
   }
-  printf("%s:%i\n", __FILE__, __LINE__);
 
 #ifdef MPI_PARALLEL
   // Ensure the file is available for all ranks
@@ -352,7 +350,6 @@ void InitializeFromRestart(Mesh *pm) {
   // Extract Rebound parameters
   auto &nbody_pkg = pm->packages.Get("nbody");
   auto reb_sim = nbody_pkg->Param<RebSim>("reb_sim");
-  printf("%i %i v: %i\n", __FILE__, __LINE__, reb_sim.get()->simulationarchive_version);
   auto particle_id = nbody_pkg->Param<std::vector<int>>("particle_id");
   auto particles = nbody_pkg->Param<ParArray1D<NBody::Particle>>("particles");
 

@@ -149,7 +149,6 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   // Build the rebound sim
   const Real box_size = pin->GetOrAddReal("nbody", "box_size", Big<Real>());
   RebSim reb_sim;
-  reb_sim.set(reb_simulation_create());
   if (parthenon::Globals::my_rank == 0) {
     for (int i = 0; i < npart; i++) {
       struct reb_particle pl = {0};
@@ -215,7 +214,6 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     SetReboundPtrs(reb_sim);
   }
   params.Add("reb_sim", reb_sim, true);
-  printf("%i %i v: %i\n", __FILE__, __LINE__, reb_sim.get()->simulationarchive_version);
 
   // Hydro integrator
   LowStorageIntegrator hydro_integ(pin);
@@ -323,10 +321,7 @@ void UserWorkBeforeRestartOutputMesh(Mesh *pmesh, ParameterInput *, SimTime &,
         PARTHENON_FAIL("Unable to delete temporary REBOUND file!");
       }
     }
-    printf("%s:%i\n", __FILE__, __LINE__);
-    printf("v: %i\n", reb_sim.get()->simulationarchive_version);
     reb_simulation_save_to_file(reb_sim.get(), NBody::rebound_filename.c_str());
-    printf("%s:%i\n", __FILE__, __LINE__);
   }
   printf("%s:%i\n", __FILE__, __LINE__);
 
@@ -336,17 +331,14 @@ void UserWorkBeforeRestartOutputMesh(Mesh *pmesh, ParameterInput *, SimTime &,
 #endif
 
   // Read Rebound restart back into string
-  printf("fnam: %s\n", NBody::rebound_filename.c_str());
   std::ifstream file(NBody::rebound_filename, std::ios::binary);
   PARTHENON_REQUIRE(file.is_open(), "Error opening temporary rebound output file!");
   std::vector<char> reb_sim_buffer((std::istreambuf_iterator<char>(file)),
                                    std::istreambuf_iterator<char>());
   file.close();
-  printf("READING BACK!\n");
 
   // Store current rebound output as restartable parameter.  Every rank must store a
   // matching buffer parameter or else I/O will hang
-  printf("p[%i] buff: %s\n", Globals::my_rank, reb_sim_buffer.data());
   nbody_pkg->UpdateParam<std::vector<char>>("reb_sim_buffer", reb_sim_buffer);
 }
 
@@ -373,18 +365,13 @@ void InitializeFromRestart(Mesh *pm) {
     outfile.close();
 
     // Create rebound simulation from new save file
-    // char *reb_filename = new char[NBody::rebound_filename.size() + 1];
-    // std::strcpy(reb_filename, NBody::rebound_filename.c_str());
-    // RebSim new_reb_sim;
-    // new_reb_sim.set(reb_simulation_create_from_file(reb_filename, -1));
     RebSim new_reb_sim(NBody::rebound_filename);
     SetReboundPtrs(new_reb_sim);
     nbody_pkg->UpdateParam<RebSim>("reb_sim", new_reb_sim);
   }
 
   // Send restarted rebound particles to all nodes
-  RebSim reb_sim_rst;
-  reb_sim_rst = nbody_pkg->Param<RebSim>("reb_sim");
+  auto reb_sim_rst = nbody_pkg->Param<RebSim>("reb_sim");
   SyncWithRebound(reb_sim_rst, particle_id, particles);
 }
 

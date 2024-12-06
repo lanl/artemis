@@ -178,11 +178,6 @@ TaskStatus Advance(Mesh *pm, const Real time, const int stage,
   // Update our copies of the particle positions and velocities
   SyncWithRebound(r_sim, particle_id, particles);
 
-  // Free the rebound copy if we are not on the last stage
-  // if ((parthenon::Globals::my_rank == 0) && (stage < nstages)) {
-  //  reb_simulation_free(r_sim.get());
-  // }
-
   // Reset pforce for next step
   for (int n = 0; n < npart; n++) {
     for (int i = 0; i < 7; i++) {

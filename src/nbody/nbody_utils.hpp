@@ -39,15 +39,8 @@ extern int collision_resolution(struct reb_simulation *const r, struct reb_colli
 class RebSim {
  public:
   // Constructor to initialize the shared_ptr with a custom deleter
-  RebSim()
-      : reb_sim(nullptr, reb_sim_deleter
-                /*[](struct reb_simulation *p) {
-                    printf("Destructor!\n");
-                    if (p != nullptr) {
-                      reb_simulation_free(p);
-                    }
-                  }*/
-        ) {}
+  // RebSim() : reb_sim(nullptr, reb_sim_deleter) {}
+  RebSim() : reb_sim(reb_simulation_create(), reb_sim_deleter) {}
 
   // Constructor that accepts a preexisting pointer
   RebSim(const RebSim &existing_reb_sim)
@@ -69,8 +62,9 @@ class RebSim {
   }
 
  private:
-  // Shared pointer with a custom deleter
+  // Shared pointer which will use a custom deleter
   std::shared_ptr<struct reb_simulation> reb_sim;
+
   // Shared custom deleter
   static void reb_sim_deleter(struct reb_simulation *p) {
     if (p != nullptr) {

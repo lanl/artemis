@@ -149,7 +149,6 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   // Build the rebound sim
   const Real box_size = pin->GetOrAddReal("nbody", "box_size", Big<Real>());
   RebSim reb_sim;
-  printf("%s:%i\n", __FILE__, __LINE__);
   if (parthenon::Globals::my_rank == 0) {
     for (int i = 0; i < npart; i++) {
       struct reb_particle pl = {0};
@@ -214,9 +213,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     // Set the function pointers
     SetReboundPtrs(reb_sim);
   }
-  printf("%s:%i\n", __FILE__, __LINE__);
   params.Add("reb_sim", reb_sim, true);
-  printf("%s:%i\n", __FILE__, __LINE__);
 
   // Hydro integrator
   LowStorageIntegrator hydro_integ(pin);
@@ -313,7 +310,6 @@ void UserWorkBeforeRestartOutputMesh(Mesh *pmesh, ParameterInput *, SimTime &,
   // Extract Rebound simulation
   auto &nbody_pkg = pmesh->packages.Get("nbody");
   auto reb_sim = nbody_pkg->Param<RebSim>("reb_sim");
-  printf("%s:%i\n", __FILE__, __LINE__);
 
   // Write native Rebound restart
   if (Globals::my_rank == 0) {
@@ -354,7 +350,6 @@ void InitializeFromRestart(Mesh *pm) {
   // Extract Rebound parameters
   auto &nbody_pkg = pm->packages.Get("nbody");
   auto reb_sim = nbody_pkg->Param<RebSim>("reb_sim");
-  printf("%s:%i\n", __FILE__, __LINE__);
   auto particle_id = nbody_pkg->Param<std::vector<int>>("particle_id");
   auto particles = nbody_pkg->Param<ParArray1D<NBody::Particle>>("particles");
 
@@ -367,16 +362,13 @@ void InitializeFromRestart(Mesh *pm) {
     outfile.close();
 
     // Create rebound simulation from new save file
-    printf("%s:%i\n", __FILE__, __LINE__);
     RebSim new_reb_sim(NBody::rebound_filename);
     SetReboundPtrs(new_reb_sim);
-    printf("%s:%i\n", __FILE__, __LINE__);
     nbody_pkg->UpdateParam<RebSim>("reb_sim", new_reb_sim);
   }
 
   // Send restarted rebound particles to all nodes
   auto reb_sim_rst = nbody_pkg->Param<RebSim>("reb_sim");
-  printf("%s:%i\n", __FILE__, __LINE__);
   SyncWithRebound(reb_sim_rst, particle_id, particles);
 }
 

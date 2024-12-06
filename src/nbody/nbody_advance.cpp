@@ -140,7 +140,6 @@ TaskStatus Advance(Mesh *pm, const Real time, const int stage,
     } else {
       r_sim = reb_sim;
     }
-    // r_sim = (stage < nstages) ? RebSim(reb_sim) : reb_sim;
     SetReboundPtrs(r_sim);
     enable_stderr(sid);
 

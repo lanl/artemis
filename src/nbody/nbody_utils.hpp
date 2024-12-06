@@ -41,12 +41,6 @@ class RebSim {
   // Constructor to initialize the shared_ptr
   RebSim() : reb_sim(reb_simulation_create(), reb_sim_deleter) {}
 
-  // Constructor that accepts a preexisting pointer
-  // RebSim(const RebSim &existing_reb_sim)
-  //    : reb_sim(reb_simulation_copy(existing_reb_sim), reb_sim_deleter) {
-  //  printf("COPY CONSTRUCTOR!\n");
-  //}
-
   // Constructor that accepts a rebound filename
   RebSim(std::string reb_filename)
       : reb_sim(reb_simulation_create_from_file(reb_filename.data(), -1),
@@ -58,8 +52,9 @@ class RebSim {
     return reb_sim.get();
   }
 
+  // Copy an existing rebound simulation into the pointer owned by this struct
   void copy(const RebSim &existing_reb_sim) {
-    reb_sim(reb_simulation_copy(existing_reb_sim), reb_sim_deleter);
+    reb_sim.reset(reb_simulation_copy(existing_reb_sim), reb_sim_deleter);
   }
 
   // Conversion operator to return the raw pointer

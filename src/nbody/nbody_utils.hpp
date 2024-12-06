@@ -42,8 +42,10 @@ class RebSim {
   RebSim() : reb_sim(reb_simulation_create(), reb_sim_deleter) {}
 
   // Constructor that accepts a preexisting pointer
-  RebSim(const RebSim &existing_reb_sim)
-      : reb_sim(reb_simulation_copy(existing_reb_sim), reb_sim_deleter) {}
+  // RebSim(const RebSim &existing_reb_sim)
+  //    : reb_sim(reb_simulation_copy(existing_reb_sim), reb_sim_deleter) {
+  //  printf("COPY CONSTRUCTOR!\n");
+  //}
 
   // Constructor that accepts a rebound filename
   RebSim(std::string reb_filename)
@@ -54,6 +56,10 @@ class RebSim {
   struct reb_simulation *get() const {
     PARTHENON_REQUIRE(reb_sim, "Internal pointer is null!");
     return reb_sim.get();
+  }
+
+  void copy(const RebSim &existing_reb_sim) {
+    reb_sim(reb_simulation_copy(existing_reb_sim), reb_sim_deleter);
   }
 
   // Conversion operator to return the raw pointer

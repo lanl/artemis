@@ -136,13 +136,7 @@ TaskStatus Advance(Mesh *pm, const Real time, const int stage,
     // Advance the simulation.  If this is the final stage, advance the master simulation.
     // If not, advance a copy of the master.
     int sid = disable_stderr();
-    // r_sim.set((stage < nstages) ? reb_simulation_copy(reb_sim.get()) : reb_sim.get());
-    if (stage < nstages) {
-      r_sim.set(reb_simulation_copy(reb_sim.get()));
-    } else {
-      r_sim = reb_sim;
-    }
-    printf("%s:%i v: %i\n", __FILE__, __LINE__, r_sim.get()->simulationarchive_version);
+    r_sim = (stage < nstages) ? RebSim(reb_sim) : reb_sim;
     SetReboundPtrs(r_sim);
     enable_stderr(sid);
 

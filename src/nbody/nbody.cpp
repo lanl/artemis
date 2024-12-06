@@ -373,13 +373,11 @@ void InitializeFromRestart(Mesh *pm) {
     outfile.close();
 
     // Create rebound simulation from new save file
-    char *reb_filename = new char[NBody::rebound_filename.size() + 1];
-    std::strcpy(reb_filename, NBody::rebound_filename.c_str());
-    RebSim new_reb_sim;
-    new_reb_sim.set(reb_simulation_create_from_file(reb_filename, -1));
-    printf("%s:%i\n", __FILE__, __LINE__);
-    printf("v? %i\n", new_reb_sim.get()->simulationarchive_version);
-    // reb_simulation_free(reb_sim.get());
+    // char *reb_filename = new char[NBody::rebound_filename.size() + 1];
+    // std::strcpy(reb_filename, NBody::rebound_filename.c_str());
+    // RebSim new_reb_sim;
+    // new_reb_sim.set(reb_simulation_create_from_file(reb_filename, -1));
+    RebSim new_reb_sim(NBody::rebound_filename);
     SetReboundPtrs(new_reb_sim);
     nbody_pkg->UpdateParam<RebSim>("reb_sim", new_reb_sim);
   }

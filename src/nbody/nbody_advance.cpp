@@ -92,7 +92,7 @@ TaskStatus Advance(Mesh *pm, const Real time, const int stage,
   auto pforce = nbody_pkg->Param<ParArray2D<Real>>("particle_force");
   auto pforce_tot = nbody_pkg->Param<ParArray2D<Real>>("particle_force_tot");
   auto pforce_step = nbody_pkg->Param<ParArray2D<Real>>("particle_force_step");
-  auto reb_sim = nbody_pkg->Param<struct reb_simulation *>("reb_sim");
+  auto reb_sim = nbody_pkg->Param<RebSim>("reb_sim");
 
   // Extract integrators/weights
   // NOTE(PDM): reb_integ is the rebound integrator pushing particles.  nbody_integ is the
@@ -130,12 +130,16 @@ TaskStatus Advance(Mesh *pm, const Real time, const int stage,
   }
 #endif
 
-  struct reb_simulation *r_sim = nullptr;
+  RebSim r_sim;
   if (parthenon::Globals::my_rank == 0) {
     // Advance the simulation.  If this is the final stage, advance the master simulation.
     // If not, advance a copy of the master.
     int sid = disable_stderr();
-    r_sim = (stage < nstages) ? reb_simulation_copy(reb_sim) : reb_sim;
+    if (stage < nstages) {
+      r_sim.copy(reb_sim);
+    } else {
+      r_sim = reb_sim;
+    }
     SetReboundPtrs(r_sim);
     enable_stderr(sid);
 
@@ -176,11 +180,6 @@ TaskStatus Advance(Mesh *pm, const Real time, const int stage,
 
   // Update our copies of the particle positions and velocities
   SyncWithRebound(r_sim, particle_id, particles);
-
-  // Free the rebound copy if we are not on the last stage
-  if ((parthenon::Globals::my_rank == 0) && (stage < nstages)) {
-    reb_simulation_free(r_sim);
-  }
 
   // Reset pforce for next step
   for (int n = 0; n < npart; n++) {

@@ -42,6 +42,14 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("x2max", pin->GetReal("parthenon/mesh", "x2max"));
   params.Add("x3max", pin->GetReal("parthenon/mesh", "x3max"));
 
+  params.Add("dslope",pin->GetReal("problem", "dslope"));
+  params.Add("tslope",pin->GetReal("problem", "tslope"));
+  params.Add("h0",pin->GetReal("problem", "h0"));
+  params.Add("r0",pin->GetReal("problem", "r0"));
+  params.Add("gm",pin->GetReal("gravity", "gm"));
+  params.Add("omf",pin->GetReal("rotating_frame", "omega"));
+  params.Add("nu",pin->GetReal("gas/viscosity", "nu"));
+
   const bool do_gas = pin->GetOrAddBoolean("physics", "gas", true);
   const bool do_dust = pin->GetOrAddBoolean("physics", "dust", false);
 

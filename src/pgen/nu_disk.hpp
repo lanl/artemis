@@ -156,6 +156,7 @@ ComputeDiskProfile(const struct DiskParams pgen, const parthenon::Coordinates_t 
   gvel1 = ArtemisUtils::VDot(vcyl, ex1);
   gvel2 = ArtemisUtils::VDot(vcyl, ex2);
   gvel3 = ArtemisUtils::VDot(vcyl, ex3);
+}
 
 //----------------------------------------------------------------------------------------
 //! \fn void InitDiskParams

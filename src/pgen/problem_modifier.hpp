@@ -102,6 +102,44 @@ void ProblemModifier(parthenon::ParthenonManager *pman) {
       pman->app_input->RegisterBoundaryCondition(BF::outer_x1, "viscous",
                                                  disk::DiskBoundaryVisc<G, ID::outer_x1>);
     }
+  } else if (artemis_problem == "nu_disk") {
+    pman->app_input->InitMeshBlockUserData = nu_disk::InitDiskParams;
+
+    artemis::ProblemCheckRefinementBlock = nu_disk::ProblemCheckRefinementBlock;
+
+    pman->app_input->RegisterBoundaryCondition(BF::inner_x1, "ic",
+                                               nu_disk::DiskBoundaryIC<G, ID::inner_x1>);
+    pman->app_input->RegisterBoundaryCondition(BF::outer_x1, "ic",
+                                               nu_disk::DiskBoundaryIC<G, ID::outer_x1>);
+    pman->app_input->RegisterBoundaryCondition(BF::inner_x2, "ic",
+                                               nu_disk::DiskBoundaryIC<G, ID::inner_x2>);
+    pman->app_input->RegisterBoundaryCondition(BF::outer_x2, "ic",
+                                               nu_disk::DiskBoundaryIC<G, ID::outer_x2>);
+    pman->app_input->RegisterBoundaryCondition(BF::inner_x3, "ic",
+                                               nu_disk::DiskBoundaryIC<G, ID::inner_x3>);
+    pman->app_input->RegisterBoundaryCondition(BF::outer_x3, "ic",
+                                               nu_disk::DiskBoundaryIC<G, ID::outer_x3>);
+
+    pman->app_input->RegisterBoundaryCondition(BF::inner_x1, "extrap",
+                                               nu_disk::DiskBoundaryExtrap<G, ID::inner_x1>);
+    pman->app_input->RegisterBoundaryCondition(BF::outer_x1, "extrap",
+                                               nu_disk::DiskBoundaryExtrap<G, ID::outer_x1>);
+    pman->app_input->RegisterBoundaryCondition(BF::inner_x2, "extrap",
+                                               nu_disk::DiskBoundaryExtrap<G, ID::inner_x2>);
+    pman->app_input->RegisterBoundaryCondition(BF::outer_x2, "extrap",
+                                               nu_disk::DiskBoundaryExtrap<G, ID::outer_x2>);
+    pman->app_input->RegisterBoundaryCondition(BF::inner_x3, "extrap",
+                                               nu_disk::DiskBoundaryExtrap<G, ID::inner_x3>);
+    pman->app_input->RegisterBoundaryCondition(BF::outer_x3, "extrap",
+                                               nu_disk::DiskBoundaryExtrap<G, ID::outer_x3>);
+
+    if constexpr (geometry::is_axisymmetric<G>() || (G == Coordinates::cylindrical) ||
+                  (G == Coordinates::spherical3D)) {
+      pman->app_input->RegisterBoundaryCondition(BF::inner_x1, "viscous",
+                                                 nu_disk::DiskBoundaryVisc<G, ID::inner_x1>);
+      pman->app_input->RegisterBoundaryCondition(BF::outer_x1, "viscous",
+                                                 nu_disk::DiskBoundaryVisc<G, ID::outer_x1>);
+    }
   } else if (artemis_problem == "linear_wave") {
     pman->app_input->UserWorkAfterLoop = linear_wave::UserWorkAfterLoop<G>;
   } else if (artemis_problem == "shock") {

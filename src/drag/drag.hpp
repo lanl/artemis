@@ -213,8 +213,6 @@ TaskStatus SelfDragSourceImpl(MeshData<Real> *md, const Real time, const Real dt
         const auto &hx = coords.GetScaleFactors();
         const auto &[xcyl, ex1, ex2, ex3] = coords.ConvertToCylWithVec(xv);
 
-        const Real PI_2 = 1.5707963267948966;
-
         // Compute the ramp for this cell
         // Ramps are quadratic, eg. the left regions is SQR( (X - ix)/(ix - xmin) )
         if (do_gas) {

@@ -13,6 +13,8 @@
 #ifndef NBODY_NBODY_UTILS_HPP_
 #define NBODY_NBODY_UTILS_HPP_
 
+// This file was created in part by one of OpenAI's generative AI models
+
 // C++/C includes
 #include <cstdio>
 #include <fcntl.h>
@@ -34,10 +36,49 @@ namespace NBody {
 extern void reb_extra_forces(struct reb_simulation *rsim);
 extern int collision_resolution(struct reb_simulation *const r, struct reb_collision c);
 
+class RebSim {
+ public:
+  // Constructor to initialize the shared_ptr
+  RebSim() : reb_sim(reb_simulation_create(), reb_sim_deleter) {}
+
+  // Constructor that accepts a rebound filename
+  RebSim(std::string reb_filename)
+      : reb_sim(reb_simulation_create_from_file(reb_filename.data(), -1),
+                reb_sim_deleter) {}
+
+  // Function to get a reference to the shared_ptr
+  struct reb_simulation *get() const {
+    PARTHENON_REQUIRE(reb_sim, "Internal pointer is null!");
+    return reb_sim.get();
+  }
+
+  // Copy an existing rebound simulation into the pointer owned by this struct
+  void copy(const RebSim &existing_reb_sim) {
+    reb_sim.reset(reb_simulation_copy(existing_reb_sim), reb_sim_deleter);
+  }
+
+  // Conversion operator to return the raw pointer
+  operator struct reb_simulation *() const { return reb_sim.get(); }
+
+  // Overloaded -> operator
+  reb_simulation *operator->() const { return reb_sim.get(); }
+
+ private:
+  // Shared pointer which will use a custom deleter
+  std::shared_ptr<struct reb_simulation> reb_sim;
+
+  // Shared custom deleter
+  static void reb_sim_deleter(struct reb_simulation *p) {
+    if (p != nullptr) {
+      reb_simulation_free(p);
+    }
+  }
+};
+
 //----------------------------------------------------------------------------------------
 //! \fn  void NBody::SetReboundPtrs
 //! \brief
-static void SetReboundPtrs(struct reb_simulation *reb_sim) {
+static void SetReboundPtrs(RebSim &reb_sim) {
   reb_sim->collision_resolve = collision_resolution;
   if (RebAttrs::extras) reb_sim->additional_forces = reb_extra_forces;
 }
@@ -75,7 +116,7 @@ static void PrintSystem(const int npart, ParArray1D<Particle> particles) {
 //----------------------------------------------------------------------------------------
 //! \fn  void NBody::SyncWithRebound
 //! \brief Copy the positions and velocities from the rebound sim to the Particles list
-static void SyncWithRebound(struct reb_simulation *r_sim, std::vector<int> particle_id,
+static void SyncWithRebound(RebSim &r_sim, std::vector<int> particle_id,
                             ParArray1D<Particle> particles) {
   const auto npart = particle_id.size();
   auto particles_h = particles.GetHostMirrorAndCopy();

@@ -645,8 +645,8 @@ TaskCollection OperatorSplitDustSelect(Mesh *pm, parthenon::SimTime &tm) {
     auto &md_coag = pm->mesh_data.GetOrAdd("dust_subset", i);
     auto bcs = parthenon::AddBoundaryExchangeTasks(pre_comm, tl, md_coag, pm->multilevel);
 
-    // Update primitive variables
-    auto c2p = tl.AddTask(bcs, FillDerived<MeshData<Real>>, base.get());
+    // Sync fields
+    auto p2c = tl.AddTask(bcs, FillDerived<MeshData<Real>>, base.get());
   }
   *dtCoag = 0.0;
 

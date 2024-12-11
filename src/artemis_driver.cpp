@@ -252,18 +252,18 @@ TaskCollection ArtemisDriver<GEOM>::StepTasks() {
           tl.AddTask(cooling_src, ArtemisDerived::SetAuxillaryFields<GEOM>, u0.get());
 
       // Set (remaining) fields to be communicated
-      auto pre_comm = tl.AddTask(set_aux, PreCommFillDerived<MeshData<Real>>, u0.get());
+      auto c2p = tl.AddTask(set_aux, PreCommFillDerived<MeshData<Real>>, u0.get());
 
       // Set boundary conditions (both physical and logical)
-      auto bcs = parthenon::AddBoundaryExchangeTasks(pre_comm, tl, u0, pmesh->multilevel);
+      auto bcs = parthenon::AddBoundaryExchangeTasks(c2p, tl, u0, pmesh->multilevel);
 
-      // Update primitive variables
-      auto c2p = tl.AddTask(TQ::local_sync, bcs, FillDerived<MeshData<Real>>, u0.get());
+      // Sync fields
+      auto p2c = tl.AddTask(TQ::local_sync, bcs, FillDerived<MeshData<Real>>, u0.get());
 
       // Advance nbody integrator
-      TaskID nbadv = c2p;
+      TaskID nbadv = p2c;
       if (do_nbody) {
-        nbadv = tl.AddTask(TQ::once_per_region, c2p, NBody::Advance, pmesh, time, stage,
+        nbadv = tl.AddTask(TQ::once_per_region, p2c, NBody::Advance, pmesh, time, stage,
                            nbody_integrator.get());
       }
     }

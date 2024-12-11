@@ -38,9 +38,9 @@ TaskCollection SyncFields(Mesh *pmesh, const Real time, const Real dt) {
     auto &tl = post_region[i];
     auto &u0 = pmesh->mesh_data.GetOrAdd("base", i);
     auto start_recv = tl.AddTask(none, parthenon::StartReceiveBoundBufs<any>, u0);
-    auto pre_comm = tl.AddTask(start_recv, PreCommFillDerived<MeshData<Real>>, u0.get());
-    auto bcs = parthenon::AddBoundaryExchangeTasks(pre_comm, tl, u0, pmesh->multilevel);
-    auto c2p = tl.AddTask(bcs, FillDerived<MeshData<Real>>, u0.get());
+    auto c2p = tl.AddTask(start_recv, PreCommFillDerived<MeshData<Real>>, u0.get());
+    auto bcs = parthenon::AddBoundaryExchangeTasks(c2p, tl, u0, pmesh->multilevel);
+    auto p2c = tl.AddTask(bcs, FillDerived<MeshData<Real>>, u0.get());
   }
 
   return tc;

@@ -96,15 +96,21 @@ def run_tests_in_temp_dir(pr_number, head_repo, head_ref, output_dir):
         ]
         ret = subprocess.run(test_command, check=True)
 
+        # Set group ownership
+        subprocess.run(
+            ["chgrp", "-R", "jovian", output_dir],
+            check=True,
+        )
+
         # Set permissions for directories
         subprocess.run(
-            ["find", output_dir, "-type", "d", "-exec", "chmod", "750", "{}", "+"],
+            ["find", output_dir, "-type", "d", "-exec", "chmod", "770", "{}", "+"],
             check=True,
         )
 
         # Set permissions for files
         subprocess.run(
-            ["find", output_dir, "-type", "f", "-exec", "chmod", "640", "{}", "+"],
+            ["find", output_dir, "-type", "f", "-exec", "chmod", "660", "{}", "+"],
             check=True,
         )
 

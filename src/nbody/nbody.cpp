@@ -148,8 +148,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
   // Build the rebound sim
   const Real box_size = pin->GetOrAddReal("nbody", "box_size", Big<Real>());
-  struct reb_simulation *reb_sim = nullptr;
-  reb_sim = reb_simulation_create();
+  RebSim reb_sim;
   if (parthenon::Globals::my_rank == 0) {
     for (int i = 0; i < npart; i++) {
       struct reb_particle pl = {0};
@@ -163,6 +162,25 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
       pl.vy = particles_v[i].vel[1];
       pl.vz = particles_v[i].vel[2];
       reb_simulation_add(reb_sim, pl);
+
+      // Verify that what we added still lives
+      struct reb_particle *pl2 = reb_simulation_particle_by_hash(reb_sim, i + 1);
+      PARTHENON_REQUIRE(pl2->r == particles_v[i].radius,
+                        "Particle radius is inconsistent at setup!");
+      PARTHENON_REQUIRE(pl2->m == particles_v[i].GM,
+                        "Particle mass is inconsistent at setup!");
+      PARTHENON_REQUIRE(pl2->x == particles_v[i].pos[0],
+                        "Particle x is inconsistent at setup!");
+      PARTHENON_REQUIRE(pl2->y == particles_v[i].pos[1],
+                        "Particle y is inconsistent at setup!");
+      PARTHENON_REQUIRE(pl2->z == particles_v[i].pos[2],
+                        "Particle z is inconsistent at setup!");
+      PARTHENON_REQUIRE(pl2->vx == particles_v[i].vel[0],
+                        "Particle vx is inconsistent at setup!");
+      PARTHENON_REQUIRE(pl2->vy == particles_v[i].vel[1],
+                        "Particle vy is inconsistent at setup!");
+      PARTHENON_REQUIRE(pl2->vz == particles_v[i].vel[2],
+                        "Particle vz is inconsistent at setup!");
     }
 
     reb_simulation_configure_box(reb_sim, box_size, 1, 1, 1);
@@ -291,7 +309,7 @@ void UserWorkBeforeRestartOutputMesh(Mesh *pmesh, ParameterInput *, SimTime &,
 
   // Extract Rebound simulation
   auto &nbody_pkg = pmesh->packages.Get("nbody");
-  auto reb_sim = nbody_pkg->Param<struct reb_simulation *>("reb_sim");
+  auto reb_sim = nbody_pkg->Param<RebSim>("reb_sim");
 
   // Write native Rebound restart
   if (Globals::my_rank == 0) {
@@ -331,7 +349,7 @@ void InitializeFromRestart(Mesh *pm) {
 
   // Extract Rebound parameters
   auto &nbody_pkg = pm->packages.Get("nbody");
-  auto reb_sim = nbody_pkg->Param<struct reb_simulation *>("reb_sim");
+  auto reb_sim = nbody_pkg->Param<RebSim>("reb_sim");
   auto particle_id = nbody_pkg->Param<std::vector<int>>("particle_id");
   auto particles = nbody_pkg->Param<ParArray1D<NBody::Particle>>("particles");
 
@@ -344,16 +362,14 @@ void InitializeFromRestart(Mesh *pm) {
     outfile.close();
 
     // Create rebound simulation from new save file
-    char *reb_filename = new char[NBody::rebound_filename.size() + 1];
-    std::strcpy(reb_filename, NBody::rebound_filename.c_str());
-    auto new_reb_sim = reb_simulation_create_from_file(reb_filename, -1);
-    reb_simulation_free(reb_sim);
+    RebSim new_reb_sim(NBody::rebound_filename);
     SetReboundPtrs(new_reb_sim);
-    nbody_pkg->UpdateParam<struct reb_simulation *>("reb_sim", new_reb_sim);
+    nbody_pkg->UpdateParam<RebSim>("reb_sim", new_reb_sim);
   }
 
   // Send restarted rebound particles to all nodes
-  SyncWithRebound(reb_sim, particle_id, particles);
+  auto reb_sim_rst = nbody_pkg->Param<RebSim>("reb_sim");
+  SyncWithRebound(reb_sim_rst, particle_id, particles);
 }
 
 //----------------------------------------------------------------------------------------

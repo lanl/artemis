@@ -15,7 +15,7 @@
 // Licensed under the 3-clause BSD License (the "LICENSE")
 //========================================================================================
 
-// NOTE(@pdmullen): The following is taken directly from the open-source
+// NOTE(@Shengtai): The following is taken directly from the open-source
 // Athena++-dustfluid software, and adapted for Parthenon/Artemis by @Shengtai on 4/12/24
 
 //! \file dust_collision.cpp

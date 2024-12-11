@@ -53,17 +53,56 @@ struct DustCoagulationVariable {
   Real gamma, gm1;
   Real iso_cs;
   Real d2g;
-  int nstep1Coag;
-  Real rho_g0;
-  Real mass0;
-  Real time0;
-  Real length0;
-  Real vol0;
 };
 
 } // end anonymous namespace
 
 namespace dust_coagulation {
+
+struct CGSUnit {
+  Real mass0 = 1.0;
+  Real time0 = 1.0;
+  Real length0 = 1.0;
+  Real vol0 = 1.0;
+  bool isurface_den = true;
+  bool Code2PhysicalUnit_Set = false;
+
+  bool isSet() const { return Code2PhysicalUnit_Set; }
+
+  void SetCGSUnit(const Real &mass0_in, const Real &length0_in, const Real &time0_in,
+                  const int isurf) {
+    if (!Code2PhysicalUnit_Set) {
+      mass0 = mass0_in;
+      length0 = length0_in;
+      vol0 = SQR(length0_in);
+      if (isurf == 0) vol0 *= length0_in; // 3D volume
+      time0 = time0_in;
+      Code2PhysicalUnit_Set = true;
+    }
+  }
+
+  void SetCGSUnit(ParameterInput *pin) {
+    if (!Code2PhysicalUnit_Set) {
+      const Real M_SUN = 1.988409870698051e33;   // gram (sun)
+      const Real AU_LENGTH = 1.4959787070000e13; // cm
+      const Real GRAV_CONST =
+          6.674299999999999e-8; // gravitational const in cm^3 g^-1 s^-2
+
+      Real mstar = pin->GetOrAddReal("problem", "mstar", 1.0) * M_SUN;
+      length0 = pin->GetOrAddReal("problem", "r0_length", 1.0) * AU_LENGTH;
+      const Real omega0 = std::sqrt(GRAV_CONST * mstar / (length0 * length0 * length0));
+      time0 = 1. / omega0;
+
+      const Real rho0 = pin->GetReal("problem", "rho0");
+      mass0 = rho0 * mstar;
+
+      isurface_den = pin->GetOrAddBoolean("dust", "surface_density_flag", true);
+      vol0 = SQR(length0);
+      if (isurface_den == 0) vol0 *= length0; // 3D volume
+      Code2PhysicalUnit_Set = true;
+    }
+  }
+};
 
 DustCoagulationVariable dcv;
 
@@ -83,72 +122,69 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   auto &dust_pkg = pmb->packages.Get("dust");
 
-  const bool enable_coagulation = dust_pkg->Param<bool>("enable_coagulation");
-  // PARTHENON_REQUIRE(enable_coagulation,
-  //                  "dust_coagulation pgen requires enable_coagulation=true!");
+  const bool do_coagulation = artemis_pkg->Param<bool>("do_coagulation");
+  PARTHENON_REQUIRE(do_coagulation,
+                    "dust_coagulation pgen requires physics coagulation=true!");
 
   // read global parameters
   dcv.nDust = pin->GetOrAddReal("dust", "nspecies", 121);
   dcv.nInit_dust = pin->GetOrAddReal("problem", "nInit_dust", 1);
   dcv.d2g = pin->GetOrAddReal("problem", "dust_to_gas", 0.01);
-  dcv.nstep1Coag = pin->GetOrAddReal("problem", "nstep1Coag", 50);
-
-  if (Dust::cgsunit == NULL) {
-    Dust::cgsunit = new Dust::CGSUnit();
-  }
-  if (!Dust::cgsunit->isSet()) {
-    Dust::cgsunit->SetCGSUnit(pin);
-  }
-
-  dcv.length0 = Dust::cgsunit->length0;
-  dcv.mass0 = Dust::cgsunit->mass0;
-  dcv.time0 = Dust::cgsunit->time0;
-
-  Real den_code2phy = 1.0;
-  dcv.vol0 = Dust::cgsunit->vol0;
-
-  den_code2phy = dcv.mass0 / dcv.vol0;
-
-  dcv.rho_g0 = den_code2phy;
 
   // using MRN distribution for the initial dust setup
   ParArray1D<Real> dust_size = dust_pkg->template Param<ParArray1D<Real>>("sizes");
 
-  auto s_p_prefh = Kokkos::create_mirror(dust_size);
-  Kokkos::deep_copy(s_p_prefh, dust_size);
+  // convert input "AU" and "mstar" to CGS unit
+  CGSUnit *cgsunit = new CGSUnit();
+  cgsunit->SetCGSUnit(pin);
+  const Real den0 = cgsunit->mass0 / cgsunit->vol0; // density
+  const Real time0 = cgsunit->time0;
+  const Real vel0 = cgsunit->length0 / cgsunit->time0;
 
-  Real sum1 = 0.0;
-  for (int i = 0; i < dcv.nInit_dust; i++) {
-    sum1 += std::sqrt(s_p_prefh(i));
+  const Real tlim_in = pin->GetReal("parthenon/time", "tlim");
+  pin->SetReal("parthenon/time", "tlim", tlim_in * time0);
+
+  if (pin->DoesBlockExist("parthenon/output0")) {
+    const Real dt = pin->GetReal("parthenon/output0", "dt");
+    pin->SetReal("parthenon/output0", "dt", dt * time0);
   }
 
-  for (int i = 0; i < dcv.nInit_dust; i++) {
-    s_p_prefh(i) = std::sqrt(s_p_prefh(i)) / sum1;
+  if (pin->DoesBlockExist("parthenon/output1")) {
+    const Real dt = pin->GetReal("parthenon/output1", "dt");
+    pin->SetReal("parthenon/output1", "dt", dt * time0);
   }
 
-  for (int i = dcv.nInit_dust; i < dcv.nDust; i++) {
-    s_p_prefh(i) = 0.0;
+  if (pin->DoesBlockExist("parthenon/output2")) {
+    const Real dt = pin->GetReal("parthenon/output2", "dt");
+    pin->SetReal("parthenon/output2", "dt", dt * time0);
   }
-  ParArray1D<Real> s_p_pref("init dust", dcv.nDust);
-  Kokkos::deep_copy(s_p_pref, s_p_prefh);
 
+  const Real x1max = pin->GetReal("parthenon/mesh", "x1max");
+  if (x1max < 1e10) {
+    std::stringstream msg;
+    msg << " reset x1min and x1max using cgs unit = " << cgsunit->length0 << std::endl;
+    PARTHENON_FAIL(msg);
+  }
   auto gas_pkg = pmb->packages.Get("gas");
   auto eos_d = gas_pkg->template Param<EOS>("eos_d");
 
   dcv.gamma = gas_pkg->Param<Real>("adiabatic_index");
   dcv.gm1 = dcv.gamma - 1.0;
   dcv.iso_cs = pin->GetOrAddReal("gas", "iso_sound_speed", 1e-1);
+  dcv.iso_cs *= vel0;
 
-  const Real gdens = 1.0;
+  const Real gdens = 1.0 * den0;
   const Real gtemp = SQR(dcv.iso_cs);
-  const Real vx_g = 0.0;
   const Real gsie = eos_d.InternalEnergyFromDensityTemperature(gdens, gtemp);
-  std::cout << "gamma,cs,pre=" << dcv.gamma << " " << dcv.iso_cs << " " << gsie * dcv.gm1
-            << std::endl;
+  if (pmb->gid == 0) {
+    std::cout << "gamma,cs,temp=" << dcv.gamma << " " << dcv.iso_cs << " "
+              << gsie * dcv.gm1 << ", time0,length0,mass0,den0,vel0=" << time0 << " "
+              << cgsunit->length0 << " " << cgsunit->mass0 << " " << den0 << " " << vel0
+              << std::endl;
+  }
 
-  const Real vx_d = 0.0;
-  const Real vy_d = 0.0;
-  const Real vz_d = 0.0;
+  const Real vx_g = 0.0 * vel0;
+  const Real vx_d = 0.0 * vel0;
 
   // packing and capture variables for kernel
   auto &md = pmb->meshblock_data.Get();
@@ -165,6 +201,11 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
   auto &dcoag = dcv;
 
+  Real sum1 = 0.0;
+  pmb->par_reduce(
+      "pgen_partialSum", 0, dcoag.nInit_dust - 1,
+      KOKKOS_LAMBDA(const int n, Real &lsum) { lsum += std::sqrt(dust_size(n)); }, sum1);
+
   pmb->par_for(
       "pgen_dustCoagulation", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
@@ -174,12 +215,18 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         v(0, gas::prim::velocity(2), k, j, i) = 0.0;
         v(0, gas::prim::sie(0), k, j, i) = gsie;
 
-        // dust initial condition
-        for (int n = 0; n < dcoag.nDust; ++n) {
-          v(0, dust::prim::density(n), k, j, i) = dcoag.d2g * gdens * s_p_pref(n);
+        for (int n = 0; n < dcoag.nInit_dust; ++n) {
+          const Real sratio = std::sqrt(dust_size(n)) / sum1;
+          v(0, dust::prim::density(n), k, j, i) = dcoag.d2g * gdens * sratio;
           v(0, dust::prim::velocity(n * 3 + 0), k, j, i) = vx_d;
-          v(0, dust::prim::velocity(n * 3 + 1), k, j, i) = vy_d;
-          v(0, dust::prim::velocity(n * 3 + 2), k, j, i) = vz_d;
+          v(0, dust::prim::velocity(n * 3 + 1), k, j, i) = 0.0;
+          v(0, dust::prim::velocity(n * 3 + 2), k, j, i) = 0.0;
+        }
+        for (int n = dcoag.nInit_dust; n < dcoag.nDust; ++n) {
+          v(0, dust::prim::density(n), k, j, i) = 0.0;
+          v(0, dust::prim::velocity(n * 3 + 0), k, j, i) = vx_d;
+          v(0, dust::prim::velocity(n * 3 + 1), k, j, i) = 0.0;
+          v(0, dust::prim::velocity(n * 3 + 2), k, j, i) = 0.0;
         }
       });
 }

@@ -21,7 +21,7 @@ namespace Coagulation {
 
 enum coag2DRv { dpod, aFrag, phiFrag, epsFrag, dalp, kdelta, coef_fett, last2 };
 
-std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
+std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin, Params &dustPars);
 
 struct CoagParams {
   int coord = 0; // 1--surface density, 0: 3D
@@ -44,7 +44,9 @@ struct CoagParams {
   Real err_eps; // Relative tolerance for adaptive step sizing
   Real S;       // Safety margin for adaptive step sizing
   Real cfl;
-  Real errcon; // Needed for increasing step size
+  Real errcon;      // Needed for increasing step size
+  Real gm;          // sqrt(grav_const * mstar);
+  bool const_omega; // for shearing-box or testing
 
   // pre-calculated array, once-for-all
   ParArray2D<int> klf;
@@ -79,32 +81,32 @@ Real v_rel_ormel(Real tau_1, Real tau_2, Real t0, Real v0, Real ts, Real vs,
     st2 = tau_mn / t0;
   }
 
-  vg2 = 1.5 * pow(v0, 2); // note the square
-  ya = 1.6;               // approximate solution for st*=y*st1; valid for st1 << 1.
+  vg2 = 1.5 * SQR(v0); // note the square
+  ya = 1.6;            // approximate solution for st*=y*st1; valid for st1 << 1.
 
   Real sqRe = 1.0 / sqrt(reynolds);
   if (tau_mx < 0.2 * ts) {
     // very small regime
-    return 1.5 * pow((vs / ts * (tau_mx - tau_mn)), 2);
+    return 1.5 * SQR((vs / ts * (tau_mx - tau_mn)));
   } else if (tau_mx < ts / ya) {
     return vg2 * (st1 - st2) / (st1 + st2) *
-           (pow(st1, 2) / (st1 + sqRe) - pow(st2, 2) / (st2 + sqRe));
+           (SQR(st1) / (st1 + sqRe) - SQR(st2) / (st2 + sqRe));
   } else if (tau_mx < 5.0 * ts) {
     // eq. 17 of oc07. the second term with st_i**2.0 is negligible (assuming re>>1)
     // hulp1 = eq. 17; hulp2 = eq. 18
-    hulp1 = ((st1 - st2) / (st1 + st2) *
-             (pow(st1, 2) / (st1 + ya * st1) -
-              pow(st2, 2) / (st2 + ya * st1))); // note the -sign
-    hulp2 = 2.0 * (ya * st1 - sqRe) + pow(st1, 2.0) / (ya * st1 + st1) -
-            pow(st1, 2) / (st1 + sqRe) + pow(st2, 2) / (ya * st1 + st2) -
-            pow(st2, 2) / (st2 + sqRe);
+    hulp1 =
+        ((st1 - st2) / (st1 + st2) *
+         (SQR(st1) / (st1 + ya * st1) - SQR(st2) / (st2 + ya * st1))); // note the -sign
+    hulp2 = 2.0 * (ya * st1 - sqRe) + SQR(st1) / (ya * st1 + st1) -
+            SQR(st1) / (st1 + sqRe) + SQR(st2) / (ya * st1 + st2) -
+            SQR(st2) / (st2 + sqRe);
     return vg2 * (hulp1 + hulp2);
   } else if (tau_mx < t0 / 5.0) {
     // full intermediate regime
     eps = st2 / st1; // stopping time ratio
-    return vg2 *
-           (st1 * (2.0 * ya - (1.0 + eps) +
-                   2.0 / (1.0 + eps) * (1.0 / (1.0 + ya) + pow(eps, 3) / (ya + eps))));
+    return vg2 * (st1 * (2.0 * ya - (1.0 + eps) +
+                         2.0 / (1.0 + eps) *
+                             (1.0 / (1.0 + ya) + (eps * eps * eps) / (ya + eps))));
   } else if (tau_mx < t0) {
     // now y* lies between 1.6 (st1 << 1) and 1.0 (st1>=1). the fit below fits ystar to
     // less than 1%
@@ -112,12 +114,13 @@ Real v_rel_ormel(Real tau_1, Real tau_2, Real t0, Real v0, Real ts, Real vs,
     c2 = 0.32938936;
     c1 = -0.63119577;
     c0 = 1.6015125;
-    y_star = c0 + c1 * st1 + c2 * pow(st1, 2) + c3 * pow(st1, 3);
+    y_star = c0 + c1 * st1 + c2 * SQR(st1) + c3 * (st1 * st1 * st1);
     // we can then employ the same formula as before
     eps = st2 / st1; // stopping time ratio
-    return vg2 * (st1 * (2.0 * y_star - (1.0 + eps) +
-                         2.0 / (1.0 + eps) *
-                             (1.0 / (1.0 + y_star) + pow(eps, 3) / (y_star + eps))));
+    return vg2 *
+           (st1 * (2.0 * y_star - (1.0 + eps) +
+                   2.0 / (1.0 + eps) *
+                       (1.0 / (1.0 + y_star) + (eps * eps * eps) / (y_star + eps))));
   } else {
     // heavy particle limit
     return vg2 * (1.0 / (1.0 + st1) + 1.0 / (1.0 + st2));

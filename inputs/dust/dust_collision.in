@@ -29,9 +29,10 @@ dt        = 0.05  # time increment between outputs
 
 <parthenon/time>
 nlim       = -1     # cycle limit
-tlim       = 0.05  # time limit
+tlim       = 0.05   # time limit
 integrator = rk2    # time integration algorithm
 ncycle_out = 1      # interval for stdout summary info
+dt_user    = 0.005
 
 <parthenon/mesh>
 nghost = 2
@@ -39,31 +40,32 @@ refinement = none
 # numlevel = 1
 
 nx1    = 16        # Number of zones in X1-direction
-x1min  = 0.0      # minimum value of X1
+x1min  = 0.0       # minimum value of X1
 x1max  = 1.0       # maximum value of X1
-ix1_bc = periodic   # Inner-X1 boundary condition flag
-ox1_bc = periodic   # Outer-X1 boundary condition flag
+ix1_bc = periodic  # Inner-X1 boundary condition flag
+ox1_bc = periodic  # Outer-X1 boundary condition flag
 
-nx2    = 1        # Number of zones in X2-direction
+nx2    = 1         # Number of zones in X2-direction
 x2min  = -0.5      # minimum value of X2
-x2max  =  0.5       # maximum value of X2
-ix2_bc = periodic   # Inner-X2 boundary condition flag
-ox2_bc = periodic   # Outer-X2 boundary condition flag
+x2max  =  0.5      # maximum value of X2
+ix2_bc = periodic  # Inner-X2 boundary condition flag
+ox2_bc = periodic  # Outer-X2 boundary condition flag
 
-nx3    = 1        # Number of zones in X3-direction
+nx3    = 1         # Number of zones in X3-direction
 x3min  = -0.5      # minimum value of X3
-x3max  =  0.5       # maximum value of X3
-ix3_bc = periodic   # Inner-X3 boundary condition flag
-ox3_bc = periodic   # Outer-X3 boundary condition flag
+x3max  =  0.5      # maximum value of X3
+ix3_bc = periodic  # Inner-X3 boundary condition flag
+ox3_bc = periodic  # Outer-X3 boundary condition flag
 
 <parthenon/meshblock>
-nx1 = 16  # Number of cells in each MeshBlock, X1-dir
-nx2 = 1  # Number of cells in each MeshBlock, X2-dir
-nx3 = 1   # Number of cells in each MeshBlock, X3-dir
+nx1 = 16           # Number of cells in each MeshBlock, X1-dir
+nx2 = 1            # Number of cells in each MeshBlock, X2-dir
+nx3 = 1            # Number of cells in each MeshBlock, X3-dir
 
 <physics>
 gas = true
 dust = true
+drag = true
 
 <gas>
 cfl = 0.9
@@ -73,14 +75,17 @@ iso_sound_speed = 0.1
 <dust>
 cfl = 0.9
 nspecies = 2
-const_stopping_time = true
-enable_dust_drag = true
-enable_dust_feedback = true
-drag_method = implicit
-user_dt = 0.005
 
-size_input = none
-stopping_time  = 0.01, 0.002
+sizes = 1.0, 1.0
+
+<dust/stopping_time>
+type = constant
+tau = 0.01, 0.001  # for iprob = 1 
+#tau = 2.0, 1.0    # for iprob = 2
+
+<drag>
+type = simple_dust
+
 
 <problem>
-iprob = 1
+iprob = 1	   # 1 or 2

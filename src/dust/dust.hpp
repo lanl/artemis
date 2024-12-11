@@ -33,59 +33,8 @@ TaskStatus FluxSource(MeshData<Real> *md, const Real dt);
 
 void AddHistory(Coordinates coords, Params &params);
 
-struct CGSUnit {
-  Real mass0 = 1.0;
-  Real time0 = 1.0;
-  Real length0 = 1.0;
-  Real vol0 = 1.0;
-  bool isurface_den = true;
-  bool Code2PhysicalUnit_Set = false;
-
-  bool isSet() const { return Code2PhysicalUnit_Set; }
-
-  void SetCGSUnit(const Real &mass0_in, const Real &length0_in, const Real &time0_in,
-                  const int isurf) {
-    if (!Code2PhysicalUnit_Set) {
-      mass0 = mass0_in;
-      length0 = length0_in;
-      vol0 = SQR(length0_in);
-      if (isurf == 0) vol0 *= length0_in; // 3D volume
-      time0 = time0_in;
-      Code2PhysicalUnit_Set = true;
-    }
-  }
-
-  void SetCGSUnit(ParameterInput *pin) {
-    if (!Code2PhysicalUnit_Set) {
-      const Real M_SUN = 1.988409870698051e33;   // gram (sun)
-      const Real AU_LENGTH = 1.4959787070000e13; // cm
-      const Real GRAV_CONST =
-          6.674299999999999e-8; // gravitational const in cm^3 g^-1 s^-2
-
-      Real mstar = pin->GetOrAddReal("problem", "mstar", 1.0) * M_SUN;
-      length0 = pin->GetOrAddReal("problem", "r0_length", 1.0) * AU_LENGTH;
-      const Real omega0 = std::sqrt(GRAV_CONST * mstar / pow(length0, 3));
-      time0 = 1. / omega0;
-
-      const Real rho0 = pin->GetReal("problem", "rho0");
-      mass0 = rho0 * mstar;
-
-      isurface_den = pin->GetOrAddBoolean("dust", "surface_density_flag", true);
-      vol0 = SQR(length0);
-      if (isurface_den == 0) vol0 *= length0; // 3D volume
-      Code2PhysicalUnit_Set = true;
-    }
-  }
-};
-
-extern CGSUnit *cgsunit;
-
-template <Coordinates GEOM>
-TaskStatus UpdateDustStoppingTime(MeshData<Real> *md);
-
 // OperatorSplit tasks
-template <Coordinates GEOM>
-TaskCollection OperatorSplitDust(Mesh *pm, parthenon::SimTime &tm, const Real dt);
+TaskListStatus OperatorSplitDust(Mesh *pm, parthenon::SimTime &tm);
 
 template <Coordinates GEOM>
 TaskStatus CoagulationOneStep(MeshData<Real> *md, const Real time, const Real dt);

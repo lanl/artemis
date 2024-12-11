@@ -27,10 +27,10 @@
 #include "utils/fluxes/fluid_fluxes.hpp"
 #include "utils/history.hpp"
 
+using ArtemisUtils::EOS;
 using ArtemisUtils::VI;
 
 namespace Dust {
-CGSUnit *cgsunit = NULL;
 //----------------------------------------------------------------------------------------
 //! \fn  StateDescriptor Dust::Initialize
 //! \brief Adds intialization function for dust hydrodynamics package
@@ -107,12 +107,14 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("hst_out_d2g", hst_out_d2g);
 
   // coagulation flag
-  bool enable_dust_coagulation = pin->GetOrAddBoolean("physics", "coagulation", false);
+  bool do_coagulation = pin->GetOrAddBoolean("physics", "coagulation", false);
 
   // Dust sizes
   auto size_dist = pin->GetOrAddString("dust", "size_input", "direct");
-  if (enable_dust_coagulation) size_dist = "logspace";
-  params.Add("enable_coagulation", enable_dust_coagulation);
+  if (do_coagulation) {
+    PARTHENON_REQUIRE(size_dist == "logspace",
+                      "dust coagulation requires size_input = logspace!");
+  }
 
   if (size_dist == "linspace") {
     // uniform
@@ -146,11 +148,6 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     params.Add("sizes", sizes);
     params.Add("h_sizes", h_sizes);
 
-    if (parthenon::Globals::my_rank == 0) {
-      for (int n = 0; n < nspecies; n++) {
-        std::cout << "dust_size(" << n << ")=" << h_sizes(n) << std::endl;
-      }
-    }
   } else if (size_dist == "direct") {
     // specify them directly
     auto sizes_v = pin->GetVector<Real>("dust", "sizes");
@@ -188,38 +185,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   }
 
   // Dust density
-  const Real rho_p_orig = pin->GetOrAddReal("dust", "grain_density", 1.0);
-  params.Add("grain_density", rho_p_orig);
+  params.Add("grain_density", pin->GetOrAddReal("dust", "grain_density", 1.0));
 
-  if (enable_dust_coagulation) {
-    if (cgsunit == NULL) {
-      cgsunit = new CGSUnit;
-    }
-    if (!cgsunit->isSet()) {
-      cgsunit->SetCGSUnit(pin);
-    }
-    params.Add("cgs_unit", cgsunit);
-
-    Real rho_p = rho_p_orig;
-    // density in physical unit correspinding to code unit 1.
-    // const Real rho_g0 = pin->GetOrAddReal("dust", "rho_g0", 1.0);
-    const Real rho_g0 = cgsunit->mass0 / cgsunit->vol0;
-    // re-scale rho_p to account for rho_g0 for stopping_time calculation
-    rho_p /= rho_g0;
-
-    // re-scale rho_p by prefactor coefficient
-    if (cgsunit->isurface_den) {
-      rho_p *= 0.5 * M_PI;
-    } else {
-      rho_p *= std::sqrt(M_PI / 8.);
-      rho_p /= cgsunit->length0;
-    }
-
-    if (parthenon::Globals::my_rank == 0) {
-      std::cout << "rho_p, rho_g0=" << rho_p << " " << rho_g0 << std::endl;
-    }
-    params.Add("rho_p", rho_p);
-  }
   // Scratch for dust flux
   const int scr_level = pin->GetOrAddInteger("dust", "scr_level", 0);
   params.Add("scr_level", scr_level);
@@ -257,14 +224,6 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   m.SetSparseThresholds(0.0, 0.0, 0.0);
   dust->AddSparsePool<dust::prim::velocity>(m, control_field, dustids);
 
-  // dust stopping-time
-  m = Metadata({Metadata::Cell, Metadata::Derived, Metadata::Intensive, Metadata::OneCopy,
-                Metadata::Sparse});
-  m.SetSparseThresholds(0.0, 0.0, 0.0);
-  dust->AddSparsePool<dust::stopping_time>(m, control_field, dustids);
-  // std::vector<int> stopping_id = {0};
-  // dust->AddSparsePool<dust::stopping_time>(m, control_field, stopping_id);
-
   // Dust hydrodynamics timestep
   if (coords == Coordinates::cartesian) {
     dust->EstimateTimestepMesh = EstimateTimestepMesh<Coordinates::cartesian>;
@@ -286,81 +245,6 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 }
 
 //----------------------------------------------------------------------------------------
-//! \fn  TaskStatus Dust::UpdateDustStoppingTime
-//  \brief Wrapper function for update dust stopping time
-template <Coordinates GEOM>
-TaskStatus UpdateDustStoppingTime(MeshData<Real> *md) {
-
-  using parthenon::MakePackDescriptor;
-
-  auto pm = md->GetParentPointer();
-
-  auto &dust_pkg = pm->packages.Get("dust");
-  if ((!dust_pkg->template Param<bool>("enable_coagulation"))) {
-    return TaskStatus::complete;
-  }
-
-  auto &resolved_pkgs = pm->resolved_packages;
-
-  IndexRange ib = md->GetBoundsI(IndexDomain::interior);
-  IndexRange jb = md->GetBoundsJ(IndexDomain::interior);
-  IndexRange kb = md->GetBoundsK(IndexDomain::interior);
-
-  const int nspecies = dust_pkg->template Param<int>("nspecies");
-
-  const bool isurf_den = cgsunit->isurface_den;
-  ParArray1D<Real> dust_size = dust_pkg->template Param<ParArray1D<Real>>("sizes");
-  static auto desc =
-      MakePackDescriptor<gas::prim::density, gas::prim::pressure, dust::stopping_time>(
-          resolved_pkgs.get());
-
-  auto vmesh = desc.GetPack(md);
-
-  auto &gas_pkg = pm->packages.Get("gas");
-
-  const Real gamma = gas_pkg->template Param<Real>("adiabatic_index");
-  const Real rho_p = dust_pkg->template Param<Real>("rho_p");
-
-  parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "Dust::DustStoppingTime2", parthenon::DevExecSpace(), 0,
-      md->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
-      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
-        const Real dens_g = vmesh(b, gas::prim::density(0), k, j, i);
-        // usually the Stokes number depends gas density, unless constant is used
-        // stopping_time = Stokes_number/Omega_k
-
-        if (isurf_den) {
-          geometry::Coords<GEOM> coords(vmesh.GetCoordinates(b), k, j, i);
-          // for surface denstiy, Stokes number = Pi/2*rho_p*s_p/sigma_g
-          // calculate the Keplerian Omega at mid-plane
-          Real rad;
-          if constexpr (GEOM == Coordinates::cylindrical) {
-            rad = coords.hx2v(); // cylindrical-rad
-          } else {
-            rad = coords.hx3v();
-          }
-          Real Omega_k = 1.0 / std::sqrt(rad) / rad;
-          for (int n = 0; n < nspecies; ++n) {
-            const Real St = rho_p * dust_size(n) / dens_g;
-            vmesh(b, dust::stopping_time(n), k, j, i) = St / Omega_k;
-          }
-
-        } else {
-
-          // for density (g/cc), Stokes number = sqrt(Pi/8)*rho_p*s_p*Omega_k/rho_g/Cs
-          const Real pres = vmesh(b, gas::prim::pressure(0), k, j, i);
-          const Real cs = std::sqrt(gamma * pres / dens_g);
-          for (int n = 0; n < nspecies; ++n) {
-            const Real StOme = rho_p * dust_size(n) / dens_g;
-            vmesh(b, dust::stopping_time(n), k, j, i) = StOme / cs;
-          }
-        }
-      });
-
-  return TaskStatus::complete;
-}
-
-//----------------------------------------------------------------------------------------
 //! \fn  Real Dust::EstimateTimestepMesh
 //! \brief Compute dust hydrodynamics timestep
 template <Coordinates GEOM>
@@ -372,13 +256,11 @@ Real EstimateTimestepMesh(MeshData<Real> *md) {
   auto &dust_pkg = pm->packages.Get("dust");
   auto &params = dust_pkg->AllParams();
 
-  auto userDt = params.template Get<Real>("user_dt");
   auto nspecies = params.template Get<int>("nspecies");
 
   const auto cfl_number = params.template Get<Real>("cfl");
   static auto desc =
-      MakePackDescriptor<dust::prim::density, dust::prim::velocity, dust::stopping_time>(
-          resolved_pkgs.get());
+      MakePackDescriptor<dust::prim::density, dust::prim::velocity>(resolved_pkgs.get());
   auto vmesh = desc.GetPack(md);
   IndexRange ib = md->GetBoundsI(IndexDomain::interior);
   IndexRange jb = md->GetBoundsJ(IndexDomain::interior);
@@ -399,12 +281,12 @@ Real EstimateTimestepMesh(MeshData<Real> *md) {
           for (int d = 0; d < ndim; d++) {
             denom += std::abs(vmesh(b, dust::prim::velocity(VI(n, d)), k, j, i)) / dx[d];
           }
-          ldt = std::min(ldt, 1.0 / denom * cfl_number);
+          ldt = std::min(ldt, 1.0 / denom);
         }
       },
       Kokkos::Min<Real>(min_dt));
 
-  return std::min(userDt, min_dt);
+  return (cfl_number * min_dt);
 }
 
 //----------------------------------------------------------------------------------------
@@ -457,7 +339,6 @@ TaskStatus FluxSource(MeshData<Real> *md, const Real dt) {
   return TaskStatus::complete;
 }
 
-//#define COAG_DEBUG
 //----------------------------------------------------------------------------------------
 //! \fn  TaskStatus Dust::CoagulationOneStep
 //  \brief Wrapper function for coagulation procedure in one time step
@@ -472,76 +353,76 @@ TaskStatus CoagulationOneStep(MeshData<Real> *md, const Real time, const Real dt
   IndexRange kb = md->GetBoundsK(IndexDomain::interior);
 
   auto &gas_pkg = pm->packages.Get("gas");
-  const Real gamma = gas_pkg->template Param<Real>("adiabatic_index");
+  auto eos_d = gas_pkg->template Param<EOS>("eos_d");
 
   auto &resolved_pkgs = pm->resolved_packages;
   const int nspecies = dust_pkg->template Param<int>("nspecies");
+  auto &dust_size = dust_pkg->template Param<ParArray1D<Real>>("sizes");
 
   auto &coag_pkg = pm->packages.Get("coagulation");
   auto &coag = coag_pkg->template Param<Dust::Coagulation::CoagParams>("coag_pars");
 
-  PARTHENON_REQUIRE(cgsunit->isSet(),
-                    "coagulation requires setting code-to-physical unit in user routine");
-
   static auto desc =
-      MakePackDescriptor<gas::prim::density, gas::prim::pressure, dust::cons::density,
-                         dust::cons::momentum, dust::prim::density, dust::prim::velocity,
-                         dust::stopping_time>(resolved_pkgs.get());
+      MakePackDescriptor<gas::prim::density, gas::prim::sie, dust::cons::density,
+                         dust::cons::momentum, dust::prim::density, dust::prim::velocity>(
+          resolved_pkgs.get());
 
   auto vmesh = desc.GetPack(md);
 
   const Real alpha = coag_pkg->template Param<Real>("coag_alpha"); // 1e-3
-  const int nvel = 3;
+  int nvel = 3;
+  if (coag.coord) nvel = 2; // surface-density
+  auto &dfloor = dust_pkg->template Param<Real>("dfloor");
 
   const int scr_level = coag_pkg->template Param<int>("coag_scr_level");
+  auto info_out_flag = coag_pkg->template Param<bool>("coag_info_out");
+
   size_t isize = (5 + nvel) * nspecies;
   if (coag.integrator == 3 && coag.mom_coag) isize += nspecies;
   size_t scr_size = ScratchPad1D<Real>::shmem_size(isize);
-  const Real den0 = cgsunit->mass0 / cgsunit->vol0;
-  const Real time0 = cgsunit->time0;
-  // const Real vol0 = cgsunit->vol0;
-  const Real vel0 = cgsunit->length0 / cgsunit->time0;
 
   auto pmb = md->GetBlockData(0)->GetBlockPointer();
-  ParArray3D<int> nCalls("nCalls", pmb->cellbounds.ncellsk(IndexDomain::entire),
-                         pmb->cellbounds.ncellsj(IndexDomain::entire),
-                         pmb->cellbounds.ncellsi(IndexDomain::entire));
+  ParArray3D<int> nCalls;
+  int maxCalls, maxSize, maxSize0;
+  Real massd0, massd;
+  if (info_out_flag) {
+    nCalls = ParArray3D<int>("coag_nCalls", pmb->cellbounds.ncellsk(IndexDomain::entire),
+                             pmb->cellbounds.ncellsj(IndexDomain::entire),
+                             pmb->cellbounds.ncellsi(IndexDomain::entire));
+    maxCalls = 0;
+    maxSize = 1;
+    massd = 0.0;
 
-  int maxCalls = 0, maxSize = 1;
-  auto &dfloor = dust_pkg->template Param<Real>("dfloor");
+    maxSize0 = 1;
+    massd0 = 0.0;
 
-  int maxSize0 = 1;
-  Real massd = 0.0;
-  Kokkos::parallel_reduce(
-      "coag::maxSize0",
-      Kokkos::MDRangePolicy<Kokkos::Rank<4>>(
-          {0, kb.s, jb.s, ib.s}, {md->NumBlocks(), kb.e + 1, jb.e + 1, ib.e + 1}),
-      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, Real &lsum,
-                    int &lmax) {
-        geometry::Coords<GEOM> coords(vmesh.GetCoordinates(b), k, j, i);
-        for (int n = 0; n < nspecies; ++n) {
-          Real &dens_d = vmesh(b, dust::cons::density(n), k, j, i);
-          lsum += dens_d * coords.Volume();
-        }
-        for (int n = nspecies - 1; n >= 0; --n) {
-          Real &dens_d = vmesh(b, dust::cons::density(n), k, j, i);
-          if (dens_d > dfloor) {
-            lmax = std::max(lmax, n);
-            break;
+    Kokkos::parallel_reduce(
+        "coag::maxSize0",
+        Kokkos::MDRangePolicy<Kokkos::Rank<4>>(
+            {0, kb.s, jb.s, ib.s}, {md->NumBlocks(), kb.e + 1, jb.e + 1, ib.e + 1}),
+        KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, Real &lsum,
+                      int &lmax) {
+          geometry::Coords<GEOM> coords(vmesh.GetCoordinates(b), k, j, i);
+          for (int n = 0; n < nspecies; ++n) {
+            Real &dens_d = vmesh(b, dust::cons::density(n), k, j, i);
+            lsum += dens_d * coords.Volume();
           }
-        }
-      },
-      massd, Kokkos::Max<int>(maxSize0));
+          for (int n = nspecies - 1; n >= 0; --n) {
+            Real &dens_d = vmesh(b, dust::cons::density(n), k, j, i);
+            if (dens_d > dfloor) {
+              lmax = std::max(lmax, n);
+              break;
+            }
+          }
+        },
+        massd0, Kokkos::Max<int>(maxSize0));
 #ifdef MPI_PARALLEL
-  // Sum the perturbations over all processors
-  MPI_Reduce(MPI_IN_PLACE, &maxSize0, 1, MPI_INT, MPI_MAX, 0, MPI_COMM_WORLD);
-  MPI_Reduce(MPI_IN_PLACE, &massd, 1, MPI_PARTHENON_REAL, MPI_SUM, 0, MPI_COMM_WORLD);
+    // Sum over all processors
+    MPI_Reduce(MPI_IN_PLACE, &maxSize0, 1, MPI_INT, MPI_MAX, 0, MPI_COMM_WORLD);
+    MPI_Reduce(MPI_IN_PLACE, &massd0, 1, MPI_PARTHENON_REAL, MPI_SUM, 0, MPI_COMM_WORLD);
 #endif // MPI_PARALLEL
+  }    // end if (info_out_flag)
 
-  Real sumd1 = 0.0;
-#ifdef COAG_DEBUG
-  ParArray3D<Real> floor_tmp("floor_tmp", 17, nspecies, 2);
-#endif
   for (int b = 0; b < md->NumBlocks(); b++) {
     parthenon::par_for_outer(
         DEFAULT_OUTER_LOOP_PATTERN, "Dust::Coagulation", parthenon::DevExecSpace(),
@@ -552,24 +433,25 @@ TaskStatus CoagulationOneStep(MeshData<Real> *md, const Real time, const Real dt
           const int nDust_live = (vmesh.GetUpperBound(b, dust::prim::density()) -
                                   vmesh.GetLowerBound(b, dust::prim::density()) + 1);
 
-          const Real dens_g = vmesh(b, gas::prim::density(0), k, j, i) * den0;
-          Real dt_sync = dt * time0;
-          const Real time1 = time * time0;
+          const Real dens_g = vmesh(b, gas::prim::density(0), k, j, i);
+          Real dt_sync = dt;
+          const Real time1 = time;
 
           geometry::Coords<GEOM> coords(vmesh.GetCoordinates(b), k, j, i);
           const auto &hx = coords.GetScaleFactors();
-          Real rad = hx[2];
-          if constexpr (GEOM == Coordinates::cylindrical) {
-            rad = hx[1];
-          }
-          const Real Omega_k = 1.0 / std::sqrt(rad) / rad; // code unit
-          // const Real vol1 = coords.Volume() * vol0;
+          const auto &xv = coords.GetCellCenter();
+          const auto &xcyl = coords.ConvertToCyl(xv);
+
+          const Real rad = xcyl[0]; // cylindrical
+          const Real Omega_k =
+              coag.const_omega ? coag.gm : coag.gm / std::sqrt(rad) / rad; // code unit
 
           int nCall1 = 0;
 
-          const Real pres = vmesh(b, gas::prim::pressure(0), k, j, i);
-          const Real cs = std::sqrt(gamma * pres / dens_g * den0) * vel0;
-          const Real omega1 = Omega_k / time0;
+          const Real sie = vmesh(b, gas::prim::sie(0), k, j, i);
+          const Real bulk = eos_d.BulkModulusFromDensityInternalEnergy(dens_g, sie);
+          const Real cs = std::sqrt(bulk / dens_g);
+          const Real omega1 = Omega_k;
           const int nm = nspecies;
 
           ScratchPad1D<Real> rhod(mbr.team_scratch(scr_level), nspecies);
@@ -583,23 +465,28 @@ TaskStatus CoagulationOneStep(MeshData<Real> *md, const Real time, const Real dt
             Q2 = ScratchPad1D<Real>(mbr.team_scratch(scr_level), nspecies);
           }
 
+          // calculate the stopping time on the fly
+          Real st0 = 1.0;
+          if (coag.coord) { // surface density
+            st0 = 0.5 * M_PI * coag.rho_p / dens_g / omega1;
+          } else {
+            st0 = std::sqrt(M_PI / 8.0) * coag.rho_p / dens_g / cs;
+          }
+
           parthenon::par_for_inner(
               DEFAULT_INNER_LOOP_PATTERN, mbr, 0, nm - 1, [&](const int n) {
-                // for (int n = 0; n < nm; ++n) {
-                stime(n) = vmesh(b, dust::stopping_time(n), k, j, i) * time0;
+                // calculate the stopping time on fly
+                stime(n) = st0 * dust_size(n);
                 if (vmesh(b, dust::prim::density(n), k, j, i) > dfloor) {
-                  rhod(n) = vmesh(b, dust::prim::density(n), k, j, i) * den0;
-                  vel(0 + n * 3) =
-                      vmesh(b, dust::prim::velocity(VI(n, 0)), k, j, i) * vel0;
-                  vel(1 + n * 3) =
-                      vmesh(b, dust::prim::velocity(VI(n, 1)), k, j, i) * vel0;
-                  vel(2 + n * 3) =
-                      vmesh(b, dust::prim::velocity(VI(n, 2)), k, j, i) * vel0;
+                  rhod(n) = vmesh(b, dust::prim::density(n), k, j, i);
+                  for (int d = 0; d < nvel; d++) {
+                    vel(VI(n, d)) = vmesh(b, dust::prim::velocity(VI(n, d)), k, j, i);
+                  }
                 } else {
                   rhod(n) = 0.0;
-                  vel(0 + n * 3) = 0.0;
-                  vel(1 + n * 3) = 0.0;
-                  vel(2 + n * 3) = 0.0;
+                  for (int d = 0; d < nvel; d++) {
+                    vel(VI(n, d)) = 0.0;
+                  }
                 }
               });
 
@@ -607,94 +494,98 @@ TaskStatus CoagulationOneStep(MeshData<Real> *md, const Real time, const Real dt
                                           vel, nvel, Q, nQs, alpha, cs, omega1, coag,
                                           source, nCall1, Q2);
 
-          nCalls(k, j, i) = nCall1;
+          if (info_out_flag) nCalls(k, j, i) = nCall1;
 
           // update dust density and velocity after coagulation
           parthenon::par_for_inner(
               DEFAULT_INNER_LOOP_PATTERN, mbr, 0, nm - 1, [&](const int n) {
                 // for (int n = 0; n < nspecies; ++n) {
                 if (rhod(n) > 0.0) {
-                  const Real rhod1 = rhod(n) / den0;
+                  const Real rhod1 = rhod(n);
                   vmesh(b, dust::cons::density(n), k, j, i) = rhod1;
-                  vmesh(b, dust::cons::momentum(VI(n, 0)), k, j, i) =
-                      rhod1 * vel(0 + n * 3) * hx[0] / vel0;
-                  vmesh(b, dust::cons::momentum(VI(n, 1)), k, j, i) =
-                      rhod1 * vel(1 + n * 3) * hx[1] / vel0;
-                  vmesh(b, dust::cons::momentum(VI(n, 2)), k, j, i) =
-                      rhod1 * vel(2 + n * 3) * hx[2] / vel0;
+                  for (int d = 0; d < nvel; d++) {
+                    vmesh(b, dust::cons::momentum(VI(n, d)), k, j, i) =
+                        rhod1 * vel(VI(n, d)) * hx[d];
+                  }
                 } else {
                   vmesh(b, dust::cons::density(n), k, j, i) = 0.0;
-                  vmesh(b, dust::cons::momentum(VI(n, 0)), k, j, i) = 0.0;
-                  vmesh(b, dust::cons::momentum(VI(n, 1)), k, j, i) = 0.0;
-                  vmesh(b, dust::cons::momentum(VI(n, 2)), k, j, i) = 0.0;
+                  for (int d = 0; d < nvel; d++) {
+                    vmesh(b, dust::cons::momentum(VI(n, d)), k, j, i) = 0.0;
+                  }
                 }
               });
-#ifdef COAG_DEBUG
-          parthenon::par_for_inner(
-              DEFAULT_INNER_LOOP_PATTERN, mbr, 0, nm - 1, [&](const int n) {
-                // for (int n = 0; n < nspecies; n++) {
-                floor_tmp(i - ib.s, n, 0) = source(n);
-                floor_tmp(i - ib.s, n, 1) = vmesh(b, dust::cons::density(n), k, j, i);
-              });
-#endif
         });
 
-    Real sumd0 = 0.0;
-    Kokkos::parallel_reduce(
-        "coag::nCallsMaximum",
-        Kokkos::MDRangePolicy<Kokkos::Rank<3>>({kb.s, jb.s, ib.s},
-                                               {kb.e + 1, jb.e + 1, ib.e + 1}),
-        KOKKOS_LAMBDA(const int k, const int j, const int i, Real &lsum, int &lmax1,
-                      int &lmax2) {
-          geometry::Coords<GEOM> coords(vmesh.GetCoordinates(b), k, j, i);
-          const Real vol00 = coords.Volume();
-          for (int n = 0; n < nspecies; ++n) {
-            Real &dens_d = vmesh(b, dust::cons::density(n), k, j, i);
-            lsum += dens_d * vol00;
-          }
-          lmax1 = std::max(lmax1, nCalls(k, j, i));
-          for (int n = nspecies - 1; n >= 0; --n) {
-            Real &dens_d = vmesh(b, dust::cons::density(n), k, j, i);
-            if (dens_d > dfloor) {
-              lmax2 = std::max(lmax2, n);
-              break;
+    if (info_out_flag) {
+      Real sumd0 = 0.0;
+      int maxCalls1 = 1, maxSize1 = 1;
+      Kokkos::parallel_reduce(
+          "coag::nCallsMaximum",
+          Kokkos::MDRangePolicy<Kokkos::Rank<3>>({kb.s, jb.s, ib.s},
+                                                 {kb.e + 1, jb.e + 1, ib.e + 1}),
+          KOKKOS_LAMBDA(const int k, const int j, const int i, Real &lsum, int &lmax1,
+                        int &lmax2) {
+            geometry::Coords<GEOM> coords(vmesh.GetCoordinates(b), k, j, i);
+            const Real vol00 = coords.Volume();
+            for (int n = 0; n < nspecies; ++n) {
+              Real &dens_d = vmesh(b, dust::cons::density(n), k, j, i);
+              lsum += dens_d * vol00;
             }
-          }
-        },
-        Kokkos::Sum<Real>(sumd0), Kokkos::Max<int>(maxCalls), Kokkos::Max<int>(maxSize));
-    sumd1 += sumd0;
-  } // loop of blocks
+            lmax1 = std::max(lmax1, nCalls(k, j, i));
+            for (int n = nspecies - 1; n >= 0; --n) {
+              Real &dens_d = vmesh(b, dust::cons::density(n), k, j, i);
+              if (dens_d > dfloor) {
+                lmax2 = std::max(lmax2, n);
+                break;
+              }
+            }
+          },
+          Kokkos::Sum<Real>(sumd0), Kokkos::Max<int>(maxCalls1),
+          Kokkos::Max<int>(maxSize1));
+      massd += sumd0;
+      maxCalls = std::max(maxCalls, maxCalls1);
+      maxSize = std::max(maxSize, maxSize1);
+    } // end if (info_out_flag)
+  }   // loop of blocks
 
-#ifdef COAG_DEBUG
-  auto floor_h =
-      Kokkos::create_mirror_view_and_copy(parthenon::HostMemSpace(), floor_tmp);
-  for (int i = 0; i <= 0; i++) {
-    std::cout << "i=" << i << " ";
-    for (int n = 0; n < 20; n++) {
-      std::cout << floor_h(i, n, 0) << " ";
-    }
-    std::cout << std::endl;
-
-    std::cout << "i=" << i << " ";
-    for (int n = 0; n < 20; n++) {
-      std::cout << floor_h(i, n, 1) << " ";
-    }
-    std::cout << std::endl;
-  }
-#endif
-
+  if (info_out_flag) {
 #ifdef MPI_PARALLEL
-  // over all processors
-  MPI_Reduce(MPI_IN_PLACE, &maxCalls, 1, MPI_INT, MPI_MAX, 0, MPI_COMM_WORLD);
-  MPI_Reduce(MPI_IN_PLACE, &maxSize, 1, MPI_INT, MPI_MAX, 0, MPI_COMM_WORLD);
-  MPI_Reduce(MPI_IN_PLACE, &sumd1, 1, MPI_PARTHENON_REAL, MPI_SUM, 0, MPI_COMM_WORLD);
+    // over all processors
+    MPI_Reduce(MPI_IN_PLACE, &maxCalls, 1, MPI_INT, MPI_MAX, 0, MPI_COMM_WORLD);
+    MPI_Reduce(MPI_IN_PLACE, &maxSize, 1, MPI_INT, MPI_MAX, 0, MPI_COMM_WORLD);
+    MPI_Reduce(MPI_IN_PLACE, &massd, 1, MPI_PARTHENON_REAL, MPI_SUM, 0, MPI_COMM_WORLD);
 #endif // MPI_PARALLEL
 
-  if (parthenon::Globals::my_rank == 0) {
-    std::cout << "maxcalls,size= " << time << " " << maxCalls << " " << maxSize << " "
-              << maxSize0 << " " << time0 * dt << std::endl
-              << "total massd =" << time << " " << massd << " " << sumd1 << std::endl;
-  }
+    if (parthenon::Globals::my_rank == 0) {
+      std::string fname;
+      // fname.assign(pin->GetString("parthenon/job", "problem_id"));
+      fname = "artemis";
+      fname.append("_coag_info.dat");
+      static FILE *pfile = NULL;
+
+      // The file exists -- reopen the file in append mode
+      if (pfile == NULL) {
+        if ((pfile = std::fopen(fname.c_str(), "r")) != nullptr) {
+          if ((pfile = std::freopen(fname.c_str(), "a", pfile)) == nullptr) {
+            PARTHENON_FAIL("Error output file could not be opened");
+          }
+          // The file does not exist -- open the file in write mode and add headers
+        } else {
+          if ((pfile = std::fopen(fname.c_str(), "w")) == nullptr) {
+            PARTHENON_FAIL("Error output file could not be opened");
+          }
+          std::string label = "# time dt maxCall end_maxSize beg_massSize ";
+          label.append("end_total_massd beg_total_massd diff_massd \n");
+          std::fprintf(pfile, label.c_str());
+        }
+      }
+      std::fprintf(pfile, "  %e ", time);
+      std::fprintf(pfile, "  %e ", dt);
+      std::fprintf(pfile, "  %d  %d  %d ", maxCalls, maxSize, maxSize0);
+      std::fprintf(pfile, "  %e  %e  %e", massd, massd0, (massd - massd0) / massd);
+      std::fprintf(pfile, "\n");
+    }
+  } // end if (info_out_flag)
 
   return TaskStatus::complete;
 }
@@ -703,7 +594,7 @@ TaskStatus CoagulationOneStep(MeshData<Real> *md, const Real time, const Real dt
 //! \fn  TaskCollection Dust::OperatorSplitDust
 //! \brief dust operator split task collection
 template <Coordinates GEOM>
-TaskCollection OperatorSplitDust(Mesh *pm, parthenon::SimTime &tm, const Real dt) {
+TaskCollection OperatorSplitDustSelect(Mesh *pm, parthenon::SimTime &tm) {
   TaskCollection tc;
   auto &coag_pkg = pm->packages.Get("coagulation");
   auto *dtCoag = coag_pkg->MutableParam<Real>("dtCoag");
@@ -712,12 +603,12 @@ TaskCollection OperatorSplitDust(Mesh *pm, parthenon::SimTime &tm, const Real dt
     *dtCoag = 0.0;
   }
 
-  *dtCoag += dt;
+  *dtCoag += tm.dt;
   if ((tm.ncycle + 1) % nstep1Coag != 0) {
     return tc;
   }
 
-  const Real time_local = tm.time + dt - (*dtCoag);
+  const Real time_local = tm.time + tm.dt - (*dtCoag);
   const Real dt_local = (*dtCoag);
   if (parthenon::Globals::my_rank == 0) {
     std::cout << "coagulation at: time,dt,cycle=" << time_local << " " << dt_local << " "
@@ -736,6 +627,7 @@ TaskCollection OperatorSplitDust(Mesh *pm, parthenon::SimTime &tm, const Real dt
   }
   auto &dust_subset =
       pm->mesh_data.AddShallow("dust_subset", pm->mesh_data.Get(), dust_var_names);
+
   using namespace ::parthenon::Update;
   const int num_partitions = pm->DefaultNumPartitions();
   TaskRegion &tr = tc.AddRegion(num_partitions);
@@ -759,6 +651,31 @@ TaskCollection OperatorSplitDust(Mesh *pm, parthenon::SimTime &tm, const Real dt
   *dtCoag = 0.0;
 
   return tc;
+}
+
+//----------------------------------------------------------------------------------------
+//! \fn  TaskStatus Dust::OperatorSplit
+//  \brief Wrapper function for Dust::OperatorSplitDust
+TaskListStatus OperatorSplitDust(Mesh *pm, parthenon::SimTime &tm) {
+  auto &dust_pkg = pm->packages.Get("dust");
+  typedef Coordinates C;
+  const C coords = dust_pkg->template Param<Coordinates>("coords");
+
+  if (coords == C::cartesian) {
+    return OperatorSplitDustSelect<C::cartesian>(pm, tm).Execute();
+  } else if (coords == C::spherical1D) {
+    return OperatorSplitDustSelect<C::spherical1D>(pm, tm).Execute();
+  } else if (coords == C::spherical2D) {
+    return OperatorSplitDustSelect<C::spherical2D>(pm, tm).Execute();
+  } else if (coords == C::spherical3D) {
+    return OperatorSplitDustSelect<C::spherical3D>(pm, tm).Execute();
+  } else if (coords == C::cylindrical) {
+    return OperatorSplitDustSelect<C::cylindrical>(pm, tm).Execute();
+  } else if (coords == C::axisymmetric) {
+    return OperatorSplitDustSelect<C::axisymmetric>(pm, tm).Execute();
+  } else {
+    PARTHENON_FAIL("Invalid artemis/coordinate system!");
+  }
 }
 
 //----------------------------------------------------------------------------------------
@@ -849,13 +766,6 @@ template Real EstimateTimestepMesh<Coordinates::spherical2D>(MeshData<Real> *md)
 template Real EstimateTimestepMesh<Coordinates::spherical3D>(MeshData<Real> *md);
 template Real EstimateTimestepMesh<Coordinates::axisymmetric>(MeshData<Real> *md);
 
-template TaskStatus UpdateDustStoppingTime<Coordinates::cartesian>(MeshData<Real> *md);
-template TaskStatus UpdateDustStoppingTime<Coordinates::cylindrical>(MeshData<Real> *md);
-template TaskStatus UpdateDustStoppingTime<Coordinates::spherical1D>(MeshData<Real> *md);
-template TaskStatus UpdateDustStoppingTime<Coordinates::spherical2D>(MeshData<Real> *md);
-template TaskStatus UpdateDustStoppingTime<Coordinates::spherical3D>(MeshData<Real> *md);
-template TaskStatus UpdateDustStoppingTime<Coordinates::axisymmetric>(MeshData<Real> *md);
-
 template TaskStatus CoagulationOneStep<Coordinates::cartesian>(MeshData<Real> *md,
                                                                const Real time,
                                                                const Real dt);
@@ -874,24 +784,5 @@ template TaskStatus CoagulationOneStep<Coordinates::spherical3D>(MeshData<Real> 
 template TaskStatus CoagulationOneStep<Coordinates::axisymmetric>(MeshData<Real> *md,
                                                                   const Real time,
                                                                   const Real dt);
-
-template TaskCollection OperatorSplitDust<Coordinates::cartesian>(Mesh *pm,
-                                                                  parthenon::SimTime &tm,
-                                                                  const Real dt);
-template TaskCollection
-OperatorSplitDust<Coordinates::spherical1D>(Mesh *pm, parthenon::SimTime &tm,
-                                            const Real dt);
-template TaskCollection
-OperatorSplitDust<Coordinates::spherical2D>(Mesh *pm, parthenon::SimTime &tm,
-                                            const Real dt);
-template TaskCollection
-OperatorSplitDust<Coordinates::spherical3D>(Mesh *pm, parthenon::SimTime &tm,
-                                            const Real dt);
-template TaskCollection
-OperatorSplitDust<Coordinates::cylindrical>(Mesh *pm, parthenon::SimTime &tm,
-                                            const Real dt);
-template TaskCollection
-OperatorSplitDust<Coordinates::axisymmetric>(Mesh *pm, parthenon::SimTime &tm,
-                                             const Real dt);
 
 } // namespace Dust

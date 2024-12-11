@@ -105,7 +105,10 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   if (do_cooling) packages.Add(Gas::Cooling::Initialize(pin.get()));
   if (do_drag) packages.Add(Drag::Initialize(pin.get()));
   if (do_nbody) packages.Add(NBody::Initialize(pin.get()));
-  if (do_coagulation) packages.Add(Dust::Coagulation::Initialize(pin.get()));
+  if (do_coagulation) {
+    auto &dustPars = packages.Get("dust")->AllParams();
+    packages.Add(Dust::Coagulation::Initialize(pin.get(), dustPars));
+  }
   if (do_radiation) {
     auto eos_h = packages.Get("gas")->Param<EOS>("eos_h");
     auto opacity_h = packages.Get("gas")->Param<Opacity>("opacity_h");
@@ -145,25 +148,6 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   // Add optionally enrollable operator split Metadata flag
   parthenon::MetadataFlag MetadataOperatorSplit =
       parthenon::Metadata::AddUserFlag("OperatorSplit");
-
-  if (do_coagulation) {
-    typedef Coordinates C;
-    if (coords == C::cartesian) {
-      OperatorSplitTasks.push_back(&Dust::OperatorSplitDust<C::cartesian>);
-    } else if (coords == C::spherical1D) {
-      OperatorSplitTasks.push_back(&Dust::OperatorSplitDust<C::spherical1D>);
-    } else if (coords == C::spherical2D) {
-      OperatorSplitTasks.push_back(&Dust::OperatorSplitDust<C::spherical2D>);
-    } else if (coords == C::spherical3D) {
-      OperatorSplitTasks.push_back(&Dust::OperatorSplitDust<C::spherical3D>);
-    } else if (coords == C::cylindrical) {
-      OperatorSplitTasks.push_back(&Dust::OperatorSplitDust<C::cylindrical>);
-    } else if (coords == C::axisymmetric) {
-      OperatorSplitTasks.push_back(&Dust::OperatorSplitDust<C::axisymmetric>);
-    } else {
-      PARTHENON_FAIL("Invalid artemis/coordinate system!");
-    }
-  }
 
   // Add in user-defined AMR criterion callback
   const bool amr_user = pin->GetOrAddBoolean("artemis", "amr_user", false);

@@ -17,31 +17,43 @@
 #include "dust/dust.hpp"
 #include "geometry/geometry.hpp"
 
-using namespace parthenon::package::prelude;
-
 namespace Dust {
 namespace Coagulation {
 //----------------------------------------------------------------------------------------
 //! \fn  StateDescriptor Coagulalation::Initialize
 //! \brief Adds intialization function for coagulation package
-std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
+std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin, Params &dustPars) {
   auto coag = std::make_shared<StateDescriptor>("coagulation");
   Params &params = coag->AllParams();
 
   CoagParams cpars;
-  const int nm = pin->GetOrAddInteger("dust", "nspecies", 1);
+
+  const int nm = dustPars.template Get<int>("nspecies");
+  const Real dfloor = dustPars.template Get<Real>("dfloor");
+  const Real rho_p = dustPars.template Get<Real>("grain_density");
   cpars.nm = nm;
   cpars.vfrag = pin->GetOrAddReal("dust", "vfrag", 1.e3); // cm/s
   cpars.nlim = 1e10;
-  cpars.integrator = pin->GetOrAddInteger("dust", "coag_int", 3);
-  cpars.use_adaptive = pin->GetOrAddBoolean("dust", "coag_use_adaptiveStep", true);
-  cpars.mom_coag = pin->GetOrAddBoolean("dust", "coag_mom_preserve", true);
-  cpars.nCall_mx = pin->GetOrAddInteger("dust", "coag_nsteps_mx", 1000);
-  // dust particle internal density g/cc
-  const Real rho_p = pin->GetOrAddReal("dust", "grain_density", 1.25);
+  cpars.integrator = pin->GetOrAddInteger("dust/coagulation", "coag_int", 3);
+  cpars.use_adaptive =
+      pin->GetOrAddBoolean("dust/coagulation", "coag_use_adaptiveStep", true);
+  cpars.mom_coag = pin->GetOrAddBoolean("dust/coagulation", "coag_mom_preserve", true);
+  cpars.nCall_mx = pin->GetOrAddInteger("dust/coagulation", "coag_nsteps_mx", 1000);
   cpars.rho_p = rho_p;
 
-  cpars.ibounce = pin->GetOrAddBoolean("dust", "coag_bounce", false);
+  const Real M_SUN = 1.988409870698051e33;      // gram (sun)
+  const Real GRAV_CONST = 6.674299999999999e-8; // gravitational const in cm^3 g^-1 s^-2
+  const Real mstar = pin->GetOrAddReal("problem", "mstar", 1.0) * M_SUN;
+  cpars.gm = std::sqrt(GRAV_CONST * mstar);
+  const bool const_omega = pin->GetOrAddBoolean("problem", "const_coag_omega", false);
+  cpars.const_omega = const_omega;
+  if (const_omega) {
+    const Real AU_LENGTH = 1.4959787070000e13; // cm
+    const Real r0 = pin->GetOrAddReal("problem", "r0_length", 1.0) * AU_LENGTH;
+    cpars.gm /= (std::sqrt(r0) * r0);
+  }
+
+  cpars.ibounce = pin->GetOrAddBoolean("dust/coagulation", "coag_bounce", false);
 
   int coord_type = 0; // density
 
@@ -72,28 +84,17 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     cpars.errcon = std::pow((5. / cpars.S), (1. / cpars.pgrow));
   }
 
-  const Real s_min = pin->GetReal("dust", "min_size");
-  const Real s_max = pin->GetReal("dust", "max_size");
-  const Real mmin = 4.0 * M_PI / 3.0 * rho_p * std::pow(s_min, 3);
-  const Real mmax = 4.0 * M_PI / 3.0 * rho_p * std::pow(s_max, 3);
-  const Real cond = 1.0 / (1.0 - nm) * std::log(mmin / mmax);
-  const Real conc = std::log(mmin);
+  auto h_sizes = dustPars.template Get<ParArray1D<Real>>("h_sizes");
+  const Real cond = 3.0 / (1.0 - nm) * std::log(h_sizes(0) / h_sizes(nm - 1));
   if (std::exp(cond) > std::sqrt(2.0)) {
     std::stringstream msg;
     msg << "### FATAL ERROR in dust with coagulation: using nspecies >"
-        << std::log(mmax / mmin) / (std::log(std::sqrt(2.0))) + 1. << " instead of " << nm
-        << std::endl;
+        << 3.0 * std::log(h_sizes(nm - 1) / h_sizes(0)) / (std::log(std::sqrt(2.0))) + 1.
+        << " instead of " << nm << std::endl;
     PARTHENON_FAIL(msg);
   }
 
-  ParArray1D<Real> dust_size("dustSize", nm);
-  auto dust_size_host = dust_size.GetHostMirror();
-
-  for (int n = 0; n < nm; ++n) {
-    Real mgrid = std::exp(conc + cond * n);
-    dust_size_host(n) = std::pow(3.0 * mgrid / (4.0 * M_PI * cpars.rho_p), 1. / 3.);
-  }
-  dust_size.DeepCopy(dust_size_host);
+  auto dust_size = dustPars.template Get<ParArray1D<Real>>("sizes");
 
   // allocate array and assign values
   cpars.klf = ParArray2D<int>("klf", nm, nm);
@@ -103,16 +104,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   cpars.cpod_notzero = ParArray3D<int>("idx_nzcpod", nm, nm, 4);
   cpars.cpod_short = ParArray3D<Real>("nzcpod", nm, nm, 4);
 
-  if (Dust::cgsunit == NULL) {
-    Dust::cgsunit = new CGSUnit;
-  }
-  if (!Dust::cgsunit->isSet()) {
-    Dust::cgsunit->SetCGSUnit(pin);
-  }
-  const Real dfloor = pin->GetOrAddReal("dust", "dfloor", 1.0e-25);
-  // convert to CGS unit
-  cpars.dfloor = dfloor * Dust::cgsunit->mass0 / Dust::cgsunit->vol0;
-  Real a = std::log10(mmin / mmax) / static_cast<Real>(1 - nm);
+  cpars.dfloor = dfloor;
+  Real a = 3.0 * std::log10(h_sizes(0) / h_sizes(nm - 1)) / static_cast<Real>(1 - nm);
 
   initializeArray(nm, cpars.pGrid, cpars.rho_p, cpars.chi, a, dust_size, cpars.klf,
                   cpars.mass_grid, cpars.coagR3D, cpars.cpod_notzero, cpars.cpod_short);
@@ -124,10 +117,12 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("nstep1Coag", nstep1Coag);
   Real dtCoag = 0.0;
   params.Add("dtCoag", dtCoag, Params::Mutability::Restart);
-  const Real alpha = pin->GetOrAddReal("dust", "coag_alpha", 1.e-3);
+  const Real alpha = pin->GetOrAddReal("dust/coagulation", "coag_alpha", 1.e-3);
   params.Add("coag_alpha", alpha);
-  const int scr_level = pin->GetOrAddReal("dust", "coag_scr_level", 0);
+  const int scr_level = pin->GetOrAddReal("dust/coagulation", "coag_scr_level", 0);
   params.Add("coag_scr_level", scr_level);
+  const bool info_out = pin->GetOrAddBoolean("dust/coagulation", "coag_info_out", false);
+  params.Add("coag_info_out", info_out);
 
   return coag;
 }
@@ -139,23 +134,21 @@ void initializeArray(const int nm, int &pGrid, const Real &rho_p, const Real &ch
                      ParArray3D<int> cpod_notzero, ParArray3D<Real> cpod_short) {
 
   int ikdelta = coag2DRv::kdelta;
-  auto kdelta = Kokkos::subview(coag3D, ikdelta, Kokkos::ALL, Kokkos::ALL);
   int icoef_fett = coag2DRv::coef_fett;
-  auto coef_fett = Kokkos::subview(coag3D, icoef_fett, Kokkos::ALL, Kokkos::ALL);
   parthenon::par_for(
       parthenon::loop_pattern_flatrange_tag, "initializeCoag1", parthenon::DevExecSpace(),
       0, nm - 1, KOKKOS_LAMBDA(const int i) {
         // initialize in_idx(*) array
         // initialize kdelta array
         for (int j = 0; j < nm; j++) {
-          kdelta(i, j) = 0.0;
+          coag3D(ikdelta, i, j) = 0.0;
         }
-        kdelta(i, i) = 1.0;
-        mass_grid(i) = 4.0 * M_PI / 3.0 * rho_p * std::pow(dsize(i), 3);
-        // initialize coef_fett(*,*)
+        coag3D(ikdelta, i, i) = 1.0;
+        mass_grid(i) = 4.0 * M_PI / 3.0 * rho_p * dsize(i) * dsize(i) * dsize(i);
+        // initialize coag3D(icoef_fett, *,*)
         for (int j = 0; j < nm; j++) {
-          Real tmp1 = (1.0 - 0.5 * kdelta(i, j));
-          coef_fett(i, j) = M_PI * SQR(dsize(i) + dsize(j)) * tmp1;
+          Real tmp1 = (1.0 - 0.5 * coag3D(ikdelta, i, j));
+          coag3D(icoef_fett, i, j) = M_PI * SQR(dsize(i) + dsize(j)) * tmp1;
         }
       });
 
@@ -171,20 +164,17 @@ void initializeArray(const int nm, int &pGrid, const Real &rho_p, const Real &ch
 
   int iphiFrag = coag2DRv::phiFrag, iepsFrag = coag2DRv::epsFrag;
   int iaFrag = coag2DRv::aFrag;
-  auto phiFrag = Kokkos::subview(coag3D, iphiFrag, Kokkos::ALL, Kokkos::ALL);
-  auto epsFrag = Kokkos::subview(coag3D, iepsFrag, Kokkos::ALL, Kokkos::ALL);
-  auto aFrag = Kokkos::subview(coag3D, iaFrag, Kokkos::ALL, Kokkos::ALL);
   parthenon::par_for(
       parthenon::loop_pattern_flatrange_tag, "initializeCoag2", parthenon::DevExecSpace(),
       0, nm - 1, KOKKOS_LAMBDA(const int i) {
         Real sum_pF = 0.0;
         for (int j = 0; j <= i; j++) {
-          phiFrag(j, i) = std::pow(mass_grid(j), frag_slope);
-          sum_pF += phiFrag(j, i);
+          coag3D(iphiFrag, j, i) = std::pow(mass_grid(j), frag_slope);
+          sum_pF += coag3D(iphiFrag, j, i);
         }
         // normalization
         for (int j = 0; j <= i; j++) {
-          phiFrag(j, i) /= sum_pF; // switch (i,j) from fortran
+          coag3D(iphiFrag, j, i) /= sum_pF; // switch (i,j) from fortran
         }
 
         // Cratering
@@ -195,18 +185,18 @@ void initializeArray(const int nm, int &pGrid, const Real &rho_p, const Real &ch
           // Mass bin of largest fragment
           klf(i, j) = j;
 
-          aFrag(i, j) = (1.0 + chi) * mass_grid(j);
-          //            |_____________|
-          //                    |
+          coag3D(iaFrag, i, j) = (1.0 + chi) * mass_grid(j);
+          //                      |_______|
+          //                           |
           //                    Mass of fragments
-          epsFrag(i, j) = chi * mass_grid(j) / (mass_grid(i) * (1.0 - ten_ma));
+          coag3D(iepsFrag, i, j) = chi * mass_grid(j) / (mass_grid(i) * (1.0 - ten_ma));
         }
 
         int i1 = std::max(0, i - pGrid);
         for (int j = i1; j <= i; j++) {
           // The largest fragment has the mass of the larger collison partner
           klf(i, j) = i;
-          aFrag(i, j) = (mass_grid(i) + mass_grid(j));
+          coag3D(iaFrag, i, j) = (mass_grid(i) + mass_grid(j));
         }
       });
 
@@ -215,18 +205,16 @@ void initializeArray(const int nm, int &pGrid, const Real &rho_p, const Real &ch
   // Calculate the E matrix
   ParArray2D<Real> e("epod", nm, nm);
   int idalp = coag2DRv::dalp, idpod = coag2DRv::dpod;
-  auto dalp = Kokkos::subview(coag3D, idalp, Kokkos::ALL, Kokkos::ALL);
-  auto dpod = Kokkos::subview(coag3D, idpod, Kokkos::ALL, Kokkos::ALL);
   parthenon::par_for(
       parthenon::loop_pattern_flatrange_tag, "initializeCoag4", parthenon::DevExecSpace(),
       0, nm - 1, KOKKOS_LAMBDA(const int k) {
         for (int j = 0; j < nm; j++) {
           if (j <= k + 1 - ce) {
-            dalp(k, j) = 1.0;
-            dpod(k, j) = -mass_grid(j) / (mass_grid(k) * (ten_a - 1.0));
+            coag3D(idalp, k, j) = 1.0;
+            coag3D(idpod, k, j) = -mass_grid(j) / (mass_grid(k) * (ten_a - 1.0));
           } else {
-            dpod(k, j) = -1.0;
-            dalp(k, j) = 0.0;
+            coag3D(idpod, k, j) = -1.0;
+            coag3D(idalp, k, j) = 0.0;
           }
         }
         // for E matrix-------------
@@ -272,10 +260,10 @@ void initializeArray(const int nm, int &pGrid, const Real &rho_p, const Real &ch
           Real dtheta_ji = (j - i - 0.5 < 0.0) ? 0.0 : 1.0; // theta(j - i - 0.5);
           for (int k = 0; k < nm; k++) {
             Real theta_kj = (k - j - 1.5 < 0.0) ? 0.0 : 1.0; // theta(k - j - 1.5)
-            cpod(i, j, k) = (0.5 * kdelta(i, j) * cpod(i, j, k) +
+            cpod(i, j, k) = (0.5 * coag3D(ikdelta, i, j) * cpod(i, j, k) +
                              cpod(i, j, k) * theta_kj * dtheta_ji);
           }
-          cpod(i, j, j) += dpod(j, i);
+          cpod(i, j, j) += coag3D(idpod, j, i);
           cpod(i, j, j + 1) += e(j + 1, i) * dtheta_ji;
 
         } //  end if

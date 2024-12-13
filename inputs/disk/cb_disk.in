@@ -81,10 +81,9 @@ siefloor = 1.0e-6
 type = constant
 nu = 1e-3
 
-
 <gravity>
-type = nbody
 gm = 1.0
+<gravity/nbody>
 
 <nbody>
 integrator = ias15

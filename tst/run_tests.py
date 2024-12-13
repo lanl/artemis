@@ -22,14 +22,16 @@
 #   - This file should not be modified when adding new scripts.
 #   - This file is largely borrowed from the open-source Athena++/AthenaK CI regression,
 #     adapted to work with LANL Darwin runners
+#   - This file was created in part by one of OpenAI's generative AI models
 
 # Modules
 import argparse
 import os
-from collections import OrderedDict
-from importlib import reload
 import logging
 import logging.config
+import shutil
+from collections import OrderedDict
+from importlib import reload
 from pkgutil import iter_modules
 from timeit import default_timer as timer
 
@@ -48,7 +50,10 @@ logger = logging.getLogger("artemis")
 
 def process_suite(filename):
     tests = []
-    with open("suites/" + filename, "r") as f:
+    aname = os.path.join(artemis.get_artemis_dir(), "tst")
+    fname = os.path.join(aname, "suites", filename)
+
+    with open(fname, "r") as f:
         for line in f.readlines():
             line = line.strip()
             if len(line) > 0:
@@ -64,7 +69,8 @@ def process_suite(filename):
                         dir_test_names = [
                             name
                             for _, name, _ in iter_modules(
-                                path=["scripts/" + test_name], prefix=test_name + "."
+                                path=[os.path.join(aname, "scripts", test_name)],
+                                prefix=test_name + ".",
                             )
                         ]
                         tests += dir_test_names
@@ -74,15 +80,17 @@ def process_suite(filename):
 # Main function
 def main(**kwargs):
     # Make list of tests to run
+    scripts_path = os.path.join(artemis.get_artemis_dir(), "tst/scripts/")
     tests = kwargs.pop("tests")
     test_names = []
     if len(tests) == 0:  # run all tests
-        for _, directory, ispkg in iter_modules(path=["scripts"]):
-            if ispkg and (directory != "utils" and directory != "style"):
+        for _, directory, ispkg in iter_modules(path=[scripts_path]):
+            if ispkg and directory != "utils":
                 dir_test_names = [
                     name
                     for _, name, _ in iter_modules(
-                        path=["scripts/" + directory], prefix=directory + "."
+                        path=[os.path.join(scripts_path, directory)],
+                        prefix=directory + ".",
                     )
                 ]
                 test_names.extend(dir_test_names)
@@ -98,7 +106,8 @@ def main(**kwargs):
                 dir_test_names = [
                     name
                     for _, name, _ in iter_modules(
-                        path=["scripts/" + test], prefix=test + "."
+                        path=[os.path.join(scripts_path, test)],
+                        prefix=test + ".",
                     )
                 ]
                 test_names.extend(dir_test_names)
@@ -108,10 +117,12 @@ def main(**kwargs):
     logger.info("Running: " + ", ".join(test_names))
 
     # Run tests
-    current_dir = os.getcwd()
+    build_dir = os.path.join(artemis.get_artemis_dir(), "tst")
     test_times = []
     test_results = []
     test_errors = []
+
+    # Extract arguments
     try:
         # Check that required modules are installed for all test dependencies
         deps_installed = True
@@ -129,19 +140,28 @@ def main(**kwargs):
                 logger.warning("Unable to " 'import "{:}".'.format(missing_module))
                 deps_installed = False
         if not deps_installed:
-            logger.warning("WARNING! Not all required Python modules " "are available")
+            logger.warning("WARNING! Not all required Python modules are available")
+
         # Build Artemis
-        if not kwargs.pop("reuse_build"):
+        if not artemis.get_supplied_exe() and not kwargs.pop("reuse_build"):
             try:
-                os.system("rm -rf {0}/build".format(current_dir))
+                os.system("rm -rf {0}/build".format(build_dir))
                 # insert arguments for artemis.make()
                 artemis_cmake_args = kwargs.pop("cmake")
                 artemis_make_nproc = kwargs.pop("make_nproc")
-                module.artemis.make(artemis_cmake_args, artemis_make_nproc)
+                artemis.make(artemis_cmake_args, artemis_make_nproc)
             except Exception:
                 logger.error("Exception occurred", exc_info=True)
                 test_errors.append("make()")
                 raise TestError("Unable to build Artemis")
+
+        # Build working directory and copy librebound.so into working directory
+        os.makedirs(artemis.get_outputs_dir(), exist_ok=True)
+        reb_path = os.path.join(artemis.get_exe_dir(), "librebound.so")
+        if not os.path.exists(reb_path):
+            raise TestError(f'librebound.so not found at "{reb_path}"!')
+        shutil.copy(reb_path, artemis.get_outputs_dir())
+
         # Run each test
         for name in test_names:
             t0 = timer()
@@ -178,8 +198,8 @@ def main(**kwargs):
             # For CI, print after every individual test has finished
             logger.info("{} test: run(), analyze() finished".format(name))
     finally:
-        if not kwargs.pop("save_build"):
-            os.system("rm -rf {0}/build".format(current_dir))
+        if not kwargs.pop("save_build") and not artemis.get_supplied_exe():
+            os.system("rm -rf {0}/build".format(build_dir))
 
     # Report test results
     logger.info("\nResults:")
@@ -201,6 +221,11 @@ def main(**kwargs):
         "Summary: {0} out of {1} {2} "
         "passed\n".format(num_passed, num_tests, test_string)
     )
+
+    # Erase simulation output data unless requested that it be saved
+    if kwargs.pop("erase_data"):
+        os.system(f"rm -rf {artemis.get_data_dir()}")
+
     # For CI calling scripts, explicitly raise error if not all tests passed
     if num_passed == num_tests:
         return 0
@@ -232,7 +257,8 @@ def log_init(args):
     # setup log_file
     log_fn = kwargs.pop("log_file")
     if log_fn:
-        f_handler = logging.FileHandler(log_fn)
+        os.makedirs(artemis.get_log_dir(), exist_ok=True)
+        f_handler = logging.FileHandler(os.path.join(artemis.get_log_dir(), log_fn))
         f_handler.setLevel(0)  # log everything
         f_format = logging.Formatter(
             "%(asctime)s|%(levelname)s" ":%(name)s: %(message)s"
@@ -240,6 +266,93 @@ def log_init(args):
         f_handler.setFormatter(f_format)
         logger.addHandler(f_handler)
     logger.debug("Starting Artemis regression tests")
+
+
+# Reads Artemis CMakeCache.txt to find executable
+def read_cmakecache(filename):
+    with open(filename, "r") as f:
+        for line in f.readlines():
+            if "artemis_BINARY_DIR" in line:
+                return os.path.join(line.split("=")[-1].strip(), "src", "artemis")
+
+
+# Sets global variables
+def set_globals(args):
+    kwargs = vars(args)
+
+    # Set MPI oversubscribe
+    if kwargs.pop("use_oversubscribe"):
+        artemis.set_mpi_oversubscribe(True)
+
+    # Check for executable path and output directory args
+    out_dir = kwargs.pop("output_dir")
+    out_dir = os.path.join(out_dir, "testing") if out_dir is not None else None
+    exe_path = kwargs.pop("exe")
+    use_cwd = kwargs.pop("cwd")
+
+    # Set the correct paths
+    if exe_path is not None:
+        adir = os.path.join(artemis.get_artemis_dir(), "tst")
+        out_dir = os.path.join(adir, "testing") if out_dir is None else out_dir
+        reb_path = os.path.join(os.path.dirname(exe_path), "librebound.so")
+
+        if use_cwd:
+            raise TestError("--cwd and --exe=PATH cannot be passed together!")
+
+        if not (os.path.exists(exe_path) and os.access(exe_path, os.X_OK)):
+            raise TestError(f'Provided exe "{exe_path}" not found or cannot be run!')
+
+        if not os.path.exists(reb_path):
+            raise TestError(f'librebound.so not found at "{reb_path}"!')
+
+        abs_out_dir = os.path.abspath(out_dir)
+        abs_exe_dir = os.path.abspath(os.path.dirname(exe_path))
+        artemis.set_paths(abs_exe_dir, abs_out_dir)
+        artemis.set_supplied_exe(True)
+    else:
+        cwd = os.getcwd()
+        lpath_exe = os.path.join(cwd, "artemis")
+        lpath_cache = os.path.join(cwd, "CMakeCache.txt")
+        if use_cwd:
+            # If we are in a directory with an executable, default to using that
+            if os.path.isfile(lpath_exe) and os.access(lpath_exe, os.X_OK):
+                exe_path = lpath_exe
+                out_dir = os.path.join(cwd, "testing") if out_dir is None else out_dir
+                reb_path = os.path.join(os.path.dirname(exe_path), "librebound.so")
+
+                if not os.path.exists(reb_path):
+                    raise TestError(f'librebound.so not found at "{reb_path}"!')
+
+                abs_out_dir = os.path.abspath(out_dir)
+                abs_exe_dir = os.path.abspath(os.path.dirname(exe_path))
+                artemis.set_paths(abs_exe_dir, abs_out_dir)
+                artemis.set_supplied_exe(True)
+            elif os.path.exists(lpath_cache) and os.access(lpath_cache, os.R_OK):
+                # Check if we are one level up from the executable
+                exe_path = read_cmakecache(lpath_cache)
+                out_dir = os.path.join(cwd, "testing") if out_dir is None else out_dir
+                reb_path = os.path.join(os.path.dirname(exe_path), "librebound.so")
+
+                if not (os.path.exists(exe_path) and os.access(exe_path, os.X_OK)):
+                    raise TestError(f'No exe in "{exe_path}" or cannot be run!')
+
+                if not os.path.exists(reb_path):
+                    raise TestError(f'librebound.so not found at "{reb_path}"!')
+
+                abs_out_dir = os.path.abspath(out_dir)
+                abs_exe_dir = os.path.abspath(os.path.dirname(exe_path))
+                artemis.set_paths(abs_exe_dir, abs_out_dir)
+                artemis.set_supplied_exe(True)
+            else:
+                raise TestError("Unable to find executable via --cwd")
+        else:
+            adir = os.path.join(artemis.get_artemis_dir(), "tst")
+            exe_path = os.path.join(adir, "build/src/artemis")
+            out_dir = os.path.join(adir, "testing") if out_dir is None else out_dir
+            abs_out_dir = os.path.abspath(out_dir)
+            abs_exe_dir = os.path.abspath(os.path.dirname(exe_path))
+            artemis.set_paths(abs_exe_dir, abs_out_dir)
+            artemis.set_supplied_exe(False)
 
 
 # Execute main function
@@ -260,6 +373,12 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
+        "--use_oversubscribe",
+        action="store_true",
+        help="use MPI oversubscribe",
+    )
+
+    parser.add_argument(
         "--log_file", type=str, default=None, help="set filename of logfile"
     )
 
@@ -270,12 +389,39 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
+        "--erase_data",
+        action="store_true",
+        help="save output files generated by artemis during testing",
+    )
+
+    parser.add_argument(
         "--reuse_build",
         action="store_true",
         help="do not recompile the code and reuse the build directory.",
     )
 
+    parser.add_argument(
+        "--exe",
+        type=str,
+        default=None,
+        help="path to pre-built executable",
+    )
+
+    parser.add_argument(
+        "--output_dir",
+        type=str,
+        default=None,
+        help="path to output directory",
+    )
+
+    parser.add_argument(
+        "--cwd",
+        action="store_true",
+        help="search local path for preexisting executable",
+    )
+
     args = parser.parse_args()
+    set_globals(args)
     log_init(args)
 
     try:

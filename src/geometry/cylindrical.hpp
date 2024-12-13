@@ -56,12 +56,11 @@ class Coords<Coordinates::cylindrical>
 
   KOKKOS_INLINE_FUNCTION std::array<Real, 3> FaceCenX3(const CellFace f) {
     //  <r> = d(r^3/3) / d(r^2/2)
-    std::array<Real, 3> xf{2.0 / 3.0 *
-                               (bnds.x1[0] * bnds.x1[0] + bnds.x1[0] * bnds.x1[1] +
-                                bnds.x1[1] * bnds.x1[1]) /
-                               (bnds.x1[0] + bnds.x1[1]),
-                           0.5 * (bnds.x2[0] + bnds.x2[1]), bnds.x3[static_cast<int>(f)]};
-    return xf;
+    return {2.0 / 3.0 *
+                (bnds.x1[0] * bnds.x1[0] + bnds.x1[0] * bnds.x1[1] +
+                 bnds.x1[1] * bnds.x1[1]) /
+                (bnds.x1[0] + bnds.x1[1]),
+            0.5 * (bnds.x2[0] + bnds.x2[1]), bnds.x3[static_cast<int>(f)]};
   }
 
   KOKKOS_INLINE_FUNCTION Real AreaX1(const Real x1f) {
@@ -97,8 +96,7 @@ class Coords<Coordinates::cylindrical>
   ConvertCoordsToCart(const std::array<Real, 3> &xi) {
     const Real cp = std::cos(xi[1]);
     const Real sp = std::sin(xi[1]);
-    std::array<Real, 3> xo{xi[0] * cp, xi[0] * sp, xi[2]};
-    return xo;
+    return {xi[0] * cp, xi[0] * sp, xi[2]};
   }
   KOKKOS_INLINE_FUNCTION Mat3x3 ConvertVecToCart(const std::array<Real, 3> &xi) {
     const Real cp = std::cos(xi[1]);
@@ -114,8 +112,7 @@ class Coords<Coordinates::cylindrical>
     const Real R = std::sqrt(xi[0] * xi[0] + xi[2] * xi[2]);
     const Real ct = xi[2] / (R + Fuzz<Real>());
     const Real st = xi[0] / (R + Fuzz<Real>());
-    std::array<Real, 3> xo{R, std::acos(ct), xi[1]};
-    return xo;
+    return {R, std::acos(ct), xi[1]};
   }
   KOKKOS_INLINE_FUNCTION Mat3x3 ConvertVecToSph(const std::array<Real, 3> &xi) {
     const Real rsph = std::sqrt(xi[0] * xi[0] + xi[2] * xi[2]);
@@ -140,8 +137,7 @@ class Coords<Coordinates::cylindrical>
 
   KOKKOS_INLINE_FUNCTION std::array<Real, 3>
   ConvertCoordsToAxi(const std::array<Real, 3> &xi) {
-    std::array<Real, 3> xo{xi[0], xi[2], xi[1]};
-    return xi;
+    return {xi[0], xi[2], xi[1]};
   }
   KOKKOS_INLINE_FUNCTION Mat3x3 ConvertVecToAxi(const std::array<Real, 3> &xi) {
     std::array<Real, 3> ex1{1.0, 0.0, 0.0};

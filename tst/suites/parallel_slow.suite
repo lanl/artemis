@@ -11,25 +11,17 @@
 #  the public, perform publicly and display publicly, and to permit others to do so.
 # ========================================================================================
 
-# Regression to test a binary in a 2D disk
+# parallel suite
 
-# Modules
-import importlib
-import logging
-import scripts.binary.binary as binary
-
-logger = logging.getLogger("artemis" + __name__[7:])  # set logger name
-
-importlib.reload(binary)
-binary._nranks = 16
-binary._file_id = "binary_mpi"
-
-
-# Run Artemis
-def run(**kwargs):
-    return binary.run(**kwargs)
-
-
-# Analyze outputs
-def analyze():
-    return binary.analyze()
+advection/advection_mpi
+binary/binary_mpi
+binary_aid/binary_adi_mpi
+coords/blast_mpi
+disk/disk_mpi
+nbody/nbody_mpi
+hydro/linwave_mpi
+ssheet/ssheet_mpi
+diffusion/viscous_diffusion_mpi
+diffusion/alpha_disk_mpi
+diffusion/thermal_diffusion_mpi
+drag/drag_mpi

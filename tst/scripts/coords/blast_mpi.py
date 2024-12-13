@@ -14,16 +14,13 @@
 # Regression to test the sphericity of the blast wave in all coordinate systems
 
 # Modules
+import importlib
 import logging
-import numpy as np
-import os
-import scripts.utils.artemis as artemis
 import scripts.coords.blast as blast
 
 logger = logging.getLogger("artemis" + __name__[7:])  # set logger name
-logging.getLogger("h5py").setLevel(logging.WARNING)
-logging.getLogger("matplotlib").setLevel(logging.WARNING)
 
+importlib.reload(blast)
 blast._nranks = 8
 blast._file_id = "blast_mpi"
 

@@ -18,10 +18,14 @@ import logging
 import numpy as np
 import os
 import scripts.utils.artemis as artemis
+from scipy.interpolate import interp1d
+
 
 logger = logging.getLogger("artemis" + __name__[7:])  # set logger name
 logging.getLogger("h5py").setLevel(logging.WARNING)
 logging.getLogger("matplotlib").setLevel(logging.WARNING)
+import h5py
+import matplotlib.pyplot as plt
 
 _nranks = 1
 _file_id = "blast"
@@ -92,15 +96,22 @@ def run(**kwargs):
 
 # Analyze outputs
 def analyze():
-    from scipy.interpolate import interp1d
-    import matplotlib.pyplot as plt
-
     logger.debug("Analyzing test " + __name__)
-    os.makedirs(artemis.artemis_fig_dir, exist_ok=True)
+    os.makedirs(artemis.get_fig_dir(), exist_ok=True)
     analyze_status = True
 
-    dat2 = np.loadtxt("./scripts/coords/sedov2d.dat", comments="#")
-    dat3 = np.loadtxt("./scripts/coords/sedov3d.dat", comments="#")
+    dat2 = np.loadtxt(
+        os.path.join(
+            artemis.get_artemis_dir(), "tst", "scripts", "coords", "sedov2d.dat"
+        ),
+        comments="#",
+    )
+    dat3 = np.loadtxt(
+        os.path.join(
+            artemis.get_artemis_dir(), "tst", "scripts", "coords", "sedov3d.dat"
+        ),
+        comments="#",
+    )
     tol = 1.0
     fig, axes = plt.subplots(2, 3, figsize=(8 * 3, 6 * 2))
     axes[0, 0].plot(dat2[:, 0], dat2[:, 1], "-k")
@@ -117,7 +128,10 @@ def analyze():
             else interp1d(dat3[:, 0], dat3[:, 3])
         )
         res = load_snap(
-            "build/src/" + _file_id + "_{}{:d}.out1.final.phdf".format(g, 2)
+            os.path.join(
+                artemis.get_data_dir(),
+                _file_id + "_{}{:d}.out1.final.phdf".format(g, 2),
+            )
         )
         pres = res[4][-1]
         xc = 0.5 * (res[1][:, 1:] + res[1][:, :-1])
@@ -152,7 +166,9 @@ def analyze():
         ax.set_xlim(0, 0.6)
         ax.minorticks_on()
     fig.tight_layout()
-    fig.savefig(artemis.artemis_fig_dir + _file_id + ".png", bbox_inches="tight")
+    fig.savefig(
+        os.path.join(artemis.get_fig_dir(), _file_id + ".png"), bbox_inches="tight"
+    )
 
     # Check failure criterion
     for res in L2:
@@ -200,8 +216,6 @@ def transform_3d(xc, yc, zc, vx, vy, vz, pos=(0, 0, 0)):
 
 
 def load_snap(fname):
-    import h5py
-
     with h5py.File(fname, "r") as f:
         time = f["Info"].attrs["Time"]
         x = f["Locations/x"][...]
@@ -216,8 +230,6 @@ def load_snap(fname):
 
 
 def sedov_cyl(fcyl_1d, fcart_2d, savefig=None):
-    import matplotlib.pyplot as plt
-
     dat = np.loadtxt("sedov2d.dat")
     fig, axes = plt.subplots(1, 3, figsize=(8 * 3, 6))
 
@@ -297,8 +309,8 @@ def sedov_cyl(fcyl_1d, fcart_2d, savefig=None):
         ax.minorticks_on()
     fig.tight_layout()
     if savefig is not None:
-        os.makedirs(artemis.artemis_fig_dir, exist_ok=True)
-        fig.savefig(artemis.artemis_fig_dir + savefig, bbox_inches="tight")
+        os.makedirs(artemis.get_fig_dir(), exist_ok=True)
+        fig.savefig(os.path.join(artemis.get_fig_dir(), savefig), bbox_inches="tight")
 
 
 def sedov_sph(fsph_1d, faxi_2d, fcart_3d, savefig=None):
@@ -417,5 +429,5 @@ def sedov_sph(fsph_1d, faxi_2d, fcart_3d, savefig=None):
         ax.minorticks_on()
     fig.tight_layout()
     if savefig is not None:
-        os.makedirs(artemis.artemis_fig_dir, exist_ok=True)
-        fig.savefig(artemis.artemis_fig_dir + savefig, bbox_inches="tight")
+        os.makedirs(artemis.get_fig_dir(), exist_ok=True)
+        fig.savefig(os.path.join(artemis.get_fig_dir(), savefig), bbox_inches="tight")

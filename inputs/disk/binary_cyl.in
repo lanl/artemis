@@ -75,7 +75,6 @@ riemann = hllc
 gamma = 1.00001
 dfloor = 1.0e-10
 siefloor = 1.0e-10
-de_switch = 0.0
 refine_field = pressure
 refine_type = gradient
 refine_thr = 3.0
@@ -88,8 +87,8 @@ type = alpha
 alpha = 1e-3
 
 <gravity>
-type = binary
 gm = 1.0
+<gravity/binary>
 q = 1.0e-5
 a = 1.0
 e = 0.0

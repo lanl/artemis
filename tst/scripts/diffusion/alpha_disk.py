@@ -18,11 +18,15 @@ import logging
 import numpy as np
 import os
 import scripts.utils.artemis as artemis
-import scripts.binary.binary as binary  # loads the
+from scipy.interpolate import interp1d
+
 
 logger = logging.getLogger("artemis" + __name__[7:])  # set logger name
 logging.getLogger("h5py").setLevel(logging.WARNING)
 logging.getLogger("matplotlib").setLevel(logging.WARNING)
+import scripts.utils.analysis as analysis
+import matplotlib.colors as colors
+import matplotlib.pyplot as plt
 
 _nranks = 1
 _file_id = "alpha_disk"
@@ -72,18 +76,14 @@ def run(**kwargs):
 
 # Analyze outputs
 def analyze():
-    from scipy.interpolate import interp1d
-    import matplotlib.colors as colors
-    import matplotlib.pyplot as plt
-
     errors = []
     d = 1
     base = "{}_{:d}d".format(_file_id, d)
     logger.debug("Analyzing test " + __name__ + " {:d}D".format(d))
-    os.makedirs(artemis.artemis_fig_dir, exist_ok=True)
+    os.makedirs(artemis.get_fig_dir(), exist_ok=True)
 
-    time, x, y, z, [dens, u, v, w, T] = binary.load_level(
-        "final", dir="build/src", base=base + ".out1"
+    time, x, y, z, [dens, u, v, w, T] = analysis.load_level(
+        "final", dir=artemis.get_data_dir(), base=base + ".out1"
     )
     r = 0.5 * (x[1:] + x[:-1])
 
@@ -115,7 +115,9 @@ def analyze():
         ax.minorticks_on()
 
     fig.tight_layout()
-    fig.savefig(artemis.artemis_fig_dir + base + "_res.png", bbox_inches="tight")
+    fig.savefig(
+        os.path.join(artemis.get_fig_dir(), base + "_res.png"), bbox_inches="tight"
+    )
 
     errors = [
         abs((dens_ans - dens) / dens_ans).mean(),
@@ -125,26 +127,3 @@ def analyze():
     print(errors)
     analyze_status = all([err <= _tol for err in errors])
     return analyze_status
-
-
-def create_colorbar(ax, norm, where="top", cax=None, cmap="viridis", **kargs):
-    import matplotlib
-    import matplotlib.cm
-    from mpl_toolkits.axes_grid1 import make_axes_locatable
-
-    labelsize = kargs.pop("labelsize", 14)
-    labelsize = kargs.pop("fontsize", 14)
-
-    if cax is None:
-        divider = make_axes_locatable(ax)
-        cax = divider.append_axes(where, size="3%", pad=0.05)
-
-    cmap = matplotlib.cm.get_cmap(cmap)
-    cb = matplotlib.colorbar.ColorbarBase(
-        ax=cax, cmap=cmap, norm=norm, orientation="horizontal", **kargs
-    )
-    cb.ax.xaxis.set_ticks_position(where)
-    cb.ax.xaxis.set_label_position(where)
-    cb.ax.tick_params(labelsize=labelsize)
-
-    return cb

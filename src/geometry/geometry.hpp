@@ -184,21 +184,18 @@ class CoordsBase {
 
   KOKKOS_INLINE_FUNCTION std::array<Real, 3> FaceCenX1(const CellFace f) {
     // The centroid value of the X1 face
-    std::array<Real, 3> xf{bnds.x1[static_cast<int>(f)], static_cast<T *>(this)->x2v(),
-                           static_cast<T *>(this)->x3v()};
-    return xf;
+    return {bnds.x1[static_cast<int>(f)], static_cast<T *>(this)->x2v(),
+            static_cast<T *>(this)->x3v()};
   }
   KOKKOS_INLINE_FUNCTION std::array<Real, 3> FaceCenX2(const CellFace f) {
     // The centroid value of the X2 face
-    std::array<Real, 3> xf{static_cast<T *>(this)->x1v(), bnds.x2[static_cast<int>(f)],
-                           static_cast<T *>(this)->x3v()};
-    return xf;
+    return {static_cast<T *>(this)->x1v(), bnds.x2[static_cast<int>(f)],
+            static_cast<T *>(this)->x3v()};
   }
   KOKKOS_INLINE_FUNCTION std::array<Real, 3> FaceCenX3(const CellFace f) {
     // The centroid value of the X3 face
-    std::array<Real, 3> xf{static_cast<T *>(this)->x1v(), static_cast<T *>(this)->x2v(),
-                           bnds.x3[static_cast<int>(f)]};
-    return xf;
+    return {static_cast<T *>(this)->x1v(), static_cast<T *>(this)->x2v(),
+            bnds.x3[static_cast<int>(f)]};
   }
 
   KOKKOS_INLINE_FUNCTION Real AreaX1(const Real x1f) {
@@ -269,8 +266,7 @@ class CoordsBase {
     const Real ct = xi[2] / (r + Fuzz<Real>());
     const Real cp = xi[0] / (R + Fuzz<Real>());
     const Real sp = xi[1] / (R + Fuzz<Real>());
-    std::array<Real, 3> xo{r, std::acos(ct), std::atan2(sp, cp)};
-    return xo;
+    return {r, std::acos(ct), std::atan2(sp, cp)};
   }
   KOKKOS_INLINE_FUNCTION Mat3x3 ConvertVecToSph(const std::array<Real, 3> &xi) {
     // Convert the input vector from the problem coordinate system to spherical
@@ -292,8 +288,7 @@ class CoordsBase {
     Real R = std::sqrt(xi[0] * xi[0] + xi[1] * xi[1]);
     const Real cp = xi[0] / (R + Fuzz<Real>());
     const Real sp = xi[1] / (R + Fuzz<Real>());
-    std::array<Real, 3> xo{R, std::atan2(sp, cp), xi[2]};
-    return xo;
+    return {R, std::atan2(sp, cp), xi[2]};
   }
   KOKKOS_INLINE_FUNCTION Mat3x3 ConvertVecToCyl(const std::array<Real, 3> &xi) {
     // Convert the input vector from the problem coordinate system to cylindrical
@@ -312,8 +307,7 @@ class CoordsBase {
     Real R = std::sqrt(xi[0] * xi[0] + xi[1] * xi[1]);
     const Real cp = xi[0] / (R + Fuzz<Real>());
     const Real sp = xi[1] / (R + Fuzz<Real>());
-    std::array<Real, 3> xo{R, xi[2], std::atan2(sp, cp)};
-    return xo;
+    return {R, xi[2], std::atan2(sp, cp)};
   }
   KOKKOS_INLINE_FUNCTION Mat3x3 ConvertVecToAxi(const std::array<Real, 3> &xi) {
     // Convert the input vector from the problem coordinate system to axisymmetric
@@ -354,44 +348,37 @@ class CoordsBase {
     // Return all cell widths
     const Real xv[3] = {static_cast<T *>(this)->x1v(), static_cast<T *>(this)->x2v(),
                         static_cast<T *>(this)->x3v()};
-    const std::array<Real, 3> dx{
-        static_cast<T *>(this)->hx1(xv[0], xv[1], xv[2]) * (bnds.x1[1] - bnds.x1[0]),
-        static_cast<T *>(this)->hx2(xv[0], xv[1], xv[2]) * (bnds.x2[1] - bnds.x2[0]),
-        static_cast<T *>(this)->hx3(xv[0], xv[1], xv[2]) * (bnds.x3[1] - bnds.x3[0])};
-    return dx;
+    return {static_cast<T *>(this)->hx1(xv[0], xv[1], xv[2]) * (bnds.x1[1] - bnds.x1[0]),
+            static_cast<T *>(this)->hx2(xv[0], xv[1], xv[2]) * (bnds.x2[1] - bnds.x2[0]),
+            static_cast<T *>(this)->hx3(xv[0], xv[1], xv[2]) * (bnds.x3[1] - bnds.x3[0])};
   }
 
   KOKKOS_INLINE_FUNCTION std::array<Real, 3> GetCellCenter() {
     // Get the cell centroid
-    std::array<Real, 3> xv{static_cast<T *>(this)->x1v(), static_cast<T *>(this)->x2v(),
-                           static_cast<T *>(this)->x3v()};
-    return xv;
+    return {static_cast<T *>(this)->x1v(), static_cast<T *>(this)->x2v(),
+            static_cast<T *>(this)->x3v()};
   }
 
   KOKKOS_INLINE_FUNCTION std::array<Real, 3> GetScaleFactors() {
     // Get the volume averaged scale factors
-    std::array<Real, 3> hx{static_cast<T *>(this)->hx1v(), static_cast<T *>(this)->hx2v(),
-                           static_cast<T *>(this)->hx3v()};
-    return hx;
+    return {static_cast<T *>(this)->hx1v(), static_cast<T *>(this)->hx2v(),
+            static_cast<T *>(this)->hx3v()};
   }
 
   KOKKOS_INLINE_FUNCTION std::array<Real, 2> GetFaceAreaX1() {
     // Get the lower and upper face areas in the X1 direction
-    const std::array<Real, 2> areas{static_cast<T *>(this)->AreaX1(bnds.x1[0]),
-                                    static_cast<T *>(this)->AreaX1(bnds.x1[1])};
-    return areas;
+    return {static_cast<T *>(this)->AreaX1(bnds.x1[0]),
+            static_cast<T *>(this)->AreaX1(bnds.x1[1])};
   }
   KOKKOS_INLINE_FUNCTION std::array<Real, 2> GetFaceAreaX2() {
     // Get the lower and upper face areas in the X2 direction
-    const std::array<Real, 2> areas{static_cast<T *>(this)->AreaX2(bnds.x2[0]),
-                                    static_cast<T *>(this)->AreaX2(bnds.x2[1])};
-    return areas;
+    return {static_cast<T *>(this)->AreaX2(bnds.x2[0]),
+            static_cast<T *>(this)->AreaX2(bnds.x2[1])};
   }
   KOKKOS_INLINE_FUNCTION std::array<Real, 2> GetFaceAreaX3() {
     // Get the lower and upper face areas in the X3 direction
-    const std::array<Real, 2> areas{static_cast<T *>(this)->AreaX3(bnds.x3[0]),
-                                    static_cast<T *>(this)->AreaX3(bnds.x3[1])};
-    return areas;
+    return {static_cast<T *>(this)->AreaX3(bnds.x3[0]),
+            static_cast<T *>(this)->AreaX3(bnds.x3[1])};
   }
 
   template <parthenon::CoordinateDirection XDIR>
@@ -422,24 +409,18 @@ class CoordsBase {
 
   KOKKOS_INLINE_FUNCTION std::array<Real, 3> GetConnX1() {
     // { dh1/dx1, dh2/dx1, dh3/dx1 }
-    const std::array<Real, 3> Gamma{static_cast<T *>(this)->dh1dx1(),
-                                    static_cast<T *>(this)->dh2dx1(),
-                                    static_cast<T *>(this)->dh3dx1()};
-    return Gamma;
+    return {static_cast<T *>(this)->dh1dx1(), static_cast<T *>(this)->dh2dx1(),
+            static_cast<T *>(this)->dh3dx1()};
   }
   KOKKOS_INLINE_FUNCTION std::array<Real, 3> GetConnX2() {
     // { dh1/dx2, dh2/dx2, dh3/dx2 }
-    const std::array<Real, 3> Gamma{static_cast<T *>(this)->dh1dx2(),
-                                    static_cast<T *>(this)->dh2dx2(),
-                                    static_cast<T *>(this)->dh3dx2()};
-    return Gamma;
+    return {static_cast<T *>(this)->dh1dx2(), static_cast<T *>(this)->dh2dx2(),
+            static_cast<T *>(this)->dh3dx2()};
   }
   KOKKOS_INLINE_FUNCTION std::array<Real, 3> GetConnX3() {
     // { dh1/dx3, dh2/dx3, dh3/dx3 }
-    const std::array<Real, 3> Gamma{static_cast<T *>(this)->dh1dx3(),
-                                    static_cast<T *>(this)->dh2dx3(),
-                                    static_cast<T *>(this)->dh3dx3()};
-    return Gamma;
+    return {static_cast<T *>(this)->dh1dx3(), static_cast<T *>(this)->dh2dx3(),
+            static_cast<T *>(this)->dh3dx3()};
   }
 
   KOKKOS_INLINE_FUNCTION Mat3x3 GetConns() {

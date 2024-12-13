@@ -68,7 +68,6 @@ nx3 = 32  # Number of cells in each MeshBlock, X3-dir
 <physics>
 gas = true
 dust = true
-gravity = false
 
 <gas>
 cfl = 0.9

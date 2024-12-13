@@ -17,11 +17,17 @@
 # Modules
 import logging
 import numpy as np
+import os
 import scripts.utils.artemis as artemis
+from scipy.interpolate import interp1d
+
 
 logger = logging.getLogger("artemis" + __name__[7:])  # set logger name
 logging.getLogger("h5py").setLevel(logging.WARNING)
 logging.getLogger("matplotlib").setLevel(logging.WARNING)
+import h5py
+import matplotlib.colors as colors
+import matplotlib.pyplot as plt
 
 _nranks = 1
 _file_id = "disk_nbody"
@@ -77,28 +83,29 @@ def run(**kwargs):
 
 # Analyze outputs
 def analyze():
-    from scipy.interpolate import interp1d
-    import matplotlib.colors as colors
-    import matplotlib.pyplot as plt
-
     bad = False
     for b in _bc:
         for g in _geom:
             for gam in _gamma:
                 logger.debug("Analyzing test {}_{}".format(__name__, g))
                 logger.debug(
-                    "build/src/disk_nbody_{}_{:d}_{}.out1".format(g, int(10 * gam), b)
+                    os.path.join(
+                        artemis.get_data_dir(),
+                        "disk_nbody_{}_{:d}_{}.out1".format(g, int(10 * gam), b),
+                    )
                 )
                 _, (x, y, z), (d0, _, _, _, _), sys, _ = loadf(
                     0,
-                    base="build/src/disk_nbody_{}_{:d}_{}.out1".format(
-                        g, int(10 * gam), b
+                    base=os.path.join(
+                        artemis.get_data_dir(),
+                        "/disk_nbody_{}_{:d}_{}.out1".format(g, int(10 * gam), b),
                     ),
                 )
                 time, (x, y, z), (d, T, u, v, w), sys, dt = loadf(
                     "final",
-                    base="build/src/disk_nbody_{}_{:d}_{}.out1".format(
-                        g, int(10 * gam), b
+                    base=os.path.join(
+                        artemis.get_data_dir(),
+                        "disk_nbody_{}_{:d}_{}.out1".format(g, int(10 * gam), b),
                     ),
                 )
                 mybad = False
@@ -124,8 +131,6 @@ def analyze():
 
 
 def loadf(n, base="disk_nbody.out1"):
-    import h5py
-
     try:
         fname = "{}.{:05d}.phdf".format(base, n)
     except:

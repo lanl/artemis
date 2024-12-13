@@ -16,13 +16,13 @@
 # softwares.
 
 # Modules
+import importlib
 import logging
-import numpy as np
-import scripts.utils.artemis as artemis
 import scripts.advection.advection as advection
 
 logger = logging.getLogger("artemis" + __name__[7:])  # set logger name
 
+importlib.reload(advection)
 advection._nranks = 4
 advection._file_id = "advection_mpi"
 

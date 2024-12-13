@@ -14,16 +14,13 @@
 # Regression to test a viscous_diffusion of a gaussian bump
 
 # Modules
+import importlib
 import logging
-import numpy as np
-import os
-import scripts.utils.artemis as artemis
 import scripts.diffusion.viscous_diffusion as viscous_diffusion
 
 logger = logging.getLogger("artemis" + __name__[7:])  # set logger name
-logging.getLogger("h5py").setLevel(logging.WARNING)
-logging.getLogger("matplotlib").setLevel(logging.WARNING)
 
+importlib.reload(viscous_diffusion)
 viscous_diffusion._nranks = 4
 viscous_diffusion._nd = [2]
 viscous_diffusion._file_id = "viscous_diffusion_mpi"

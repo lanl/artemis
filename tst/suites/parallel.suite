@@ -14,8 +14,6 @@
 # parallel suite
 
 advection/advection_mpi
-binary/binary_mpi
-binary_adi/binary_adi_mpi
 coords/blast_mpi
 disk/disk_mpi
 nbody/nbody_mpi
@@ -23,5 +21,4 @@ hydro/linwave_mpi
 ssheet/ssheet_mpi
 diffusion/viscous_diffusion_mpi
 diffusion/alpha_disk_mpi
-diffusion/thermal_diffusion_mpi
 drag/drag_mpi

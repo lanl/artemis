@@ -14,13 +14,13 @@
 # Regression to test collisions with REBOUND particles and MPI
 
 # Modules
+import importlib
 import logging
-import numpy as np
-import scripts.utils.artemis as artemis
 import scripts.collisions.collisions as collisions
 
 logger = logging.getLogger("artemis" + __name__[7:])  # set logger name
 
+importlib.reload(collisions)
 collisions._nranks = 16
 collisions._file_id = "collisions_mpi"
 

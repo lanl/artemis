@@ -80,8 +80,8 @@ dfloor = 1.0e-10
 siefloor = 1.0e-10
 
 <gravity>
-type = nbody
 gm = 1.0
+<gravity/nbody>
 
 <gas/damping>
 inner_x1 = 0.45

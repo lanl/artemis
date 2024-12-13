@@ -18,11 +18,15 @@
 # Modules
 import logging
 import numpy as np
+import os
 import scripts.utils.artemis as artemis
+from scipy.interpolate import interp1d
+
 
 logger = logging.getLogger("artemis" + __name__[7:])  # set logger name
-logging.getLogger("h5py").setLevel(logging.WARNING)
 logging.getLogger("matplotlib").setLevel(logging.WARNING)
+import matplotlib.colors as colors
+import matplotlib.pyplot as plt
 
 _nranks = 1
 _file_id = "collisions"
@@ -52,13 +56,11 @@ def run(**kwargs):
 
 # Analyze outputs
 def analyze():
-    from scipy.interpolate import interp1d
-    import matplotlib.colors as colors
-    import matplotlib.pyplot as plt
-
     logger.debug("Analyzing test " + __name__)
 
-    fname = "build/src/{}_{:d}.reb".format(_file_id, _nranks)
+    fname = os.path.join(
+        artemis.get_data_dir(), "{}_{:d}.reb".format(_file_id, _nranks)
+    )
     logger.debug("Reading" + fname)
     d = np.loadtxt(fname)
     with open(fname, "r") as f:

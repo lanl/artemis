@@ -17,11 +17,17 @@
 # Modules
 import logging
 import numpy as np
+import os
 import scripts.utils.artemis as artemis
+from scipy.interpolate import interp1d
+
 
 logger = logging.getLogger("artemis" + __name__[7:])  # set logger name
 logging.getLogger("h5py").setLevel(logging.WARNING)
 logging.getLogger("matplotlib").setLevel(logging.WARNING)
+import h5py
+import matplotlib.colors as colors
+import matplotlib.pyplot as plt
 
 _nranks = 1
 _file_id = "disk"
@@ -47,6 +53,13 @@ def run(**kwargs):
     for b in _bc:
         for g in _geom:
             bc_args = []
+            geom_args = []
+            if g == "cart":
+                geom_args = [
+                    "parthenon/mesh/nx1=64",
+                    "parthenon/mesh/nx2=64",
+                    "parthenon/mesh/nx3=64",
+                ]
             for d in directions[g]:
                 bc_args.append("parthenon/mesh/i{}_bc={}".format(d, b))
                 bc_args.append("parthenon/mesh/o{}_bc={}".format(d, b))
@@ -60,7 +73,9 @@ def run(**kwargs):
                             g, int(10 * gam), b
                         ),
                         "problem/polytropic_index={:.2f}".format(gam),
-                    ],
+                        "gas/de_switch=" + str(0.0 if g != "sph" else 1e-2),
+                    ]
+                    + geom_args,
                 )
                 artemis.run(
                     _nranks,
@@ -71,7 +86,8 @@ def run(**kwargs):
                             g, int(10 * gam), b
                         ),
                         "problem/polytropic_index={:.2f}".format(gam),
-                    ],
+                    ]
+                    + geom_args,
                     restart="disk_{}_{:d}_{}.out2.final.rhdf".format(
                         g, int(10 * gam), b
                     ),
@@ -80,25 +96,30 @@ def run(**kwargs):
 
 # Analyze outputs
 def analyze():
-    from scipy.interpolate import interp1d
-    import matplotlib.colors as colors
-    import matplotlib.pyplot as plt
-
     bad = False
     for b in _bc:
         for g in _geom:
             for gam in _gamma:
                 logger.debug("Analyzing test {}_{}".format(__name__, g))
                 logger.debug(
-                    "build/src/disk_{}_{:d}_{}.out1".format(g, int(10 * gam), b)
+                    os.path.join(
+                        artemis.get_data_dir(),
+                        "disk_{}_{:d}_{}.out1".format(g, int(10 * gam), b),
+                    )
                 )
                 _, (x, y, z), (d0, _, _, _, _), sys, _ = loadf(
                     0,
-                    base="build/src/disk_{}_{:d}_{}.out1".format(g, int(10 * gam), b),
+                    base=os.path.join(
+                        artemis.get_data_dir(),
+                        "disk_{}_{:d}_{}.out1".format(g, int(10 * gam), b),
+                    ),
                 )
                 time, (x, y, z), (d, T, u, v, w), sys, dt = loadf(
                     "final",
-                    base="build/src/disk_{}_{:d}_{}.out1".format(g, int(10 * gam), b),
+                    base=os.path.join(
+                        artemis.get_data_dir(),
+                        "disk_{}_{:d}_{}.out1".format(g, int(10 * gam), b),
+                    ),
                 )
                 mybad = False
                 mybad |= np.any(np.isnan(d))
@@ -166,8 +187,6 @@ def analyze():
 
 
 def loadf(n, base="disk.out1"):
-    import h5py
-
     try:
         fname = "{}.{:05d}.phdf".format(base, n)
     except:

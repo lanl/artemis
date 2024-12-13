@@ -64,19 +64,17 @@ if [[ $PARTITION == "unknown" ]]; then
     echo "Partition is unknown! exiting..."
 elif [[ $PARTITION == "chicoma-gpu" ]]; then
     module unload cray-libsci
-    module load PrgEnv-gnu cudatoolkit/24.7_12.5
+    module load PrgEnv-gnu
+    module load cudatoolkit/24.7_12.5
     module load craype-accel-nvidia80
     unset OMP_NUM_THREADS
     unset OMP_PROC_BIND
     unset OMP_PLACES
     export MPICH_GPU_SUPPORT_ENABLED=1
     export MPICH_GPU_MANAGED_MEMORY_SUPPORT_ENABLED=1
-    C_NATIVE=cc
-    CXX_NATIVE=CC
     module load cray-hdf5-parallel
-    module load python/3.10-anaconda-2023.03
-    source /usr/projects/hpcsoft/common/x86_64/anaconda/2023.03-python-3.10/bin/activate /usr/projects/jovian/dependencies/python/chicoma-frontend
-    shorten_prompt
+    module load cray-python/3.11.5
+    source /usr/projects/jovian/dependencies/python/chicoma-gpu/bin/activate
     module load cmake
     export NVCC_WRAPPER_DEFAULT_COMPILER=CC
     export ARTEMIS_SUITE=chicoma-gpu
@@ -84,9 +82,8 @@ elif [[ $PARTITION == "chicoma-gpu" ]]; then
 elif [[ $PARTITION == "chicoma-cpu" ]]; then
     module swap PrgEnv-cray PrgEnv-gnu
     module load cray-hdf5-parallel
-    module load python/3.10-anaconda-2023.03
-    source /usr/projects/hpcsoft/common/x86_64/anaconda/2023.03-python-3.10/bin/activate /usr/projects/jovian/dependencies/python/chicoma-frontend
-    shorten_prompt
+    module load cray-python/3.11.5
+    source /usr/projects/jovian/dependencies/python/chicoma-cpu/bin/activate
     module load cmake
     export ARTEMIS_SUITE=chicoma-cpu
     echo "...setup SUCCEEDED"

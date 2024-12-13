@@ -46,7 +46,7 @@ void UserWorkBeforeRestartOutputMesh(Mesh *pmesh, ParameterInput *, SimTime &,
 //! \fn  StateDescriptor NBody::Initialize
 //! \brief Adds intialization function for NBody package
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
-                                            const ArtemisUtils::Units &units) {
+                                            const ArtemisUtils::Constants &constants) {
   auto nbody = std::make_shared<StateDescriptor>("nbody");
   Params &params = nbody->AllParams();
   PARTHENON_REQUIRE(
@@ -76,7 +76,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   params.Add("mscale", pin->GetOrAddReal("nbody", "mscale", 1.0));
 
   // Reference gravitational mass in code units (where mass = 1)
-  const Real GM = units.GetGCode();
+  const Real GM = constants.GetGCode();
 
   // Frame specification
   // NOTE(ADM): Shearing box has Rf = {R0, 0,0}, shearing box has Vf = {0, Om0*R0,0},
@@ -87,7 +87,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   Real Rf[3] = {0.0};
   Real Vf[3] = {0.0};
   if (global_frame && (Omf != 0.0) && (qshear != 0.0)) {
-    const Real R0 = std::pow(SQR(Omf) / units.GetGCode(), 1.0 / 3.0);
+    const Real R0 = std::pow(SQR(Omf) / constants.GetGCode(), 1.0 / 3.0);
     Rf[0] = R0;
     Vf[1] = R0 * Omf;
   }
@@ -97,7 +97,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   RebAttrs::PN = pin->GetOrAddReal("nbody", "pn", 0);
   RebAttrs::include_pn2 = pin->GetOrAddInteger("nbody", "pn2_corr", 1);
   RebAttrs::extras = (RebAttrs::PN > 0);
-  RebAttrs::c = units.GetCCode();
+  RebAttrs::c = constants.GetCCode();
   RebAttrs::merge_on_collision =
       pin->GetOrAddBoolean("nbody", "merge_on_collision", true);
 

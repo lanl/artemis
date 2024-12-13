@@ -104,7 +104,7 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   if (do_rotating_frame) packages.Add(RotatingFrame::Initialize(pin.get()));
   if (do_cooling) packages.Add(Gas::Cooling::Initialize(pin.get()));
   if (do_drag) packages.Add(Drag::Initialize(pin.get()));
-  if (do_nbody) packages.Add(NBody::Initialize(pin.get(), units));
+  if (do_nbody) packages.Add(NBody::Initialize(pin.get(), constants));
   if (do_radiation) {
     auto eos_h = packages.Get("gas")->Param<EOS>("eos_h");
     auto opacity_h = packages.Get("gas")->Param<Opacity>("opacity_h");

@@ -45,7 +45,7 @@ void NBodySetup(ParameterInput *pin, const Real GM, const Real Rf[3], const Real
                 std::vector<int> &particle_id, std::vector<Particle> &particles);
 
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
-                                            const ArtemisUtils::Units &units);
+                                            const ArtemisUtils::Constants &constants);
 
 Real EstimateTimestepMesh(MeshData<Real> *md);
 

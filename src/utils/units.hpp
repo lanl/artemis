@@ -67,42 +67,6 @@ class Units {
   KOKKOS_INLINE_FUNCTION
   Real GetMassDensityPhysicalToCode() const { return 1. / mass_density_; }
 
-  KOKKOS_INLINE_FUNCTION
-  Real GetTemperatureCodeToPhysical() const { return temperature_; }
-  KOKKOS_INLINE_FUNCTION
-  Real GetTemperaturePhysicalToCode() const { return 1. / temperature_; }
-
-  // Physical constants
-  KOKKOS_INLINE_FUNCTION
-  Real GetGPhysical() const { return G_; }
-  KOKKOS_INLINE_FUNCTION
-  Real GetGCode() const { return G_code_; }
-
-  KOKKOS_INLINE_FUNCTION
-  Real GetKBPhysical() const { return kb_; }
-  KOKKOS_INLINE_FUNCTION
-  Real GetKBCode() const { return kb_code_; }
-
-  KOKKOS_INLINE_FUNCTION
-  Real GetCPhysical() const { return c_; }
-  KOKKOS_INLINE_FUNCTION
-  Real GetCCode() const { return c_code_; }
-
-  KOKKOS_INLINE_FUNCTION
-  Real GetHPhysical() const { return h_; }
-  KOKKOS_INLINE_FUNCTION
-  Real GetHCode() const { return h_code_; }
-
-  KOKKOS_INLINE_FUNCTION
-  Real GetMsolarPhysical() const { return Msolar_; }
-  KOKKOS_INLINE_FUNCTION
-  Real GetMsolarCode() const { return Msolar_code_; }
-
-  KOKKOS_INLINE_FUNCTION
-  Real GetAUPhysical() const { return AU_; }
-  KOKKOS_INLINE_FUNCTION
-  Real GetAUCode() const { return AU_code_; }
-
  private:
   // Unit conversion factors from code to physical units
   // e.g. length_ has units of cm when using CGS as physical unit system

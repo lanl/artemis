@@ -34,7 +34,7 @@ class Units {
 
   // Return unit system
   KOKKOS_INLINE_FUNCTION
-  UnitSystem GetUnitSystem() const { return unit_system; }
+  UnitSystem GetUnitSystem() const { return unit_system_; }
 
   // Unit conversions
   KOKKOS_INLINE_FUNCTION
@@ -115,28 +115,14 @@ class Units {
   Real mass_density_;
   Real temperature_;
 
-  // Physical constants in physical units
-  Real G_;      // Gravitational constant
-  Real kb_;     // Boltzmann constant
-  Real c_;      // Speed of light
-  Real h_;      // Planck constant
-  Real Msolar_; // Solar mass
-  Real AU_;     // Astronomical unit
-
-  // Physical constants in code units
-  Real G_code_;
-  Real kb_code_;
-  Real c_code_;
-  Real h_code_;
-  Real Msolar_code_;
-  Real AU_code_;
-
-  UnitSystem unit_system;
+  UnitSystem unit_system_;
 };
 
 class Constants {
-
+ public:
   Constants() = delete;
+
+  KOKKOS_FUNCTION
   Constants(Units &units);
 
   KOKKOS_INLINE_FUNCTION

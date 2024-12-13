@@ -37,7 +37,11 @@ namespace Gas {
 //----------------------------------------------------------------------------------------
 //! \fn  StateDescriptor Gas::Initialize
 //! \brief Adds intialization function for gas hydrodynamics package
-std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
+std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
+                                            ArtemisUtils::Units &units,
+                                            ArtemisUtils::Constants &constants) {
+  using namespace singularity::photons;
+
   auto gas = std::make_shared<StateDescriptor>("gas");
   Params &params = gas->AllParams();
 
@@ -97,7 +101,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   const std::string eos_name = pin->GetOrAddString("gas", "eos", "ideal");
   if (eos_name == "ideal") {
     const Real gamma = pin->GetOrAddReal("gas", "gamma", 1.66666666667);
-    const Real cv = pin->GetOrAddReal("gas", "cv", 1. / (gamma - 1.));
+    const Real mmw = pin->GetOrAddReal("gas", "mmw", 1.);
+    const Real cv = constants.GetKBCode() / ((gamma - 1.) * mmw);
     EOS eos_host = singularity::IdealGas(gamma - 1., cv);
     EOS eos_device = eos_host.GetOnDevice();
     params.Add("eos_h", eos_host);
@@ -111,11 +116,14 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   ArtemisUtils::Opacity opacity;
   std::string opacity_model_name =
       pin->GetOrAddString("gas/opacity/absorption", "opacity_model", "constant");
+  const Real length = units.GetLengthCodeToPhysical();
+  const Real time = units.GetTimeCodeToPhysical();
+  const Real mass = units.GetMassCodeToPhysical();
   if (opacity_model_name == "none") {
-    opacity = singularity::photons::Gray(0.0);
+    opacity = NonCGSUnits<Gray>(Gray(0.0), time, mass, length, 1.);
   } else if (opacity_model_name == "constant") {
     const Real kappa_a = pin->GetOrAddReal("gas/opacity/absorption", "kappa_a", 0.0);
-    opacity = singularity::photons::Gray(kappa_a);
+    opacity = NonCGSUnits<Gray>(Gray(kappa_a), time, mass, length, 1.);
   } else if (opacity_model_name == "shocktube_a") {
     const Real coef_kappa_a =
         pin->GetOrAddReal("gas/opacity/absorption", "coef_kappa_a", 0.0);
@@ -137,10 +145,10 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   std::string scattering_model_name =
       pin->GetOrAddString("gas/opacity/scattering", "scattering_model", "none");
   if (scattering_model_name == "none") {
-    scattering = singularity::photons::GrayS(0.0, 1.0);
+    scattering = NonCGSUnitsS<GrayS>(GrayS(0.0, 1.0), time, mass, length, 1.);
   } else if (scattering_model_name == "constant") {
     const Real kappa_s = pin->GetOrAddReal("gas/opacity/scattering", "kappa_s", 0.0);
-    scattering = singularity::photons::GrayS(kappa_s, 1.0);
+    scattering = NonCGSUnitsS<GrayS>(GrayS(kappa_s, 1.0), time, mass, length, 1.);
   } else {
     PARTHENON_FAIL("Scattering model not recognized!");
   }

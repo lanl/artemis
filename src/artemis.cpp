@@ -55,9 +55,9 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
 
   // Set up unit conversions for this problem
   ArtemisUtils::Units units(pin.get(), artemis);
+  ArtemisUtils::Constants constants(units);
   artemis->AddParam("units", units);
-  // TODO(BRR) store unit parameters for analysis usage? Pass artemis StateDescriptor to
-  // units class?
+  artemis->AddParam("constants", constants);
 
   // Determine input file specified physics
   const bool do_gas = pin->GetOrAddBoolean("physics", "gas", true);
@@ -98,7 +98,7 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   artemis->AddParam("coord_sys", sys);
 
   // Call package initializers here
-  if (do_gas) packages.Add(Gas::Initialize(pin.get()));
+  if (do_gas) packages.Add(Gas::Initialize(pin.get(), units, constants));
   if (do_dust) packages.Add(Dust::Initialize(pin.get()));
   if (do_gravity) packages.Add(Gravity::Initialize(pin.get()));
   if (do_rotating_frame) packages.Add(RotatingFrame::Initialize(pin.get()));

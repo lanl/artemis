@@ -67,7 +67,8 @@ Units::Units(ParameterInput *pin, std::shared_ptr<StateDescriptor> pkg) {
       mass_ = pin->GetReal("artemis/units", "mass");
     } else if (unit_specifier == "orbit") {
       const Real total_mass = pin->GetReal("artemis/units", "total_mass"); // Solar masses
-      const Real ref_radius = pin->GetReal("artemis/units", "reference_radius"); // AU
+      const Real reference_radius =
+          pin->GetReal("artemis/units", "reference_radius"); // AU
       mass_ = total_mass * Msolar_;
       length_ = reference_radius * AU_;
       time_ = std::sqrt(4. * M_PI * M_PI / (G_ * mass_) *

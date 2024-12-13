@@ -44,15 +44,15 @@ using ThermalizationOpacity =
     singularity::photons::GrayOpacity<PhysicalConstantsThermalization>;
 
 // Reduced absorption variant for this codebase
-using Opacity = singularity::photons::impl::Variant <
-                singularity::photons::NonCGSUnits<singularity::photons::Gray>,
-      singularity::photons::NonCGSUnits<singularity::photons::EPBremss>,
-      ShocktubeAOpacity, ThermalizationOpacity;
+using Opacity = singularity::photons::impl::Variant<
+    singularity::photons::NonCGSUnits<singularity::photons::Gray>,
+    singularity::photons::NonCGSUnits<singularity::photons::EPBremss>, ShocktubeAOpacity,
+    ThermalizationOpacity>;
 
 // Reduced scattering variant for this codebase
 using Scattering = singularity::photons::impl::S_Variant<
-    singularity::photons::NonCGSUnits<singularity::photons::GrayS>,
-    singularity::photons::NonCGSUnits<singularity::photons::ThomsonS>>;
+    singularity::photons::NonCGSUnitsS<singularity::photons::GrayS>,
+    singularity::photons::NonCGSUnitsS<singularity::photons::ThomsonS>>;
 
 } // namespace ArtemisUtils
 

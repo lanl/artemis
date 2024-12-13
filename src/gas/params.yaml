@@ -14,11 +14,11 @@ gas:
     _default: "5/3"
     _description:  "Adiabatic index for ideal EOS"
 
-  cv:
+  mmw:
     _type: Real
-    _default: "1.5"
-    _description:  "Specific heat for ideal EOS"
-    _units: "erg g^-1 K^-1"
+    _default: "1."
+    _description:  "Mean molecular weight for ideal EOS"
+    _units: "g"
 
   cfl:
     _type: Real

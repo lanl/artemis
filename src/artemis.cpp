@@ -54,7 +54,7 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   artemis->AddParam("mb_dim", nb);
 
   // Set up unit conversions for this problem
-  ArtemisUtils::Units units(pin.get());
+  ArtemisUtils::Units units(pin.get(), artemis);
   artemis->AddParam("units", units);
   // TODO(BRR) store unit parameters for analysis usage? Pass artemis StateDescriptor to
   // units class?

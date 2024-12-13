@@ -28,6 +28,7 @@
 #include "utils/history.hpp"
 #include "utils/opacity/opacity.hpp"
 #include "utils/refinement/amr_criteria.hpp"
+#include "utils/units.hpp"
 
 using ArtemisUtils::EOS;
 using ArtemisUtils::VI;
@@ -378,6 +379,10 @@ Real EstimateTimestepMesh(MeshData<Real> *md) {
   auto &params = gas_pkg->AllParams();
   auto eos_d = params.template Get<EOS>("eos_d");
 
+  // Units test
+  auto units =
+      pm->packages.Get("artemis")->AllParams().template Get<ArtemisUtils::Units>("units");
+
   static auto desc =
       MakePackDescriptor<gas::prim::density, gas::prim::velocity, gas::prim::sie>(
           resolved_pkgs.get());
@@ -392,6 +397,7 @@ Real EstimateTimestepMesh(MeshData<Real> *md) {
       parthenon::loop_pattern_mdrange_tag, "Gas::EstimateTimestepMesh", DevExecSpace(), 0,
       md->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, Real &ldt) {
+        printf("kb: %e\n", units.GetKBPhysical());
         // Extract coordinates
         geometry::Coords<GEOM> coords(vmesh.GetCoordinates(b), k, j, i);
         const auto &dx = coords.GetCellWidths();

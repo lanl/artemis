@@ -15,9 +15,9 @@
 
 namespace ArtemisUtils {
 
-Units::Units(ParameterInput *pin) {
-  unit_system_ = pin->GetOrAddString("artemis/units", "type", "code");
-  if (unit_system_ == "code") {
+Units::Units(ParameterInput *pin, std::shared_ptr<StateDescriptor> pkg) {
+  std::string unit_system = pin->GetOrAddString("artemis/units", "type", "code");
+  if (unit_system == "code") {
     length_ = 1.;
     time_ = 1.;
     mass_ = 1.;
@@ -28,7 +28,7 @@ Units::Units(ParameterInput *pin) {
     Msolar_ = 1.;
     AU_ = 1.;
   } else {
-    if (unit_system_ == "cgs") {
+    if (unit_system == "cgs") {
       parthenon::constants::PhysicalConstants<parthenon::constants::CGS> pc;
       G_ = pc.gravitational_constant;
       kb_ = pc.kb;
@@ -71,14 +71,15 @@ Units::Units(ParameterInput *pin) {
   Msolar_code_ = Msolar_ / mass_;
   AU_code_ = AU_ / length_;
 
-  if (unit_system_ != "code") {
+  if (unit_system != "code") {
 
-    unit_specifier_ = pin->GetOrAddString("artemis/units", "specifier", "base");
-    if (unit_specifier_ == "base") {
+    std::string unit_specifier =
+        pin->GetOrAddString("artemis/units", "specifier", "base");
+    if (unit_specifier == "base") {
       length_ = pin->GetReal("artemis/units", "length");
       time_ = pin->GetReal("artemis/units", "time");
       mass_ = pin->GetReal("artemis/units", "mass");
-    } else if (unit_specifier_ == "orbit") {
+    } else if (unit_specifier == "orbit") {
       const Real Mstar = pin->GetReal("artemis/units", "star_mass");     // Solar masses
       const Real Rorbit = pin->GetReal("artemis/units", "orbit_radius"); // AU
       mass_ = Mstar * Msolar_;
@@ -95,6 +96,19 @@ Units::Units(ParameterInput *pin) {
   number_density_ = std::pow(length_, -3);
   mass_density_ = mass_ * number_density_;
   temperature_ = 1.;
+
+  // Store everything necessary in params for usage in analysis
+  pkg->AddParam("unit_system", unit_system);
+  pkg->AddParam("length", length_);
+  pkg->AddParam("time", time_);
+  pkg->AddParam("mass", mass_);
+  pkg->AddParam("temperature", temperature_);
+  pkg->AddParam("G", G_);
+  pkg->AddParam("kb", kb_);
+  pkg->AddParam("c", c_);
+  pkg->AddParam("h", h_);
+  pkg->AddParam("Msolar", Msolar_);
+  pkg->AddParam("AU", AU_);
 }
 
 } // namespace ArtemisUtils

@@ -383,10 +383,6 @@ Real EstimateTimestepMesh(MeshData<Real> *md) {
   auto pm = md->GetParentPointer();
   auto &resolved_pkgs = pm->resolved_packages;
 
-  auto &artemis_pkg = pm->packages.Get("artemis");
-  auto &units = artemis_pkg->AllParams().template Get<ArtemisUtils::Units>("units");
-  auto &constants =
-      artemis_pkg->AllParams().template Get<ArtemisUtils::Constants>("units");
   auto &gas_pkg = pm->packages.Get("gas");
   auto &params = gas_pkg->AllParams();
   auto eos_d = params.template Get<EOS>("eos_d");
@@ -405,7 +401,6 @@ Real EstimateTimestepMesh(MeshData<Real> *md) {
       parthenon::loop_pattern_mdrange_tag, "Gas::EstimateTimestepMesh", DevExecSpace(), 0,
       md->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, Real &ldt) {
-        printf("kb: %e\n", constants.GetKBPhysical());
         // Extract coordinates
         geometry::Coords<GEOM> coords(vmesh.GetCoordinates(b), k, j, i);
         const auto &dx = coords.GetCellWidths();

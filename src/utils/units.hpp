@@ -19,14 +19,22 @@
 
 namespace ArtemisUtils {
 
+enum class UnitSystem { scalefree, cgs };
+
 class Units {
  public:
+  // No default constructor
+  Units() = delete;
   // Host-only constructor from parameter input file
   Units(ParameterInput *pin, std::shared_ptr<StateDescriptor> pkg);
 
   // Copy constructor must be marked with KOKKOS_FUNCTION
   KOKKOS_FUNCTION
   Units(const Units &other) {}
+
+  // Return unit system
+  KOKKOS_INLINE_FUNCTION
+  UnitSystem GetUnitSystem() const { return unit_system; }
 
   // Unit conversions
   KOKKOS_INLINE_FUNCTION
@@ -107,6 +115,61 @@ class Units {
   Real mass_density_;
   Real temperature_;
 
+  // Physical constants in physical units
+  Real G_;      // Gravitational constant
+  Real kb_;     // Boltzmann constant
+  Real c_;      // Speed of light
+  Real h_;      // Planck constant
+  Real Msolar_; // Solar mass
+  Real AU_;     // Astronomical unit
+
+  // Physical constants in code units
+  Real G_code_;
+  Real kb_code_;
+  Real c_code_;
+  Real h_code_;
+  Real Msolar_code_;
+  Real AU_code_;
+
+  UnitSystem unit_system;
+};
+
+class Constants {
+
+  Constants() = delete;
+  Constants(Units &units);
+
+  KOKKOS_INLINE_FUNCTION
+  Real GetGPhysical() const { return G_; }
+  KOKKOS_INLINE_FUNCTION
+  Real GetGCode() const { return G_code_; }
+
+  KOKKOS_INLINE_FUNCTION
+  Real GetKBPhysical() const { return kb_; }
+  KOKKOS_INLINE_FUNCTION
+  Real GetKBCode() const { return kb_code_; }
+
+  KOKKOS_INLINE_FUNCTION
+  Real GetCPhysical() const { return c_; }
+  KOKKOS_INLINE_FUNCTION
+  Real GetCCode() const { return c_code_; }
+
+  KOKKOS_INLINE_FUNCTION
+  Real GetHPhysical() const { return h_; }
+  KOKKOS_INLINE_FUNCTION
+  Real GetHCode() const { return h_code_; }
+
+  KOKKOS_INLINE_FUNCTION
+  Real GetMsolarPhysical() const { return Msolar_; }
+  KOKKOS_INLINE_FUNCTION
+  Real GetMsolarCode() const { return Msolar_code_; }
+
+  KOKKOS_INLINE_FUNCTION
+  Real GetAUPhysical() const { return AU_; }
+  KOKKOS_INLINE_FUNCTION
+  Real GetAUCode() const { return AU_code_; }
+
+ private:
   // Physical constants in physical units
   Real G_;      // Gravitational constant
   Real kb_;     // Boltzmann constant

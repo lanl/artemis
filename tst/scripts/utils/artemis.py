@@ -24,7 +24,7 @@ from timeit import default_timer as timer
 from .log_pipe import LogPipe
 
 # Global variables
-artemis_dir = os.path.abspath(os.path.join(__file__, "../../../../"))
+artemis_dir = os.path.abspath(os.path.join(__file__, "..", "..", "..", ".."))
 current_dir = os.getcwd()
 artemis_exe_dir = "/dev/null"
 artemis_outputs_dir = "/dev/null"

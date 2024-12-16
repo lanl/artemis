@@ -102,7 +102,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   if (eos_name == "ideal") {
     const Real gamma = pin->GetOrAddReal("gas", "gamma", 1.66666666667);
     const Real mmw = pin->GetOrAddReal("gas", "mmw", 1.);
-    const Real cv = constants.GetKBCode() / ((gamma - 1.) * mmw);
+    const Real cv = constants.GetKBCode() / ((gamma - 1.) * constants.GetAMUCode() * mmw);
     EOS eos_host = singularity::IdealGas(gamma - 1., cv);
     EOS eos_device = eos_host.GetOnDevice();
     params.Add("eos_h", eos_host);

@@ -17,6 +17,7 @@ namespace ArtemisUtils {
 
 constexpr Real Msolar = 1.988416e33;
 constexpr Real AU = 1.495978707e13;
+constexpr Real Year = 31536000;
 
 Units::Units(ParameterInput *pin, std::shared_ptr<StateDescriptor> pkg) {
   std::string unit_system_str = pin->GetOrAddString("artemis/units", "type", "scalefree");
@@ -65,16 +66,22 @@ Constants::Constants(Units &units) {
     kb_ = 1.;
     c_ = 1.;
     h_ = 1.;
+    amu_ = 1.;
+    eV_ = 1.;
     Msolar_ = 1.;
     AU_ = 1.;
+    Year_ = 1.;
   } else if (units.GetUnitSystem() == UnitSystem::cgs) {
     parthenon::constants::PhysicalConstants<parthenon::constants::CGS> pc;
     G_ = pc.gravitational_constant;
     kb_ = pc.kb;
     c_ = pc.c;
     h_ = pc.h;
+    amu_ = pc.amu;
+    eV_ = pc.eV;
     Msolar_ = Msolar;
     AU_ = AU;
+    Year_ = Year;
   } else {
     PARTHENON_FAIL("Unknown unit system");
   }
@@ -90,8 +97,11 @@ Constants::Constants(Units &units) {
         kb_ * std::pow(time, 2) / mass * std::pow(length, -2); // 1 K = 1 code unit temp
     c_code_ = c_ * time / length;
     h_code_ = h_ * time / mass * std::pow(length, -2);
+    amu_code_ = amu_ / mass;
+    eV_code_ = ev_ * std::pow(time, 2) / mass * std::pot(length, -2);
     Msolar_code_ = Msolar_ / mass;
     AU_code_ = AU_ / length;
+    Year_code_ = Year_ / time;
   }
 }
 

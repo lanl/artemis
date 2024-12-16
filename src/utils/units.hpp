@@ -110,6 +110,11 @@ class Constants {
   Real GetHCode() const { return h_code_; }
 
   KOKKOS_INLINE_FUNCTION
+  Real GetAMUPhysical() const { return amu_; }
+  KOKKOS_INLINE_FUNCTION
+  Real GetAMUCode() const { return amu_code_; }
+
+  KOKKOS_INLINE_FUNCTION
   Real GetMsolarPhysical() const { return Msolar_; }
   KOKKOS_INLINE_FUNCTION
   Real GetMsolarCode() const { return Msolar_code_; }
@@ -119,22 +124,33 @@ class Constants {
   KOKKOS_INLINE_FUNCTION
   Real GetAUCode() const { return AU_code_; }
 
+  KOKKOS_INLINE_FUNCTION
+  Real GetYearPhysical() const { return Year_; }
+  KOKKOS_INLINE_FUNCTION
+  Real GetYearCode() const { return Year_code_; }
+
  private:
   // Physical constants in physical units
   Real G_;      // Gravitational constant
   Real kb_;     // Boltzmann constant
   Real c_;      // Speed of light
   Real h_;      // Planck constant
+  Real amu_;    // Atomic mass unit
+  Real eV_;     // Electron-volt
   Real Msolar_; // Solar mass
   Real AU_;     // Astronomical unit
+  Real Year_;   // Year
 
   // Physical constants in code units
   Real G_code_;
   Real kb_code_;
   Real c_code_;
   Real h_code_;
+  Real amu_code_;
+  Real eV_code_;
   Real Msolar_code_;
   Real AU_code_;
+  Real Year_code_;
 };
 
 } // namespace ArtemisUtils

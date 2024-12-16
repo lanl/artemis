@@ -18,7 +18,7 @@ gas:
     _type: Real
     _default: "1."
     _description:  "Mean molecular weight for ideal EOS"
-    _units: "g"
+    _units: "amu"
 
   cfl:
     _type: Real

@@ -13,6 +13,7 @@
 
 #include "../geometry.hpp"
 #include "artemis.hpp"
+#include "utils/robust.hpp"
 
 class TestRecorder {
  public:
@@ -30,6 +31,8 @@ class TestRecorder {
   int n_fail_;
 };
 
+using parthenon::robust::SoftEquiv;
+
 int main() {
   auto coords = geometry::Coords<Coordinates::spherical3D>();
 
@@ -37,8 +40,16 @@ int main() {
 
   int nfail = 0;
 
-  // coords.x1dep() == false ? nfail++;
+  // Dimensionality
   rec(coords.x1dep() == true);
+  rec(coords.x2dep() == true);
+  rec(coords.x3dep() == false);
+
+  // Geometry at a point
+  const Real x[3] = {1.5, 1.7, 1.9};
+  rec(SoftEquiv(coords.hx1(x[0], x[1], x[2]), 1.));
+  rec(SoftEquiv(coords.hx2(x[0], x[1], x[2]), x[0]));
+  rec(SoftEquiv(coords.hx3(x[0], x[1], x[2]), x[0] * std::sin(x[1])));
 
   // Indicate whether the test passed
   return rec.get_n_fail();

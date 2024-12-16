@@ -125,6 +125,11 @@ class Constants {
   Real GetAUCode() const { return AU_code_; }
 
   KOKKOS_INLINE_FUNCTION
+  Real GetPcPhysical() const { return pc_; }
+  KOKKOS_INLINE_FUNCTION
+  Real GetPcCode() const { return pc_code_; }
+
+  KOKKOS_INLINE_FUNCTION
   Real GetYearPhysical() const { return Year_; }
   KOKKOS_INLINE_FUNCTION
   Real GetYearCode() const { return Year_code_; }
@@ -139,6 +144,7 @@ class Constants {
   Real eV_;     // Electron-volt
   Real Msolar_; // Solar mass
   Real AU_;     // Astronomical unit
+  Real pc_;     // Parsec
   Real Year_;   // Year
 
   // Physical constants in code units
@@ -150,6 +156,7 @@ class Constants {
   Real eV_code_;
   Real Msolar_code_;
   Real AU_code_;
+  Real pc_code_;
   Real Year_code_;
 };
 

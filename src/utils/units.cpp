@@ -54,7 +54,6 @@ Units::Units(ParameterInput *pin, std::shared_ptr<StateDescriptor> pkg) {
   // Remaining conversion factors
   energy_ = std::pow(length_, 2) * mass_ * std::pow(time_, -2);
   number_density_ = std::pow(length_, -3);
-  mass_density_ = mass_ * number_density_;
 
   // Store everything necessary in params for usage in analysis
   pkg->AddParam("unit_system", unit_system_);

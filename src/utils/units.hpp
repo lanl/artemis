@@ -53,6 +53,11 @@ class Units {
   Real GetMassPhysicalToCode() const { return 1. / mass_; }
 
   KOKKOS_INLINE_FUNCTION
+  Real GetSpeedCodeToPhysical() const { return length_ / time_; }
+  KOKKOS_INLINE_FUNCTION
+  Real GetSpeedPhysicalToCode() const { return time_ / mass_; }
+
+  KOKKOS_INLINE_FUNCTION
   Real GetEnergyCodeToPhysical() const { return energy_; }
   KOKKOS_INLINE_FUNCTION
   Real GetEnergyPhysicalToCode() const { return 1. / energy_; }
@@ -63,21 +68,35 @@ class Units {
   Real GetNumberDensityPhysicalToCode() const { return 1. / number_density_; }
 
   KOKKOS_INLINE_FUNCTION
-  Real GetMassDensityCodeToPhysical() const { return mass_density_; }
+  Real GetEnergyDensityCodeToPhysical() const { return energy_ * number_density_; }
   KOKKOS_INLINE_FUNCTION
-  Real GetMassDensityPhysicalToCode() const { return 1. / mass_density_; }
+  Real GetEnergyDensityPhysicalToCode() const { return 1. / (energy_ * number_density_); }
+
+  KOKKOS_INLINE_FUNCTION
+  Real GetMassDensityCodeToPhysical() const { return mass_ * number_density_; }
+  KOKKOS_INLINE_FUNCTION
+  Real GetMassDensityPhysicalToCode() const { return 1. / (mass_ * number_density_); }
+
+  KOKKOS_INLINE_FUNCTION
+  Real GetOpacityCodeToPhysical() const { return length_ * length_ / mass_; }
+  KOKKOS_INLINE_FUNCTION
+  Real GetOpacityPhysicalToCode() const { return mass_ / (length_ * length_); }
+
+  KOKKOS_INLINE_FUNCTION
+  Real GetSpecificHeatCodeToPhysical() const { return energy_ / mass_; }
+  KOKKOS_INLINE_FUNCTION
+  Real GetSpecificHeatPhysicalToCode() const { return mass_ / energy_; }
 
  private:
   // Unit conversion factors from code to physical units
   // e.g. length_ has units of cm when using CGS as physical unit system
+  // Temperature is always Kelvin
   Real length_;
   Real time_;
   Real mass_;
 
   Real energy_;
   Real number_density_;
-  Real mass_density_;
-  Real temperature_;
 
   UnitSystem unit_system_;
 };

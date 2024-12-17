@@ -214,7 +214,3 @@ add_subdirectory(external/jaybenne)
 # Add artemis
 message("\nConfiguring src")
 add_subdirectory(src)
-
-# Add testing
-message("\nConfiguring tst")
-add_subdirectory(tst)

@@ -1,11 +1,11 @@
 ---
 gravity:
   _description: "External gravitational sources"
-  gm:
+  mass_tot:
     _type: Real
     _description: "Normalization parameter setting GM."
     _default: "NaN"
-    _units: "dyn cm^2 g^-1"
+    _units: "Msolar"
   tstart:
     _type: Real
     _description: "When to turn gravity on."

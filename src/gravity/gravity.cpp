@@ -32,7 +32,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   std::string sys = pin->GetOrAddString("artemis", "coordinates", "cartesian");
   Coordinates coords = geometry::CoordSelect(sys, ndim);
 
-  const Real gm = pin->GetOrAddReal("gravity", "gm", Null<Real>());
+  const Real gm = constants.GetGCode() * pin->GetReal("gravity", "mass_tot") *
+                  constants.GetMsolarCode();
   params.Add("tstart",
              pin->GetOrAddReal("gravity", "tstart", std::numeric_limits<Real>::lowest()));
   params.Add("tstop", pin->GetOrAddReal("gravity", "tstop", Big<Real>()));

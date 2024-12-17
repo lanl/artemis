@@ -72,11 +72,11 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   if (integrator == "none") dt_reb = Big<Real>();
   params.Add("dt_reb", dt_reb);
 
-  // Scaling factor for gravitational forces
+  // Total mass of gravitating particles
+  const Real gm = constants.GetGCode() * pin->GetReal("gravity", "mass_tot") *
+                  constants.GetMsolarCode();
+  params.Add("gm", gm);
   params.Add("mscale", pin->GetOrAddReal("nbody", "mscale", 1.0));
-
-  // Reference gravitational mass in code units (where mass = 1)
-  const Real GM = constants.GetGCode();
 
   // Frame specification
   // NOTE(ADM): Shearing box has Rf = {R0, 0,0}, shearing box has Vf = {0, Om0*R0,0},
@@ -104,7 +104,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   // Read the parameter file for the particles
   std::vector<int> particle_id;
   std::vector<Particle> particles_v;
-  NBodySetup(pin, GM, Rf, Vf, particle_id, particles_v);
+  NBodySetup(pin, gm, Rf, Vf, particle_id, particles_v);
   const int npart = static_cast<int>(particles_v.size());
   params.Add("npart", npart);
   params.Add("particle_id", particle_id);

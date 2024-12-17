@@ -19,6 +19,8 @@ constexpr Real Msolar = 1.988416e33;
 constexpr Real AU = 1.495978707e13;
 constexpr Real Year = 31536000;
 constexpr Real parsec = 3.0857e18;
+constexpr Real Rjup = 6.991100e6;
+constexpr Real Mjup = 1.8982e30;
 
 Units::Units(ParameterInput *pin, std::shared_ptr<StateDescriptor> pkg) {
   std::string unit_system_str = pin->GetOrAddString("artemis/units", "type", "scalefree");
@@ -83,6 +85,8 @@ Constants::Constants(Units &units) {
     eV_ = pc.eV;
     Msolar_ = Msolar;
     AU_ = AU;
+    Rjup_ = Rjup;
+    Mjup_ = Mjup;
     pc_ = parsec;
     Year_ = Year;
   } else {
@@ -104,6 +108,8 @@ Constants::Constants(Units &units) {
     eV_code_ = ev_ * std::pow(time, 2) / mass * std::pot(length, -2);
     Msolar_code_ = Msolar_ / mass;
     AU_code_ = AU_ / length;
+    Rjup_code_ = Rjup_ / length;
+    Mjup_code_ = Mjup_ / mass;
     pc_code_ = pc_ / length;
     Year_code_ = Year_ / time;
   }

@@ -144,6 +144,8 @@ class Constants {
   Real eV_;     // Electron-volt
   Real Msolar_; // Solar mass
   Real AU_;     // Astronomical unit
+  Real Rjup_;   // Jupiter radius
+  Real Mjup_;   // Jupiter mass
   Real pc_;     // Parsec
   Real Year_;   // Year
 
@@ -156,6 +158,8 @@ class Constants {
   Real eV_code_;
   Real Msolar_code_;
   Real AU_code_;
+  Real Rjup_code_;
+  Real Mjup_code_;
   Real pc_code_;
   Real Year_code_;
 };

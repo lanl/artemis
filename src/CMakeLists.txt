@@ -170,11 +170,6 @@ function(add_unit_test test_source_file)
     )
 endfunction()
 
-add_unit_test(geometry/test/test_spherical.cpp)
-
 # TODO(BRR) if unit testing
-#add_executable(test_spherical geometry/test/test_spherical.cpp)
-#target_link_libraries(test_spherical PRIVATE artemislib)
-#set_target_properties(test_spherical PROPERTIES
-#    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/test/unit
-#)
+
+add_unit_test(geometry/test/test_spherical.cpp)

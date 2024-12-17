@@ -105,7 +105,7 @@ Constants::Constants(Units &units) {
     c_code_ = c_ * time / length;
     h_code_ = h_ * time / mass * std::pow(length, -2);
     amu_code_ = amu_ / mass;
-    eV_code_ = ev_ * std::pow(time, 2) / mass * std::pot(length, -2);
+    eV_code_ = eV_ * std::pow(time, 2) / mass * std::pow(length, -2);
     Msolar_code_ = Msolar_ / mass;
     AU_code_ = AU_ / length;
     Rjup_code_ = Rjup_ / length;

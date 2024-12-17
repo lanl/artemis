@@ -101,13 +101,22 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   const std::string eos_name = pin->GetOrAddString("gas", "eos", "ideal");
   if (eos_name == "ideal") {
     const Real gamma = pin->GetOrAddReal("gas", "gamma", 1.66666666667);
-    const Real mmw = pin->GetOrAddReal("gas", "mmw", 1.);
-    const Real cv = constants.GetKBCode() / ((gamma - 1.) * constants.GetAMUCode() * mmw);
+    auto cv = Null<Real>();
+    if (pin->DoesParameterExist("gas", "cv")) {
+      PARTHENON_REQUIRE(!pin->DoesParameterExist("gas", "mmw"),
+                        "Cannot specify both cv and mmw");
+      cv = pin->GetReal("gas", "cv");
+      PARTHENON_REQUIRE(cv > 0, "Only positive cv allowed!");
+    } else {
+      const Real mu = pin->GetOrAddReal("gas", "mu", 1.);
+      PARTHENON_REQUIRE(mu > 0, "Only positive mean molecular weight allowed!");
+      cv = constants.GetKBCode() / ((gamma - 1.) * constants.GetAMUCode() * mu);
+    }
     EOS eos_host = singularity::IdealGas(gamma - 1., cv);
     EOS eos_device = eos_host.GetOnDevice();
     params.Add("eos_h", eos_host);
     params.Add("eos_d", eos_device);
-    // This needs to be removed when we convert everything to EOS calls
+    // TODO This needs to be removed when we convert everything to EOS calls
     params.Add("adiabatic_index", gamma);
   }
 

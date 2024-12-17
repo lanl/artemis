@@ -54,35 +54,14 @@ artemis:
     mass:
       _type: "Real"
       _description: "Physical units value of mass equal to 1 code unit"
-    star_mass:
+    total_mass:
       _type: "Real"
       _description: "Physical units value of mass of central object"
       _units: "Solar mass"
-    orbit_radius:
+    reference_radius:
       _type: "Real"
       _description: "Physical units value of characteristic orbital radius"
       _units: "AU"
-    constants:
-      _description: "Optional custom values for physical constants in physical units"
-      G:
-        _type: "Real"
-        _description: "Gravitational constant"
-      kb:
-        _type: "Real"
-        _description: "Boltzmann constant"
-      c:
-        _type: "Real"
-        _description: "Speed of light"
-      h:
-        _type: "Real"
-        _description: "Planck constant"
-      Msolar:
-        _type: "Real"
-        _description: "Solar mass"
-      AU:
-        _type: "Real"
-        _description: "Astronomical unit"
-
 
 
 physics:

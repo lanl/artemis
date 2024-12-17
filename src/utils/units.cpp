@@ -46,20 +46,25 @@ Units::Units(ParameterInput *pin, std::shared_ptr<StateDescriptor> pkg) {
       parthenon::constants::PhysicalConstants<parthenon::constants::CGS> pc;
       time_ = std::sqrt(4. * M_PI * M_PI / (pc.gravitational_constant * mass_) *
                         std::pow(length_, 3)); // Orbital period
-    } else {
-      PARTHENON_FAIL("Unit specifier not recognized!");
+    } else if (unit_specifier == "ppd") {
+      length_ = AU;
+      mass_ = Msolar;
+      time_ = Year / (2. * M_PI);
     }
+  } else {
+    PARTHENON_FAIL("Unit specifier not recognized!");
   }
+}
 
-  // Remaining conversion factors
-  energy_ = std::pow(length_, 2) * mass_ * std::pow(time_, -2);
-  number_density_ = std::pow(length_, -3);
+// Remaining conversion factors
+energy_ = std::pow(length_, 2) * mass_ * std::pow(time_, -2);
+number_density_ = std::pow(length_, -3);
 
-  // Store everything necessary in params for usage in analysis
-  pkg->AddParam("unit_system", unit_system_);
-  pkg->AddParam("length", length_);
-  pkg->AddParam("time", time_);
-  pkg->AddParam("mass", mass_);
+// Store everything necessary in params for usage in analysis
+pkg->AddParam("unit_system", unit_system_);
+pkg->AddParam("length", length_);
+pkg->AddParam("time", time_);
+pkg->AddParam("mass", mass_);
 }
 
 Constants::Constants(Units &units) {

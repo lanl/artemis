@@ -234,10 +234,15 @@ TaskCollection ArtemisDriver<GEOM>::StepTasks() {
                                 time, bdt);
       }
 
+      // Apply pgen-defined source term
+      // NOTE(@pdmullen): Intentional positioning after S(W) srcs and before S(U) srcs
+      auto pgen_src =
+          tl.AddTask(rframe_src, ArtemisUtils::ProblemSourceTerm, u0.get(), time, bdt);
+
       // Apply drag source term
-      TaskID drag_src = rframe_src;
+      TaskID drag_src = pgen_src;
       if (do_drag) {
-        drag_src = tl.AddTask(rframe_src, Drag::DragSource<GEOM>, u0.get(), time, bdt);
+        drag_src = tl.AddTask(pgen_src, Drag::DragSource<GEOM>, u0.get(), time, bdt);
       }
 
       // Apply cooling source term

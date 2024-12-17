@@ -148,6 +148,8 @@ inline int ProblemDimension(parthenon::ParameterInput *pin) {
 
 namespace artemis {
 extern std::function<AmrTag(MeshBlockData<Real> *mbd)> ProblemCheckRefinementBlock;
+extern std::function<TaskStatus(MeshData<Real> *md, const Real time, const Real dt)>
+    ProblemGeneratorSourceTerm;
 } // namespace artemis
 
 #endif // ARTEMIS_ARTEMIS_HPP_

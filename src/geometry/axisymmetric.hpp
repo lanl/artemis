@@ -16,8 +16,6 @@
 // Artemis includes
 #include "geometry.hpp"
 
-using namespace parthenon::package::prelude;
-
 namespace geometry {
 //----------------------------------------------------------------------------------------
 //! The derived axisymmetric specialization

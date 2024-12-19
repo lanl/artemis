@@ -11,6 +11,8 @@
 #  the public, perform publicly and display publicly, and to permit others to do so.
 # ========================================================================================
 
+# This file was created in part by one of OpenAI's generative AI models
+
 # File list in src/
 set (SRC_LIST
   artemis_driver.cpp
@@ -148,3 +150,26 @@ if (CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
                               ${CMAKE_BINARY_DIR}/rebound/librebound.so
                               $<TARGET_FILE_DIR:artemis>)
 endif()
+
+function(add_unit_test test_source_file)
+    # Extract the test name from the source file name
+    get_filename_component(test_name ${test_source_file} NAME_WE)
+
+    # Add the executable for the test
+    add_executable(${test_name} ${test_source_file})
+
+    # Add unit test utility header
+    target_include_directories(${test_name} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../tst/)
+
+    # Link the test executable to the library
+    target_link_libraries(${test_name} PRIVATE artemislib)
+
+    # Set the runtime output directory for the test executable
+    set_target_properties(${test_name} PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/test/unit
+    )
+endfunction()
+
+# TODO(BRR) if unit testing
+
+add_unit_test(geometry/test/test_spherical.cpp)

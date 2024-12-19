@@ -27,7 +27,7 @@ artemis:
     _description: "Unit conversions between code and cgs."
     type:
       _type: "string"
-      _default: "code"
+      _default: "scalefree"
       _description: "What unit system to use for physical units"
       code:
         _type: opt

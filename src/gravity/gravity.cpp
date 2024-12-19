@@ -24,7 +24,8 @@ namespace Gravity {
 //----------------------------------------------------------------------------------------
 //! \fn  StateDescriptor Gravity::Initialize
 //! \brief Adds intialization function for gravity package
-std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
+std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
+                                            const ArtemisUtils::Constants &constants) {
   auto gravity = std::make_shared<StateDescriptor>("gravity");
   Params &params = gravity->AllParams();
 

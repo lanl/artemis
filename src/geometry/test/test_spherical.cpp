@@ -34,6 +34,15 @@ int main() {
   COMPARE(coords.hx2(x[0], x[1], x[2]), x[0]);
   COMPARE(coords.hx3(x[0], x[1], x[2]), x[0] * std::sin(x[1]));
 
+  /*
+  // Test of ConvertVecToCart<>
+  {auto coords = ... const Real x[] = COMPARE(...)}
+          .
+          .
+
+          // Text of ConvertCoordstoSph<>
+          .. */
+
   // Indicate whether the test passed
   return test.return_code();
 }

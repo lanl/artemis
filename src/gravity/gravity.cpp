@@ -17,8 +17,6 @@
 #include "geometry/geometry.hpp"
 #include "gravity/nbody_gravity.hpp"
 
-using namespace parthenon::package::prelude;
-
 namespace Gravity {
 
 //----------------------------------------------------------------------------------------

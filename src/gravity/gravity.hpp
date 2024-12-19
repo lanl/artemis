@@ -20,8 +20,6 @@
 #include "artemis.hpp"
 #include "utils/units.hpp"
 
-using namespace parthenon::package::prelude;
-
 namespace Gravity {
 
 enum class GravityType { uniform, point, binary, nbody, null };

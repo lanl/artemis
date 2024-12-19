@@ -186,11 +186,11 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   params.Add("do_diffusion", do_diffusion);
 
   if (do_viscosity) {
-    Diffusion::DiffCoeffParams dp("gas/viscosity", "viscosity", pin);
+    Diffusion::DiffCoeffParams dp("gas/viscosity", "viscosity", pin, constants);
     params.Add("visc_params", dp);
   }
   if (do_conduction) {
-    Diffusion::DiffCoeffParams dp("gas/conductivity", "conductivity", pin);
+    Diffusion::DiffCoeffParams dp("gas/conductivity", "conductivity", pin, constants);
     params.Add("cond_params", dp);
   }
 

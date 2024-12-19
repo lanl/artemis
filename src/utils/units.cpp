@@ -32,7 +32,11 @@ Units::Units(ParameterInput *pin, std::shared_ptr<StateDescriptor> pkg) {
     PARTHENON_FAIL("Unit system not recognized! Valid choices are [scalefree, cgs]");
   }
 
-  if (unit_system_ != UnitSystem::scalefree) {
+  if (unit_system_ == UnitSystem::scalefree) {
+    length_ = 1.;
+    time_ = 1.;
+    mass_ = 1.;
+  } else {
     std::string unit_specifier = pin->GetOrAddString("artemis", "specifier", "base");
     if (unit_specifier == "base") {
       length_ = pin->GetReal("artemis", "length");
@@ -45,10 +49,6 @@ Units::Units(ParameterInput *pin, std::shared_ptr<StateDescriptor> pkg) {
     } else {
       PARTHENON_FAIL("Unit specifier not recognized!");
     }
-  } else {
-    length_ = 1.;
-    time_ = 1.;
-    mass_ = 1.;
   }
 
   // Remaining conversion factors
@@ -92,26 +92,24 @@ Constants::Constants(Units &units) {
     PARTHENON_FAIL("Unknown unit system");
   }
 
-  if (units.GetUnitSystem() != UnitSystem::scalefree) {
-    const Real length = units.GetLengthCodeToPhysical();
-    const Real time = units.GetTimeCodeToPhysical();
-    const Real mass = units.GetMassCodeToPhysical();
+  const Real length = units.GetLengthCodeToPhysical();
+  const Real time = units.GetTimeCodeToPhysical();
+  const Real mass = units.GetMassCodeToPhysical();
 
-    // Convert constants to code units
-    G_code_ = G_ * std::pow(length, -3) / mass * std::pow(time, 2);
-    kb_code_ =
-        kb_ * std::pow(time, 2) / mass * std::pow(length, -2); // 1 K = 1 code unit temp
-    c_code_ = c_ * time / length;
-    h_code_ = h_ * time / mass * std::pow(length, -2);
-    amu_code_ = amu_ / mass;
-    eV_code_ = eV_ * std::pow(time, 2) / mass * std::pow(length, -2);
-    Msolar_code_ = Msolar_ / mass;
-    AU_code_ = AU_ / length;
-    Rjup_code_ = Rjup_ / length;
-    Mjup_code_ = Mjup_ / mass;
-    pc_code_ = pc_ / length;
-    Year_code_ = Year_ / time;
-  }
+  // Convert constants to code units
+  G_code_ = G_ * std::pow(length, -3) / mass * std::pow(time, 2);
+  kb_code_ =
+      kb_ * std::pow(time, 2) / mass * std::pow(length, -2); // 1 K = 1 code unit temp
+  c_code_ = c_ * time / length;
+  h_code_ = h_ * time / mass * std::pow(length, -2);
+  amu_code_ = amu_ / mass;
+  eV_code_ = eV_ * std::pow(time, 2) / mass * std::pow(length, -2);
+  Msolar_code_ = Msolar_ / mass;
+  AU_code_ = AU_ / length;
+  Rjup_code_ = Rjup_ / length;
+  Mjup_code_ = Mjup_ / mass;
+  pc_code_ = pc_ / length;
+  Year_code_ = Year_ / time;
 }
 
 } // namespace ArtemisUtils

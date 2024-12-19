@@ -87,7 +87,7 @@ type = alpha
 alpha = 1e-3
 
 <gravity>
-gm = 1.0
+mass_tot = 1.0
 <gravity/binary>
 q = 1.0e-5
 a = 1.0

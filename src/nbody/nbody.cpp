@@ -73,7 +73,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   params.Add("dt_reb", dt_reb);
 
   // Total mass of gravitating particles
-  const Real gm = constants.GetGCode() * pin->GetReal("gravity", "mass_tot") *
+  const Real gm = constants.GetGCode() * pin->GetOrAddReal("gravity", "mass_tot", 1.) *
                   constants.GetMsolarCode();
   params.Add("gm", gm);
   params.Add("mscale", pin->GetOrAddReal("nbody", "mscale", 1.0));

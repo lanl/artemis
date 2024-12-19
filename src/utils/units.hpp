@@ -108,6 +108,9 @@ class Constants {
   KOKKOS_FUNCTION
   Constants(Units &units);
 
+  KOKKOS_FUNCTION
+  Constants(const Constants &other) {}
+
   KOKKOS_INLINE_FUNCTION
   Real GetGPhysical() const { return G_; }
   KOKKOS_INLINE_FUNCTION

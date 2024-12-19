@@ -45,6 +45,10 @@ Units::Units(ParameterInput *pin, std::shared_ptr<StateDescriptor> pkg) {
     } else {
       PARTHENON_FAIL("Unit specifier not recognized!");
     }
+  } else {
+    length_ = 1.;
+    time_ = 1.;
+    mass_ = 1.;
   }
 
   // Remaining conversion factors

@@ -107,15 +107,11 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
                         "Cannot specify both cv and mmw");
       cv = pin->GetReal("gas", "cv");
       PARTHENON_REQUIRE(cv > 0, "Only positive cv allowed!");
-      printf("B\n");
     } else {
       const Real mu = pin->GetOrAddReal("gas", "mu", 1.);
       PARTHENON_REQUIRE(mu > 0, "Only positive mean molecular weight allowed!");
       cv = constants.GetKBCode() / ((gamma - 1.) * constants.GetAMUCode() * mu);
-      printf("k %e amu %e\n", constants.GetKBCode(), constants.GetAMUCode());
-      printf("A\n");
     }
-    printf("cv: %e\n", cv);
     EOS eos_host = singularity::IdealGas(gamma - 1., cv);
     EOS eos_device = eos_host.GetOnDevice();
     params.Add("eos_h", eos_host);

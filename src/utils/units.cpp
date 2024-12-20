@@ -23,31 +23,33 @@ constexpr Real Rjup = 6.991100e6;
 constexpr Real Mjup = 1.8982e30;
 
 Units::Units(ParameterInput *pin, std::shared_ptr<StateDescriptor> pkg) {
-  std::string unit_system_str = pin->GetOrAddString("artemis/units", "type", "scalefree");
-  if (unit_system_str == "scalefree") {
-    unit_system_ = UnitSystem::scalefree;
-  } else if (unit_system_str == "cgs") {
-    unit_system_ = UnitSystem::cgs;
+  std::string physical_units_str =
+      pin->GetOrAddString("artemis", "physical_units", "scalefree");
+  if (physical_units_str == "scalefree") {
+    physical_units_ = PhysicalUnits::scalefree;
+  } else if (physical_units_str == "cgs") {
+    physical_units_ = PhysicalUnits::cgs;
   } else {
-    PARTHENON_FAIL("Unit system not recognized! Valid choices are [scalefree, cgs]");
+    PARTHENON_FAIL("Physical unit system not recognized! Choices are [scalefree, cgs]");
   }
 
-  if (unit_system_ == UnitSystem::scalefree) {
+  if (physical_units_ == PhysicalUnits::scalefree) {
     length_ = 1.;
     time_ = 1.;
     mass_ = 1.;
   } else {
-    std::string unit_specifier = pin->GetOrAddString("artemis", "specifier", "base");
-    if (unit_specifier == "base") {
+    std::string unit_conversion =
+        pin->GetOrAddString("artemis", "unit_conversion", "base");
+    if (unit_conversion == "base") {
       length_ = pin->GetReal("artemis", "length");
       time_ = pin->GetReal("artemis", "time");
       mass_ = pin->GetReal("artemis", "mass");
-    } else if (unit_specifier == "ppd") {
+    } else if (unit_conversion == "ppd") {
       length_ = AU;
       mass_ = Msolar;
       time_ = Year / (2. * M_PI);
     } else {
-      PARTHENON_FAIL("Unit specifier not recognized!");
+      PARTHENON_FAIL("Unit conversion not recognized! Choices are [base, ppd]");
     }
   }
 
@@ -56,30 +58,32 @@ Units::Units(ParameterInput *pin, std::shared_ptr<StateDescriptor> pkg) {
   number_density_ = std::pow(length_, -3);
 
   // Store everything necessary in params for usage in analysis
-  pkg->AddParam("unit_system", unit_system_);
+  pkg->AddParam("physical_units", physical_units_);
   pkg->AddParam("length", length_);
   pkg->AddParam("time", time_);
   pkg->AddParam("mass", mass_);
 }
 
 Constants::Constants(Units &units) {
-  if (units.GetUnitSystem() == UnitSystem::scalefree) {
+  if (units.GetPhysicalUnits() == PhysicalUnits::scalefree) {
     G_ = 1.;
     kb_ = 1.;
     c_ = 1.;
     h_ = 1.;
+    ar_ = 1.;
     amu_ = 1.;
     eV_ = 1.;
     Msolar_ = 1.;
     AU_ = 1.;
     pc_ = 1.;
     Year_ = 1.;
-  } else if (units.GetUnitSystem() == UnitSystem::cgs) {
+  } else if (units.GetPhysicalUnits() == PhysicalUnits::cgs) {
     parthenon::constants::PhysicalConstants<parthenon::constants::CGS> pc;
     G_ = pc.gravitational_constant;
     kb_ = pc.kb;
     c_ = pc.c;
     h_ = pc.h;
+    ar_ = pc.ar;
     amu_ = pc.amu;
     eV_ = pc.eV;
     Msolar_ = Msolar;
@@ -102,6 +106,7 @@ Constants::Constants(Units &units) {
       kb_ * std::pow(time, 2) / mass * std::pow(length, -2); // 1 K = 1 code unit temp
   c_code_ = c_ * time / length;
   h_code_ = h_ * time / mass * std::pow(length, -2);
+  ar_code_ = ar_ * length * time * time / mass;
   amu_code_ = amu_ / mass;
   eV_code_ = eV_ * std::pow(time, 2) / mass * std::pow(length, -2);
   Msolar_code_ = Msolar_ / mass;

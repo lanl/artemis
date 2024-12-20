@@ -19,7 +19,7 @@
 
 namespace ArtemisUtils {
 
-enum class UnitSystem { scalefree, cgs };
+enum class PhysicalUnits { scalefree, cgs };
 
 class Units {
  public:
@@ -32,9 +32,9 @@ class Units {
   KOKKOS_FUNCTION
   Units(const Units &other) {}
 
-  // Return unit system
+  // Return physical unit system
   KOKKOS_INLINE_FUNCTION
-  UnitSystem GetUnitSystem() const { return unit_system_; }
+  PhysicalUnits GetPhysicalUnits() const { return physical_units_; }
 
   // Unit conversions
   KOKKOS_INLINE_FUNCTION
@@ -98,7 +98,7 @@ class Units {
   Real energy_;
   Real number_density_;
 
-  UnitSystem unit_system_;
+  PhysicalUnits physical_units_;
 };
 
 class Constants {
@@ -132,6 +132,11 @@ class Constants {
   Real GetHCode() const { return h_code_; }
 
   KOKKOS_INLINE_FUNCTION
+  Real GetARPhysical() const { return ar_; }
+  KOKKOS_INLINE_FUNCTION
+  Real GetARCode() const { return ar_code_; }
+
+  KOKKOS_INLINE_FUNCTION
   Real GetAMUPhysical() const { return amu_; }
   KOKKOS_INLINE_FUNCTION
   Real GetAMUCode() const { return amu_code_; }
@@ -162,6 +167,7 @@ class Constants {
   Real kb_;     // Boltzmann constant
   Real c_;      // Speed of light
   Real h_;      // Planck constant
+  Real ar_;     // Radiation constant
   Real amu_;    // Atomic mass unit
   Real eV_;     // Electron-volt
   Real Msolar_; // Solar mass
@@ -176,6 +182,7 @@ class Constants {
   Real kb_code_;
   Real c_code_;
   Real h_code_;
+  Real ar_code_;
   Real amu_code_;
   Real eV_code_;
   Real Msolar_code_;

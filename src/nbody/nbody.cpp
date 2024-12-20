@@ -87,7 +87,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   Real Rf[3] = {0.0};
   Real Vf[3] = {0.0};
   if (global_frame && (Omf != 0.0) && (qshear != 0.0)) {
-    const Real R0 = std::pow(SQR(Omf) / constants.GetGCode(), 1.0 / 3.0);
+    const Real R0 = std::pow(SQR(Omf) / gm, 1.0 / 3.0);
     Rf[0] = R0;
     Vf[1] = R0 * Omf;
   }

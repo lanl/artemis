@@ -34,14 +34,12 @@ elif [[ "$HOST" =~ ^ve-rfe[1-7]$ || "$HOST" =~ ^ve-fe[1-7]$ ]]; then
         PARTITION="venado-gg"
     fi
 else # Catch-all for Darwin
-    if [ -z "$SLURM_JOB_PARTITION" ]; then
-        if [[ $HOSTNAME == darwin-fe* ]]; then
-            echo "Do not compile on Darwin frontend nodes; use a specific partition!"
-            echo "Supported partitions are"
-            echo "  skylake-gold"
-            echo "  volta-x86"
-            echo "...setup FAILED"
-        fi
+    if [[ $HOSTNAME == darwin-fe* ]]; then
+        echo "Currently on darwin frontend node; formatting is supported but not compilation"
+        echo "Supported partitions are"
+        echo "  skylake-gold"
+        echo "  volta-x86"
+        PARTITION="darwin-fe"
     elif [[ $SLURM_JOB_PARTITION == "power9-rhel7" ]]; then
         PARTITION="darwin-power9-rhel7"
     elif [[ $SLURM_JOB_PARTITION == "skylake-gold" ]]; then
@@ -84,6 +82,10 @@ elif [[ $PARTITION == "chicoma-cpu" ]]; then
     module load cmake
     export ARTEMIS_SUITE=chicoma-cpu
     echo "...setup SUCCEEDED"
+elif [[ $PARTITION == "darwin-fe" ]]; then
+    module load clang/12.0.1
+    module load miniconda3/py311_23.11.0
+    source /usr/projects/jovian/dependencies/python/darwin-fe/bin/activate
 elif [[ $PARTITION == "darwin-power9-rhel7" ]]; then
     echo "darwin-power9-rhel7 partition has been decommissioned! Exiting..."
 elif [[ $PARTITION == "darwin-skylake-gold" ]]; then
@@ -209,6 +211,11 @@ function build_artemis {
                 ;;
         esac
     done
+
+    if [[ $PARTITION == "darwin-fe" ]]; then
+        echo "Building not supported on darwin frontend nodes!"
+        return 1
+    fi
 
     if [[ "$BUILD_DIR" == /* ]]; then
         # Use absolute path

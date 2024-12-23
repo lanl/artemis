@@ -78,6 +78,9 @@ set (SRC_LIST
 
   utils/artemis_utils.cpp
   utils/artemis_utils.hpp
+  utils/history.hpp
+  utils/units.cpp
+  utils/units.hpp
 
   utils/diffusion/diffusion.hpp
   utils/diffusion/diffusion_coeff.hpp
@@ -93,8 +96,6 @@ set (SRC_LIST
   utils/fluxes/riemann/hlle.hpp
   utils/fluxes/riemann/llf.hpp
   utils/fluxes/riemann/riemann.hpp
-
-  utils/history.hpp
 
   utils/integrators/artemis_integrator.hpp
 

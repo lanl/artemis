@@ -17,14 +17,13 @@
 #include "geometry/geometry.hpp"
 #include "gravity/nbody_gravity.hpp"
 
-using namespace parthenon::package::prelude;
-
 namespace Gravity {
 
 //----------------------------------------------------------------------------------------
 //! \fn  StateDescriptor Gravity::Initialize
 //! \brief Adds intialization function for gravity package
-std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
+std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
+                                            const ArtemisUtils::Constants &constants) {
   auto gravity = std::make_shared<StateDescriptor>("gravity");
   Params &params = gravity->AllParams();
 
@@ -32,7 +31,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   std::string sys = pin->GetOrAddString("artemis", "coordinates", "cartesian");
   Coordinates coords = geometry::CoordSelect(sys, ndim);
 
-  const Real gm = pin->GetOrAddReal("gravity", "gm", Null<Real>());
+  const Real gm = constants.GetGCode() * pin->GetOrAddReal("gravity", "mass_tot", 1.) *
+                  constants.GetMsolarCode();
   params.Add("tstart",
              pin->GetOrAddReal("gravity", "tstart", std::numeric_limits<Real>::lowest()));
   params.Add("tstop", pin->GetOrAddReal("gravity", "tstop", Big<Real>()));

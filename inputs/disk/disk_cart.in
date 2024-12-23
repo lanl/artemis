@@ -111,7 +111,7 @@ dfloor = 1.0e-10
 pfloor = 1.0e-15
 
 <gravity>
-gm = 1.0
+mass_tot = 1.0
 <gravity/point>
 
 <problem>

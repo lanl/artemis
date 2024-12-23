@@ -25,6 +25,7 @@ extern "C" {
 #include "geometry/geometry.hpp"
 #include "nbody/nbody.hpp"
 #include "nbody/nbody_utils.hpp"
+#include "utils/units.hpp"
 
 using parthenon::MetadataFlag;
 
@@ -44,7 +45,8 @@ void UserWorkBeforeRestartOutputMesh(Mesh *pmesh, ParameterInput *, SimTime &,
 //----------------------------------------------------------------------------------------
 //! \fn  StateDescriptor NBody::Initialize
 //! \brief Adds intialization function for NBody package
-std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
+std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
+                                            const ArtemisUtils::Constants &constants) {
   auto nbody = std::make_shared<StateDescriptor>("nbody");
   Params &params = nbody->AllParams();
   PARTHENON_REQUIRE(
@@ -70,9 +72,10 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   if (integrator == "none") dt_reb = Big<Real>();
   params.Add("dt_reb", dt_reb);
 
-  // Unit system for gravity
-  const Real GM = pin->GetReal("gravity", "gm");
-  params.Add("GM", GM);
+  // Total mass of gravitating particles
+  const Real gm = constants.GetGCode() * pin->GetOrAddReal("gravity", "mass_tot", 1.) *
+                  constants.GetMsolarCode();
+  params.Add("gm", gm);
   params.Add("mscale", pin->GetOrAddReal("nbody", "mscale", 1.0));
 
   // Frame specification
@@ -84,7 +87,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   Real Rf[3] = {0.0};
   Real Vf[3] = {0.0};
   if (global_frame && (Omf != 0.0) && (qshear != 0.0)) {
-    const Real R0 = std::pow(SQR(Omf) / GM, 1.0 / 3.0);
+    const Real R0 = std::pow(SQR(Omf) / gm, 1.0 / 3.0);
     Rf[0] = R0;
     Vf[1] = R0 * Omf;
   }
@@ -94,16 +97,14 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   RebAttrs::PN = pin->GetOrAddReal("nbody", "pn", 0);
   RebAttrs::include_pn2 = pin->GetOrAddInteger("nbody", "pn2_corr", 1);
   RebAttrs::extras = (RebAttrs::PN > 0);
-  RebAttrs::c = (RebAttrs::extras)
-                    ? pin->GetReal("nbody", "light_speed")
-                    : pin->GetOrAddReal("nbody", "light_speed", Big<Real>());
+  RebAttrs::c = constants.GetCCode();
   RebAttrs::merge_on_collision =
       pin->GetOrAddBoolean("nbody", "merge_on_collision", true);
 
   // Read the parameter file for the particles
   std::vector<int> particle_id;
   std::vector<Particle> particles_v;
-  NBodySetup(pin, GM, Rf, Vf, particle_id, particles_v);
+  NBodySetup(pin, gm, Rf, Vf, particle_id, particles_v);
   const int npart = static_cast<int>(particles_v.size());
   params.Add("npart", npart);
   params.Add("particle_id", particle_id);

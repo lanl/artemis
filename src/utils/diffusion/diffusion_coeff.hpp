@@ -17,6 +17,7 @@
 #include "artemis.hpp"
 #include "geometry/geometry.hpp"
 #include "utils/eos/eos.hpp"
+#include "utils/units.hpp"
 
 using ArtemisUtils::EOS;
 namespace Diffusion {
@@ -84,7 +85,8 @@ struct DiffCoeffParams {
 
   DiffCoeffParams() = default;
   DiffCoeffParams(std::string block_name, std::string dtype,
-                  parthenon::ParameterInput *pin) {
+                  parthenon::ParameterInput *pin,
+                  const ArtemisUtils::Constants &constants) {
     // Read the parameter file
     std::string type_ = pin->GetString(block_name, "type");
     type = ChooseDiffusion(dtype, type_);
@@ -109,7 +111,8 @@ struct DiffCoeffParams {
       eta = pin->GetOrAddReal(block_name, "eta_bulk", 0.0);
 
       R0 = pin->GetOrAddReal("problem", "r0", 1.0);
-      auto gm = pin->GetReal("gravity", "gm");
+      const Real gm = constants.GetGCode() * pin->GetReal("gravity", "mass_tot") *
+                      constants.GetMsolarCode();
       Omega0 = std::sqrt(gm / (R0 * R0 * R0));
     } else if (type == DiffType::thermaldiff_const) {
       kappa_0 = pin->GetReal(block_name, "kappa");

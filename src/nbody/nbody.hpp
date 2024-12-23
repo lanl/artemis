@@ -18,6 +18,7 @@
 #include "artemis.hpp"
 #include "nbody/particle_base.hpp"
 #include "utils/artemis_utils.hpp"
+#include "utils/units.hpp"
 
 namespace NBody {
 
@@ -43,7 +44,8 @@ struct Orbit {
 void NBodySetup(ParameterInput *pin, const Real GM, const Real Rf[3], const Real Vf[3],
                 std::vector<int> &particle_id, std::vector<Particle> &particles);
 
-std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
+std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
+                                            const ArtemisUtils::Constants &constants);
 
 Real EstimateTimestepMesh(MeshData<Real> *md);
 

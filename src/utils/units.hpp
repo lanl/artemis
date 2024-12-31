@@ -109,7 +109,7 @@ class Constants {
   Constants(Units &units);
 
   KOKKOS_FUNCTION
-  Constants(const Constants &other) {}
+  Constants(const Constants &other) = default;
 
   KOKKOS_INLINE_FUNCTION
   Real GetGPhysical() const { return G_; }

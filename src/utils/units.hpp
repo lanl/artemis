@@ -30,7 +30,7 @@ class Units {
 
   // Copy constructor must be marked with KOKKOS_FUNCTION
   KOKKOS_FUNCTION
-  Units(const Units &other) {}
+  Units(const Units &other) = default;
 
   // Return physical unit system
   KOKKOS_INLINE_FUNCTION

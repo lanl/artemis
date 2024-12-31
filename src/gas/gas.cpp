@@ -396,6 +396,12 @@ Real EstimateTimestepMesh(MeshData<Real> *md) {
   auto &params = gas_pkg->AllParams();
   auto eos_d = params.template Get<EOS>("eos_d");
 
+  // Test
+  auto &apkg = pm->packages.Get("artemis");
+  auto &units = apkg->AllParams().template Get<ArtemisUtils::Units>("units");
+  printf("l: %e\n", units.GetLengthCodeToPhysical());
+  exit(-1);
+
   static auto desc =
       MakePackDescriptor<gas::prim::density, gas::prim::velocity, gas::prim::sie>(
           resolved_pkgs.get());

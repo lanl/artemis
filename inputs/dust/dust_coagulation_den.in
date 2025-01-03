@@ -13,7 +13,12 @@
 
 <artemis>
 problem = dust_coagulation           # name of the pgen
-coordinates = cartesian  # coordinate system
+coordinates = cartesian	# coordinate system
+unit_conversion	= ppd	# ppd (code unit: AU, Msun, year/(2*pi)
+r0_length	= 10.		# AU
+mstar	= 1.0		# M_sun
+rho0	= 1.59577e-4	# 3D rho (mstar/r0^3)
+physical_units	= cgs	# 	
 
 <parthenon/job>
 problem_id = coag   # problem ID: basename of output filenames
@@ -34,7 +39,7 @@ file_type = rst
 dt 	  = 628
 
 <parthenon/time>
-nlim       = 5   	# cycle limit
+nlim       = -1   	# cycle limit
 tlim       = 6280. 	# time limit
 integrator = rk2    	# time integration algorithm
 ncycle_out = 1    	# interval for stdout summary info
@@ -45,8 +50,8 @@ refinement = none
 # numlevel = 1
 
 nx1    = 16  		# Number of zones in X1-direction
-x1min  = 1.35e15   	# minimum value of X1
-x1max  = 1.64e15  	# maximum value of X1
+x1min  = 9.0   		# minimum value of X1
+x1max  = 11.0  		# maximum value of X1
 ix1_bc = outflow 	# Inner-X1 boundary condition flag
 ox1_bc = outflow 	# Outer-X1 boundary condition flag
 
@@ -76,6 +81,7 @@ coagulation = true
 cfl = 0.9
 gamma = 1.00001
 iso_sound_speed = 0.05	# code unit
+cv = 1e5	# 1/(gamma-1)
 
 <dust>
 cfl = 0.9
@@ -100,8 +106,6 @@ coag_info_out	      = true
 nInit_dust = 11		# number of dust species initially
 dust_to_gas = 0.01
 nstep1Coag = 1
-mstar = 1.0		# central star masss (m_sun)
-r0_length = 10.0	# 1 code unit (AU)
-rho0 = 2e-5		# code unit value of 1 m_star/r0_length^2
+#rho0 = 2e-5		# code unit value of 1 m_star/r0_length^2
 const_coag_omega = true # using omega at r0_length
 

@@ -34,6 +34,7 @@ TaskStatus FluxSource(MeshData<Real> *md, const Real dt);
 void AddHistory(Coordinates coords, Params &params);
 
 // OperatorSplit tasks
+template <Coordinates GEOM>
 TaskListStatus OperatorSplitDust(Mesh *pm, parthenon::SimTime &tm);
 
 template <Coordinates GEOM>

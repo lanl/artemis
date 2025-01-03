@@ -59,51 +59,6 @@ struct DustCoagulationVariable {
 
 namespace dust_coagulation {
 
-struct CGSUnit {
-  Real mass0 = 1.0;
-  Real time0 = 1.0;
-  Real length0 = 1.0;
-  Real vol0 = 1.0;
-  bool isurface_den = true;
-  bool Code2PhysicalUnit_Set = false;
-
-  bool isSet() const { return Code2PhysicalUnit_Set; }
-
-  void SetCGSUnit(const Real &mass0_in, const Real &length0_in, const Real &time0_in,
-                  const int isurf) {
-    if (!Code2PhysicalUnit_Set) {
-      mass0 = mass0_in;
-      length0 = length0_in;
-      vol0 = SQR(length0_in);
-      if (isurf == 0) vol0 *= length0_in; // 3D volume
-      time0 = time0_in;
-      Code2PhysicalUnit_Set = true;
-    }
-  }
-
-  void SetCGSUnit(ParameterInput *pin) {
-    if (!Code2PhysicalUnit_Set) {
-      const Real M_SUN = 1.988409870698051e33;   // gram (sun)
-      const Real AU_LENGTH = 1.4959787070000e13; // cm
-      const Real GRAV_CONST =
-          6.674299999999999e-8; // gravitational const in cm^3 g^-1 s^-2
-
-      Real mstar = pin->GetOrAddReal("problem", "mstar", 1.0) * M_SUN;
-      length0 = pin->GetOrAddReal("problem", "r0_length", 1.0) * AU_LENGTH;
-      const Real omega0 = std::sqrt(GRAV_CONST * mstar / (length0 * length0 * length0));
-      time0 = 1. / omega0;
-
-      const Real rho0 = pin->GetReal("problem", "rho0");
-      mass0 = rho0 * mstar;
-
-      isurface_den = pin->GetOrAddBoolean("dust", "surface_density_flag", true);
-      vol0 = SQR(length0);
-      if (isurface_den == 0) vol0 *= length0; // 3D volume
-      Code2PhysicalUnit_Set = true;
-    }
-  }
-};
-
 DustCoagulationVariable dcv;
 
 //----------------------------------------------------------------------------------------
@@ -134,57 +89,23 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   // using MRN distribution for the initial dust setup
   ParArray1D<Real> dust_size = dust_pkg->template Param<ParArray1D<Real>>("sizes");
 
-  // convert input "AU" and "mstar" to CGS unit
-  CGSUnit *cgsunit = new CGSUnit();
-  cgsunit->SetCGSUnit(pin);
-  const Real den0 = cgsunit->mass0 / cgsunit->vol0; // density
-  const Real time0 = cgsunit->time0;
-  const Real vel0 = cgsunit->length0 / cgsunit->time0;
-
-  const Real tlim_in = pin->GetReal("parthenon/time", "tlim");
-  pin->SetReal("parthenon/time", "tlim", tlim_in * time0);
-
-  if (pin->DoesBlockExist("parthenon/output0")) {
-    const Real dt = pin->GetReal("parthenon/output0", "dt");
-    pin->SetReal("parthenon/output0", "dt", dt * time0);
-  }
-
-  if (pin->DoesBlockExist("parthenon/output1")) {
-    const Real dt = pin->GetReal("parthenon/output1", "dt");
-    pin->SetReal("parthenon/output1", "dt", dt * time0);
-  }
-
-  if (pin->DoesBlockExist("parthenon/output2")) {
-    const Real dt = pin->GetReal("parthenon/output2", "dt");
-    pin->SetReal("parthenon/output2", "dt", dt * time0);
-  }
-
-  const Real x1max = pin->GetReal("parthenon/mesh", "x1max");
-  if (x1max < 1e10) {
-    std::stringstream msg;
-    msg << " reset x1min and x1max using cgs unit = " << cgsunit->length0 << std::endl;
-    PARTHENON_FAIL(msg);
-  }
   auto gas_pkg = pmb->packages.Get("gas");
   auto eos_d = gas_pkg->template Param<EOS>("eos_d");
 
   dcv.gamma = gas_pkg->Param<Real>("adiabatic_index");
   dcv.gm1 = dcv.gamma - 1.0;
   dcv.iso_cs = pin->GetOrAddReal("gas", "iso_sound_speed", 1e-1);
-  dcv.iso_cs *= vel0;
 
-  const Real gdens = 1.0 * den0;
+  const Real gdens = 1.0;
   const Real gtemp = SQR(dcv.iso_cs);
   const Real gsie = eos_d.InternalEnergyFromDensityTemperature(gdens, gtemp);
   if (pmb->gid == 0) {
-    std::cout << "gamma,cs,temp=" << dcv.gamma << " " << dcv.iso_cs << " "
-              << gsie * dcv.gm1 << ", time0,length0,mass0,den0,vel0=" << time0 << " "
-              << cgsunit->length0 << " " << cgsunit->mass0 << " " << den0 << " " << vel0
-              << std::endl;
+    std::cout << "gamma,cs,pre=" << dcv.gamma << " " << dcv.iso_cs << " "
+              << gsie * dcv.gm1 * gdens << std::endl;
   }
 
-  const Real vx_g = 0.0 * vel0;
-  const Real vx_d = 0.0 * vel0;
+  const Real vx_g = 0.0;
+  const Real vx_d = 0.0;
 
   // packing and capture variables for kernel
   auto &md = pmb->meshblock_data.Get();

@@ -45,9 +45,11 @@ Units::Units(ParameterInput *pin, std::shared_ptr<StateDescriptor> pkg) {
       time_ = pin->GetReal("artemis", "time");
       mass_ = pin->GetReal("artemis", "mass");
     } else if (unit_conversion == "ppd") {
-      length_ = AU;
-      mass_ = Msolar;
-      time_ = Year / (2. * M_PI);
+      const Real r0_length = pin->GetOrAddReal("artemis", "r0_length", 1.0); // in AU
+      const Real mstar = pin->GetOrAddReal("artemis", "mstar", 1.0);         // M_sun
+      length_ = r0_length * AU;
+      mass_ = mstar * Msolar * pin->GetReal("artemis", "rho0");
+      time_ = Year / (2. * M_PI) * std::sqrt(r0_length / mstar) * r0_length;
     } else {
       PARTHENON_FAIL("Unit conversion not recognized! Choices are [base, ppd]");
     }

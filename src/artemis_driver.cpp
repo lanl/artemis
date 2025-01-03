@@ -112,7 +112,7 @@ TaskListStatus ArtemisDriver<GEOM>::Step() {
   if (do_radiation) status = IMC::JaybenneIMC<GEOM>(pmesh, tm.time, tm.dt);
   if (status != TaskListStatus::complete) return status;
 
-  if (do_coagulation) status = Dust::OperatorSplitDust(pmesh, tm);
+  if (do_coagulation) status = Dust::OperatorSplitDust<GEOM>(pmesh, tm);
   if (status != TaskListStatus::complete) return status;
 
   // Compute new dt, (de)refine, and handle sparse (if enabled)

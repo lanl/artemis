@@ -16,15 +16,21 @@
 #include "artemis.hpp"
 #include "dust/dust.hpp"
 #include "geometry/geometry.hpp"
+#include "utils/units.hpp"
 
 namespace Dust {
 namespace Coagulation {
 //----------------------------------------------------------------------------------------
 //! \fn  StateDescriptor Coagulalation::Initialize
 //! \brief Adds intialization function for coagulation package
-std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin, Params &dustPars) {
+std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin, Params &dustPars,
+                                            ArtemisUtils::Units &units,
+                                            ArtemisUtils::Constants &constants) {
   auto coag = std::make_shared<StateDescriptor>("coagulation");
   Params &params = coag->AllParams();
+
+  PARTHENON_REQUIRE(units.GetPhysicalUnits() == ArtemisUtils::PhysicalUnits::cgs,
+                    "coagulation physics requires physical_units = cgs");
 
   CoagParams cpars;
 
@@ -41,17 +47,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin, Params &dustPar
   cpars.nCall_mx = pin->GetOrAddInteger("dust/coagulation", "coag_nsteps_mx", 1000);
   cpars.rho_p = rho_p;
 
-  const Real M_SUN = 1.988409870698051e33;      // gram (sun)
-  const Real GRAV_CONST = 6.674299999999999e-8; // gravitational const in cm^3 g^-1 s^-2
-  const Real mstar = pin->GetOrAddReal("problem", "mstar", 1.0) * M_SUN;
-  cpars.gm = std::sqrt(GRAV_CONST * mstar);
   const bool const_omega = pin->GetOrAddBoolean("problem", "const_coag_omega", false);
   cpars.const_omega = const_omega;
-  if (const_omega) {
-    const Real AU_LENGTH = 1.4959787070000e13; // cm
-    const Real r0 = pin->GetOrAddReal("problem", "r0_length", 1.0) * AU_LENGTH;
-    cpars.gm /= (std::sqrt(r0) * r0);
-  }
 
   cpars.ibounce = pin->GetOrAddBoolean("dust/coagulation", "coag_bounce", false);
 
@@ -60,6 +57,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin, Params &dustPar
   const bool isurface_den = pin->GetOrAddBoolean("dust", "surface_density_flag", true);
   if (isurface_den) coord_type = 1;
   cpars.coord = coord_type; // 1--surface density, 0: 3D
+
+  cpars.rho0 = units.GetMassDensityCodeToPhysical();
+  if (isurface_den) cpars.rho0 *= units.GetLengthCodeToPhysical();
 
   cpars.err_eps = 1.0e-1;
   cpars.S = 0.9;
@@ -104,7 +104,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin, Params &dustPar
   cpars.cpod_notzero = ParArray3D<int>("idx_nzcpod", nm, nm, 4);
   cpars.cpod_short = ParArray3D<Real>("nzcpod", nm, nm, 4);
 
-  cpars.dfloor = dfloor;
+  cpars.dfloor = dfloor * cpars.rho0;
   Real a = 3.0 * std::log10(h_sizes(0) / h_sizes(nm - 1)) / static_cast<Real>(1 - nm);
 
   initializeArray(nm, cpars.pGrid, cpars.rho_p, cpars.chi, a, dust_size, cpars.klf,

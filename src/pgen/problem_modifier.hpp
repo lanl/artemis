@@ -126,8 +126,6 @@ void ProblemModifier(parthenon::ParthenonManager *pman) {
                                                strat::ExtrapInnerX3<G>);
     pman->app_input->RegisterBoundaryCondition(BF::outer_x3, "extrap",
                                                strat::ExtrapOuterX3<G>);
-  } else if (artemis_problem == "dust_collision") {
-    pman->app_input->PreStepMeshUserWorkInLoop = dust_collision::PreStepUserWorkInLoop;
   }
 
   // Register jaybenne swarm boundary conditions

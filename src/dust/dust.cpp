@@ -347,6 +347,7 @@ TaskStatus CoagulationOneStep(MeshData<Real> *md, const Real time, const Real dt
 
   using parthenon::MakePackDescriptor;
   auto pm = md->GetParentPointer();
+  auto &artemis_pkg = pm->packages.Get("artemis");
   auto &dust_pkg = pm->packages.Get("dust");
   IndexRange ib = md->GetBoundsI(IndexDomain::interior);
   IndexRange jb = md->GetBoundsJ(IndexDomain::interior);
@@ -373,6 +374,13 @@ TaskStatus CoagulationOneStep(MeshData<Real> *md, const Real time, const Real dt
   int nvel = 3;
   if (coag.coord) nvel = 2; // surface-density
   auto &dfloor = dust_pkg->template Param<Real>("dfloor");
+
+  // unit: coagulation using cgs physical unit
+  auto &units = artemis_pkg->template Param<ArtemisUtils::Units>("units");
+  const Real time0 = units.GetTimeCodeToPhysical();
+  const Real length0 = units.GetLengthCodeToPhysical();
+  const Real rho0 = coag.rho0;
+  const Real vel0 = length0 / time0;
 
   const int scr_level = coag_pkg->template Param<int>("coag_scr_level");
   auto info_out_flag = coag_pkg->template Param<bool>("coag_info_out");
@@ -434,25 +442,26 @@ TaskStatus CoagulationOneStep(MeshData<Real> *md, const Real time, const Real dt
                                   vmesh.GetLowerBound(b, dust::prim::density()) + 1);
 
           const Real dens_g = vmesh(b, gas::prim::density(0), k, j, i);
-          Real dt_sync = dt;
-          const Real time1 = time;
+          Real dt_sync = dt * time0;
 
           geometry::Coords<GEOM> coords(vmesh.GetCoordinates(b), k, j, i);
           const auto &hx = coords.GetScaleFactors();
           const auto &xv = coords.GetCellCenter();
           const auto &xcyl = coords.ConvertToCyl(xv);
 
-          const Real rad = xcyl[0]; // cylindrical
-          const Real Omega_k =
-              coag.const_omega ? coag.gm : coag.gm / std::sqrt(rad) / rad; // code unit
+          const Real rad = coag.const_omega ? 1.0 : xcyl[0]; // cylindrical
+
+          const Real Omega_k = 1.0 / std::sqrt(rad) / rad;
 
           int nCall1 = 0;
 
           const Real sie = vmesh(b, gas::prim::sie(0), k, j, i);
           const Real bulk = eos_d.BulkModulusFromDensityInternalEnergy(dens_g, sie);
-          const Real cs = std::sqrt(bulk / dens_g);
-          const Real omega1 = Omega_k;
+          const Real cs1 = std::sqrt(bulk / dens_g) * vel0;
+          const Real omega1 = Omega_k / time0;
           const int nm = nspecies;
+          const Real time1 = time * time0;
+          const Real dens_g1 = dens_g * rho0;
 
           ScratchPad1D<Real> rhod(mbr.team_scratch(scr_level), nspecies);
           ScratchPad1D<Real> stime(mbr.team_scratch(scr_level), nspecies);
@@ -468,9 +477,9 @@ TaskStatus CoagulationOneStep(MeshData<Real> *md, const Real time, const Real dt
           // calculate the stopping time on the fly
           Real st0 = 1.0;
           if (coag.coord) { // surface density
-            st0 = 0.5 * M_PI * coag.rho_p / dens_g / omega1;
+            st0 = 0.5 * M_PI * coag.rho_p / dens_g1 / omega1;
           } else {
-            st0 = std::sqrt(M_PI / 8.0) * coag.rho_p / dens_g / cs;
+            st0 = std::sqrt(M_PI / 8.0) * coag.rho_p / dens_g1 / cs1;
           }
 
           parthenon::par_for_inner(
@@ -478,9 +487,10 @@ TaskStatus CoagulationOneStep(MeshData<Real> *md, const Real time, const Real dt
                 // calculate the stopping time on fly
                 stime(n) = st0 * dust_size(n);
                 if (vmesh(b, dust::prim::density(n), k, j, i) > dfloor) {
-                  rhod(n) = vmesh(b, dust::prim::density(n), k, j, i);
+                  rhod(n) = vmesh(b, dust::prim::density(n), k, j, i) * rho0;
                   for (int d = 0; d < nvel; d++) {
-                    vel(VI(n, d)) = vmesh(b, dust::prim::velocity(VI(n, d)), k, j, i);
+                    vel(VI(n, d)) =
+                        vmesh(b, dust::prim::velocity(VI(n, d)), k, j, i) * vel0;
                   }
                 } else {
                   rhod(n) = 0.0;
@@ -490,8 +500,8 @@ TaskStatus CoagulationOneStep(MeshData<Real> *md, const Real time, const Real dt
                 }
               });
 
-          Coagulation::CoagulationOneCell(mbr, i, time1, dt_sync, dens_g, rhod, stime,
-                                          vel, nvel, Q, nQs, alpha, cs, omega1, coag,
+          Coagulation::CoagulationOneCell(mbr, i, time1, dt_sync, dens_g1, rhod, stime,
+                                          vel, nvel, Q, nQs, alpha, cs1, omega1, coag,
                                           source, nCall1, Q2);
 
           if (info_out_flag) nCalls(k, j, i) = nCall1;
@@ -502,10 +512,10 @@ TaskStatus CoagulationOneStep(MeshData<Real> *md, const Real time, const Real dt
                 // for (int n = 0; n < nspecies; ++n) {
                 if (rhod(n) > 0.0) {
                   const Real rhod1 = rhod(n);
-                  vmesh(b, dust::cons::density(n), k, j, i) = rhod1;
+                  vmesh(b, dust::cons::density(n), k, j, i) = rhod1 / rho0;
                   for (int d = 0; d < nvel; d++) {
                     vmesh(b, dust::cons::momentum(VI(n, d)), k, j, i) =
-                        rhod1 * vel(VI(n, d)) * hx[d];
+                        rhod1 * vel(VI(n, d)) * hx[d] / vel0;
                   }
                 } else {
                   vmesh(b, dust::cons::density(n), k, j, i) = 0.0;
@@ -592,10 +602,9 @@ TaskStatus CoagulationOneStep(MeshData<Real> *md, const Real time, const Real dt
 
 //----------------------------------------------------------------------------------------
 //! \fn  TaskCollection Dust::OperatorSplitDust
-//! \brief dust operator split task collection
+//! \brief dust wrapper function for operatorsplitDust
 template <Coordinates GEOM>
-TaskCollection OperatorSplitDustSelect(Mesh *pm, parthenon::SimTime &tm) {
-  TaskCollection tc;
+TaskListStatus OperatorSplitDust(Mesh *pm, parthenon::SimTime &tm) {
   auto &coag_pkg = pm->packages.Get("coagulation");
   auto *dtCoag = coag_pkg->MutableParam<Real>("dtCoag");
   int nstep1Coag = coag_pkg->template Param<int>("nstep1Coag");
@@ -605,7 +614,7 @@ TaskCollection OperatorSplitDustSelect(Mesh *pm, parthenon::SimTime &tm) {
 
   *dtCoag += tm.dt;
   if ((tm.ncycle + 1) % nstep1Coag != 0) {
-    return tc;
+    return TaskListStatus::complete;
   }
 
   const Real time_local = tm.time + tm.dt - (*dtCoag);
@@ -615,6 +624,7 @@ TaskCollection OperatorSplitDustSelect(Mesh *pm, parthenon::SimTime &tm) {
               << tm.ncycle << std::endl;
   }
 
+  TaskCollection tc;
   TaskID none(0);
 
   // Assemble tasks
@@ -650,32 +660,7 @@ TaskCollection OperatorSplitDustSelect(Mesh *pm, parthenon::SimTime &tm) {
   }
   *dtCoag = 0.0;
 
-  return tc;
-}
-
-//----------------------------------------------------------------------------------------
-//! \fn  TaskStatus Dust::OperatorSplit
-//  \brief Wrapper function for Dust::OperatorSplitDust
-TaskListStatus OperatorSplitDust(Mesh *pm, parthenon::SimTime &tm) {
-  auto &dust_pkg = pm->packages.Get("dust");
-  typedef Coordinates C;
-  const C coords = dust_pkg->template Param<Coordinates>("coords");
-
-  if (coords == C::cartesian) {
-    return OperatorSplitDustSelect<C::cartesian>(pm, tm).Execute();
-  } else if (coords == C::spherical1D) {
-    return OperatorSplitDustSelect<C::spherical1D>(pm, tm).Execute();
-  } else if (coords == C::spherical2D) {
-    return OperatorSplitDustSelect<C::spherical2D>(pm, tm).Execute();
-  } else if (coords == C::spherical3D) {
-    return OperatorSplitDustSelect<C::spherical3D>(pm, tm).Execute();
-  } else if (coords == C::cylindrical) {
-    return OperatorSplitDustSelect<C::cylindrical>(pm, tm).Execute();
-  } else if (coords == C::axisymmetric) {
-    return OperatorSplitDustSelect<C::axisymmetric>(pm, tm).Execute();
-  } else {
-    PARTHENON_FAIL("Invalid artemis/coordinate system!");
-  }
+  return tc.Execute();
 }
 
 //----------------------------------------------------------------------------------------
@@ -784,5 +769,17 @@ template TaskStatus CoagulationOneStep<Coordinates::spherical3D>(MeshData<Real> 
 template TaskStatus CoagulationOneStep<Coordinates::axisymmetric>(MeshData<Real> *md,
                                                                   const Real time,
                                                                   const Real dt);
+template TaskListStatus OperatorSplitDust<Coordinates::cartesian>(Mesh *pm,
+                                                                  parthenon::SimTime &tm);
+template TaskListStatus
+OperatorSplitDust<Coordinates::cylindrical>(Mesh *pm, parthenon::SimTime &tm);
+template TaskListStatus
+OperatorSplitDust<Coordinates::spherical1D>(Mesh *pm, parthenon::SimTime &tm);
+template TaskListStatus
+OperatorSplitDust<Coordinates::spherical2D>(Mesh *pm, parthenon::SimTime &tm);
+template TaskListStatus
+OperatorSplitDust<Coordinates::spherical3D>(Mesh *pm, parthenon::SimTime &tm);
+template TaskListStatus
+OperatorSplitDust<Coordinates::axisymmetric>(Mesh *pm, parthenon::SimTime &tm);
 
 } // namespace Dust

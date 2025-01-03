@@ -14,6 +14,7 @@
 #define DUST_COAGULATION_HPP_
 
 #include "utils/artemis_utils.hpp"
+#include "utils/units.hpp"
 
 //#define  COAGULATION_DEBUG
 namespace Dust {
@@ -21,7 +22,9 @@ namespace Coagulation {
 
 enum coag2DRv { dpod, aFrag, phiFrag, epsFrag, dalp, kdelta, coef_fett, last2 };
 
-std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin, Params &dustPars);
+std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin, Params &dustPars,
+                                            ArtemisUtils::Units &units,
+                                            ArtemisUtils::Constants &constants);
 
 struct CoagParams {
   int coord = 0; // 1--surface density, 0: 3D
@@ -45,8 +48,9 @@ struct CoagParams {
   Real S;       // Safety margin for adaptive step sizing
   Real cfl;
   Real errcon;      // Needed for increasing step size
-  Real gm;          // sqrt(grav_const * mstar);
   bool const_omega; // for shearing-box or testing
+
+  Real rho0; // physical-to-code unit conversion
 
   // pre-calculated array, once-for-all
   ParArray2D<int> klf;

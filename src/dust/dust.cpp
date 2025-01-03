@@ -568,9 +568,8 @@ TaskStatus CoagulationOneStep(MeshData<Real> *md, const Real time, const Real dt
 
     if (parthenon::Globals::my_rank == 0) {
       std::string fname;
-      // fname.assign(pin->GetString("parthenon/job", "problem_id"));
-      fname = "artemis";
-      fname.append("_coag_info.dat");
+      fname.assign(artemis_pkg->template Param<std::string>("job_name"));
+      fname.append("_info.dat");
       static FILE *pfile = NULL;
 
       // The file exists -- reopen the file in append mode

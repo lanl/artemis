@@ -15,9 +15,9 @@
 problem = dust_coagulation           # name of the pgen
 coordinates = cartesian	# coordinate system
 unit_conversion	= ppd	# ppd (code unit: AU, Msun, year/(2*pi)
-r0_length	= 10.		# AU
+r0_length	= 10.	# AU
 mstar	= 1.0		# M_sun
-rho0	= 1.59577e-4	# 3D rho (mstar/r0^3)
+rho0	= 1.59577e-4	# prefactor for 3D density profile
 physical_units	= cgs	# 	
 
 <parthenon/job>
@@ -47,7 +47,6 @@ ncycle_out = 1    	# interval for stdout summary info
 <parthenon/mesh>
 nghost = 2
 refinement = none
-# numlevel = 1
 
 nx1    = 16  		# Number of zones in X1-direction
 x1min  = 9.0   		# minimum value of X1
@@ -78,34 +77,33 @@ dust = true
 coagulation = true
 
 <gas>
-cfl = 0.9
-gamma = 1.00001
+cfl = 0.9		# gas cfl number
+gamma = 1.00001		# adiabatic index
 iso_sound_speed = 0.05	# code unit
-cv = 1e5	# 1/(gamma-1)
+cv = 1e5		# code unit: 1/(gamma-1)
 
 <dust>
-cfl = 0.9
-nspecies = 121
-size_input = logspace
+cfl = 0.9		# dust cfl number
+nspecies = 121		# number of dust size
+size_input = logspace	# dust size distribution
 
 scr_level = 1		# for reconstruction
 
 surface_density_flag = false  # surface or volume density 
 grain_density = 1.25	# dust internal density g/cc
-min_size = 1e-5	#cm
-max_size = 10.0	#cm
+min_size = 1e-5		#cm
+max_size = 10.0		#cm
 
 <dust/coagulation>
 vfrag 	= 1000.0	#cm/s
 coag_int = 1
-coag_use_adaptiveStep = false
-coag_mom_preserve     = false
-coag_info_out	      = true
+coag_use_adaptiveStep 	= false
+coag_mom_preserve     	= false
+coag_info_out		= true
 
 <problem>
 nInit_dust = 11		# number of dust species initially
-dust_to_gas = 0.01
-nstep1Coag = 1
-#rho0 = 2e-5		# code unit value of 1 m_star/r0_length^2
+dust_to_gas = 0.01	# init dust-to-gas ratio
+nstep1Coag = 10		# number of steps for one coagulation call
 const_coag_omega = true # using omega at r0_length
 

@@ -66,6 +66,7 @@ ArtemisDriver<GEOM>::ArtemisDriver(ParameterInput *pin, ApplicationInput *app_in
   do_nbody = artemis_pkg->template Param<bool>("do_nbody");
   do_diffusion = do_viscosity || do_conduction;
   do_radiation = artemis_pkg->template Param<bool>("do_radiation");
+  do_coagulation = artemis_pkg->template Param<bool>("do_coagulation");
 
   // NBody initialization tasks
   if (do_nbody) {
@@ -109,6 +110,9 @@ TaskListStatus ArtemisDriver<GEOM>::Step() {
 
   // Execute operator split physics
   if (do_radiation) status = IMC::JaybenneIMC<GEOM>(pmesh, tm.time, tm.dt);
+  if (status != TaskListStatus::complete) return status;
+
+  if (do_coagulation) status = Dust::OperatorSplitDust<GEOM>(pmesh, tm);
   if (status != TaskListStatus::complete) return status;
 
   // Compute new dt, (de)refine, and handle sparse (if enabled)

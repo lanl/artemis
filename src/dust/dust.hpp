@@ -33,6 +33,13 @@ TaskStatus FluxSource(MeshData<Real> *md, const Real dt);
 
 void AddHistory(Coordinates coords, Params &params);
 
+// OperatorSplit tasks
+template <Coordinates GEOM>
+TaskListStatus OperatorSplitDust(Mesh *pm, parthenon::SimTime &tm);
+
+template <Coordinates GEOM>
+TaskStatus CoagulationOneStep(MeshData<Real> *md, const Real time, const Real dt);
+
 } // namespace Dust
 
 #endif // DUST_DUST_HPP_

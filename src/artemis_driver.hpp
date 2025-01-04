@@ -58,6 +58,7 @@ class ArtemisDriver : public EvolutionDriver {
       do_nbody, do_conduction, do_diffusion, do_moment, do_imc;
   const bool is_restart;
   Real trad, dtr;
+  int rad_stages;
 };
 
 using TaskCollectionFnPtr = TaskCollection (*)(Mesh *pm, const Real time, const Real dt);

@@ -68,6 +68,9 @@ ArtemisDriver<GEOM>::ArtemisDriver(ParameterInput *pin, ApplicationInput *app_in
   do_diffusion = do_viscosity || do_conduction;
   do_imc = artemis_pkg->template Param<bool>("do_imc");
   do_moment = artemis_pkg->template Param<bool>("do_moment");
+  if (do_moment) {
+    rad_stages = pm->packages.Get("radiation").get()->template Param<int>("nstages");
+  }
   // NBody initialization tasks
   if (do_nbody) {
     // NBody coupling integrator (not to be confused with the rebound integrator)
@@ -110,6 +113,8 @@ TaskListStatus ArtemisDriver<GEOM>::Step() {
 
   // Execute operator split physics
   if (do_imc) status = IMC::JaybenneIMC<GEOM>(pmesh, tm.time, tm.dt);
+  if (status != TaskListStatus::complete) return status;
+
   if (do_moment) status = RadiationDriver();
   if (status != TaskListStatus::complete) return status;
 
@@ -276,26 +281,35 @@ TaskCollection ArtemisDriver<GEOM>::StepTasks() {
 
 template <Coordinates GEOM>
 TaskListStatus ArtemisDriver<GEOM>::RadiationDriver() {
+
+  // turn into a AddSublist ?
+
   TaskListStatus status = TaskListStatus::complete;
   // Execute a series of substeps
   trad = tm.time;
   Real tend = tm.time + tm.dt;
-  int step = 1;
-  // Loop over all meshblocks and get the minimum dx
-  // min(dx) = min(<hi>) * dxi
-  // Likely doesn't need a kernel
+
+  // The maximum allowed dt (maybe doesn't need a kernel?)
   dtr = Radiation::EstimateTimeStep<GEOM>(pmesh);
 
-  printf("%lg %lg\n", tm.dt, dtr);
-  while (trad < tend) {
-    if (trad + dtr > tend) dtr = tend - trad;
-    printf("Executing %d %lg\n", step, dtr);
+  // How many steps is it going to take to get through the hydro step
+  // We make it so that all steps are equal dt as opposed to the last step
+  // being smaller than the rest
+  auto nsteps = static_cast<int>(std::ceil(tm.dt / dtr));
+  dtr = tm.dt / nsteps;
+
+  if (tm.ncycle % tm.ncycle_out == 0) {
+    if (Globals::my_rank == 0) {
+      std::cout << tm.dt << " " << dtr << "\nTaking " << nsteps << " radiation substeps"
+                << " at dt=" << dtr << std::endl;
+    }
+  }
+
+  for (int step = 1; step <= nsteps; step++, trad += dtr) {
     status = RadiationTasks().Execute();
     if (status != TaskListStatus::complete) {
       return status;
     }
-    trad += dtr;
-    step++;
   }
   return status;
 }
@@ -320,7 +334,8 @@ TaskCollection ArtemisDriver<GEOM>::RadiationTasks() {
     auto &u1 = pmesh->mesh_data.GetOrAdd("u1", i);
     tl.AddTask(none, ArtemisUtils::DeepCopyConservedData, u1.get(), u0.get());
   }
-  const int nstages = 2;
+
+  const int nstages = rad_stages;
   const std::array<Real, 2> beta{1.0, 0.5};
   const std::array<Real, 2> gam0{0.0, 0.5};
   const std::array<Real, 2> gam1{1.0, 0.5};
@@ -355,7 +370,7 @@ TaskCollection ArtemisDriver<GEOM>::RadiationTasks() {
                                u1.get(), stage, gam0[stage - 1], gam1[stage - 1], bdt);
 
       // Apply "coordinate source terms"
-      TaskID coord_src = tl.AddTask(update, Radiation::FluxSource, u0.get(), bdt);
+      auto coord_src = tl.AddTask(update, Radiation::FluxSource, u0.get(), bdt);
 
       // Apply rotating frame source term
       // TaskID rframe_src = coord_src;
@@ -366,9 +381,28 @@ TaskCollection ArtemisDriver<GEOM>::RadiationTasks() {
       // }
 
       // Apply matter-coupling step
+      // This is the first task to update the gas/dust values
+      auto coupling =
+          tl.AddTask(coord_src, Radiation::MatterCoupling<GEOM>, u0.get(), u1.get(), bdt);
 
-      // Set fields to be communicated
-      auto pre_comm = tl.AddTask(coord_src, PreCommFillDerived<MeshData<Real>>, u0.get());
+      // // Set fields to be communicated
+      // auto pre_comm = tl.AddTask(coupling, PreCommFillDerived<MeshData<Real>>,
+      // u0.get());
+
+      // // Set boundary conditions (both physical and logical)
+      // auto bcs = parthenon::AddBoundaryExchangeTasks(pre_comm, tl, u0,
+      // pmesh->multilevel);
+
+      // // Update primitive variables
+      // auto c2p = tl.AddTask(TQ::local_sync, bcs, FillDerived<MeshData<Real>>,
+      // u0.get());
+
+      // Set auxillary fields
+      auto set_aux =
+          tl.AddTask(coupling, ArtemisDerived::SetAuxillaryFields<GEOM>, u0.get());
+
+      // Set (remaining) fields to be communicated
+      auto pre_comm = tl.AddTask(set_aux, PreCommFillDerived<MeshData<Real>>, u0.get());
 
       // Set boundary conditions (both physical and logical)
       auto bcs = parthenon::AddBoundaryExchangeTasks(pre_comm, tl, u0, pmesh->multilevel);

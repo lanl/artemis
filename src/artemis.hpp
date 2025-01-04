@@ -80,7 +80,7 @@ ARTEMIS_VARIABLE(rad.prim, pressure);
 ARTEMIS_VARIABLE(rad.prim, flux);
 ARTEMIS_VARIABLE(rad.prim, edd);
 } // namespace prim
-}
+} // namespace rad
 
 #undef ARTEMIS_VARIABLE
 
@@ -118,7 +118,7 @@ enum class ArtemisBC {
   none
 };
 
-enum class TensIdx {X11=0, X22=1, X33=2, X23=3, X13=4, X12=5};
+enum TensIdx { X11 = 0, X22 = 1, X33 = 2, X23 = 3, X13 = 4, X12 = 5 };
 
 // Floating point limits
 template <typename T = Real>

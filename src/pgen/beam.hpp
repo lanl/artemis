@@ -17,13 +17,17 @@
 #include "artemis.hpp"
 #include "geometry/geometry.hpp"
 #include "utils/artemis_utils.hpp"
-
+using ArtemisUtils::EOS;
 namespace beam {
 
 struct BeamParams {
-  Real erad;
   Real width;
   Real mu;
+  Real rho;
+  Real tg;
+  Real tr;
+  Real sigma;
+  Real bump;
 };
 
 inline void InitBeamParams(MeshBlock *pmb, ParameterInput *pin) {
@@ -31,9 +35,14 @@ inline void InitBeamParams(MeshBlock *pmb, ParameterInput *pin) {
   if (!(params.hasKey("beam_params"))) {
     BeamParams beam_params;
 
-    beam_params.erad = pin->GetOrAddReal("problem", "erad", 1.0);
     beam_params.width = pin->GetOrAddReal("problem", "width", 0.05);
     beam_params.mu = pin->GetOrAddReal("problem", "mu", 0.5);
+    beam_params.sigma = pin->GetOrAddReal("problem", "sigma", 1e-10);
+    beam_params.bump = pin->GetOrAddReal("problem", "bump", 0.0);
+
+    beam_params.rho = pin->GetOrAddReal("problem", "rho", 1.0);
+    beam_params.tg = pin->GetOrAddReal("problem", "tgas", 1.0);
+    beam_params.tr = pin->GetOrAddReal("problem", "trad", 1.0);
     params.Add("beam_params", beam_params);
   }
 }
@@ -51,6 +60,10 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto artemis_pkg = pmb->packages.Get("artemis");
   const bool do_gas = artemis_pkg->Param<bool>("do_gas");
   const bool do_rad = artemis_pkg->Param<bool>("do_moment");
+  auto rad_pkg = pmb->packages.Get("radiation");
+  auto gas_pkg = pmb->packages.Get("gas");
+  const auto eos = gas_pkg->Param<EOS>("eos_d");
+  const Real ar = rad_pkg->Param<Real>("arad");
 
   // packing and capture variables for kernel
   auto &md = pmb->meshblock_data.Get();
@@ -65,21 +78,30 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
+  auto &pars = artemis_pkg->Param<BeamParams>("beam_params");
+  auto &pco = pmb->coords;
   pmb->par_for(
       "pgen_beam", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
         // cell-centered coordinates
-
+        geometry::Coords<GEOM> coords(pco, k, j, i);
+        const auto &xv = coords.GetCellCenter();
         // compute cell-centered conserved variables
         if (do_gas) {
-          v(0, gas::prim::density(0), k, j, i) = 1.0;
+          // put in a ball at the center
+          const Real dr2 = SQR(xv[0] - 1.0) + SQR(xv[1] - 1.0);
+          const Real dens =
+              pars.rho *
+              (1.0 + pars.bump * std::exp(-dr2 / (Fuzz<Real>() + 2.0 * SQR(pars.sigma))));
+          v(0, gas::prim::density(0), k, j, i) = dens;
           v(0, gas::prim::velocity(0), k, j, i) = 0.0;
           v(0, gas::prim::velocity(1), k, j, i) = 0.0;
           v(0, gas::prim::velocity(2), k, j, i) = 0.0;
-          v(0, gas::prim::sie(0), k, j, i) = 1.0;
+          v(0, gas::prim::sie(0), k, j, i) =
+              eos.InternalEnergyFromDensityTemperature(dens, pars.tg);
         }
         if (do_rad) {
-          v(0, rad::prim::energy(0), k, j, i) = 1.0;
+          v(0, rad::prim::energy(0), k, j, i) = ar * SQR(SQR(pars.tg));
           v(0, rad::prim::flux(0), k, j, i) = 0.0;
           v(0, rad::prim::flux(1), k, j, i) = 0.0;
           v(0, rad::prim::flux(2), k, j, i) = 0.0;
@@ -96,7 +118,8 @@ inline void BeamInnerX2(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) 
   auto artemis_pkg = pmb->packages.Get("artemis");
   const bool do_gas = artemis_pkg->Param<bool>("do_gas");
   const bool do_rad = artemis_pkg->Param<bool>("do_moment");
-
+  auto rad_pkg = pmb->packages.Get("radiation");
+  const Real ar = rad_pkg->Param<Real>("arad");
   static auto descriptors =
       ArtemisUtils::GetBoundaryPackDescriptorMap<gas::prim::density, gas::prim::velocity,
                                                  gas::prim::sie, rad::prim::energy,
@@ -129,7 +152,7 @@ inline void BeamInnerX2(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) 
         }
         if (do_rad) {
           const bool bc = (xf <= pars.width);
-          const Real erad = pars.erad;
+          const Real erad = ar * SQR(SQR(pars.tr));
           const Real f = std::sqrt(pars.mu);
           v(0, rad::prim::flux(0), k, j, i) =
               (bc) ? f : v(0, rad::prim::flux(0), k, js, i);
@@ -138,7 +161,7 @@ inline void BeamInnerX2(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) 
           v(0, rad::prim::flux(2), k, j, i) =
               (bc) ? 0.0 : v(0, rad::prim::flux(2), k, js, i);
           v(0, rad::prim::energy(0), k, j, i) =
-              (bc) ? pars.erad : v(0, rad::prim::energy(0), k, js, i);
+              (bc) ? erad : v(0, rad::prim::energy(0), k, js, i);
         }
       });
 }
@@ -152,6 +175,8 @@ inline void BeamInnerX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) 
   auto artemis_pkg = pmb->packages.Get("artemis");
   const bool do_gas = artemis_pkg->Param<bool>("do_gas");
   const bool do_rad = artemis_pkg->Param<bool>("do_moment");
+  auto rad_pkg = pmb->packages.Get("radiation");
+  const Real ar = rad_pkg->Param<Real>("arad");
 
   static auto descriptors =
       ArtemisUtils::GetBoundaryPackDescriptorMap<gas::prim::density, gas::prim::velocity,
@@ -185,6 +210,7 @@ inline void BeamInnerX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) 
         }
         if (do_rad) {
           const bool bc = (yf <= pars.width);
+          const Real erad = ar * SQR(SQR(pars.tr));
           const Real f = std::sqrt(pars.mu);
           v(0, rad::prim::flux(0), k, j, i) =
               (bc) ? f : -v(0, rad::prim::flux(0), k, j, is);
@@ -193,7 +219,7 @@ inline void BeamInnerX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) 
           v(0, rad::prim::flux(2), k, j, i) =
               (bc) ? 0.0 : v(0, rad::prim::flux(2), k, j, is);
           v(0, rad::prim::energy(0), k, j, i) =
-              (bc) ? pars.erad : v(0, rad::prim::energy(0), k, j, is);
+              (bc) ? erad : v(0, rad::prim::energy(0), k, j, is);
         }
       });
 }

@@ -56,18 +56,40 @@ inline TaskStatus DeepCopyConservedData(MeshData<Real> *to, MeshData<Real> *from
 template <Coordinates GEOM>
 TaskStatus ApplyUpdate(MeshData<Real> *u0, MeshData<Real> *u1, const int stage,
                        parthenon::LowStorageIntegrator *integrator) {
+
   using parthenon::MakePackDescriptor;
   using parthenon::variable_names::any;
   auto pm = u0->GetParentPointer();
-
   // Extract integrator weights
   const Real gam0 = integrator->gam0[stage - 1];
   const Real gam1 = integrator->gam1[stage - 1];
   const Real beta_dt = integrator->beta[stage - 1] * integrator->dt;
 
+  auto artemis_pkg = pm->packages.Get("artemis");
+  const bool do_gas = artemis_pkg->template Param<bool>("do_gas");
+  const bool do_dust = artemis_pkg->template Param<bool>("do_dust");
+
+  // Get the variable names we want to apply this too.
+  // We purposefully remove the radiation package from this list
+  parthenon::Metadata::FlagCollection flags;
+  std::vector<std::string> names;
+
+  if (do_gas) {
+    auto gas_pkg = pm->packages.Get("gas").get();
+    auto gas_names = gas_pkg->GetVariableNames(flags);
+    names.insert(names.end(), gas_names.begin(), gas_names.end());
+  }
+  if (do_dust) {
+    auto dust_pkg = pm->packages.Get("dust").get();
+    auto dust_names = dust_pkg->GetVariableNames(flags);
+    names.insert(names.end(), dust_names.begin(), dust_names.end());
+  }
+
   // Packing and indexing
-  std::vector<MetadataFlag> flags({Metadata::Conserved, Metadata::WithFluxes});
-  static auto desc = MakePackDescriptor<any>(u0, flags, {parthenon::PDOpt::WithFluxes});
+  static auto desc = MakePackDescriptor(pm->resolved_packages.get(), names,
+                                        {Metadata::Conserved, Metadata::WithFluxes},
+                                        {parthenon::PDOpt::WithFluxes});
+
   const auto v0 = desc.GetPack(u0);
   const auto v1 = desc.GetPack(u1);
   const auto ib = u0->GetBoundsI(IndexDomain::interior);

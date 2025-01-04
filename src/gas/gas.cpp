@@ -95,8 +95,10 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   // Equation of state
   const std::string eos_name = pin->GetOrAddString("gas", "eos", "ideal");
   if (eos_name == "ideal") {
+    auto pc = parthenon::constants::PhysicalConstants<parthenon::constants::CGS>();
     const Real gamma = pin->GetOrAddReal("gas", "gamma", 1.66666666667);
-    const Real cv = pin->GetOrAddReal("gas", "cv", 1. / (gamma - 1.));
+    const Real mu = pin->GetOrAddReal("gas", "mu", 1.0);
+    const Real cv = pin->GetOrAddReal("gas", "cv", pc.kb / (pc.mp * mu * (gamma - 1.)));
     EOS eos_host = singularity::IdealGas(gamma - 1., cv);
     EOS eos_device = eos_host.GetOnDevice();
     params.Add("eos_h", eos_host);

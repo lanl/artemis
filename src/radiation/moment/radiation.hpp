@@ -17,6 +17,8 @@
 
 namespace Radiation {
 
+enum class Closure { Eddington, M1 };
+
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
 
 template <Coordinates GEOM>
@@ -26,15 +28,41 @@ TaskStatus CalculateFluxes(MeshData<Real> *md, const bool pcm);
 TaskStatus FluxSource(MeshData<Real> *md, const Real dt);
 
 template <Coordinates GEOM>
+TaskStatus MatterCoupling(MeshData<Real> *u0, MeshData<Real> *u1, const Real dt);
+
+template <Coordinates GEOM>
 TaskStatus ApplyUpdate(MeshData<Real> *u0, MeshData<Real> *u1, const int stage,
                        const Real gam0, const Real gam1, const Real beta_dt);
 
 void AddHistory(Coordinates coords, Params &params);
 
-KOKKOS_INLINE_FUNCTION
-Real EddingtonFactor(const Real f) {
+template <Closure CTYP>
+KOKKOS_INLINE_FUNCTION Real EddingtonFactor(const Real f) {
+  if constexpr (CTYP == Closure::Eddington) {
+    return 1. / 3.;
+  }
   const Real f2 = f * f;
   return (3. + 4. * f2) / (5. + 2. * std::sqrt(4. - 3. * f2));
+}
+
+template <Closure CTYP>
+KOKKOS_INLINE_FUNCTION std::array<Real, 6>
+EddingtonTensor(const std::array<Real, 3> fred) {
+
+  if constexpr (CTYP == Closure::Eddington) {
+    return {1.0 / 3.0, 1.0 / 3.0, 1.0 / 3.0, 0.0, 0.0, 0.0};
+  }
+
+  Real fmag = std::sqrt(SQR(fred[0]) + SQR(fred[1]) + SQR(fred[2]));
+  std::array<Real, 3> n{fred[0] / (fmag + Fuzz<Real>()), fred[1] / (fmag + Fuzz<Real>()),
+                        fred[2] / (fmag + Fuzz<Real>())};
+  fmag = std::min(1.0, fmag);
+  const std::array<Real, 3> f{n[0] * fmag, n[1] * fmag, n[2] * fmag};
+  const Real chi = EddingtonFactor<CTYP>(fmag);
+  const Real ca = 0.5 * (1. - chi);
+  const Real cb = 0.5 * (3 * chi - 1.);
+  return {ca + cb * n[0] * n[0], ca + cb * n[1] * n[1], ca + cb * n[2] * n[2],
+          cb * n[1] * n[2],      cb * n[0] * n[2],      cb * n[0] * n[1]};
 }
 
 KOKKOS_INLINE_FUNCTION
@@ -105,6 +133,82 @@ Real EstimateTimeStep(parthenon::Mesh *pmesh) {
   const auto chat = params.template Get<Real>("chat");
   const auto cfl = params.template Get<Real>("cfl");
   return cfl * dxmin / chat;
+}
+
+KOKKOS_INLINE_FUNCTION
+std::tuple<Real, Real> EnergyRHS(const Real cv, const Real a, const Real b, const Real d,
+                                 const Real e, const Real e0, const Real Er, const Real B,
+                                 const Real coverc) {
+  const Real R = (a * (B - Er) + b * Er + d);
+  const Real Fi = (e - e0) + coverc * R;
+  return {R, Fi};
+}
+
+KOKKOS_INLINE_FUNCTION
+std::tuple<Real, Real> TemperatureCoeffs(const Real cv, const Real a, const Real b,
+                                         const Real d, const Real dB, const Real coverc) {
+  const Real c1 = cv + coverc * a * dB;
+  const Real c2 = b - a;
+  return {c1, c2};
+}
+
+KOKKOS_INLINE_FUNCTION
+std::tuple<Real, Real> PlanckEnergy(const Real ar, const Real T) {
+  const Real T2 = SQR(T);
+  const Real B = ar * SQR(T2);
+  const Real dB = 4.0 * ar * T2 * T;
+  return {B, dB};
+}
+
+KOKKOS_INLINE_FUNCTION
+Real FleckFactor(const Real ar, const Real T, const Real cv) {
+  return 4.0 * ar * T * T * T / cv;
+}
+
+KOKKOS_INLINE_FUNCTION
+std::tuple<Real, Real, Real> EnergyExchangeCoeffs(const Real sigp, const Real sigr,
+                                                  std::array<Real, 3> v,
+                                                  std::array<Real, 3> F,
+                                                  std::array<Real, 6> fedd, const Real c,
+                                                  const Real chat) {
+  // R = a * (B - E) + b * E  + d
+  Real beta2 = (SQR(v[0]) + SQR(v[1]) + SQR(v[2])) / (c * c);
+  Real bdf = (v[0] * F[0] + v[1] * F[1] + v[2] * F[2]) / (c * c);
+  Real fb[3] = {fedd[TensIdx::X11] * v[0] / c + fedd[TensIdx::X12] * v[1] / c +
+                    fedd[TensIdx::X13] * v[2] / c,
+                fedd[TensIdx::X12] * v[0] / c + fedd[TensIdx::X22] * v[1] / c +
+                    fedd[TensIdx::X23] * v[2] / c,
+                fedd[TensIdx::X13] * v[0] / c + fedd[TensIdx::X23] * v[1] / c +
+                    fedd[TensIdx::X33] * v[2] / c};
+  Real fbf = fb[0] * v[0] / c + fb[1] * v[1] / c + fb[2] * v[2] / c;
+
+  Real a = chat * sigp * (1. + 0.5 * beta2);
+  Real b = chat * (sigr - sigp) * (beta2 + fbf);
+  Real d = chat * (sigp + (sigp - sigr)) * bdf;
+  return {a, b, d};
+}
+
+KOKKOS_INLINE_FUNCTION
+std::tuple<Real, Real, std::array<Real, 3>>
+MomentumExchangeCoeffs(const Real sigp, const Real sigr, const std::array<Real, 3> beta,
+                       const Real B, std::array<Real, 6> fedd, const Real Er,
+                       const Real c, const Real chat) {
+
+  const Real beta2 = SQR(beta[0]) + SQR(beta[1]) + SQR(beta[2]);
+  const Real a = sigr * (1. + 0.5 * beta2);
+  const Real b = 2 * (sigr - sigp);
+  const std::array<Real, 3> bdp = {
+      beta[0] * fedd[TensIdx::X11] + beta[1] * fedd[TensIdx::X12] +
+          beta[2] * fedd[TensIdx::X13],
+      beta[0] * fedd[TensIdx::X12] + beta[1] * fedd[TensIdx::X22] +
+          beta[2] * fedd[TensIdx::X23],
+      beta[0] * fedd[TensIdx::X13] + beta[1] * fedd[TensIdx::X23] +
+          beta[2] * fedd[TensIdx::X33]};
+
+  const std::array<Real, 3> d{sigr * (bdp[0] + beta[0]) * Er + sigp * (B - Er) * beta[0],
+                              sigr * (bdp[1] + beta[1]) * Er + sigp * (B - Er) * beta[1],
+                              sigr * (bdp[2] + beta[2]) * Er + sigp * (B - Er) * beta[2]};
+  return {a, b, d};
 }
 
 } // namespace Radiation

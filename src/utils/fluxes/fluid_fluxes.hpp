@@ -95,8 +95,10 @@ TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PackPrim vprim,
     eos = pkg->template Param<EOS>("eos_d");
   }
   Real chat = Null<Real>();
+  Real c = Null<Real>();
   if constexpr (FLUID_TYPE == Fluid::radiation) {
     chat = pkg->template Param<Real>("chat");
+    c = pkg->template Param<Real>("c");
   }
 
   // Scratch properties
@@ -124,7 +126,7 @@ TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PackPrim vprim,
 
         // Compute fluxes over[is, ie + 1]
         RiemannSolver<RIEMANN, FLUID_TYPE> riemann;
-        riemann.solve(eos, chat, mbr, b, k, j, il, iu, X1DIR, wl, wr, vprim, vflux,
+        riemann.solve(eos, c, chat, mbr, b, k, j, il, iu, X1DIR, wl, wr, vprim, vflux,
                       vface);
         mbr.team_barrier();
 
@@ -163,8 +165,8 @@ TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PackPrim vprim,
             if (j > jl) {
               // compute fluxes over [js,je+1]
               RiemannSolver<RIEMANN, FLUID_TYPE> riemann;
-              riemann.solve(eos, chat, mbr, b, k, j, il, iu, X2DIR, wl, wr, vprim, vflux,
-                            vface);
+              riemann.solve(eos, c, chat, mbr, b, k, j, il, iu, X2DIR, wl, wr, vprim,
+                            vflux, vface);
               mbr.team_barrier();
 
               // Scale X2-momentum flux by appropriate scale factor for coord system
@@ -205,8 +207,8 @@ TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PackPrim vprim,
             // compute fluxes over [ks,ke+1]
             if (k > kl) {
               RiemannSolver<RIEMANN, FLUID_TYPE> riemann;
-              riemann.solve(eos, chat, mbr, b, k, j, il, iu, X3DIR, wl, wr, vprim, vflux,
-                            vface);
+              riemann.solve(eos, c, chat, mbr, b, k, j, il, iu, X3DIR, wl, wr, vprim,
+                            vflux, vface);
               mbr.team_barrier();
 
               // Scale X3-momentum flux by appropriate scale factor for coord system
@@ -428,7 +430,8 @@ TaskStatus FluxSourceImpl(MeshData<Real> *md, PKG &pkg, PackPrim vprim, PackCons
             const Real f2 =
                 std::sqrt(SQR(vprim(b, IVX, k, j, i)) + SQR(vprim(b, IVY, k, j, i)) +
                           SQR(vprim(b, IVZ, k, j, i)));
-            const Real chi = Radiation::EddingtonFactor(std::sqrt(f2));
+            const Real chi =
+                Radiation::EddingtonFactor<Radiation::Closure::M1>(std::sqrt(f2));
             rdt *= (3. * chi - 1.) * 0.5 * cfac_ / (f2 + Fuzz<Real>());
           }
           if (x1dep) {

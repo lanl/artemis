@@ -87,22 +87,20 @@ class Coords<Coordinates::spherical3D>
 
   KOKKOS_INLINE_FUNCTION std::array<Real, 3> FaceCenX2(const CellFace f) {
     // <r> = d(r^3/3) / d(r^2/2)
-    std::array<Real, 3> xf{2.0 / 3.0 *
-                               (bnds.x1[0] * bnds.x1[0] + bnds.x1[0] * bnds.x1[1] +
-                                bnds.x1[1] * bnds.x1[1]) /
-                               (bnds.x1[0] + bnds.x1[1]),
-                           bnds.x2[static_cast<int>(f)], 0.5 * (bnds.x3[0] + bnds.x3[1])};
-    return xf;
+    return {2.0 / 3.0 *
+                (bnds.x1[0] * bnds.x1[0] + bnds.x1[0] * bnds.x1[1] +
+                 bnds.x1[1] * bnds.x1[1]) /
+                (bnds.x1[0] + bnds.x1[1]),
+            bnds.x2[static_cast<int>(f)], 0.5 * (bnds.x3[0] + bnds.x3[1])};
   }
 
   KOKKOS_INLINE_FUNCTION std::array<Real, 3> FaceCenX3(const CellFace f) {
     // <r> = d(r^3/3) / d(r^2/2)
-    std::array<Real, 3> xf{2.0 / 3.0 *
-                               (bnds.x1[0] * bnds.x1[0] + bnds.x1[0] * bnds.x1[1] +
-                                bnds.x1[1] * bnds.x1[1]) /
-                               (bnds.x1[0] + bnds.x1[1]),
-                           0.5 * (bnds.x2[0] + bnds.x2[1]), bnds.x3[static_cast<int>(f)]};
-    return xf;
+    return {2.0 / 3.0 *
+                (bnds.x1[0] * bnds.x1[0] + bnds.x1[0] * bnds.x1[1] +
+                 bnds.x1[1] * bnds.x1[1]) /
+                (bnds.x1[0] + bnds.x1[1]),
+            0.5 * (bnds.x2[0] + bnds.x2[1]), bnds.x3[static_cast<int>(f)]};
   }
 
   KOKKOS_INLINE_FUNCTION Real AreaX1(const Real x1f) {
@@ -176,8 +174,7 @@ class Coords<Coordinates::spherical3D>
     const Real sp = std::sin(xi[2]);
     const Real ct = std::cos(xi[1]);
     const Real st = std::sin(xi[1]);
-    std::array<Real, 3> xo{xi[0] * st * cp, xi[0] * st * sp, xi[0] * ct};
-    return xo;
+    return {xi[0] * st * cp, xi[0] * st * sp, xi[0] * ct};
   }
   KOKKOS_INLINE_FUNCTION Mat3x3 ConvertVecToCart(const std::array<Real, 3> &xi) {
     const Real cp = std::cos(xi[2]);
@@ -209,8 +206,7 @@ class Coords<Coordinates::spherical3D>
     const Real ct = std::cos(xi[1]);
     const Real st = std::sin(xi[1]);
 
-    std::array<Real, 3> xo{xi[0] * st, xi[2], xi[0] * ct};
-    return xo;
+    return {xi[0] * st, xi[2], xi[0] * ct};
   }
   KOKKOS_INLINE_FUNCTION Mat3x3 ConvertVecToCyl(const std::array<Real, 3> &xi) {
     // rhat = st * Rhat + ct * Zhat = (st, 0, ct)
@@ -228,8 +224,7 @@ class Coords<Coordinates::spherical3D>
   ConvertCoordsToAxi(const std::array<Real, 3> &xi) {
     const Real ct = std::cos(xi[1]);
     const Real st = std::sin(xi[1]);
-    std::array<Real, 3> xo{xi[0] * st, xi[0] * ct, xi[2]};
-    return xo;
+    return {xi[0] * st, xi[0] * ct, xi[2]};
   }
   KOKKOS_INLINE_FUNCTION Mat3x3 ConvertVecToAxi(const std::array<Real, 3> &xi) {
     const Real ct = std::cos(xi[1]);
@@ -296,22 +291,20 @@ class Coords<Coordinates::spherical2D>
 
   KOKKOS_INLINE_FUNCTION std::array<Real, 3> FaceCenX2(const CellFace f) {
     // <r> = d(r^3/3) / d(r^2/2)
-    std::array<Real, 3> xf{2.0 / 3.0 *
-                               (bnds.x1[0] * bnds.x1[0] + bnds.x1[0] * bnds.x1[1] +
-                                bnds.x1[1] * bnds.x1[1]) /
-                               (bnds.x1[0] + bnds.x1[1]),
-                           bnds.x2[static_cast<int>(f)], 0.0};
-    return xf;
+    return {2.0 / 3.0 *
+                (bnds.x1[0] * bnds.x1[0] + bnds.x1[0] * bnds.x1[1] +
+                 bnds.x1[1] * bnds.x1[1]) /
+                (bnds.x1[0] + bnds.x1[1]),
+            bnds.x2[static_cast<int>(f)], 0.0};
   }
 
   KOKKOS_INLINE_FUNCTION std::array<Real, 3> FaceCenX3(const CellFace f) {
     // <r> = d(r^3/3) / d(r^2/2)
-    std::array<Real, 3> xf{2.0 / 3.0 *
-                               (bnds.x1[0] * bnds.x1[0] + bnds.x1[0] * bnds.x1[1] +
-                                bnds.x1[1] * bnds.x1[1]) /
-                               (bnds.x1[0] + bnds.x1[1]),
-                           0.5 * (bnds.x2[0] + bnds.x2[1]), 0.0};
-    return xf;
+    return {2.0 / 3.0 *
+                (bnds.x1[0] * bnds.x1[0] + bnds.x1[0] * bnds.x1[1] +
+                 bnds.x1[1] * bnds.x1[1]) /
+                (bnds.x1[0] + bnds.x1[1]),
+            0.5 * (bnds.x2[0] + bnds.x2[1]), 0.0};
   }
 
   KOKKOS_INLINE_FUNCTION Real AreaX1(const Real x1f) {
@@ -382,8 +375,7 @@ class Coords<Coordinates::spherical2D>
     const Real sp = 0.0;
     const Real ct = std::cos(xi[1]);
     const Real st = std::sin(xi[1]);
-    std::array<Real, 3> xo{xi[0] * st * cp, xi[0] * st * sp, xi[0] * ct};
-    return xo;
+    return {xi[0] * st * cp, xi[0] * st * sp, xi[0] * ct};
   }
   KOKKOS_INLINE_FUNCTION Mat3x3 ConvertVecToCart(const std::array<Real, 3> &xi) {
     const Real cp = 1.0;
@@ -415,8 +407,7 @@ class Coords<Coordinates::spherical2D>
     const Real ct = std::cos(xi[1]);
     const Real st = std::sin(xi[1]);
 
-    std::array<Real, 3> xo{xi[0] * st, 0.0, xi[0] * ct};
-    return xo;
+    return {xi[0] * st, 0.0, xi[0] * ct};
   }
   KOKKOS_INLINE_FUNCTION Mat3x3 ConvertVecToCyl(const std::array<Real, 3> &xi) {
     // rhat = st * Rhat + ct * Zhat = (st, 0, ct)
@@ -434,8 +425,7 @@ class Coords<Coordinates::spherical2D>
   ConvertCoordsToAxi(const std::array<Real, 3> &xi) {
     const Real ct = std::cos(xi[1]);
     const Real st = std::sin(xi[1]);
-    std::array<Real, 3> xo{xi[0] * st, xi[0] * ct, 0.0};
-    return xo;
+    return {xi[0] * st, xi[0] * ct, 0.0};
   }
   KOKKOS_INLINE_FUNCTION Mat3x3 ConvertVecToAxi(const std::array<Real, 3> &xi) {
     const Real ct = std::cos(xi[1]);
@@ -472,22 +462,20 @@ class Coords<Coordinates::spherical1D>
 
   KOKKOS_INLINE_FUNCTION std::array<Real, 3> FaceCenX2(const CellFace f) {
     // <r> = d(r^3/3) / d(r^2/2)
-    std::array<Real, 3> xf{2.0 / 3.0 *
-                               (bnds.x1[0] * bnds.x1[0] + bnds.x1[0] * bnds.x1[1] +
-                                bnds.x1[1] * bnds.x1[1]) /
-                               (bnds.x1[0] + bnds.x1[1]),
-                           M_PI * 0.5, 0.0};
-    return xf;
+    return {2.0 / 3.0 *
+                (bnds.x1[0] * bnds.x1[0] + bnds.x1[0] * bnds.x1[1] +
+                 bnds.x1[1] * bnds.x1[1]) /
+                (bnds.x1[0] + bnds.x1[1]),
+            M_PI * 0.5, 0.0};
   }
 
   KOKKOS_INLINE_FUNCTION std::array<Real, 3> FaceCenX3(const CellFace f) {
     // <r> = d(r^3/3) / d(r^2/2)
-    std::array<Real, 3> xf{2.0 / 3.0 *
-                               (bnds.x1[0] * bnds.x1[0] + bnds.x1[0] * bnds.x1[1] +
-                                bnds.x1[1] * bnds.x1[1]) /
-                               (bnds.x1[0] + bnds.x1[1]),
-                           M_PI * 0.5, 0.0};
-    return xf;
+    return {2.0 / 3.0 *
+                (bnds.x1[0] * bnds.x1[0] + bnds.x1[0] * bnds.x1[1] +
+                 bnds.x1[1] * bnds.x1[1]) /
+                (bnds.x1[0] + bnds.x1[1]),
+            M_PI * 0.5, 0.0};
   }
 
   KOKKOS_INLINE_FUNCTION Real AreaX1(const Real x1f) {
@@ -530,12 +518,6 @@ class Coords<Coordinates::spherical1D>
     // volume average (r,theta)
     const Real rv = x1v();
 
-    // face averaged r on the X2 face
-    const Real rf =
-        2.0 / 3.0 *
-        (bnds.x1[0] * bnds.x1[0] + bnds.x1[0] * bnds.x1[1] + bnds.x1[1] * bnds.x1[1]) /
-        (bnds.x1[0] + bnds.x1[1]);
-
     const Real r2cyl = SQR(rv);
 
     std::array<Real, 2> bx1{r2cyl - SQR(bnds.x1[0]), SQR(bnds.x1[1]) - r2cyl};
@@ -549,8 +531,7 @@ class Coords<Coordinates::spherical1D>
     const Real sp = 0.0;
     const Real ct = 0.0;
     const Real st = 1.0;
-    std::array<Real, 3> xo{xi[0] * st * cp, xi[0] * st * sp, xi[0] * ct};
-    return xo;
+    return {xi[0] * st * cp, xi[0] * st * sp, xi[0] * ct};
   }
   KOKKOS_INLINE_FUNCTION Mat3x3 ConvertVecToCart(const std::array<Real, 3> &xi) {
     const Real cp = 1.0;
@@ -582,8 +563,7 @@ class Coords<Coordinates::spherical1D>
     const Real ct = 0.0;
     const Real st = 1.0;
 
-    std::array<Real, 3> xo{xi[0] * st, 0.0, xi[0] * ct};
-    return xo;
+    return {xi[0] * st, 0.0, xi[0] * ct};
   }
   KOKKOS_INLINE_FUNCTION Mat3x3 ConvertVecToCyl(const std::array<Real, 3> &xi) {
     // rhat = st * Rhat + ct * Zhat = (st, 0, ct)
@@ -601,8 +581,7 @@ class Coords<Coordinates::spherical1D>
   ConvertCoordsToAxi(const std::array<Real, 3> &xi) {
     const Real ct = 0.0;
     const Real st = 1.0;
-    std::array<Real, 3> xo{xi[0] * st, xi[0] * ct, 0.0};
-    return xo;
+    return {xi[0] * st, xi[0] * ct, 0.0};
   }
   KOKKOS_INLINE_FUNCTION Mat3x3 ConvertVecToAxi(const std::array<Real, 3> &xi) {
     const Real ct = 0.0;

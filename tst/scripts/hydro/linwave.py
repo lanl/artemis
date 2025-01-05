@@ -79,7 +79,7 @@ def analyze():
     # sound waves.
     logger.debug("Analyzing test " + __name__)
     data = np.loadtxt(
-        os.path.join(artemis.get_run_directory(), _file_id + "-errs.dat"),
+        os.path.join(artemis.get_data_dir(), _file_id + "-errs.dat"),
         dtype=np.float64,
         ndmin=2,
     )

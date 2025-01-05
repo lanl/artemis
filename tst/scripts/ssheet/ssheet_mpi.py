@@ -14,16 +14,13 @@
 # Regression to test a ssheet in a 2D disk
 
 # Modules
+import importlib
 import logging
-import numpy as np
-import os
-import scripts.utils.artemis as artemis
 import scripts.ssheet.ssheet as ssheet
 
 logger = logging.getLogger("artemis" + __name__[7:])  # set logger name
-logging.getLogger("h5py").setLevel(logging.WARNING)
-logging.getLogger("matplotlib").setLevel(logging.WARNING)
 
+importlib.reload(ssheet)
 ssheet._nranks = 8
 ssheet._file_id = "ssheet_mpi"
 

@@ -84,8 +84,8 @@ tcyl = .0025
 cyl_plaw = -1.0
 
 <gravity>
-type = point
-gm = 1.0
+mass_tot = 1.0
+<gravity/point>
 
 <problem>
 r0 = 1.0

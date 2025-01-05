@@ -23,7 +23,37 @@ artemis:
     _type: bool
     _default: "false"
     _description: "Add user-defined AMR criterion."
-
+  units:
+    _description: "Unit conversions between code and cgs."
+  physical_units:
+    _type: "string"
+    _default: "scalefree"
+    _description: "What unit system to use for physical units"
+    code:
+      _type: opt
+      _description: "Native code units; no conversions"
+    cgs:
+      _type: opt
+      _description: "CGS unit system"
+  unit_conversion:
+    _type: "string"
+    _default: "base"
+    _description: "How to provide unit conversions between code and physical units"
+    base:
+      _type: opt
+      _description: "Provide base unit conversions (length, time, mass)"
+    ppd:
+      _type: opt
+      _description: "AU, Year/(2 pi), solar mass units for protoplanetary disks"
+  length:
+    _type: "Real"
+    _description: "Physical units value of length equal to 1 code unit"
+  time:
+    _type: "Real"
+    _description: "Physical units value of time equal to 1 code unit"
+  mass:
+    _type: "Real"
+    _description: "Physical units value of mass equal to 1 code unit"
 
 
 physics:
@@ -60,6 +90,6 @@ physics:
     _type: "bool"
     _default: "false"
     _description: "Turn on heat conduction in the gas fluid"
-  
+
 
 

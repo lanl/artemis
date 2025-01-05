@@ -93,8 +93,8 @@ type = alpha
 alpha = 1e-3
 
 <gravity>
-type = nbody
-gm = 1.0
+mass_tot = 1.0
+<gravity/nbody>
 
 <nbody>
 dt_reb = 0.01

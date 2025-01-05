@@ -77,8 +77,8 @@ refine_thr = 3.0
 deref_thr = 0.8
 
 <gravity>
-type = point
-gm = 1.0e-5
+mass_tot = 1.0e-5
+<gravity/point>
 soft = 0.03
 x = 0.0
 y = 0.0

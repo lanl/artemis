@@ -43,10 +43,6 @@ nbody:
     _type: int
     _default: 1
     _description: "Include the 2 PN corrections."
-  light_speed:
-    _type: Real
-    _description: "The speed of light used in the PN evaluation."
-    _units: "cm s^-1"
   merge_on_collision:
     _type: bool
     _default: "true"
@@ -69,7 +65,7 @@ nbody:
     _description: "This node controls the parameters for individual particles. For example, two particles would have two blocks named <nbody/particle1> and <nbody/particle2>. For many particle systems see the <nbody/planet> nad <nbody/system> blocks."
     mass:
       _type: Real
-      _description: "Particle mass <mass>."
+      _description: "Particle mass <mass>. Arbitrary units; normalized relative to other particles based on GM parameter."
     radius:
       _type: Real
       _default: 0.0

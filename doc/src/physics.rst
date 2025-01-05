@@ -290,7 +290,7 @@ Dust
 ^^^^
 
 The ``<dust>`` input block adds a dust fluid to the simulation.
-Dust in |code| is modeled as a pressure-less fluid. As such, it an EOS is not required.
+Dust in |code| is modeled as a pressure-less fluid. As such, an EOS is not required.
 Just as with gas fluids, dust fluids require specification of the number of species, Riemann solver, and reconstruction scheme.
 An example dust input block reads:
 
@@ -298,11 +298,14 @@ An example dust input block reads:
 
    <dust>
    cfl = 0.3
-   nspecies = 20
-   riemann = hlle     # llf, hlle
-   reconstruct = plm  # pcm, plm, ppm
+   nspecies = 3
+   riemann = hlle       # llf, hlle
+   reconstruct = plm    # pcm, plm, ppm
+   grain_density = 1.7  # g/cc
+   sizes = 1e-4, 1e-2, 1e-1  # cm
 
-By default, each dust species represents a dust fluid at a fixed particle size.
+By default, each dust species represents a dust fluid at a fixed particle size. 
+To specify the sizes of each species, |code| offers several options including direct specification (as in the previous example), reading a text file, or uniform and log-uniform distrubtions.
 
 
 N-Body Dynamics
@@ -337,7 +340,7 @@ For example, if there is only a single, stationary, particle in the domain or if
 The ``frame`` parameter is typically set to its default value of ``global``.
 This means that the REBOUND simulation is in the global frame of reference.
 Note that this can be a different frame than the |code| frame if the rotating frame is active.
-Setting ``frame=local`` means that |code| artemis will not apply corrections to the REBOUND frame, but caution should be used with this option.
+Setting ``frame=local`` means that |code| will not apply corrections to the REBOUND frame, but caution should be used with this option.
 
 |code| can also make full use of the collision functionality in REBOUND.
 Particles can be given radii defining their collisional cross-section.
@@ -401,13 +404,22 @@ One example is:
    beta  = 0.0     # = torque-free mass removal
 
 There are three softening models available: ``none`` does nothing, ``spline`` is the spline softening used in Gadget (Springel 2001), and ``plummer`` modifies :math:`r^2 \rightarrow r^2 + r_s^2`.
-Spline softening is exactly Kepelerian outside the softening radius, whereas Plummer softening asymptoically approaches Keplerian outside the softening radius.
+Spline softening is exactly Keplerian outside the softening radius, whereas Plummer softening asymptoically approaches Keplerian outside the softening radius.
 Roughly, the Plummer softening radius is :math:`\sim 2.8 \times` the spline softening radius.
 
 Mass accretion is handled by a particle's ``<../sink>`` attribute.
-Two types of removal rates are avaible.
+|code| implements mass accretion by solving:
+
+.. math::
+   \frac{\partial \rho}{\partial t} = - \gamma \rho \\
+   \frac{\partial (\rho v_r)}{\partial t} = - \gamma \rho v_r \\
+   \frac{\partial (\rho v_\theta)}{\partial t} = - \gamma \rho v_\theta \\
+   \frac{\partial (\rho v_\phi)}{\partial t} = - \beta \rho v_\phi \\
+where :math:`(r,\theta,\phi)` refers to a spherical coordinate system coordinate system centered on the particle. 
+
+Two types of removal rates are available.
 The first, ``gamma``, sets the rate of mass removal for cells inside the particle's sink radius.
-The second, ``beta``, controls the amount of momentum removed from the fluid.
+The second, ``beta``, controls the amount of angular momentum removed from the fluid.
 Typically ``beta`` will either be zero -- corresponding to angular-momentum conserving mass removal -- or equal to ``gamma`` -- corresponding to isotropic momentum removal.
 
 
@@ -612,8 +624,45 @@ All planets share the options set in the ``<planet>`` block.
 Note that the central object has been left unspecified.
 An additional particle can be added at the center of the system to represent the star, or a ``<binary>`` block could be added to model a circumbinary planetary sytem, or even a ``<system>`` block for a circum-cluster planetary system.
 
+N-Body Outputs 
+^^^^^^^^^^^^^^
+
+There are two types of outputs that the ``<nbody>`` will produce if ``dt_output`` is defined.
+The first output is the ``.reb`` file. 
+This file lists the state of each particle in the simulation at the output time, as well as the total amount of mass and momentum change since the last output.
+It is laid out as an ascii history file. 
+The header for a 2 particle system looks like
+
+::
+
+  # job.reb
+  # NBody data N = 2
+  # [1]=time  [2]=hash  [3]=active  [4]=mass  [5]=x [6]=y [7]=z [8]=vx  [9]=vy  [10]=vz [11]=dm [12]=dmx_g  [13]=dmy_g  [14]=dmz_g  [15]=dmx_a  [16]=dmy_a  [17]=dmz_a
+
+Note that everything is in Cartesian coordinates -- regardless of the problem geometry. 
+Columns 11-17 hold cumulative quantities (since the last output) of mass accreted (``dm``), momentum change due to the gravitational interaction with the fluids (``dm(x,y,z)_g``), and momentum accreted (``dm(x,y,z)_a``). 
+These quantities are calculated using every timestep of the simulation. 
+Because of this, very accurate time-averages can be obtained from this data. 
+Each particle is written as a new line. 
+Therefore, for this 2 particle example, the first two rows of data correspond to the same time. 
 
 
+The second type of output file is the ``.orb`` file. 
+This file takes all the data that is already in the ``.reb`` file and outputs derived quantities useful for analysis of binaries, e.g., orbital elements, differential forces, and average forces.
+An example header for the ``.orb`` file is:
+
+::
+
+  # job.orb.0_1
+  # NBody Orbit data
+  # [1]=time  [2]=mb  [3]=xc  [4]=yc  [5]=zc  [6]=xb  [7]=yb  [8]=zb  [9]=vxc [10]=vyc  [11]=vzc  [12]=vxb  [13]=vyb  [14]=vzb  [15]=qb [16]=nb [17]=ab [18]=eb [19]=Ib [20]=o  [21]=O  [22]=pomega [23]=f  [24]=h  [25]=ex [26]=ey [27]=ix [28]=iy [29]=dm [30]=Fx_grav_com  [31]=Fy_grav_com  [32]=Fz_grav_com  [33]=Fx_acc_com [34]=Fy_acc_com [35]=Fz_acc_com [36]=Fx_grav_bin  [37]=Fy_grav_bin  [38]=Fz_grav_bin  [39]=Fx_acc_bin [40]=Fy_acc_bin [41]=Fz_acc_bin
+ 
+At every output time, |code| looks for all pairs of bound particles. Each bound pair is output to their own file, e.g., particles 0 and 1 are put in ``.orb.0_1``. 
+Columns 3-14 provide the center of mass position/velocity and separation position/velocity. 
+Columns 15-28 have the orbital elements (in addition to the mass ratio and mean motion) computed directly from REBOUND. 
+Columns 29-41 combine Columns 11-17 of the ``.reb`` file into forces on the center of mass or the separation. In particular, forces marked with ``bin`` are combined as :math:`\mu_1 f_2 - \mu_2 f_1`, where :math:`\mu_i = m_i/m_b`. 
+
+To disable these outputs, set ``disable_outputs = true`` in the ``<nbody>`` block. 
 
 External Gravity
 ----------------
@@ -626,11 +675,12 @@ Specifically, |code|, adds the body force,
 
 To activate external gravity, there must be a ``<gravity>`` node and ``gravity = true`` under the ``<physics>`` node.
 The ``<gravity>`` requires setting the parameter ``gm``, typically this is set to ``gm = 1.0``.
+In addition to ``gm``, the ``tstart`` and ``tstop`` parameters control when gravity is active.
 
-The specific model for the gravitational acceleration, :math:`\mathbf{g}`, is controlled by the ``type`` parameter.
+The specific model for the gravitational acceleration, :math:`\mathbf{g}`, is controlled by adding the appropriate subnode.
 Available options are:
 
-* ``type = constant``
+* ``<gravity/constant>``
 
   This specifies a constant gravitational acceleration. The components of :math:`\mathbf{g}` in each direction are required.
   An example input block that sets :math:`\mathbf{g}=-1.0 \mathbf{\hat{z}}` is,
@@ -638,13 +688,13 @@ Available options are:
   ::
 
    <gravity>
-   type = constant
    gm = 1.0
+   <gravity/constant>
    gx1 = 0.0
    gx2 = 0.0
    gx3 = -1.0
 
-* ``type = point``
+* ``<gravity/point>``
 
   This adds the gravitational acceleration, :math:`\mathbf{g} = - GM /r^2`, from a point mass.
   The potential can be (optionally) softened by adding a fixed number to the distance of a cell to the point mass.
@@ -654,8 +704,8 @@ Available options are:
   ::
 
    <gravity>
-   type = point
    gm = 1.0
+   <gravity/point>
    x = 0.0
    y = 0.0
    z = 0.0
@@ -663,7 +713,7 @@ Available options are:
    sink = 1e-3        # Mass accretion radius
    sink_rate = 30.0   # Mass removal rate
 
-* ``type = binary``
+* ``<gravity/binary>``
 
   This adds two point masses in a fixed binary orbit.
   In addition to the softening and accretion prescriptions described above, there are also parameters that describe the binary orbit.
@@ -672,8 +722,8 @@ Available options are:
   ::
 
    <gravity>
-   type = binary
    gm = 1.0            # Binary total GM
+   <gravity/binary>
    x = 0.0             # Binary x center of mass
    y = 0.0             # Binary y center of mass
    z = 0.0             # Binary z center of mass
@@ -692,18 +742,18 @@ Available options are:
    f = 0.0             # Binary true anomaly (in degrees)
 
 
-* ``type = nbody``
+* ``<gravity/nbody>``
 
   This indicates that the gravitational force will be calculated by the N-body system defined in the ``<nbody>`` input block.
-  The only parameter required when ``type = nbody`` is the ``gm`` parameter.
+  The only parameter required is the ``gm`` parameter.
   Note that the total mass of the system defined in the ``<nbody>`` block will be rescaled to ``gm``.
   An example input block would thus read:
 
   ::
 
    <gravity>
-   type = nbody
    gm = 1.0
+   <gravity/nbody>
 
 See `N-Body Dynamics`_ for a description of how to set up the N-body system.
 

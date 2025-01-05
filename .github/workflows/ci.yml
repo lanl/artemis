@@ -75,19 +75,21 @@ jobs:
           make -j 4
           cd ..
           python3 run_tests.py regression.suite \
-            --exe build/src/artemis \
+            --save_build \
+            --reuse_build \
+            --use_oversubscribe \
             --log_file=ci_cpu_log.txt
-      - name: Upload CPU test log
+      - name: Upload logs
         if: always()
         uses: actions/upload-artifact@v3
         with:
-          name: ci_cpu_log.txt
-          path: tst/ci_cpu_log.txt
+          name: logs
+          path: tst/testing/logs
           retention-days: 3
       - name: Upload figures
         if: always()
         uses: actions/upload-artifact@v3
         with:
           name: figs
-          path: tst/figs
+          path: tst/testing/figs
           retention-days: 3

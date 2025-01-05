@@ -72,7 +72,6 @@ reconstruct = plm
 riemann = hlle
 dfloor = 1.0e-10
 pfloor = 1.0e-13
-de_switch = 1.0
 
 <rotating_frame>
 omega = 1.0
@@ -82,8 +81,8 @@ type = alpha
 alpha = 1e-3
 
 <gravity>
-type = point
-gm = 1.0
+mass_tot = 1.0
+<gravity/point>
 
 <problem>
 r0 = 1.0

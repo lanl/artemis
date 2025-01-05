@@ -20,58 +20,86 @@
 import logging
 import os
 import subprocess
-import datetime
 from timeit import default_timer as timer
 from .log_pipe import LogPipe
 
 # Global variables
+artemis_dir = os.path.abspath(os.path.join(__file__, "../../../../"))
 current_dir = os.getcwd()
-artemis_dir = os.path.abspath(
-    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..")
-)
-artemis_executable = os.path.join(artemis_dir, "tst", "build", "src", "artemis")
-artemis_inputs_dir = os.path.join(artemis_dir, "inputs")
-# artemis_fig_dir = "./figs/"
-artemis_run_dir = os.path.join(artemis_dir, "tst", "build", "src", "tst")
-artemis_fig_dir = os.path.join(artemis_dir, "tst", "figs")
-artemis_log_dir = os.path.join(artemis_dir, "tst")
-custom_exe = False
+artemis_exe_dir = "/dev/null"
+artemis_outputs_dir = "/dev/null"
+artemis_inputs_dir = "/dev/null"
+artemis_data_dir = "/dev/null"
+artemis_fig_dir = "/dev/null"
+artemis_log_dir = "/dev/null"
+use_mpi_oversubscribe = False
+use_supplied_exe = False
+
+
+# Optionally invoke MPI oversubscribe
+def set_mpi_oversubscribe(use_oversubscribe):
+    global use_mpi_oversubscribe
+    use_mpi_oversubscribe = use_oversubscribe
+
+
+# Invoke custom executable
+def set_supplied_exe(use_exe):
+    global use_supplied_exe
+    use_supplied_exe = use_exe
+    custom_msg = "use pre-existing" if use_exe else "build"
+    print("...Regression will " + custom_msg + " executable...\n")
 
 
 # Optionally set custom path for executable, and update other variables related to where
 # we run the code
-def set_executable(executable_path):
-    global artemis_executable
-    global artemis_run_dir
-    global custom_exe
-    artemis_executable = executable_path
-    artemis_run_dir = os.path.join(os.path.dirname(artemis_executable), "tst")
-    custom_exe = True
+def set_paths(executable_dir, output_dir):
+    global artemis_exe_dir
+    global artemis_outputs_dir
+    global artemis_inputs_dir
+    global artemis_data_dir
+    global artemis_fig_dir
+    global artemis_log_dir
+    artemis_exe_dir = executable_dir
+    artemis_outputs_dir = output_dir
+    artemis_inputs_dir = os.path.join(artemis_dir, "inputs")
+    artemis_data_dir = os.path.join(output_dir, "data")
+    artemis_fig_dir = os.path.join(output_dir, "figs")
+    artemis_log_dir = os.path.join(output_dir, "logs")
+    print("Artemis Regression Paths:")
+    print("   Artemis directory:    ", artemis_dir)
+    print("   Current directory:    ", current_dir)
+    print("   Executable directory: ", artemis_exe_dir)
+    print("   Outputs directory:    ", artemis_outputs_dir)
+    print("   Inputs directory:     ", artemis_inputs_dir)
+    print("   Data directory:       ", artemis_data_dir)
+    print("   Figures directory:    ", artemis_fig_dir)
+    print("   Logs directory:       ", artemis_log_dir)
+    print("\n")
 
 
-# Function for returning the path to the run directory for this set of tests
-def get_run_directory():
-    return artemis_run_dir
-
-
-# Provide base directory of artemis source tree
-def get_source_directory():
-    return artemis_dir
+get_artemis_dir = lambda: artemis_dir
+get_current_dir = lambda: current_dir
+get_exe_dir = lambda: artemis_exe_dir
+get_outputs_dir = lambda: artemis_outputs_dir
+get_inputs_dir = lambda: artemis_inputs_dir
+get_data_dir = lambda: artemis_data_dir
+get_fig_dir = lambda: artemis_fig_dir
+get_log_dir = lambda: artemis_log_dir
+get_supplied_exe = lambda: use_supplied_exe
 
 
 # Function for compiling Artemis
 def make(cmake_args, make_nproc):
     logger = logging.getLogger("artemis.make")
     out_log = LogPipe("artemis.make", logging.INFO)
-    current_dir = os.getcwd()
+    build_dir = os.path.join(artemis_dir, "tst/build")
+    build_src_dir = os.path.join(build_dir, "src")
     try:
-        subprocess.check_call(["mkdir", "build"], stdout=out_log)
-        build_dir = current_dir + "/build/"
-        os.chdir(build_dir)
-        cmake_command = ["cmake", artemis_dir] + cmake_args
-        make_command = ["make", "-j" + str(make_nproc)]
+        cmake_command = ["cmake", "-B", build_dir] + cmake_args
+        make_command = ["make", "-j" + str(make_nproc), "-C", build_src_dir]
         try:
             t0 = timer()
+            os.chdir(artemis_dir)
             logger.debug("Executing: " + " ".join(cmake_command))
             subprocess.check_call(cmake_command, stdout=out_log)
             logger.debug("Executing: " + " ".join(make_command))
@@ -93,18 +121,19 @@ def make(cmake_args, make_nproc):
 def run(nproc, input_filename, arguments, restart=None):
     # global run_directory
     out_log = LogPipe("artemis.run", logging.INFO)
-    os.makedirs(artemis_run_dir, exist_ok=True)
 
     # Build the run command
-    run_command = ["mpiexec", "--oversubscribe", "-n", str(nproc), artemis_executable]
+    run_command = ["mpiexec"]
+    if use_mpi_oversubscribe:
+        run_command += ["--oversubscribe"]
+    run_command += ["-n", str(nproc), os.path.join(artemis_exe_dir, "artemis")]
     if restart is not None:
-        run_command += ["-r", restart]
-    input_filename_full = os.path.join(artemis_inputs_dir, input_filename)
-    run_command += ["-i", input_filename_full]
+        run_command += ["-r", os.path.join(artemis_data_dir, restart)]
+    run_command += ["-i", os.path.join(artemis_inputs_dir, input_filename)]
+    run_command += ["-d", artemis_data_dir]
 
     try:
-        # os.chdir(run_directory)
-        os.chdir(artemis_run_dir)
+        os.chdir(artemis_outputs_dir)
         cmd = run_command + arguments
         logging.getLogger("artemis.run").debug("Executing: " + " ".join(cmd))
         subprocess.check_call(cmd, stdout=out_log)

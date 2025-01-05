@@ -12,10 +12,47 @@ dust:
     _description: "Density floor"
     _units: "g cm^-3"
 
+  grain_density:
+    _type: Real
+    _default: "1.0"
+    _description: "Grain density."
+    _units: "g cm^-3"
+
   nspecies:
     _type: int
     _default: 1
     _description: "The number of dust species"
+  
+  size_input:
+    _type: string
+    _default: direct
+    _description: "How to specify the dust sizes"
+    direct:
+      _type: opt
+      _description: "Directly specify the size distribution as a comma separated list"
+    linspace:
+      _type: opt
+      _description: "Grains are distributed uniformly from a minimum size to a maximum size."
+    logspace:
+      _type: opt
+      _description: "Grains are distributed uniformly in log space from a minimum size to a maximum size."
+    file:
+      _type: opt
+      _description: "Grains are provided in a specified input file."
+
+  min_size:
+    _type: Real
+    _description: "Minimum dust size. For use with size_input=linspace or logspace."
+    _units: "cm"
+
+  max_size:
+    _type: Real
+    _description: "Maximum dust size. For use with size_input=linspace or logspace."
+    _units: "cm"
+
+  size_file:
+    _type: string 
+    _description: "Text file that lists the dust sizes. For use with size_input=file."
 
   scr_level:
     _type: int
@@ -35,9 +72,10 @@ dust:
     ppm:
       _type: opt
       _description: "Piecewise Parabolic"
+
   riemann:
     _type: string
-    _default: hllc
+    _default: hlle
     _description: "Riemann solver option."
     llf:
       _type: opt
@@ -69,6 +107,7 @@ dust:
       _default: "0.0"
       _description: "The outer damping rate."
       _units: "yr^-1"
+
   stopping_time:
     _type: node
     _description: "Dust stopping time model."

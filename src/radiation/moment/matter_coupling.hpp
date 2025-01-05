@@ -5,8 +5,8 @@
 #include "geometry/geometry.hpp"
 #include "radiation.hpp"
 #include "utils/artemis_utils.hpp"
-#include "utils/opacity/opacity.hpp"
 #include "utils/eos/eos.hpp"
+#include "utils/opacity/opacity.hpp"
 
 using ArtemisUtils::EOS;
 using ArtemisUtils::Opacity;
@@ -15,7 +15,7 @@ using ArtemisUtils::VI;
 
 namespace Radiation {
 
-template<Coordinates GEOM, Fluid CLOSURE>
+template <Coordinates GEOM, Fluid CLOSURE>
 TaskStatus MatterCouplingImpl(MeshData<Real> *u0, MeshData<Real> *u1, const Real dt) {
   using parthenon::MakePackDescriptor;
   using parthenon::variable_names::any;
@@ -63,7 +63,7 @@ TaskStatus MatterCouplingImpl(MeshData<Real> *u0, MeshData<Real> *u1, const Real
   const bool three_d = (pm->ndim > 2);
 
   // launch implementation on closure
-  
+
   // Prepare scratch pad memory
   const int ncells1 = ib.e - ib.s + 1 + 2 * parthenon::Globals::nghost;
   const int ngas = vprim.GetMaxNumberOfVars() / 5;
@@ -220,11 +220,12 @@ TaskStatus MatterCouplingImpl(MeshData<Real> *u0, MeshData<Real> *u1, const Real
                   inner_iter++;
                   inner_conv = (inner_err < inner_tol) || (inner_iter > inner_max);
                 }
-//                if (inner_iter > inner_max) {
-// //                 std::stringstream msg;
-// //                 msg << "No inner converge: " << inner_err << " " << Er - Ek;
-//                  PARTHENON_FAIL("Inner iteration failed to converge");
-//                }
+                //                if (inner_iter > inner_max) {
+                // //                 std::stringstream msg;
+                // //                 msg << "No inner converge: " << inner_err << " " <<
+                // Er - Ek;
+                //                  PARTHENON_FAIL("Inner iteration failed to converge");
+                //                }
 
                 // We have updated energies, now update the flux and velocity
                 Er = Ek;
@@ -378,11 +379,11 @@ TaskStatus MatterCouplingImpl(MeshData<Real> *u0, MeshData<Real> *u1, const Real
                 outer_iter++;
                 outer_conv = (outer_err < outer_tol) || (outer_iter > outer_max);
               }
-//              if (outer_iter > outer_max) {
-////                std::stringstream msg;
-////                msg << "No outer converge: " << outer_err;
-//                PARTHENON_FAIL("Outer iteration failed to converge");
-//              }
+              //              if (outer_iter > outer_max) {
+              ////                std::stringstream msg;
+              ////                msg << "No outer converge: " << outer_err;
+              //                PARTHENON_FAIL("Outer iteration failed to converge");
+              //              }
 
               v0(b, rad::cons::energy(), k, j, i) += (Er - Er0);
               v0(b, rad::cons::flux(0), k, j, i) = F[0] * hx[0];
@@ -414,7 +415,6 @@ TaskStatus MatterCouplingImpl(MeshData<Real> *u0, MeshData<Real> *u1, const Real
       });
 
   return TaskStatus::complete;
-
 }
 
 } // namespace Radiation

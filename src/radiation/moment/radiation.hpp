@@ -17,8 +17,6 @@
 
 namespace Radiation {
 
-enum class Closure { Eddington, M1 };
-
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
 
 template <Coordinates GEOM>
@@ -36,20 +34,20 @@ TaskStatus ApplyUpdate(MeshData<Real> *u0, MeshData<Real> *u1, const int stage,
 
 void AddHistory(Coordinates coords, Params &params);
 
-template <Closure CTYP>
+template <Fluid CTYP>
 KOKKOS_INLINE_FUNCTION Real EddingtonFactor(const Real f) {
-  if constexpr (CTYP == Closure::Eddington) {
+  if constexpr (CTYP == Fluid::greyP1) {
     return 1. / 3.;
   }
   const Real f2 = f * f;
   return (3. + 4. * f2) / (5. + 2. * std::sqrt(4. - 3. * f2));
 }
 
-template <Closure CTYP>
+template <Fluid CTYP>
 KOKKOS_INLINE_FUNCTION std::array<Real, 6>
 EddingtonTensor(const std::array<Real, 3> fred) {
 
-  if constexpr (CTYP == Closure::Eddington) {
+  if constexpr (CTYP == Fluid::greyP1) {
     return {1.0 / 3.0, 1.0 / 3.0, 1.0 / 3.0, 0.0, 0.0, 0.0};
   }
 

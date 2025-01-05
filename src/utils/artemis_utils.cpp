@@ -13,6 +13,7 @@
 
 // C++ headers
 #include "artemis_utils.hpp"
+#include "units.hpp"
 
 namespace ArtemisUtils {
 
@@ -26,6 +27,7 @@ void PrintArtemisConfiguration(Packages_t &packages) {
     const auto nx = params.Get<std::array<int, 3>>("prob_dim");
     const int nd = (nx[0] > 1) + (nx[1] > 1) + (nx[2] > 1);
     const auto nb = params.Get<std::array<int, 3>>("mb_dim");
+    const auto units = params.Get<Units>("units");
     std::string msg = "";
     if (params.Get<bool>("do_gas")) msg += "Gas\n";
     if (params.Get<bool>("do_dust")) msg += hfill + "Dust\n";
@@ -47,6 +49,10 @@ void PrintArtemisConfiguration(Packages_t &packages) {
     printf("    MPI ranks:       %d\n", parthenon::Globals::nranks);
     printf("    dimensions:      %dx%dx%d\n", nx[0], nx[1], nx[2]);
     printf("    meshblock:       %dx%dx%d\n", nb[0], nb[1], nb[2]);
+    printf("    Unit System:  %s\n", units.GetSystemName().c_str());
+    printf("                  [L] = %.2e\n", units.GetLengthCodeToPhysical());
+    printf("                  [M] = %.2e\n", units.GetMassCodeToPhysical());
+    printf("                  [T] = %.2e\n", units.GetTimeCodeToPhysical());
     printf("    Active physics:  %s", msg.c_str());
     printf("=====================================================\n\n");
   }

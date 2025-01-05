@@ -14,10 +14,12 @@
 #define RADIATION_MOMENT_RADIATION_HPP_
 
 #include "artemis.hpp"
+#include "utils/units.hpp"
 
 namespace Radiation {
 
-std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
+std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
+                                            ArtemisUtils::Constants &Constants);
 
 template <Coordinates GEOM>
 Real EstimateTimestepMesh(MeshData<Real> *md);

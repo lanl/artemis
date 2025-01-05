@@ -24,6 +24,7 @@
 #include "utils/history.hpp"
 #include "utils/opacity/opacity.hpp"
 #include "utils/refinement/amr_criteria.hpp"
+#include "utils/units.hpp"
 
 using ArtemisUtils::EOS;
 using ArtemisUtils::Opacity;
@@ -34,7 +35,8 @@ namespace Radiation {
 //----------------------------------------------------------------------------------------
 //! \fn  StateDescriptor Radiation::Initialize
 //! \brief Adds intialization function for radiation hydrodynamics package
-std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
+std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
+                                            ArtemisUtils::Constants &constants) {
   auto radiation = std::make_shared<StateDescriptor>("radiation");
   Params &params = radiation->AllParams();
 
@@ -96,13 +98,11 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
   params.Add("nstages", pin->GetOrAddInteger("radiation", "nstages", 2));
 
-  auto pc = parthenon::constants::PhysicalConstants<parthenon::constants::CGS>();
-  const Real light = pin->GetOrAddReal("radiation", "c", pc.c);
-  printf("Light speed %lg\n", light);
+  const Real light = constants.GetCCode();
   params.Add("c", light);
   const Real creduc = pin->GetOrAddReal("radiation", "creduc", 1.0);
   params.Add("chat", light / creduc);
-  const Real arad = pin->GetOrAddReal("radiation", "arad", pc.ar);
+  const Real arad = constants.GetARCode();
   params.Add("arad", arad);
 
   // Floors

@@ -72,7 +72,7 @@ class RiemannSolver<RSolver::hlle, FLUID_TYPE> {
       nvar = 6;
     } else if constexpr (FLUID_TYPE == Fluid::dust) {
       nvar = 4;
-    } else if constexpr (FLUID_TYPE == Fluid::radiation) {
+    } else if constexpr (is_grey<FLUID_TYPE>()) {
       nvar = 5;
     }
     const int nspecies = p.GetMaxNumberOfVars() / nvar;
@@ -172,15 +172,15 @@ class RiemannSolver<RSolver::hlle, FLUID_TYPE> {
             } else if constexpr (FLUID_TYPE == Fluid::dust) {
               sl = std::min(wroe_ivx, wl_ivx);
               sr = std::max(wroe_ivx, wr_ivx);
-            } else if constexpr (FLUID_TYPE == Fluid::radiation) {
+            } else if constexpr (is_grey<FLUID_TYPE>()) {
               Real fl = std::sqrt(SQR(wl_ivx) + SQR(wl_ivy) + SQR(wl_ivz));
               Real fr = std::sqrt(SQR(wr_ivx) + SQR(wr_ivy) + SQR(wr_ivz));
               const Real nlx = wl_ivx / (fl + Fuzz<Real>());
               const Real nrx = wr_ivx / (fr + Fuzz<Real>());
               fl = std::min(1.0, fl);
               fr = std::min(1.0, fr);
-              const Real chil = Radiation::EddingtonFactor<Radiation::Closure::M1>(fl);
-              const Real chir = Radiation::EddingtonFactor<Radiation::Closure::M1>(fr);
+              const Real chil = Radiation::EddingtonFactor<FLUID_TYPE>(fl);
+              const Real chir = Radiation::EddingtonFactor<FLUID_TYPE>(fr);
               const auto [sla, slb] = Radiation::WaveSpeed(nlx, fl);
               const auto [sra, srb] = Radiation::WaveSpeed(nrx, fr);
               qscale = chat;
@@ -206,10 +206,6 @@ class RiemannSolver<RSolver::hlle, FLUID_TYPE> {
 
             Real fl_mx = scalel * wl_idn * wl_ivx * qa;
             Real fr_mx = scaler * wr_idn * wr_ivx * qb;
-            // if constexpr (FLUID_TYPE == Fluid::radiation) {
-            //   fl_mx += pscalel * wl_ipr;
-            //   fr_mx += pscaler * wr_ipr;
-            // }
 
             Real fl_my = scalel * wl_idn * wl_ivy * qa;
             Real fr_my = scaler * wr_idn * wr_ivy * qb;
@@ -231,7 +227,7 @@ class RiemannSolver<RSolver::hlle, FLUID_TYPE> {
             if constexpr (FLUID_TYPE == Fluid::gas) {
               p.flux(b, dir, IPR, k, j, i) =
                   0.5 * (wl_ipr + wr_ipr) + qa * (wl_ipr - wr_ipr);
-            } else if constexpr (FLUID_TYPE == Fluid::radiation) {
+            } else if constexpr (is_grey<FLUID_TYPE>()) {
               wl_ipr = pscalel * wl_idn; // - sign?
               wr_ipr = pscaler * wr_idn;
               p.flux(b, dir, IPR, k, j, i) =

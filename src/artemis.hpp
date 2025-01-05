@@ -103,7 +103,7 @@ enum class RSolver { hllc, hlle, llf, null };
 // ...Reconstrution algorithms
 enum class ReconstructionMethod { pcm, plm, ppm, null };
 // ...Fluid types
-enum class Fluid { gas, dust, radiation, null };
+enum class Fluid { gas, dust, greyP1, greyM1, null };
 // ...Boundary conditions
 enum class ArtemisBC {
   reflect,
@@ -117,6 +117,15 @@ enum class ArtemisBC {
   periodic,
   none
 };
+
+
+template<Fluid FLUID_TYPE>
+constexpr KOKKOS_INLINE_FUNCTION
+bool is_grey() {
+  return ((FLUID_TYPE == Fluid::greyM1) || (FLUID_TYPE == Fluid::greyP1));
+}
+
+
 
 enum TensIdx { X11 = 0, X22 = 1, X33 = 2, X23 = 3, X13 = 4, X12 = 5 };
 

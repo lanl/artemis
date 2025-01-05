@@ -42,7 +42,7 @@ KOKKOS_INLINE_FUNCTION void ScaleMomentumFlux(parthenon::team_mbr_t const &membe
     nvar = 6;
   } else if constexpr (FLUID_TYPE == Fluid::dust) {
     nvar = 4;
-  } else if constexpr (FLUID_TYPE == Fluid::radiation) {
+  } else if constexpr (is_grey<FLUID_TYPE>()) {
     nvar = 4;
   }
   const int nspecies = q.GetMaxNumberOfVars() / nvar;
@@ -96,7 +96,7 @@ TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PackPrim vprim,
   }
   Real chat = Null<Real>();
   Real c = Null<Real>();
-  if constexpr (FLUID_TYPE == Fluid::radiation) {
+  if constexpr (is_grey<FLUID_TYPE>()) {
     chat = pkg->template Param<Real>("chat");
     c = pkg->template Param<Real>("c");
   }
@@ -327,12 +327,12 @@ TaskStatus FluxSourceImpl(MeshData<Real> *md, PKG &pkg, PackPrim vprim, PackCons
     nvar = 5;
   } else if constexpr (FLUID_TYPE == Fluid::dust) {
     nvar = 4;
-  } else if constexpr (FLUID_TYPE == Fluid::radiation) {
+  } else if constexpr (is_grey<FLUID_TYPE>()) {
     nvar = 5;
   }
   const int nspecies = vprim.GetMaxNumberOfVars() / nvar;
   Real c = Null<Real>(), chat = Null<Real>();
-  if constexpr (FLUID_TYPE == Fluid::radiation) {
+  if constexpr (is_grey<FLUID_TYPE>()) {
     c = pkg->template Param<Real>("c");
     chat = pkg->template Param<Real>("chat");
   }
@@ -406,7 +406,7 @@ TaskStatus FluxSourceImpl(MeshData<Real> *md, PKG &pkg, PackPrim vprim, PackCons
                                          (ax3[1] * vface_(b, TE::F3, n, k + 1, j, i) -
                                           ax3[0] * vface_(b, TE::F3, n, k, j, i));
             }
-          } else if constexpr (FLUID_TYPE == Fluid::radiation) {
+          } else if constexpr (is_grey<FLUID_TYPE>()) {
             const int IPR = nspecies * 4 + n;
             vcons_(b, IMX, k, j, i) += dt_ / dx[0] *
                                        (vprim_.flux(b, X1DIR, IPR, k, j, i) -
@@ -426,12 +426,12 @@ TaskStatus FluxSourceImpl(MeshData<Real> *md, PKG &pkg, PackPrim vprim, PackCons
           // Add coordinate source term
           Real rdt = vprim(b, n, k, j, i) * dt;
           const Real cfac_ = c * chat;
-          if constexpr (FLUID_TYPE == Fluid::radiation) {
+          if constexpr (is_grey<FLUID_TYPE>()) {
             const Real f2 =
                 std::sqrt(SQR(vprim(b, IVX, k, j, i)) + SQR(vprim(b, IVY, k, j, i)) +
                           SQR(vprim(b, IVZ, k, j, i)));
             const Real chi =
-                Radiation::EddingtonFactor<Radiation::Closure::M1>(std::sqrt(f2));
+                Radiation::EddingtonFactor<FLUID_TYPE>(std::sqrt(f2));
             rdt *= (3. * chi - 1.) * 0.5 * cfac_ / (f2 + Fuzz<Real>());
           }
           if (x1dep) {

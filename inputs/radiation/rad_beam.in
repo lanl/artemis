@@ -13,6 +13,7 @@
 
 <artemis>
 problem = beam          # name of the pgen
+physical_units  = cgs
 coordinates = cartesian  # coordinate system
 
 <parthenon/job>

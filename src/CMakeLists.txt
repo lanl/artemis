@@ -60,6 +60,7 @@ set (SRC_LIST
   nbody/particle_base.hpp
 
   pgen/advection.hpp
+  pgen/beam.hpp
   pgen/blast.hpp
   pgen/conduction.hpp
   pgen/constant.hpp
@@ -73,6 +74,9 @@ set (SRC_LIST
   pgen/thermalization.hpp
 
   radiation/imc/imc.hpp
+  radiation/moment/radiation.cpp
+  radiation/moment/radiation.hpp
+  radiation/moment/matter_coupling.hpp
 
   utils/artemis_utils.cpp
   utils/artemis_utils.hpp

@@ -17,8 +17,8 @@
 // Artemis includes
 #include "artemis.hpp"
 #include "geometry/geometry.hpp"
-#include "radiation.hpp"
 #include "matter_coupling.hpp"
+#include "radiation.hpp"
 #include "utils/artemis_utils.hpp"
 #include "utils/fluxes/fluid_fluxes.hpp"
 #include "utils/history.hpp"
@@ -328,10 +328,10 @@ TaskStatus CalculateFluxes(MeshData<Real> *md, const bool pcm) {
   auto fluid_type = pkg->Param<Fluid>("fluid_type");
   if (fluid_type == Fluid::greyM1) {
     return ArtemisUtils::CalculateFluxes<Fluid::greyM1>(md, pkg, vprim, vflux, vface,
-                                                         pcm);
+                                                        pcm);
   } else if (fluid_type == Fluid::greyP1) {
     return ArtemisUtils::CalculateFluxes<Fluid::greyP1>(md, pkg, vprim, vflux, vface,
-                                                         pcm);
+                                                        pcm);
   }
   return TaskStatus::complete;
 }
@@ -430,9 +430,9 @@ TaskStatus MatterCoupling(MeshData<Real> *u0, MeshData<Real> *u1, const Real dt)
   auto &radiation_pkg = pm->packages.Get("radiation");
   auto fluid_type = radiation_pkg->template Param<Fluid>("fluid_type");
   if (fluid_type == Fluid::greyM1) {
-    return MatterCouplingImpl<GEOM,Fluid::greyM1>(u0,u1,dt);
+    return MatterCouplingImpl<GEOM, Fluid::greyM1>(u0, u1, dt);
   } else if (fluid_type == Fluid::greyP1) {
-    return MatterCouplingImpl<GEOM,Fluid::greyP1>(u0,u1,dt);
+    return MatterCouplingImpl<GEOM, Fluid::greyP1>(u0, u1, dt);
   }
   return TaskStatus::complete;
 }
@@ -463,11 +463,23 @@ ApplyUpdate<Coordinates::spherical3D>(MeshData<Real> *u0, MeshData<Real> *u1,
                                       const int stage, const Real gam0, const Real gam1,
                                       const Real beta_dt);
 
-template TaskStatus MatterCoupling<Coordinates::cartesian>(MeshData<Real> *u0, MeshData<Real> *u1, const Real dt);
-template TaskStatus MatterCoupling<Coordinates::cylindrical>(MeshData<Real> *u0, MeshData<Real> *u1, const Real dt);
-template TaskStatus MatterCoupling<Coordinates::axisymmetric>(MeshData<Real> *u0, MeshData<Real> *u1, const Real dt);
-template TaskStatus MatterCoupling<Coordinates::spherical1D>(MeshData<Real> *u0, MeshData<Real> *u1, const Real dt);
-template TaskStatus MatterCoupling<Coordinates::spherical2D>(MeshData<Real> *u0, MeshData<Real> *u1, const Real dt);
-template TaskStatus MatterCoupling<Coordinates::spherical3D>(MeshData<Real> *u0, MeshData<Real> *u1, const Real dt);
+template TaskStatus MatterCoupling<Coordinates::cartesian>(MeshData<Real> *u0,
+                                                           MeshData<Real> *u1,
+                                                           const Real dt);
+template TaskStatus MatterCoupling<Coordinates::cylindrical>(MeshData<Real> *u0,
+                                                             MeshData<Real> *u1,
+                                                             const Real dt);
+template TaskStatus MatterCoupling<Coordinates::axisymmetric>(MeshData<Real> *u0,
+                                                              MeshData<Real> *u1,
+                                                              const Real dt);
+template TaskStatus MatterCoupling<Coordinates::spherical1D>(MeshData<Real> *u0,
+                                                             MeshData<Real> *u1,
+                                                             const Real dt);
+template TaskStatus MatterCoupling<Coordinates::spherical2D>(MeshData<Real> *u0,
+                                                             MeshData<Real> *u1,
+                                                             const Real dt);
+template TaskStatus MatterCoupling<Coordinates::spherical3D>(MeshData<Real> *u0,
+                                                             MeshData<Real> *u1,
+                                                             const Real dt);
 
 } // namespace Radiation

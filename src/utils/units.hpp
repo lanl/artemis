@@ -87,6 +87,10 @@ class Units {
   KOKKOS_INLINE_FUNCTION
   Real GetSpecificHeatPhysicalToCode() const { return mass_ / energy_; }
 
+  inline std::string GetSystemName() const {
+    return (physical_units_ == PhysicalUnits::scalefree) ? "Scale free" : "CGS";
+  }
+
  private:
   // Unit conversion factors from code to physical units
   // e.g. length_ has units of cm when using CGS as physical unit system

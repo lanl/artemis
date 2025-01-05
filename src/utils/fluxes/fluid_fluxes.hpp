@@ -430,8 +430,7 @@ TaskStatus FluxSourceImpl(MeshData<Real> *md, PKG &pkg, PackPrim vprim, PackCons
             const Real f2 =
                 std::sqrt(SQR(vprim(b, IVX, k, j, i)) + SQR(vprim(b, IVY, k, j, i)) +
                           SQR(vprim(b, IVZ, k, j, i)));
-            const Real chi =
-                Radiation::EddingtonFactor<FLUID_TYPE>(std::sqrt(f2));
+            const Real chi = Radiation::EddingtonFactor<FLUID_TYPE>(std::sqrt(f2));
             rdt *= (3. * chi - 1.) * 0.5 * cfac_ / (f2 + Fuzz<Real>());
           }
           if (x1dep) {

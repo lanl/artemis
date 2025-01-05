@@ -30,7 +30,6 @@
 #include "strat.hpp"
 #include "thermalization.hpp"
 
-
 using namespace parthenon::package::prelude;
 
 namespace artemis {

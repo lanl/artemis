@@ -20,8 +20,8 @@
 #include "gas/gas.hpp"
 #include "geometry/geometry.hpp"
 #include "gravity/gravity.hpp"
-#include "radiation/moment/radiation.hpp"
 #include "nbody/nbody.hpp"
+#include "radiation/moment/radiation.hpp"
 #include "rotating_frame/rotating_frame.hpp"
 #include "utils/artemis_utils.hpp"
 #include "utils/history.hpp"
@@ -73,10 +73,10 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   const bool do_radiation = pin->GetOrAddBoolean("physics", "radiation", false);
   // Check if we are using IMC or moment based radiation
   // This maybe is not great if user doesn't comment out unused node...
-  const bool do_imc    = do_radiation && pin->DoesBlockExist("jaybenne");
+  const bool do_imc = do_radiation && pin->DoesBlockExist("jaybenne");
   const bool do_moment = do_radiation && pin->DoesBlockExist("radiation");
-  PARTHENON_REQUIRE( !(do_imc && do_moment), 
-      "You cannot have both a <jaybenne> block and a <radiation> block");
+  PARTHENON_REQUIRE(!(do_imc && do_moment),
+                    "You cannot have both a <jaybenne> block and a <radiation> block");
 
   artemis->AddParam("do_gas", do_gas);
   artemis->AddParam("do_dust", do_dust);

@@ -76,6 +76,7 @@ set (SRC_LIST
   radiation/imc/imc.hpp
   radiation/moment/radiation.cpp
   radiation/moment/radiation.hpp
+  radiation/moment/matter_coupling.hpp
 
   utils/artemis_utils.cpp
   utils/artemis_utils.hpp

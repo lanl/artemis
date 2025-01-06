@@ -70,6 +70,9 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   const bool do_viscosity = pin->GetOrAddBoolean("physics", "viscosity", false);
   const bool do_conduction = pin->GetOrAddBoolean("physics", "conduction", false);
   const bool do_radiation = pin->GetOrAddBoolean("physics", "radiation", false);
+  const bool do_sts = pin->GetOrAddBoolean("physics", "sts", false);
+
+  artemis->AddParam("do_sts", do_sts);
   artemis->AddParam("do_gas", do_gas);
   artemis->AddParam("do_dust", do_dust);
   artemis->AddParam("do_gravity", do_gravity);
@@ -86,7 +89,7 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   PARTHENON_REQUIRE(!(do_viscosity) || (do_viscosity && do_gas),
                     "Viscosity requires the gas package, but there is not gas!");
   PARTHENON_REQUIRE(!(do_conduction) || (do_conduction && do_gas),
-                    "Conduction requires the gas package, but there is not gas!");
+                    "Conduction requires the gas package, but there is not gas!");          
   PARTHENON_REQUIRE(!(do_radiation) || (do_radiation && do_gas),
                     "Radiation requires the gas package, but there is not gas!");
 
@@ -105,6 +108,7 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   if (do_cooling) packages.Add(Gas::Cooling::Initialize(pin.get()));
   if (do_drag) packages.Add(Drag::Initialize(pin.get()));
   if (do_nbody) packages.Add(NBody::Initialize(pin.get(), constants));
+  if (do_sts) packages.Add(STS::Initialize(pin.get()));
   if (do_radiation) {
     auto eos_h = packages.Get("gas")->Param<EOS>("eos_h");
     auto opacity_h = packages.Get("gas")->Param<Opacity>("opacity_h");

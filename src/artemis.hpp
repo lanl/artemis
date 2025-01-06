@@ -104,6 +104,9 @@ enum class ArtemisBC {
   none
 };
 
+// ...STS integrator types
+enum class STSInt { rkl1, rkl2, null };
+
 // Floating point limits
 template <typename T = Real>
 KOKKOS_FORCEINLINE_FUNCTION constexpr auto Big() {

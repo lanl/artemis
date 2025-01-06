@@ -23,13 +23,11 @@ artemis:
     _type: bool
     _default: "false"
     _description: "Add user-defined AMR criterion."
-  units:
-    _description: "Unit conversions between code and cgs."
   physical_units:
     _type: "string"
     _default: "scalefree"
     _description: "What unit system to use for physical units"
-    code:
+    scalefree:
       _type: opt
       _description: "Native code units; no conversions"
     cgs:
@@ -47,12 +45,15 @@ artemis:
       _description: "AU, Year/(2 pi), solar mass units for protoplanetary disks"
   length:
     _type: "Real"
+    _default: "1.0"
     _description: "Physical units value of length equal to 1 code unit"
   time:
     _type: "Real"
+    _default: "1.0"
     _description: "Physical units value of time equal to 1 code unit"
   mass:
     _type: "Real"
+    _default: "1.0"
     _description: "Physical units value of mass equal to 1 code unit"
 
 

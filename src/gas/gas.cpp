@@ -39,7 +39,8 @@ namespace Gas {
 //! \brief Adds intialization function for gas hydrodynamics package
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
                                             ArtemisUtils::Units &units,
-                                            ArtemisUtils::Constants &constants) {
+                                            ArtemisUtils::Constants &constants,
+                                            Packages_t &packages) {
   using namespace singularity::photons;
 
   auto gas = std::make_shared<StateDescriptor>("gas");
@@ -186,11 +187,12 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   params.Add("do_diffusion", do_diffusion);
 
   if (do_viscosity) {
-    Diffusion::DiffCoeffParams dp("gas/viscosity", "viscosity", pin, constants);
+    Diffusion::DiffCoeffParams dp("gas/viscosity", "viscosity", pin, constants, packages);
     params.Add("visc_params", dp);
   }
   if (do_conduction) {
-    Diffusion::DiffCoeffParams dp("gas/conductivity", "conductivity", pin, constants);
+    Diffusion::DiffCoeffParams dp("gas/conductivity", "conductivity", pin, constants,
+                                  packages);
     params.Add("cond_params", dp);
   }
 

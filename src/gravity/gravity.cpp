@@ -23,7 +23,8 @@ namespace Gravity {
 //! \fn  StateDescriptor Gravity::Initialize
 //! \brief Adds intialization function for gravity package
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
-                                            const ArtemisUtils::Constants &constants) {
+                                            const ArtemisUtils::Constants &constants,
+                                            const Packages_t &packages) {
   auto gravity = std::make_shared<StateDescriptor>("gravity");
   Params &params = gravity->AllParams();
 
@@ -31,8 +32,6 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   std::string sys = pin->GetOrAddString("artemis", "coordinates", "cartesian");
   Coordinates coords = geometry::CoordSelect(sys, ndim);
 
-  const Real gm = constants.GetGCode() * pin->GetOrAddReal("gravity", "mass_tot", 1.) *
-                  constants.GetMsolarCode();
   params.Add("tstart",
              pin->GetOrAddReal("gravity", "tstart", std::numeric_limits<Real>::lowest()));
   params.Add("tstop", pin->GetOrAddReal("gravity", "tstop", Big<Real>()));
@@ -43,10 +42,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   GravityType gtype = GravityType::null;
   std::string block_name = "none";
 
-  bool needs_gm = true;
   // params specific to the gravity type
   if (pin->DoesBlockExist("gravity/uniform")) {
-    needs_gm = false;
     count++;
     block_name = "gravity/uniform";
     gtype = GravityType::uniform;
@@ -58,6 +55,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
     count++;
     gtype = GravityType::point;
     block_name = "gravity/point";
+    const Real m = pin->GetReal(block_name, "mass");
+    params.Add("mass", m);
+    params.Add("gm", constants.GetGCode() * m);
     params.Add("soft", pin->GetOrAddReal(block_name, "soft", 0.0));
     params.Add("sink", pin->GetOrAddReal(block_name, "sink", 0.0));
     params.Add("sink_rate", pin->GetOrAddReal(block_name, "sink_rate", 0.0));
@@ -82,6 +82,10 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
     PARTHENON_REQUIRE(!geometry::is_axisymmetric(coords),
                       "Binary gravity is not compatable with axisymmetric coordinates!");
 
+    const Real m = pin->GetReal(block_name, "mass");
+    params.Add("mass", m);
+    const Real gm = constants.GetGCode() * m;
+    params.Add("gm", gm);
     params.Add("soft1", pin->GetOrAddReal(block_name, "soft1", 0.0));
     params.Add("soft2", pin->GetOrAddReal(block_name, "soft2", 0.0));
     params.Add("sink1", pin->GetOrAddReal(block_name, "sink1", 0.0));
@@ -109,17 +113,14 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
     block_name = "gravity/nbody";
     const bool do_nbody = pin->GetBoolean("physics", "nbody");
     PARTHENON_REQUIRE(do_nbody, "You have <gravity/nbody> but not physics/nbody = true!");
-  }
-
-  if (needs_gm) {
-    PARTHENON_REQUIRE(!std::isnan(gm), "Please define gm in the <gravity> block!");
+    auto &nbody_pkg = packages.Get("nbody");
+    params.Add("gm", nbody_pkg->Param<Real>("gm"));
   }
 
   PARTHENON_REQUIRE((count > 0) && (gtype != GravityType::null), "Unknown gravity node!");
 
   PARTHENON_REQUIRE(count == 1, "artemis only supports 1 gravity type at this time");
 
-  params.Add("gm", gm);
   params.Add("type", gtype);
 
   return gravity;

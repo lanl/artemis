@@ -74,9 +74,8 @@ siefloor = 1.0e-10
 type = alpha
 alpha = 1e-2
 
-<gravity>
-mass_tot = 1.0
 <gravity/point>
+mass = 1.0
 
 <cooling>
 type = beta

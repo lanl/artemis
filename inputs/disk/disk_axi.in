@@ -80,9 +80,8 @@ omega = 1.0
 type = alpha
 alpha = 1e-3
 
-<gravity>
-mass_tot = 1.0
 <gravity/point>
+mass = 1.0
 
 <problem>
 r0 = 1.0

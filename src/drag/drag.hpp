@@ -14,6 +14,7 @@
 #define DRAG_DRAG_HPP_
 
 // Parthenon includes
+#include <iostream>
 #include <parthenon/package.hpp>
 
 // Artemis includes
@@ -86,25 +87,24 @@ struct SelfDragParams {
   }
   SelfDragParams(std::string block_name, ParameterInput *pin) {
     ix[0] = pin->GetOrAddReal(block_name, "inner_x1", -Big<Real>());
-    ix[1] = pin->GetOrAddReal(block_name, "inner_x2", -Big<Real>());
-    ix[2] = pin->GetOrAddReal(block_name, "inner_x3", -Big<Real>());
+    ix[1] = pin->GetOrAddReal(block_name, "pos_z_sh", Big<Real>());
     irate[0] = pin->GetOrAddReal(block_name, "inner_x1_rate", 0.0);
-    irate[1] = pin->GetOrAddReal(block_name, "inner_x2_rate", 0.0);
-    irate[2] = pin->GetOrAddReal(block_name, "inner_x3_rate", 0.0);
+    irate[1] = pin->GetOrAddReal(block_name, "z_rate", 0.0);
 
     ox[0] = pin->GetOrAddReal(block_name, "outer_x1", Big<Real>());
-    ox[1] = pin->GetOrAddReal(block_name, "outer_x2", Big<Real>());
-    ox[2] = pin->GetOrAddReal(block_name, "outer_x3", Big<Real>());
+    ox[1] = pin->GetOrAddReal(block_name, "neg_z_sh", Big<Real>());
     orate[0] = pin->GetOrAddReal(block_name, "outer_x1_rate", 0.0);
-    orate[1] = pin->GetOrAddReal(block_name, "outer_x2_rate", 0.0);
-    orate[2] = pin->GetOrAddReal(block_name, "outer_x3_rate", 0.0);
+    orate[1] = pin->GetOrAddReal(block_name, "z_rate", 0.0);
+
     damp_to_visc = pin->GetOrAddBoolean(block_name, "damp_to_visc", false);
 
     for (int i = 0; i < 3; i++) {
       PARTHENON_REQUIRE(irate[i] >= 0.0,
                         "The damping rate in the x1 direction must be >= 0");
+      if (i != 2) {
       PARTHENON_REQUIRE(ix[i] <= ox[i],
                         "The damping bounds must have inner_x1 <= outer_x1");
+      }
     }
   }
 };
@@ -185,6 +185,15 @@ TaskStatus SelfDragSourceImpl(MeshData<Real> *md, const Real time, const Real dt
   const int multi_d = (ndim >= 2);
   const int three_d = (ndim == 3);
 
+  const Real p = drag_pkg->template Param<Real>("dslope");
+  const Real q = drag_pkg->template Param<Real>("tslope");
+  const Real h0 = drag_pkg->template Param<Real>("h0");
+  const Real r0 = drag_pkg->template Param<Real>("r0");
+  const Real gm = drag_pkg->template Param<Real>("gm");
+  const Real omf = drag_pkg->template Param<Real>("omf");
+  const Real nu = drag_pkg->template Param<Real>("nu");
+  const Real flare = 0.5 * (1.0 + q);
+
   static auto desc =
       MakePackDescriptor<gas::cons::total_energy, gas::cons::momentum, gas::cons::density,
                          gas::cons::internal_energy, dust::cons::momentum,
@@ -207,6 +216,7 @@ TaskStatus SelfDragSourceImpl(MeshData<Real> *md, const Real time, const Real dt
         // Compute the ramp for this cell
         // Ramps are quadratic, eg. the left regions is SQR( (X - ix)/(ix - xmin) )
         if (do_gas) {
+          const Real H = xcyl[0] * h0 * std::pow(xcyl[0] / r0, flare);
           const Real fx1 =
               dt * (gasp.irate[0] * ((xv[0] < gasp.ix[0]) *
                                      SQR((xv[0] - gasp.ix[0]) / (gasp.ix[0] - x1min))) +
@@ -224,6 +234,7 @@ TaskStatus SelfDragSourceImpl(MeshData<Real> *md, const Real time, const Real dt
                                 SQR((xv[2] - gasp.ix[2]) / (gasp.ix[2] - x3min))) +
                gasp.orate[2] * ((xv[2] > gasp.ox[2]) *
                                 SQR((xv[2] - gasp.ox[2]) / (gasp.ox[2] - x3max))));
+
           for (int n = 0; n < vmesh.GetSize(b, gas::cons::density()); ++n) {
             const Real &dens = vmesh(b, gas::cons::density(n), k, j, i);
             const Real vg[3] = {
@@ -234,23 +245,34 @@ TaskStatus SelfDragSourceImpl(MeshData<Real> *md, const Real time, const Real dt
             const Real sieg = ArtemisUtils::GetSpecificInternalEnergy(
                 vmesh, b, n, k, j, i, de_switch, dflr_gas, sieflr_gas, hx);
 
-            Real vd[3] = {0., 0., 0.};
+            const Real OmKmid = std::sqrt(gm / (xcyl[0] * xcyl[0] * xcyl[0]));
+            const Real Omg = OmKmid * (1 + 0.5 * SQR(H / xcyl[0]) *
+                                               (p + q + 0.5 * q * SQR(xcyl[2] / H)));
+            const Real vp = Omg * xcyl[0];
+            const Real vR = -nu *
+                            (6 * p - 2 * q + 3 + (5 * q + 9) * SQR(xcyl[2] / H)) /
+                            (2 * xcyl[0]);
 
-            Diffusion::DiffusionCoeff<DTYP, GEOM, Fluid::gas> dcoeff;
-            const Real mu = dcoeff.Get(dp, coords, dens, sieg, eos_d);
-            const Real vR = -1.5 * mu / (xcyl[0] * dens);
-            vd[0] = ex1[0] * vR;
-            vd[1] = ex2[0] * vR;
-            vd[2] = ex3[0] * vR;
+            const Real vz = (-p)*xcyl[2]/xcyl[0]*vR;
+
+            const Real vcyl[3] = {vR, vp - omf * xcyl[0], vz};
+
+            const Real vd[3] = {
+              ArtemisUtils::VDot(vcyl, ex1),
+              ArtemisUtils::VDot(vcyl, ex2),
+              ArtemisUtils::VDot(vcyl, ex3)
+            };
 
             // Ep - E = 0.5 d ( vp^2 - v^2 )
             //  (vp-v) . (vp + v) = dv . (2v + dv) =  2 dv.v + dv.dv
             const Real dm1 = -fx1 * dens * (vg[0] - vd[0]) / (1.0 + fx1);
             const Real dm2 = -fx2 * dens * (vg[1] - vd[1]) / (1.0 + fx2);
             const Real dm3 = -fx3 * dens * (vg[2] - vd[2]) / (1.0 + fx3);
+
             vmesh(b, gas::cons::momentum(VI(n, 0)), k, j, i) += hx[0] * dm1;
             vmesh(b, gas::cons::momentum(VI(n, 1)), k, j, i) += hx[1] * dm2;
             vmesh(b, gas::cons::momentum(VI(n, 2)), k, j, i) += hx[2] * dm3;
+
             vmesh(b, gas::cons::total_energy(n), k, j, i) +=
                 dm1 * (vg[0] + 0.5 * dm1 / dens) + dm2 * (vg[1] + 0.5 * dm2 / dens) +
                 dm3 * (vg[2] + 0.5 * dm3 / dens);

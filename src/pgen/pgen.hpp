@@ -23,6 +23,7 @@
 #include "conduction.hpp"
 #include "constant.hpp"
 #include "disk.hpp"
+#include "nu_disk.hpp"
 #include "gaussian_bump.hpp"
 #include "linear_wave.hpp"
 #include "shock.hpp"
@@ -48,6 +49,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
     constant::ProblemGenerator<T>(pmb, pin);
   } else if (name == "disk") {
     disk::ProblemGenerator<T>(pmb, pin);
+  } else if (name == "nu_disk") {
+    nu_disk::ProblemGenerator<T>(pmb, pin);
   } else if (name == "gaussian_bump") {
     gaussian_bump::ProblemGenerator<T>(pmb, pin);
   } else if (name == "linear_wave") {

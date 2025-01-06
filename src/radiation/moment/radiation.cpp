@@ -135,14 +135,14 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   // Control field for sparse radiation fields
   std::string control_field = rad::cons::energy::name();
 
-  // Conserved Radiation Density
+  // Conserved Energy density
   Metadata m = Metadata({Metadata::Cell, Metadata::Conserved, Metadata::Independent,
                          Metadata::WithFluxes, Metadata::Sparse});
   ArtemisUtils::EnrollArtemisRefinementOps(m, coords);
   m.SetSparseThresholds(0.0, 0.0, 0.0);
   radiation->AddSparsePool<rad::cons::energy>(m, control_field, fluidids);
 
-  // Conserved Momenta
+  // Conserved Flux 
   m = Metadata({Metadata::Cell, Metadata::Vector, Metadata::Conserved,
                 Metadata::Independent, Metadata::WithFluxes, Metadata::Sparse},
                std::vector<int>({3}));
@@ -150,7 +150,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   m.SetSparseThresholds(0.0, 0.0, 0.0);
   radiation->AddSparsePool<rad::cons::flux>(m, control_field, fluidids);
 
-  // Primitive Density
+  // Primitive Energy density
   m = Metadata({Metadata::Cell, Metadata::Derived, Metadata::Intensive, Metadata::OneCopy,
                 Metadata::FillGhost, Metadata::Sparse});
   ArtemisUtils::EnrollArtemisRefinementOps(m, coords);
@@ -164,7 +164,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   m.SetSparseThresholds(0.0, 0.0, 0.0);
   radiation->AddSparsePool<rad::prim::pressure>(m, control_field, fluidids);
 
-  // Primitive Velocities
+  // Primitive reduced flux
   m = Metadata({Metadata::Cell, Metadata::Vector, Metadata::Derived, Metadata::Intensive,
                 Metadata::OneCopy, Metadata::FillGhost, Metadata::Sparse},
                std::vector<int>({3}));
@@ -173,12 +173,13 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   radiation->AddSparsePool<rad::prim::flux>(m, control_field, fluidids);
 
   // Eddington Tensor
-  m = Metadata({Metadata::Cell, Metadata::Derived, Metadata::Intensive, Metadata::OneCopy,
-                Metadata::FillGhost, Metadata::Sparse},
-               std::vector<int>({6}));
-  ArtemisUtils::EnrollArtemisRefinementOps(m, coords);
-  m.SetSparseThresholds(0.0, 0.0, 0.0);
-  radiation->AddSparsePool<rad::prim::flux>(m, control_field, fluidids);
+  // NOTE(AMD): If/when we add something like VET, then uncomment this
+  //m = Metadata({Metadata::Cell, Metadata::Derived, Metadata::Intensive, Metadata::OneCopy,
+  //              Metadata::FillGhost, Metadata::Sparse},
+  //             std::vector<int>({6}));
+  //ArtemisUtils::EnrollArtemisRefinementOps(m, coords);
+  //m.SetSparseThresholds(0.0, 0.0, 0.0);
+  //radiation->AddSparsePool<rad::prim::fedd>(m, control_field, fluidids);
 
   // Radiation refinement criterion
   const std::string refine_field =

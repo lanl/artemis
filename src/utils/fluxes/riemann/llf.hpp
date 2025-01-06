@@ -33,6 +33,7 @@
 
 // Artemis headers
 #include "artemis.hpp"
+#include "radiation/moment/radiation.hpp"
 #include "utils/eos/eos.hpp"
 
 namespace ArtemisUtils {
@@ -63,6 +64,8 @@ class RiemannSolver<RSolver::llf, FLUID_TYPE> {
       nvar = 6;
     } else if constexpr (FLUID_TYPE == Fluid::dust) {
       nvar = 4;
+    } else if constexpr (is_grey<FLUID_TYPE>()) {
+      nvar = 5;
     }
     const int nspecies = p.GetMaxNumberOfVars() / nvar;
 
@@ -108,13 +111,42 @@ class RiemannSolver<RSolver::llf, FLUID_TYPE> {
               wr_ise = wr(ISE, i);
             }
 
+            Real scalel = 1.0;
+            Real scaler = 1.0;
+            Real qscale = 1.0;
+            [[maybe_unused]] Real pscalel = Null<Real>();
+            [[maybe_unused]] Real pscaler = Null<Real>();
+            [[maybe_unused]] Real sl = Null<Real>();
+            [[maybe_unused]] Real sr = Null<Real>();
+            if constexpr (is_grey<FLUID_TYPE>()) {
+              Real fl = std::sqrt(SQR(wl_ivx) + SQR(wl_ivy) + SQR(wl_ivz));
+              Real fr = std::sqrt(SQR(wr_ivx) + SQR(wr_ivy) + SQR(wr_ivz));
+              const Real nlx = wl_ivx / (fl + Fuzz<Real>());
+              const Real nrx = wr_ivx / (fr + Fuzz<Real>());
+              fl = std::min(1.0, fl);
+              fr = std::min(1.0, fr);
+              const Real chil = Radiation::EddingtonFactor<FLUID_TYPE>(fl);
+              const Real chir = Radiation::EddingtonFactor<FLUID_TYPE>(fr);
+              qscale = chat;
+              const auto [sla, slb] = Radiation::WaveSpeed(nlx, fl);
+              const auto [sra, srb] = Radiation::WaveSpeed(nrx, fr);
+              sl = std::min(sla, slb);
+              sr = std::max(sra, srb);
+              pscalel = chat * c * 0.5 * (1.0 - chil);
+              pscaler = chat * c * 0.5 * (1.0 - chir);
+              scalel = c * 0.5 * (3. * chil - 1.) / (fl * fl + Fuzz<Real>());
+              scaler = c * 0.5 * (3. * chir - 1.) / (fr * fr + Fuzz<Real>());
+
+
+            }
+
             // Compute sum of L/R fluxes
-            Real qa = wl_idn * wl_ivx;
-            Real qb = wr_idn * wr_ivx;
+            Real qa = qscale * wl_idn * wl_ivx;
+            Real qb = qscale * wr_idn * wr_ivx;
             Real fsum_d = qa + qb;
-            Real fsum_mx = qa * wl_ivx + qb * wr_ivx;
-            Real fsum_my = qa * wl_ivy + qb * wr_ivy;
-            Real fsum_mz = qa * wl_ivz + qb * wr_ivz;
+            Real fsum_mx = qa * scalel * wl_ivx + qb * scaler * wr_ivx;
+            Real fsum_my = qa * scalel * wl_ivy + qb * scaler * wr_ivy;
+            Real fsum_mz = qa * scalel * wl_ivz + qb * scaler * wr_ivz;
 
             [[maybe_unused]] Real el = Null<Real>();
             [[maybe_unused]] Real er = Null<Real>();
@@ -135,13 +167,15 @@ class RiemannSolver<RSolver::llf, FLUID_TYPE> {
               a = std::max((std::abs(wl_ivx) + qa), (std::abs(wr_ivx) + qb));
             } else if constexpr (FLUID_TYPE == Fluid::dust) {
               a = std::max(std::abs(wl_ivx), std::abs(wr_ivx));
+            } else if constexpr (is_grey<FLUID_TYPE>()) {
+              a = qscale * std::max(sl,sr);
             }
 
             // Compute difference in L/R states dU, multiplied by max wave speed
             Real du_d = a * (wr_idn - wl_idn);
-            Real du_mx = a * (wr_idn * wr_ivx - wl_idn * wl_ivx);
-            Real du_my = a * (wr_idn * wr_ivy - wl_idn * wl_ivy);
-            Real du_mz = a * (wr_idn * wr_ivz - wl_idn * wl_ivz);
+            Real du_mx = a * (wr_idn * scalel * wr_ivx - wl_idn * scaler * wl_ivx);
+            Real du_my = a * (wr_idn * scalel * wr_ivy - wl_idn * scaler * wl_ivy);
+            Real du_mz = a * (wr_idn * scalel * wr_ivz - wl_idn * scaler * wl_ivz);
 
             [[maybe_unused]] Real du_e = Null<Real>();
             if constexpr (FLUID_TYPE == Fluid::gas) {
@@ -151,6 +185,8 @@ class RiemannSolver<RSolver::llf, FLUID_TYPE> {
             // Set an approximate interface pressure for coordinate source terms
             if constexpr (FLUID_TYPE == Fluid::gas) {
               p.flux(b, dir, IPR, k, j, i) = 0.5 * (wl_ipr + wr_ipr);
+            } else if constexpr (is_grey<FLUID_TYPE>()) {
+              p.flux(b, dir, IPR, k, j, i) = 0.5 * (wl_idn * pscalel + wr_idn * pscaler);
             }
 
             // Compute the LLF flux at interface

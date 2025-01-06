@@ -28,9 +28,9 @@
 
 // User-defined refinement criterion callback
 namespace artemis {
-
 std::function<AmrTag(MeshBlockData<Real> *mbd)> ProblemCheckRefinementBlock = nullptr;
-
+std::function<TaskStatus(MeshData<Real> *md, const Real time, const Real dt)>
+    ProblemGeneratorSourceTerm = nullptr;
 } // namespace artemis
 
 // Problem modifiers
@@ -66,6 +66,8 @@ void ProblemModifier(parthenon::ParthenonManager *pman) {
                                                cond::CondBoundary<G, ID::outer_x3>);
   } else if (artemis_problem == "disk") {
     pman->app_input->InitMeshBlockUserData = disk::InitDiskParams;
+
+    // artemis::ProblemGeneratorSourceTerm = disk::ProblemGeneratorSourceTerm<G>;
 
     artemis::ProblemCheckRefinementBlock = disk::ProblemCheckRefinementBlock;
 

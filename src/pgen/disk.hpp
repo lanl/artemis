@@ -815,10 +815,20 @@ void DiskBoundaryExtrap(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) 
 }
 
 //----------------------------------------------------------------------------------------
+//! \fn TaskStatus ProblemGeneratorSourceTerm()
+//! \brief Custom source term for disk pgen
+template <Coordinates GEOM>
+TaskStatus ProblemGeneratorSourceTerm(MeshData<Real> *md, const Real time,
+                                      const Real dt) {
+  PARTHENON_FAIL("Disk pgen-defined source term not yet implemented!");
+  return TaskStatus::complete;
+}
+
+//----------------------------------------------------------------------------------------
 //! \fn AmrTag ProblemCheckRefinementBlock()
 //! \brief Refinement criterion for disk pgen
 inline parthenon::AmrTag ProblemCheckRefinementBlock(MeshBlockData<Real> *mbd) {
-  PARTHENON_FAIL("Disk user-defined AMR criterion not yet implemented!");
+  PARTHENON_FAIL("Disk pgen-defined AMR criterion not yet implemented!");
   return AmrTag::same;
 }
 

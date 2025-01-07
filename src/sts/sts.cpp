@@ -79,10 +79,6 @@ void  STSRKL1( Mesh *pmesh, const Real time, Real dt, int nstages) {
     tl.AddTask(none, ArtemisUtils::DeepCopyConservedData, u1.get(), u0.get());
   }
 
-  //----------------------------------------------------------------------------------------
-  // gam0 = nuj 
-  // gam1 = muj
-  // beta_dt = dt_sts*muj_tilde ( but be careful with the puting v1 in divf calculation)
   for (int stage = 1; stage <= nstages; stage++) {
     // Set up the STS stage coefficients
     // v0 = Y_{n-2}
@@ -93,8 +89,6 @@ void  STSRKL1( Mesh *pmesh, const Real time, Real dt, int nstages) {
     Real muj = (1. - stage)/stage;
     Real nuj = (2.*stage - 1.)/stage;
     Real muj_tilde = (2.*stage - 1.)/stage * 2./(std::pow(nstages, 2.) + nstages);
-
-    const Real bdt  = dt;
 
     TaskRegion &tr = tc.AddRegion(num_partitions);
     for (int i = 0; i < num_partitions; i++) {
@@ -118,19 +112,18 @@ void  STSRKL1( Mesh *pmesh, const Real time, Real dt, int nstages) {
 
       // Communicate and set fluxes
       auto send_flx =
-          tl.AddTask(gas_flx | dust_flx | diff_flx,
+          tl.AddTask(diff_flx,
                     parthenon::SendBoundBufs<parthenon::BoundaryType::flxcor_send>, u0);
       auto recv_flx = tl.AddTask(start_flx_recv, parthenon::ReceiveFluxCorrections, u0);
       auto set_flx = tl.AddTask(recv_flx, parthenon::SetFluxCorrections, u0);
 
       // Apply flux divergence, STS need stage to 0 for the sts ceofficients
       auto update =
-          tl.AddTask(gas_flx | dust_flx | set_flx, ArtemisUtils::ApplyUpdate<GEOM>,
-                     u0.get(), u1.get(), 0, integrator.get());
+          tl.AddTask(set_flx, RKL1FluxUpadte,
+                     u0.get(), u1.get(),
+                     dt, muj, nuj, muj_tilde);
     }
-
   }
-
 }
 
 //----------------------------------------------------------------------------------------
@@ -150,5 +143,67 @@ void STSRKL2SecondStage( Mesh *pm, const Real time, Real dt, int nstages) {
 }
 
 
+//----------------------------------------------------------------------------------------
+//! \fn RKL1FluxUpadte
+//! \brief Applies the STS RKL1 update to the conserved variables
+template <Coordinates GEOM>
+TaskStatus RKL1FluxUpadte(MeshData<Real> *u0, MeshData<Real> *u1, const Real dt,
+                        const Real muj, const Real nuj, const Real muj_tilde) {
+  using parthenon::MakePackDescriptor;
+  using parthenon::variable_names::any;
+  auto pm = u0->GetParentPointer();
+
+  // Packing and indexing
+  std::vector<MetadataFlag> flags({Metadata::Conserved, Metadata::WithFluxes});
+  static auto desc = MakePackDescriptor<any>(u0, flags, {parthenon::PDOpt::WithFluxes});
+  const auto v0 = desc.GetPack(u0);
+  const auto v1 = desc.GetPack(u1);
+  const auto ib = u0->GetBoundsI(IndexDomain::interior);
+  const auto jb = u0->GetBoundsJ(IndexDomain::interior);
+  const auto kb = u0->GetBoundsK(IndexDomain::interior);
+  const bool multi_d = (pm->ndim > 1);
+  const bool three_d = (pm->ndim > 2);
+
+  parthenon::par_for(
+      DEFAULT_LOOP_PATTERN, "RKL1FluxUpadte", parthenon::DevExecSpace(), 0,
+      u0->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
+        // Extract coordinates
+        using parthenon::TopologicalElement;
+        geometry::Coords<GEOM> coords(v0.GetCoordinates(b), k, j, i);
+
+        const auto ax1 = coords.GetFaceAreaX1();
+        const auto ax2 = (multi_d) ? coords.GetFaceAreaX2() : NewArray<Real, 2>(0.0);
+        const auto ax3 = (three_d) ? coords.GetFaceAreaX3() : NewArray<Real, 2>(0.0);
+
+        const Real vol = coords.Volume();
+
+        for (int n = v0.GetLowerBound(b); n <= v0.GetUpperBound(b); ++n) {
+          // compute flux divergence
+          Real divf = (ax1[0] * v0.flux(b, X1DIR, n, k, j, i) -
+                       ax1[1] * v0.flux(b, X1DIR, n, k, j, i + 1));
+          if (multi_d)
+            divf += (ax2[0] * v0.flux(b, X2DIR, n, k, j, i) -
+                     ax2[1] * v0.flux(b, X2DIR, n, k, j + 1, i));
+          if (three_d)
+            divf += (ax3[0] * v0.flux(b, X3DIR, n, k, j, i) -
+                     ax3[1] * v0.flux(b, X3DIR, n, k + 1, j, i));
+
+          //----------------------------------------------------------------------------------------
+          // Apply STS RKL1 update
+          // Y_{m} = nuj*Y_{j-2} + muj*Y_{j-1} + dt_sts*muj_tilde*M(Y_{j-1})
+          //       = nuj*Y_{j-2} + muj*Y_{j-1} + dt_sts*muj_tilde*(divf/vol)
+          // v0 = Y_{j-1}, v1 = Y_{j-2}
+          Real Y_jm2 = v0(b, n, k, j, i);
+          v0(b, n, k, j, i) =
+              nuj * v1(b, n, k, j, i) + muj * v0(b, n, k, j, i) + divf * dt * muj_tilde/ vol;
+          
+          // ----------------------------------------------------------------------------------------
+          // Rearrange the variables for the next step
+          v1(b, n, k, j, i) = Y_jm2;
+        }
+      });
+  return TaskStatus::complete;
+}
 
 }

@@ -145,21 +145,21 @@ void ArtemisDriver<GEOM>::PreStepTasks() {
   if (do_sts) {
     // compute the number of stages needed for the STS integrator
     int s_sts =
-        static_cast<int>(0.5 * (std::sqrt(9.0 + 16.0 * tau / min_diff_dt) - 1.0)) + 1;
+        static_cast<int>(0.5 * (std::sqrt(9.0 + 16.0 * tm.dt / min_diff_dt) - 1.0)) + 1;
     if (s_sts % 2 == 0) s_sts += 1;
     
     if (parthenon::Globals::my_rank == 0) {
-      const auto ratio = 2.0 * tau / mindt_diff;
+      const auto ratio = 2.0 * tm.dt / min_diff_dt;
       std::cout << "STS ratio: " << ratio << ", Taking " << s_sts << " steps." << std::endl;
       if (ratio > 400.1) {
         std::cout << "WARNING: ratio is > 400. Proceed at own risk." << std::endl;
       }
     }
-
-    if (STSInt::rkl1){
+    auto sts_integrator = artemis_pkg->template Param<bool>("sts_integrator");
+    if (sts_integrator == STSInt::rkl1){
       // (TODO) RKL1 : Full timestep dt_sts
       //STSRKL1(pmesh, tm.time, tm.dt, s_sts);
-    }else if (STSInt::rkl2){
+    }else if (sts_integrator == STSInt::rkl2){
       // (TODO) RKL2 : // eq (21) using half hyperbolic timestep 
       // due to Strang split
       //STSRKL2(pmesh, tm.time, 0.5*tm.dt, s_sts);
@@ -215,7 +215,7 @@ TaskCollection ArtemisDriver<GEOM>::StepTasks() {
 
       // Compute (gas) diffusive fluxes
       TaskID diff_flx = none;
-      if (do_diffusion && do_gas && !do_sts) {
+      if (do_diffusion && do_gas && !(do_sts)) {
         auto zf = tl.AddTask(none, Gas::ZeroDiffusionFlux, u0.get());
         TaskID vflx = zf, tflx = zf;
         if (do_viscosity) vflx = tl.AddTask(zf, Gas::ViscousFlux<GEOM>, u0.get());
@@ -244,7 +244,7 @@ TaskCollection ArtemisDriver<GEOM>::StepTasks() {
       // NOTE(@pdmullen): I believe set_flx dependency implicitly inside gas_coord_src,
       // but included below explicitly for posterity
       TaskID gas_diff_src = gas_coord_src | diff_flx | set_flx;
-      if (do_diffusion && do_gas && !do_sts) {
+      if (do_diffusion && do_gas && !(do_sts) {
         gas_diff_src = tl.AddTask(gas_coord_src | diff_flx | set_flx,
                                   Gas::DiffusionUpdate<GEOM>, u0.get(), bdt);
       }

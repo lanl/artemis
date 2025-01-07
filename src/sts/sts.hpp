@@ -17,7 +17,13 @@
 #include "utils/units.hpp"
 
 namespace STS {
-  void STSRKL1( Mesh *pm, const Real time, Real dt, int nstages);
+  std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
+  // task list functions
+  void STSRKL1( Mesh *pmesh, const Real time, Real dt, int nstages);
   void STSRKL2FirstStage( Mesh *pm, const Real time, Real dt, int nstages);
   void STSRKL2SecondStage( Mesh *pm, const Real time, Real dt, int nstages);
+
+  // task status functions
+  TaskStatus RKL1FluxUpadte(MeshData<Real> *u0, MeshData<Real> *u1, const Real dt,
+                        const Real muj, const Real nuj, const Real muj_tilde);
 }

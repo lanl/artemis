@@ -28,7 +28,8 @@ logging.getLogger("matplotlib").setLevel(logging.WARNING)
 import matplotlib.colors as colors
 import matplotlib.pyplot as plt
 import matplotlib
-matplotlib.use('Agg')  # Use the Agg backend to avoid issues with DISPLAY not being set
+
+matplotlib.use("Agg")  # Use the Agg backend to avoid issues with DISPLAY not being set
 
 _nranks = 1
 _file_id = "collisions"

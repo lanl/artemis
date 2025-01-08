@@ -134,6 +134,15 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   } else if (opacity_model_name == "constant") {
     const Real kappa_a = pin->GetOrAddReal("gas/opacity/absorption", "kappa_a", 0.0);
     opacity = NonCGSUnits<Gray>(Gray(kappa_a), time, mass, length, 1.);
+  } else if (opacity_model_name == "powerlaw") {
+    const Real coef_kappa_a =
+        pin->GetOrAddReal("gas/opacity/absorption", "coef_kappa_a", 0.0);
+    const Real rho_exp = pin->GetOrAddReal("gas/opacity/absorption", "rho_exp", 0.0);
+    const Real temp_exp = pin->GetOrAddReal("gas/opacity/absorption", "temp_exp", 0.0);
+
+    opacity = NonCGSUnits<PowerLaw>(PowerLaw(coef_kappa_a, rho_exp, temp_exp), time, mass,
+                                    length, 1.);
+
   } else if (opacity_model_name == "shocktube_a") {
     const Real coef_kappa_a =
         pin->GetOrAddReal("gas/opacity/absorption", "coef_kappa_a", 0.0);

@@ -27,6 +27,9 @@ logging.getLogger("matplotlib").setLevel(logging.WARNING)
 import h5py
 import matplotlib.colors as colors
 import matplotlib.pyplot as plt
+import matplotlib
+if not os.getenv('DISPLAY'):
+    matplotlib.use('Agg')  # Use the Agg backend if no display is available
 
 _nranks = 1
 _file_id = "drag"

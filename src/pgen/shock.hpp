@@ -14,6 +14,13 @@
 #define PGEN_SHOCK_HPP_
 //! \file shock.hpp
 //! \brief
+//!
+//!  mu = mH, gamma = 5/3, rho*kappa = 577 /cm
+//!  c/chat = 43.3526011561
+//!  left state:         |  right state:
+//!      T = 2.18e6 K    |   T = 7.98e6 K
+//!    rho = 5.69 g/cc   | rho = 17.1 g/cc
+//!     vx = 5.19e7 cm/s |  vx = 1.73e7 cm/s
 
 // artemis headers
 #include "artemis.hpp"
@@ -32,7 +39,6 @@ namespace shock {
 struct ShockParams {
   Real rhol, vxl, tl;
   Real rhor, vxr, tr;
-  Real cv;
   Real xdisc;
 };
 
@@ -44,14 +50,13 @@ inline void InitShockParams(MeshBlock *pmb, ParameterInput *pin) {
   Params &params = artemis_pkg->AllParams();
   if (!(params.hasKey("shock_params"))) {
     ShockParams shock_params;
-    shock_params.rhol = pin->GetOrAddReal("problem", "rhol", 1.0);
-    shock_params.vxl = pin->GetOrAddReal("problem", "vxl", 2.0);
-    shock_params.tl = pin->GetOrAddReal("problem", "tl", 0.6);
-    shock_params.rhor = pin->GetOrAddReal("problem", "rhor", 2.285714);
-    shock_params.vxr = pin->GetOrAddReal("problem", "vxr", 0.875000);
-    shock_params.tr = pin->GetOrAddReal("problem", "tr", 1.246875);
+    shock_params.rhol = pin->GetOrAddReal("problem", "rhol", 5.69);
+    shock_params.vxl = pin->GetOrAddReal("problem", "vxl", 5.19e7);
+    shock_params.tl = pin->GetOrAddReal("problem", "tl", 2.18e6);
+    shock_params.rhor = pin->GetOrAddReal("problem", "rhor", 17.1);
+    shock_params.vxr = pin->GetOrAddReal("problem", "vxr", 1.73e7);
+    shock_params.tr = pin->GetOrAddReal("problem", "tr", 7.98e6);
     shock_params.xdisc = pin->GetOrAddReal("problem", "xdisc", 0.0005);
-    shock_params.cv = pin->GetOrAddReal("gas", "cv", 1.5);
     params.Add("shock_params", shock_params);
   }
 }
@@ -67,10 +72,16 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto artemis_pkg = pmb->packages.Get("artemis");
   const bool do_gas = artemis_pkg->Param<bool>("do_gas");
   const bool do_dust = artemis_pkg->Param<bool>("do_dust");
-  const bool do_radiation = artemis_pkg->Param<bool>("do_radiation");
+  const bool do_imc = artemis_pkg->Param<bool>("do_imc");
+  const bool do_moment = artemis_pkg->Param<bool>("do_moment");
   PARTHENON_REQUIRE(do_gas, "The shock problem requires gas hydrodynamics!");
   PARTHENON_REQUIRE(!(do_dust), "The shock problem does not permit dust hydrodynamics!");
   auto eos_d = pmb->packages.Get("gas")->Param<EOS>("eos_d");
+
+  Real ar = Null<Real>();
+  if (do_moment) {
+    ar = pmb->packages.Get("radiation")->Param<Real>("arad");
+  }
 
   // packing and capture variables for kernel
   auto &md = pmb->meshblock_data.Get();
@@ -78,7 +89,8 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
     if (!var->IsAllocated()) pmb->AllocateSparse(var->label());
   }
   static auto desc =
-      MakePackDescriptor<gas::prim::density, gas::prim::velocity, gas::prim::sie>(
+      MakePackDescriptor<gas::prim::density, gas::prim::velocity, gas::prim::sie,
+                         rad::prim::energy, rad::prim::flux>(
           (pmb->resolved_packages).get());
   auto v = desc.GetPack(md.get());
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
@@ -98,15 +110,22 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         const bool upwind = (xi[0] <= shkp.xdisc);
         const Real rho = upwind ? shkp.rhol : shkp.rhor;
         const Real vx = upwind ? shkp.vxl : shkp.vxr;
-        const Real sie = upwind ? shkp.cv * shkp.tl : shkp.cv * shkp.tr;
+        const Real T = upwind ? shkp.tl : shkp.tr;
         v(0, gas::prim::density(0), k, j, i) = rho;
         v(0, gas::prim::velocity(0), k, j, i) = vx;
         v(0, gas::prim::velocity(1), k, j, i) = 0.0;
         v(0, gas::prim::velocity(2), k, j, i) = 0.0;
-        v(0, gas::prim::sie(0), k, j, i) = sie;
+        v(0, gas::prim::sie(0), k, j, i) =
+            eos_d.InternalEnergyFromDensityTemperature(rho, T);
+        if (do_moment) {
+          v(0, rad::prim::energy(0), k, j, i) = ar * SQR(SQR(T));
+          v(0, rad::prim::flux(0), k, j, i) = 0.0;
+          v(0, rad::prim::flux(1), k, j, i) = 0.0;
+          v(0, rad::prim::flux(2), k, j, i) = 0.0;
+        }
       });
 
-  if (do_radiation) jaybenne::InitializeRadiation(md.get(), true);
+  if (do_imc) jaybenne::InitializeRadiation(md.get(), true);
 }
 
 //----------------------------------------------------------------------------------------
@@ -118,12 +137,19 @@ inline void ShockInnerX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse)
   auto pmb = mbd->GetBlockPointer();
 
   auto artemis_pkg = pmb->packages.Get("artemis");
+  const bool do_moment = artemis_pkg->Param<bool>("do_moment");
   auto shkp = artemis_pkg->Param<ShockParams>("shock_params");
+  auto eos_d = pmb->packages.Get("gas")->Param<EOS>("eos_d");
+  Real ar = Null<Real>();
+  if (do_moment) {
+    ar = pmb->packages.Get("radiation")->Param<Real>("arad");
+  }
   const auto nb = IndexRange{0, 0};
 
   static auto descriptors =
       ArtemisUtils::GetBoundaryPackDescriptorMap<gas::prim::density, gas::prim::velocity,
-                                                 gas::prim::sie>(mbd);
+                                                 gas::prim::sie, rad::prim::energy,
+                                                 rad::prim::flux>(mbd);
   auto v = descriptors[coarse].GetPack(mbd.get());
   if (v.GetMaxNumberOfVars() > 0) {
     pmb->par_for_bndry(
@@ -134,7 +160,14 @@ inline void ShockInnerX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse)
           v(0, gas::prim::velocity(0), k, j, i) = shkp.vxl;
           v(0, gas::prim::velocity(1), k, j, i) = 0.0;
           v(0, gas::prim::velocity(2), k, j, i) = 0.0;
-          v(0, gas::prim::sie(0), k, j, i) = shkp.cv * shkp.tl;
+          v(0, gas::prim::sie(0), k, j, i) =
+              eos_d.InternalEnergyFromDensityTemperature(shkp.rhol, shkp.tl);
+          if (do_moment) {
+            v(0, rad::prim::energy(0), k, j, i) = ar * SQR(SQR(shkp.tl));
+            v(0, rad::prim::flux(0), k, j, i) = 0.0;
+            v(0, rad::prim::flux(1), k, j, i) = 0.0;
+            v(0, rad::prim::flux(2), k, j, i) = 0.0;
+          }
         });
   }
 
@@ -150,12 +183,19 @@ inline void ShockOuterX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse)
   auto pmb = mbd->GetBlockPointer();
 
   auto artemis_pkg = pmb->packages.Get("artemis");
+  const bool do_moment = artemis_pkg->Param<bool>("do_moment");
   auto shkp = artemis_pkg->Param<ShockParams>("shock_params");
+  auto eos_d = pmb->packages.Get("gas")->Param<EOS>("eos_d");
+  Real ar = Null<Real>();
+  if (do_moment) {
+    ar = pmb->packages.Get("radiation")->Param<Real>("arad");
+  }
   const auto nb = IndexRange{0, 0};
 
   static auto descriptors =
       ArtemisUtils::GetBoundaryPackDescriptorMap<gas::prim::density, gas::prim::velocity,
-                                                 gas::prim::sie>(mbd);
+                                                 gas::prim::sie, rad::prim::energy,
+                                                 rad::prim::flux>(mbd);
   auto v = descriptors[coarse].GetPack(mbd.get());
   if (v.GetMaxNumberOfVars() > 0) {
     pmb->par_for_bndry(
@@ -166,7 +206,14 @@ inline void ShockOuterX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse)
           v(0, gas::prim::velocity(0), k, j, i) = shkp.vxr;
           v(0, gas::prim::velocity(1), k, j, i) = 0.0;
           v(0, gas::prim::velocity(2), k, j, i) = 0.0;
-          v(0, gas::prim::sie(0), k, j, i) = shkp.cv * shkp.tr;
+          v(0, gas::prim::sie(0), k, j, i) =
+              eos_d.InternalEnergyFromDensityTemperature(shkp.rhor, shkp.tr);
+          if (do_moment) {
+            v(0, rad::prim::energy(0), k, j, i) = ar * SQR(SQR(shkp.tr));
+            v(0, rad::prim::flux(0), k, j, i) = 0.0;
+            v(0, rad::prim::flux(1), k, j, i) = 0.0;
+            v(0, rad::prim::flux(2), k, j, i) = 0.0;
+          }
         });
   }
 

@@ -40,12 +40,13 @@ jobs:
           python-version: '3.x'  # Specify the Python version you need
       - name: Install dependencies
         run: |
-          pip install clang-format-12
+          pip install clang-format==12.0.1.2
           pip install black
       - name: Run format check
         run: |
           source env/bash
-          VERBOSE=1 CFM=clang-format-12 ./style/format.sh
+          which clang-format
+          VERBOSE=1 CFM=clang-format ./style/format.sh
           git diff --exit-code --ignore-submodules
 
   cpu:

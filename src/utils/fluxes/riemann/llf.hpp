@@ -136,8 +136,6 @@ class RiemannSolver<RSolver::llf, FLUID_TYPE> {
               pscaler = chat * c * 0.5 * (1.0 - chir);
               scalel = c * 0.5 * (3. * chil - 1.) / (fl * fl + Fuzz<Real>());
               scaler = c * 0.5 * (3. * chir - 1.) / (fr * fr + Fuzz<Real>());
-
-
             }
 
             // Compute sum of L/R fluxes
@@ -168,7 +166,7 @@ class RiemannSolver<RSolver::llf, FLUID_TYPE> {
             } else if constexpr (FLUID_TYPE == Fluid::dust) {
               a = std::max(std::abs(wl_ivx), std::abs(wr_ivx));
             } else if constexpr (is_grey<FLUID_TYPE>()) {
-              a = qscale * std::max(sl,sr);
+              a = qscale * std::max(sl, sr);
             }
 
             // Compute difference in L/R states dU, multiplied by max wave speed

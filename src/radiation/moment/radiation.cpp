@@ -142,7 +142,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   m.SetSparseThresholds(0.0, 0.0, 0.0);
   radiation->AddSparsePool<rad::cons::energy>(m, control_field, fluidids);
 
-  // Conserved Flux 
+  // Conserved Flux
   m = Metadata({Metadata::Cell, Metadata::Vector, Metadata::Conserved,
                 Metadata::Independent, Metadata::WithFluxes, Metadata::Sparse},
                std::vector<int>({3}));
@@ -174,12 +174,13 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
 
   // Eddington Tensor
   // NOTE(AMD): If/when we add something like VET, then uncomment this
-  //m = Metadata({Metadata::Cell, Metadata::Derived, Metadata::Intensive, Metadata::OneCopy,
+  // m = Metadata({Metadata::Cell, Metadata::Derived, Metadata::Intensive,
+  // Metadata::OneCopy,
   //              Metadata::FillGhost, Metadata::Sparse},
   //             std::vector<int>({6}));
-  //ArtemisUtils::EnrollArtemisRefinementOps(m, coords);
-  //m.SetSparseThresholds(0.0, 0.0, 0.0);
-  //radiation->AddSparsePool<rad::prim::fedd>(m, control_field, fluidids);
+  // ArtemisUtils::EnrollArtemisRefinementOps(m, coords);
+  // m.SetSparseThresholds(0.0, 0.0, 0.0);
+  // radiation->AddSparsePool<rad::prim::fedd>(m, control_field, fluidids);
 
   // Radiation refinement criterion
   const std::string refine_field =

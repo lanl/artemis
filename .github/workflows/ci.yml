@@ -44,8 +44,6 @@ jobs:
           pip install black
       - name: Run format check
         run: |
-          source env/bash
-          which clang-format
           VERBOSE=1 CFM=clang-format ./style/format.sh
           git diff --exit-code --ignore-submodules
 

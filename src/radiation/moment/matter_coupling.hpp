@@ -232,12 +232,11 @@ TaskStatus MatterCouplingImpl(MeshData<Real> *u0, MeshData<Real> *u1, const Real
                   inner_iter++;
                   inner_conv = (inner_err < inner_tol) || (inner_iter > inner_max);
                 }
-                //                if (inner_iter > inner_max) {
-                // //                 std::stringstream msg;
-                // //                 msg << "No inner converge: " << inner_err << " " <<
-                // Er - Ek;
-                //                  PARTHENON_FAIL("Inner iteration failed to converge");
-                //                }
+                if (inner_iter > inner_max) {
+                  printf("No inner convergence after %d iterations: %lg > %lg\n",
+                         inner_iter, inner_err, inner_tol);
+                  PARTHENON_FAIL("");
+                }
 
                 // We have updated energies, now update the flux and velocity
                 Er = Ek;
@@ -391,11 +390,11 @@ TaskStatus MatterCouplingImpl(MeshData<Real> *u0, MeshData<Real> *u1, const Real
                 outer_iter++;
                 outer_conv = (outer_err < outer_tol) || (outer_iter > outer_max);
               }
-              //              if (outer_iter > outer_max) {
-              ////                std::stringstream msg;
-              ////                msg << "No outer converge: " << outer_err;
-              //                PARTHENON_FAIL("Outer iteration failed to converge");
-              //              }
+              if (outer_iter > outer_max) {
+                printf("No outer convergence after %d iterations: %lg > %lg\n",
+                       outer_iter, outer_err, outer_tol);
+                PARTHENON_FAIL("");
+              }
 
               v0(b, rad::cons::energy(), k, j, i) += (Er - Er0);
               v0(b, rad::cons::flux(0), k, j, i) = F[0] * hx[0];

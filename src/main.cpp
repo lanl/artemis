@@ -119,7 +119,7 @@ int ArtemisFinalize(const DriverStatus status, const bool quick_exit,
     if (Globals::my_rank == 0) std::cout << "artemis driver timed out!" << std::endl;
     ret = 2;
   } else {
-    PARTHENON_WARN("artemis driver returned with an uknown code!");
+    PARTHENON_WARN("artemis driver returned with an unknown code!");
   }
   // Call MPI_Finalize and Kokkos::finalize if necessary
   // MPI and Kokkos can no longer be used

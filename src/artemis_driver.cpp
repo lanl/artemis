@@ -244,7 +244,7 @@ TaskCollection ArtemisDriver<GEOM>::StepTasks() {
       // NOTE(@pdmullen): I believe set_flx dependency implicitly inside gas_coord_src,
       // but included below explicitly for posterity
       TaskID gas_diff_src = gas_coord_src | diff_flx | set_flx;
-      if (do_diffusion && do_gas && !(do_sts) {
+      if (do_diffusion && do_gas && !(do_sts)) {
         gas_diff_src = tl.AddTask(gas_coord_src | diff_flx | set_flx,
                                   Gas::DiffusionUpdate<GEOM>, u0.get(), bdt);
       }

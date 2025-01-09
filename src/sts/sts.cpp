@@ -81,8 +81,8 @@ void  STSRKL1( Mesh *pmesh, const Real time, Real dt, int nstages) {
 
   for (int stage = 1; stage <= nstages; stage++) {
     // Set up the STS stage coefficients
-    // v0 = Y_{n-2}
-    // v1 = Y_{n-1}
+    // v0 = Y_{j-1}
+    // v1 = Y_{j-2}
     // gam1 = muj = (2.*j - 1.)/j;
     // gam0 = nuj = (1. - j)/j;
     // beta_dt/dt = muj_tilde = pm->muj*2./(std::pow(s, 2.) + s);
@@ -109,6 +109,8 @@ void  STSRKL1( Mesh *pmesh, const Real time, Real dt, int nstages) {
         if (do_conduction) tflx = tl.AddTask(zf | vflx, Gas::ThermalFlux<GEOM>, u0.get());
         diff_flx = vflx | tflx;
       }
+
+      // TODO Dust diffusion fluxes
 
       // Communicate and set fluxes
       auto send_flx =

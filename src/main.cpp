@@ -131,25 +131,5 @@ int main(int argc, char *argv[]) {
   // Run artemis
   auto status = LaunchWorkFlow(pman, pman.pinput.get());
 
-  int ret = 3;
-  if (status == DriverStatus::complete) {
-    std::cout << "artemis driver complete!" << std::endl;
-    ret = 0;
-  } else if (status == DriverStatus::failed) {
-    std::cout << "artemis driver failed!" << std::endl;
-    ret = 1;
-  } else if (status == DriverStatus::timeout) {
-    std::cout << "artemis driver timed out!" << std::endl;
-    ret = 2;
-  } else {
-    PARTHENON_WARN("artemis driver returned with an uknown code!");
-  }
-  // Call MPI_Finalize and Kokkos::finalize if necessary
-  // MPI and Kokkos can no longer be used
-  if (pman.ParthenonFinalize() != ParthenonStatus::complete) {
-    std::cout << "ParthenonFinalize() did not complete successfully!" << std::endl;
-    ret = 4;
-  }
-
-  return ret;
+  return ArtemisFinalize(status, pman);
 }

@@ -19,6 +19,7 @@
 # Modules
 import logging
 import os
+import shutil
 import subprocess
 from timeit import default_timer as timer
 from .log_pipe import LogPipe
@@ -119,11 +120,18 @@ def make(cmake_args, make_nproc):
 
 # Function for running Artemis (with MPI)
 def run(nproc, input_filename, arguments, restart=None):
+    logger = logging.getLogger("artemis.run")
     # global run_directory
     out_log = LogPipe("artemis.run", logging.INFO)
 
     # Build the run command
-    run_command = ["mpiexec"]
+    run_command = []
+    if shutil.which("mpiexec"):
+        run_command += ["mpiexec"]
+    elif shutil.which("srun"):
+        run_command += ["srun"]
+    else:
+        logger.error("Launcher executable [mpiexec, srun] not found", exc_info=True)
     if use_mpi_oversubscribe:
         run_command += ["--oversubscribe"]
     run_command += ["-n", str(nproc), os.path.join(artemis_exe_dir, "artemis")]

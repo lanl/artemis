@@ -28,11 +28,11 @@ logger = logging.getLogger("artemis" + __name__[7:])  # set logger name
 logging.getLogger("h5py").setLevel(logging.WARNING)
 logging.getLogger("matplotlib").setLevel(logging.WARNING)
 import scripts.utils.analysis as analysis
-import matplotlib.colors as colors
-import matplotlib.pyplot as plt
 import matplotlib
 
 matplotlib.use("Agg")  # Use the Agg backend to avoid issues with DISPLAY not being set
+import matplotlib.colors as colors
+import matplotlib.pyplot as plt
 
 _nranks = 1
 _file_id = "binary_adi"

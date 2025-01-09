@@ -105,6 +105,38 @@ parthenon::DriverStatus LaunchWorkFlow(parthenon::ParthenonManager &pman,
   return DriverStatus::failed;
 }
 
+int ArtemisFinalize(const DriverStatus status, const bool quick_exit,
+                    parthenon::ParthenonManager &pman) {
+
+  int ret = 3;
+  if (status == DriverStatus::complete) {
+    if (Globals::my_rank == 0) std::cout << "artemis driver complete!" << std::endl;
+    ret = 0;
+  } else if (status == DriverStatus::failed) {
+    if (Globals::my_rank == 0) std::cout << "artemis driver failed!" << std::endl;
+    ret = 1;
+  } else if (status == DriverStatus::timeout) {
+    if (Globals::my_rank == 0) std::cout << "artemis driver timed out!" << std::endl;
+    ret = 2;
+  } else {
+    PARTHENON_WARN("artemis driver returned with an uknown code!");
+  }
+  // Call MPI_Finalize and Kokkos::finalize if necessary
+  // MPI and Kokkos can no longer be used
+
+  if (quick_exit) {
+    if (Globals::my_rank == 0) std::cout << "Making a quick exit!" << std::endl;
+
+  } else {
+    if (pman.ParthenonFinalize() != ParthenonStatus::complete) {
+      std::cout << "ParthenonFinalize() did not complete successfully!" << std::endl;
+      ret = 4;
+    }
+  }
+
+  return ret;
+}
+
 //----------------------------------------------------------------------------------------
 //! \fn int main
 //! \brief
@@ -128,8 +160,13 @@ int main(int argc, char *argv[]) {
   // Use Parthenon default reflecting boundary conditions
   pman.app_input->RegisterDefaultReflectingBoundaryConditions();
 
+  // Allow the user to bypass ParthenonFinalize when exiting
+  const bool quick_exit =
+      pman.pinput.get()->GetOrAddBoolean("artemis", "quick_exit", false);
+
   // Run artemis
   auto status = LaunchWorkFlow(pman, pman.pinput.get());
 
-  return ArtemisFinalize(status, pman);
+  // Finalize everything before exiting
+  return ArtemisFinalize(status, quick_exit, pman);
 }

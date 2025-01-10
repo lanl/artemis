@@ -41,9 +41,9 @@ Units::Units(ParameterInput *pin, std::shared_ptr<StateDescriptor> pkg) {
     std::string unit_conversion =
         pin->GetOrAddString("artemis", "unit_conversion", "base");
     if (unit_conversion == "base") {
-      length_ = pin->GetReal("artemis", "length");
-      time_ = pin->GetReal("artemis", "time");
-      mass_ = pin->GetReal("artemis", "mass");
+      length_ = pin->GetOrAddReal("artemis", "length", 1.);
+      time_ = pin->GetOrAddReal("artemis", "time", 1.);
+      mass_ = pin->GetOrAddReal("artemis", "mass", 1.);
     } else if (unit_conversion == "ppd") {
       length_ = AU;
       mass_ = Msolar;

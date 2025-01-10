@@ -34,6 +34,9 @@ KOKKOS_INLINE_FUNCTION std::array<Real, 3> RotationVelocity(const std::array<Rea
   // Return the rotational velocity
 
   // Empty constructor to get access to conversion routine
+  if constexpr (GEOM == Coordinates::cartesian) {
+    return {0.0, omf, 0.0}; // multiply by R0
+  }
   geometry::Coords<GEOM> coords;
 
   const auto &[xcyl, ex1, ex2, ex3] = coords.ConvertToCylWithVec(xv);

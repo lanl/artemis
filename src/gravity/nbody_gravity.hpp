@@ -28,7 +28,7 @@ KOKKOS_INLINE_FUNCTION void
 NBodyGravityImpl(V1 vmesh, const NBody::Particle &pl,
                  ArtemisUtils::array_type<Real, 7> &lforce, const int b, const int k,
                  const int j, const int i, const bool do_gas, const bool do_dust,
-                 const bool do_rf, const Real omf, const Real time, const Real dt) {
+                 const Real omf, const Real time, const Real dt) {
   // Extract coordinates
   geometry::Coords<GEOM> coords(vmesh.GetCoordinates(b), k, j, i);
   const auto &x = coords.GetCellCenter();
@@ -50,7 +50,7 @@ NBodyGravityImpl(V1 vmesh, const NBody::Particle &pl,
 
   // Get the rotational velocity
   auto vf = NewArray<Real, 3>(0.0);
-  if (do_rf) {
+  if (omf != 0.0) {
     const auto &vrot = RotatingFrame::RotationVelocity<GEOM>(x, omf);
     vf[0] = ex1[0] * vrot[0] + ex2[0] * vrot[1] + ex3[0] * vrot[2];
     vf[1] = ex1[1] * vrot[0] + ex2[1] * vrot[1] + ex3[1] * vrot[2];
@@ -89,12 +89,12 @@ NBodyGravityImpl(V1 vmesh, const NBody::Particle &pl,
 
       // Update conserved variables
       const Real rdt = dens * dt;
-      Kokkos::atomic_add(&cdens, dm);
-      Kokkos::atomic_add(&cmom1, hx[0] * (rdt * gx1 + dmx1));
-      Kokkos::atomic_add(&cmom2, hx[1] * (rdt * gx2 + dmx2));
-      Kokkos::atomic_add(&cmom3, hx[2] * (rdt * gx3 + dmx3));
-      Kokkos::atomic_add(&cet, dek + dei + rdt * (v[0] * gx1 + v[1] * gx2 + v[2] * gx3));
-      Kokkos::atomic_add(&cei, dei);
+      cdens += dm;
+      cmom1 += hx[0] * (rdt * gx1 + dmx1);
+      cmom2 += hx[1] * (rdt * gx2 + dmx2);
+      cmom3 += hx[2] * (rdt * gx3 + dmx3);
+      cet += dek + dei + rdt * (v[0] * gx1 + v[1] * gx2 + v[2] * gx3);
+      cei += dei;
 
       // Track the back reaction onto the planet
       lforce.myArray[0] -= vol * dm / dt;     // Mass accreted
@@ -135,10 +135,10 @@ NBodyGravityImpl(V1 vmesh, const NBody::Particle &pl,
       Real &cmom3 = vmesh(b, dust::cons::momentum(VI(n, 2)), k, j, i);
 
       const Real rdt = dens * dt;
-      Kokkos::atomic_add(&cdens, dm);
-      Kokkos::atomic_add(&cmom1, hx[0] * (rdt * gx1 + dmx1));
-      Kokkos::atomic_add(&cmom2, hx[1] * (rdt * gx2 + dmx2));
-      Kokkos::atomic_add(&cmom3, hx[2] * (rdt * gx3 + dmx3));
+      cdens += dm;
+      cmom1 += hx[0] * (rdt * gx1 + dmx1);
+      cmom2 += hx[1] * (rdt * gx2 + dmx2);
+      cmom3 += hx[2] * (rdt * gx3 + dmx3);
 
       // Track the back reaction onto the planet
       lforce.myArray[0] -= vol * dm / dt;     // Mass accreted
@@ -165,15 +165,21 @@ TaskStatus NBodyGravity(MeshData<Real> *md, const Real time, const Real dt) {
   auto &resolved_pkgs = pm->resolved_packages;
 
   auto &artemis_pkg = pm->packages.Get("artemis");
+  auto &nbody_pkg = pm->packages.Get("nbody");
   const bool do_gas = artemis_pkg->template Param<bool>("do_gas");
   const bool do_dust = artemis_pkg->template Param<bool>("do_dust");
   bool do_rf = artemis_pkg->template Param<bool>("do_rotating_frame");
 
-  const Real omf =
-      (do_rf) ? pm->packages.Get("rotating_frame")->template Param<Real>("omega") : 0.0;
+  Real omf = 0.0;
+  if (do_rf) {
+    auto &rf_pkg = pm->packages.Get("rotating_frame");
+    const bool global_frame = nbody_pkg->template Param<bool>("frame_correction");
+    if (global_frame) {
+      omf = rf_pkg->template Param<Real>("omega");
+    }
+  }
 
   // Grab all the relevent nbody data
-  auto &nbody_pkg = pm->packages.Get("nbody");
   auto particles = nbody_pkg->template Param<ParArray1D<NBody::Particle>>("particles");
   const auto npart = static_cast<int>(particles.size());
   auto pforce = nbody_pkg->template Param<ParArray2D<Real>>("particle_force");
@@ -199,7 +205,7 @@ TaskStatus NBodyGravity(MeshData<Real> *md, const Real time, const Real dt) {
                       ArtemisUtils::array_type<Real, 7> &lsum) {
           if (particles(n).couple) {
             NBodyGravityImpl<GEOM>(vmesh, particles(n), lsum, b, k, j, i, do_gas, do_dust,
-                                   do_rf, omf, time, dt);
+                                   omf, time, dt);
           }
         },
         ArtemisUtils::SumMyArray<Real, Kokkos::HostSpace, 7>(lforce));

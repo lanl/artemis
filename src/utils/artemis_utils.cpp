@@ -13,6 +13,8 @@
 
 // C++ headers
 #include "artemis_utils.hpp"
+#include "nbody/nbody_utils.hpp"
+#include "units.hpp"
 
 namespace ArtemisUtils {
 
@@ -26,6 +28,7 @@ void PrintArtemisConfiguration(Packages_t &packages) {
     const auto nx = params.Get<std::array<int, 3>>("prob_dim");
     const int nd = (nx[0] > 1) + (nx[1] > 1) + (nx[2] > 1);
     const auto nb = params.Get<std::array<int, 3>>("mb_dim");
+    const auto units = params.Get<Units>("units");
     std::string msg = "";
     if (params.Get<bool>("do_gas")) msg += "Gas\n";
     if (params.Get<bool>("do_dust")) msg += hfill + "Dust\n";
@@ -37,7 +40,7 @@ void PrintArtemisConfiguration(Packages_t &packages) {
     if (params.Get<bool>("do_drag")) msg += hfill + "Drag\n";
     if (params.Get<bool>("do_nbody")) msg += hfill + "N-body\n";
     if (params.Get<bool>("do_radiation")) msg += hfill + "IMC radiation\n";
-    printf("\n=====================================================\n");
+    printf("\n=======================================================\n");
     printf("  ARTEMIS\n");
     printf("    name:            %s\n", params.Get<std::string>("job_name").c_str());
     printf("    problem:         %s\n", params.Get<std::string>("pgen_name").c_str());
@@ -46,8 +49,40 @@ void PrintArtemisConfiguration(Packages_t &packages) {
     printf("    MPI ranks:       %d\n", parthenon::Globals::nranks);
     printf("    dimensions:      %dx%dx%d\n", nx[0], nx[1], nx[2]);
     printf("    meshblock:       %dx%dx%d\n", nb[0], nb[1], nb[2]);
+    printf("    Unit System:  %s\n", units.GetSystemName().c_str());
+    printf("                  [L] = %.2e\n", units.GetLengthCodeToPhysical());
+    printf("                  [M] = %.2e\n", units.GetMassCodeToPhysical());
+    printf("                  [T] = %.2e\n", units.GetTimeCodeToPhysical());
     printf("    Active physics:  %s", msg.c_str());
-    printf("=====================================================\n\n");
+
+    if (params.Get<bool>("do_nbody")) {
+
+      auto nbody_pkg = packages.Get("nbody");
+      auto particles = nbody_pkg->Param<ParArray1D<NBody::Particle>>("particles");
+      auto particles_h = particles.GetHostMirrorAndCopy();
+      auto npart = particles_h.size();
+      printf("      %d NBody particle(s)\n", npart);
+      printf("      |_\n");
+      for (int n = 0; n < npart; n++) {
+        auto &part = particles_h(n);
+        printf("        Particle      %2d:\n", part.id);
+        printf("        |            mass: %.2e\n", part.GM);
+        printf("        |         coupled: %s\n", part.couple == 1 ? "yes" : "no");
+        printf("        |            live: %s\n", part.live == 1 ? "yes" : "no");
+        printf("        |       softening: %s\n",
+               part.spline == 1 ? "spline" : "plummer");
+        printf("        |          radius: %.2e\n", part.rs);
+        printf("        | accretion rates: gamma=%.2e\n", part.gamma);
+        printf("        |                   beta=%.2e\n", part.beta);
+        printf("        |          radius: %.2e\n", part.racc);
+        printf("        |        position: (%.2e,%.2e,%.2e)\n", part.pos[0], part.pos[1],
+               part.pos[2]);
+        printf("        |        velocity: (%.2e,%.2e,%.2e)\n", part.vel[0], part.vel[1],
+               part.vel[2]);
+        printf("        -----------------------------------------------\n");
+      }
+    }
+    printf("=======================================================\n\n");
   }
 }
 

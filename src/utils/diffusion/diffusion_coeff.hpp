@@ -86,7 +86,7 @@ struct DiffCoeffParams {
   DiffCoeffParams() = default;
   DiffCoeffParams(std::string block_name, std::string dtype,
                   parthenon::ParameterInput *pin,
-                  const ArtemisUtils::Constants &constants) {
+                  const ArtemisUtils::Constants &constants, const Packages_t &packages) {
     // Read the parameter file
     std::string type_ = pin->GetString(block_name, "type");
     type = ChooseDiffusion(dtype, type_);
@@ -111,8 +111,7 @@ struct DiffCoeffParams {
       eta = pin->GetOrAddReal(block_name, "eta_bulk", 0.0);
 
       R0 = pin->GetOrAddReal("problem", "r0", 1.0);
-      const Real gm = constants.GetGCode() * pin->GetReal("gravity", "mass_tot") *
-                      constants.GetMsolarCode();
+      const Real gm = packages.Get("gravity")->Param<Real>("gm");
       Omega0 = std::sqrt(gm / (R0 * R0 * R0));
     } else if (type == DiffType::thermaldiff_const) {
       kappa_0 = pin->GetReal(block_name, "kappa");

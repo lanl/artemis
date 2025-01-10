@@ -73,25 +73,10 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   params.Add("dt_reb", dt_reb);
 
   // Total mass of gravitating particles
-  const Real gm = constants.GetGCode() * pin->GetOrAddReal("gravity", "mass_tot", 1.) *
-                  constants.GetMsolarCode();
-  params.Add("gm", gm);
   params.Add("mscale", pin->GetOrAddReal("nbody", "mscale", 1.0));
+  Real mtot = pin->GetOrAddReal("nbody", "mtot", -Big<Real>());
 
-  // Frame specification
-  // NOTE(ADM): Shearing box has Rf = {R0, 0,0}, shearing box has Vf = {0, Om0*R0,0},
-  // NOTE(ADM): Shearing box global frame --> Omf^2 = GM/R0^3
-  const bool global_frame = (pin->GetOrAddString("nbody", "frame", "global") == "global");
-  const Real Omf = pin->GetOrAddReal("rotating_frame", "omega", 0.0);
-  const Real qshear = pin->GetOrAddReal("rotating_frame", "qshear", 0.0);
-  Real Rf[3] = {0.0};
-  Real Vf[3] = {0.0};
-  if (global_frame && (Omf != 0.0) && (qshear != 0.0)) {
-    const Real R0 = std::pow(SQR(Omf) / gm, 1.0 / 3.0);
-    Rf[0] = R0;
-    Vf[1] = R0 * Omf;
-  }
-  params.Add("frame_correction", global_frame);
+  const Real G = constants.GetGCode();
 
   // Extra forces
   RebAttrs::PN = pin->GetOrAddReal("nbody", "pn", 0);
@@ -104,7 +89,32 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   // Read the parameter file for the particles
   std::vector<int> particle_id;
   std::vector<Particle> particles_v;
-  NBodySetup(pin, gm, Rf, Vf, particle_id, particles_v);
+  auto parts = NBodySetup(pin, G, mtot);
+
+  // Frame specification
+  // NOTE(ADM): Shearing box has Rf = {R0, 0,0}, shearing box has Vf = {0, Om0*R0,0},
+  // NOTE(ADM): Shearing box global frame --> Omf^2 = GM/R0^3
+  const bool global_frame = (pin->GetOrAddString("nbody", "frame", "global") == "global");
+  const Real Omf = pin->GetOrAddReal("rotating_frame", "omega", 0.0);
+  const Real qshear = pin->GetOrAddReal("rotating_frame", "qshear", 0.0);
+  Real Rf[3] = {0.0};
+  Real Vf[3] = {0.0};
+
+  if (global_frame && (Omf != 0.0) && (qshear != 0.0)) {
+    const Real R0 = std::pow(SQR(Omf) / (G * mtot), 1.0 / 3.0);
+    Rf[0] = R0;
+    Vf[1] = R0 * Omf;
+  }
+  params.Add("frame_correction", global_frame);
+  params.Add("gm", G * mtot);
+  // Copy into our final particle array and check that every particle was initialized
+  int count = 0;
+  for (auto const &[id, p] : parts) {
+    particle_id.push_back(count);
+    particles_v.push_back(Particle(p, G, Rf, Vf));
+    count++;
+  }
+
   const int npart = static_cast<int>(particles_v.size());
   params.Add("npart", npart);
   params.Add("particle_id", particle_id);
@@ -188,6 +198,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
     reb_sim->boundary = reb_simulation::REB_BOUNDARY_OPEN;
     reb_sim->collision = reb_simulation::REB_COLLISION_LINE;
     reb_sim->dt = dt_reb;
+    reb_sim->G = G;
     if (RebAttrs::extras) reb_sim->force_is_velocity_dependent = 1;
     if (integrator == "whfast") {
       reb_sim->integrator = reb_simulation::REB_INTEGRATOR_WHFAST;

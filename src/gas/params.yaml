@@ -129,14 +129,13 @@ gas:
     _description: "Viscosity models"
     type:
       _type: string
-      _default: constant
       _description: "Viscosity model"
       alpha:
         _type: opt
         _description: "Alpha viscosity"
-      constant:
+      powerlaw:
         _type: opt
-        _description: "Constant kinematic viscosity"
+        _description: "Powerlaw kinematic viscosity"
     averaging:
       _type: string
       _default: "arithmetic"
@@ -154,6 +153,9 @@ gas:
       _type: Real
       _description: "Value of the kinematic shear viscosity"
       _units: "cm^2 s^-1"
+    r_exp:
+      _type: Real
+      _description: "Value of the cylindrical powerlaw exponent"
     eta_bulk:
       _type: Real
       _default: "0.0"
@@ -164,14 +166,13 @@ gas:
     _description: "Conductivity models"
     type:
       _type: string
-      _default: constant
       _description: "Conductivity model"
-      constant:
+      conductivity:
         _type: opt
-        _description: "Constant thermal conductivity"
-      diffusivity_constant:
+        _description: "Powerlaw thermal conductivity"
+      diffusivity:
         _type: opt
-        _description: "Constant thermal diffusivity"
+        _description: "Powerlaw thermal diffusivity"
     averaging:
       _type: string
       _default: "arithmetic"
@@ -191,26 +192,21 @@ gas:
       _type: Real
       _description: "Value of heat conductivity"
       _units: "erg cm^-1 s^-1 K^-1"
-
-    averaging:
-      _type: string
-      _default: "arithmetic"
-      _description: "Averaging method for the face diffusion coefficient"
-      arithmetic:
-        _type: opt
-        _description: "Simple average (L+R)/2"
-      harmonic:
-        _type: opt
-        _description: "Harmonic average 2*(L*R)/(L+R)"
-
-    kappa:
+    temp_exp:
       _type: Real
-      _description: "Value of thermal diffusivity"
-      _units: "cm^2 s^-1"
-    cond:
+      _description: "Temperature powerlaw exponent"
+    T_ref:
       _type: Real
-      _description: "Value of heat conductivity"
-      _units: "erg cm^-1 s^-1 K^-1"
+      _description: "Reference temperature"
+      _units: "K"
+    rho_exp:
+      _type: Real
+      _description: "Density powerlaw exponent"
+    rho_ref:
+      _type: Real
+      _description: "Reference density"
+      _units: "g cm^-3"
+
 
   opacity/absorption:
     _type: node

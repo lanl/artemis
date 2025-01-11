@@ -65,8 +65,13 @@ EddingtonTensor(const std::array<Real, 3> fred) {
           cb * n[1] * n[2],      cb * n[0] * n[2],      cb * n[0] * n[1]};
 }
 
-KOKKOS_INLINE_FUNCTION
-std::tuple<Real, Real> WaveSpeed(const Real mu, const Real f) {
+template <Fluid CTYP>
+KOKKOS_INLINE_FUNCTION std::tuple<Real, Real> WaveSpeed(const Real mu, const Real f) {
+  if constexpr (CTYP == Fluid::greyP1) {
+    Real val = std::sqrt(1. / 3);
+    return {-val, val};
+  }
+
   const Real f2 = f * f;
   const Real det = 4. - 3 * f2;
   const Real sdet = std::sqrt(det);

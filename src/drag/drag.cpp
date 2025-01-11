@@ -110,8 +110,8 @@ TaskStatus DragSource(MeshData<Real> *md, const Real time, const Real dt) {
       auto &gas_pkg = pm->packages.Get("gas");
       const auto &dp = gas_pkg->template Param<Diffusion::DiffCoeffParams>("visc_params");
       const auto &eos_d = gas_pkg->template Param<EOS>("eos_d");
-      if (dp.type == Diffusion::DiffType::viscosity_const) {
-        return SelfDragSourceImpl<Diffusion::DiffType::viscosity_const, GEOM>(
+      if (dp.type == Diffusion::DiffType::viscosity_plaw) {
+        return SelfDragSourceImpl<Diffusion::DiffType::viscosity_plaw, GEOM>(
             md, time, dt, dp, eos_d, gas_self_par, dust_self_par);
       } else if (dp.type == Diffusion::DiffType::viscosity_alpha) {
         return SelfDragSourceImpl<Diffusion::DiffType::viscosity_alpha, GEOM>(
@@ -134,13 +134,13 @@ TaskStatus DragSource(MeshData<Real> *md, const Real time, const Real dt) {
         drag_pkg->template Param<StoppingTimeParams>("stopping_time_params");
     if (gas_self_par.damp_to_visc) {
       auto &dp = gas_pkg->template Param<Diffusion::DiffCoeffParams>("visc_params");
-      if (dp.type == Diffusion::DiffType::viscosity_const) {
+      if (dp.type == Diffusion::DiffType::viscosity_plaw) {
         if (stop_par.model == DragModel::constant) {
-          return SimpleDragSourceImpl<Diffusion::DiffType::viscosity_const,
+          return SimpleDragSourceImpl<Diffusion::DiffType::viscosity_plaw,
                                       DragModel::constant, GEOM>(
               md, time, dt, dp, eos_d, gas_self_par, dust_self_par, stop_par);
         } else if (stop_par.model == DragModel::stokes) {
-          return SimpleDragSourceImpl<Diffusion::DiffType::viscosity_const,
+          return SimpleDragSourceImpl<Diffusion::DiffType::viscosity_plaw,
                                       DragModel::stokes, GEOM>(
               md, time, dt, dp, eos_d, gas_self_par, dust_self_par, stop_par);
         }

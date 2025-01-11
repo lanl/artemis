@@ -80,7 +80,7 @@ type = constant
 nu = 5.0e-3
 
 <gas/conductivity>
-type = constant
+type = conductivity 
 cond = 5.0e-3
 
 <problem>

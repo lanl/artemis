@@ -25,6 +25,7 @@
 #include "utils/artemis_utils.hpp"
 #include "utils/fluxes/fluid_fluxes.hpp"
 #include "utils/history.hpp"
+#include "utils/units.hpp"
 
 using ArtemisUtils::VI;
 
@@ -32,7 +33,8 @@ namespace Dust {
 //----------------------------------------------------------------------------------------
 //! \fn  StateDescriptor Dust::Initialize
 //! \brief Adds intialization function for dust hydrodynamics package
-std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
+std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
+                                            ArtemisUtils::Units &units) {
   auto dust = std::make_shared<StateDescriptor>("dust");
   Params &params = dust->AllParams();
 
@@ -99,10 +101,23 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
   // Dust sizes
   const auto size_dist = pin->GetOrAddString("dust", "size_input", "direct");
+  const auto input_units = pin->GetOrAddString("dust", "input_units", "cgs");
+  Real length_conv = Null<Real>();
+  Real rho_conv = Null<Real>();
+  if (input_units == "cgs") {
+    length_conv = units.GetLengthPhysicalToCode();
+    rho_conv = units.GetMassDensityPhysicalToCode();
+  } else if (input_units == "problem") {
+    length_conv = 1.;
+    rho_conv = 1.;
+  } else {
+    PARTHENON_FAIL("dust/input_units can only be cgs or problem.");
+  }
+
   if (size_dist == "linspace") {
     // uniform
-    auto min_size = pin->GetReal("dust", "min_size");
-    auto max_size = pin->GetReal("dust", "max_size");
+    auto min_size = length_conv * pin->GetReal("dust", "min_size");
+    auto max_size = length_conv * pin->GetReal("dust", "max_size");
 
     ParArray1D<Real> sizes("sizes", nspecies);
     auto h_sizes = sizes.GetHostMirror();
@@ -117,8 +132,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
   } else if (size_dist == "logspace") {
     // uniform in log-space
-    const auto lmin = std::log10(pin->GetReal("dust", "min_size"));
-    const auto lmax = std::log10(pin->GetReal("dust", "max_size"));
+    const auto lmin = std::log10(length_conv * pin->GetReal("dust", "min_size"));
+    const auto lmax = std::log10(length_conv * pin->GetReal("dust", "max_size"));
 
     ParArray1D<Real> sizes("sizes", nspecies);
     auto h_sizes = sizes.GetHostMirror();
@@ -138,7 +153,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     ParArray1D<Real> sizes("sizes", nspecies);
     auto h_sizes = sizes.GetHostMirror();
     for (int n = 0; n < nspecies; n++) {
-      h_sizes(n) = sizes_v[n];
+      h_sizes(n) = length_conv * sizes_v[n];
     }
     sizes.DeepCopy(h_sizes);
     params.Add("sizes", sizes);
@@ -153,11 +168,11 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     auto h_sizes = sizes.GetHostMirror();
     if (data.size() == 1) {
       for (int n = 0; n < nspecies; n++) {
-        h_sizes(n) = data[0][n];
+        h_sizes(n) = length_conv * data[0][n];
       }
     } else {
       for (int n = 0; n < nspecies; n++) {
-        h_sizes(n) = data[n][0];
+        h_sizes(n) = length_conv * data[n][0];
       }
     }
     sizes.DeepCopy(h_sizes);
@@ -168,7 +183,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   }
 
   // Dust density
-  params.Add("grain_density", pin->GetOrAddReal("dust", "grain_density", 1.0));
+  params.Add("grain_density", rho_conv * pin->GetOrAddReal("dust", "grain_density", 1.0));
 
   // Scratch for dust flux
   const int scr_level = pin->GetOrAddInteger("dust", "scr_level", 0);

@@ -181,8 +181,8 @@ class RiemannSolver<RSolver::hlle, FLUID_TYPE> {
               fr = std::min(1.0, fr);
               const Real chil = Radiation::EddingtonFactor<FLUID_TYPE>(fl);
               const Real chir = Radiation::EddingtonFactor<FLUID_TYPE>(fr);
-              const auto [sla, slb] = Radiation::WaveSpeed(nlx, fl);
-              const auto [sra, srb] = Radiation::WaveSpeed(nrx, fr);
+              const auto [sla, slb] = Radiation::WaveSpeed<FLUID_TYPE>(nlx, fl);
+              const auto [sra, srb] = Radiation::WaveSpeed<FLUID_TYPE>(nrx, fr);
               qscale = chat;
               sl = std::min(sla, slb);
               sr = std::max(sra, srb);

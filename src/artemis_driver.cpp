@@ -140,9 +140,9 @@ void ArtemisDriver<GEOM>::PreStepTasks() {
   auto &u1 = pmesh->mesh_data.Add("u1", u0);
 
   // Assign sts registers and First stage of STS integration
-  auto &gas_pkg = pmesh->packages.Get("gas");
-  auto min_diff_dt = gas_pkg->template Param<Real>("diff_dt");
   if (do_sts) {
+    auto &gas_pkg = pmesh->packages.Get("gas");
+    auto min_diff_dt = gas_pkg->template Param<Real>("diff_dt");
     // compute the number of stages needed for the STS integrator
     int s_sts =
         static_cast<int>(0.5 * (std::sqrt(9.0 + 16.0 * tm.dt / min_diff_dt) - 1.0)) + 1;

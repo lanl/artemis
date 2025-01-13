@@ -22,6 +22,7 @@
 #include "utils/artemis_utils.hpp"
 #include "utils/diffusion/diffusion_coeff.hpp"
 #include "utils/eos/eos.hpp"
+#include "utils/units.hpp"
 
 using namespace parthenon::package::prelude;
 using ArtemisUtils::EOS;
@@ -54,7 +55,7 @@ namespace Drag {
 */
 
 enum class Coupling { simple_dust, self, null };
-enum class DragModel { constant, stokes, null };
+enum class DragModel { constant, stokes, dp15, null };
 
 inline Coupling ChooseDrag(const std::string choice) {
   if (choice == "self") {
@@ -111,10 +112,11 @@ struct SelfDragParams {
 
 struct StoppingTimeParams {
 
-  Real scale;
+  Real scale, dh, mass_scale, p1, p2, p3;
   DragModel model;
   ParArray1D<Real> tau;
-  StoppingTimeParams(std::string block_name, ParameterInput *pin) {
+  StoppingTimeParams(std::string block_name, ParameterInput *pin,
+                     ArtemisUtils::Constants &constants, ArtemisUtils::Units &units) {
     const std::string choice = pin->GetString(block_name, "type");
     const int nd = pin->GetOrAddInteger("dust", "nspecies", 1);
     tau = ParArray1D<Real>("tau", nd);
@@ -137,13 +139,124 @@ struct StoppingTimeParams {
         h_tau(n) = scale;
       }
       tau.DeepCopy(h_tau);
+    } else if (choice == "dp15") {
+      model = DragModel::dp15;
+      scale = pin->GetOrAddReal(block_name, "scale", 1.0);
+      auto h_tau = tau.GetHostMirror();
+      for (int n = 0; n < nd; n++) {
+        h_tau(n) = scale;
+      }
+      tau.DeepCopy(h_tau);
+      dh = units.GetLengthPhysicalToCode() *
+           pin->GetOrAddReal(block_name, "gas_diameter", 2.71e-8 /* cm */);
+      p1 = pin->GetOrAddReal(block_name, "p1", 3.07);
+      p2 = pin->GetOrAddReal(block_name, "p2", 0.6688);
+      p3 = pin->GetOrAddReal(block_name, "p3", 0.681);
+      // save this so that we don't have to pass units struct to the Get() routines
+      mass_scale = units.GetMassPhysicalToCode();
+
     } else {
       PARTHENON_FAIL("bad type for stopping time model");
     }
   }
 };
 
-std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
+template <DragModel DTYP>
+class DragCoeff {
+ public:
+  KOKKOS_INLINE_FUNCTION Real Get(const StoppingTimeParams &dp, const int id,
+                                  const Real dg, const Real Tg, const Real u,
+                                  const Real grain_density, const Real size,
+                                  const EOS &eos) const {
+    PARTHENON_FAIL("No default implementation for drag coefficient");
+  }
+};
+
+// null
+template <>
+class DragCoeff<DragModel::null> {
+ public:
+  KOKKOS_INLINE_FUNCTION Real Get(const StoppingTimeParams &dp, const int id,
+                                  const Real dg, const Real Tg, const Real u,
+                                  const Real grain_density, const Real size,
+                                  const EOS &eos) const {
+    return Big<Real>();
+  }
+};
+
+template <>
+class DragCoeff<DragModel::constant> {
+ public:
+  KOKKOS_INLINE_FUNCTION Real Get(const StoppingTimeParams &dp, const int id,
+                                  const Real dg, const Real Tg, const Real u,
+                                  const Real grain_density, const Real size,
+                                  const EOS &eos) const {
+    return dp.tau(id);
+  }
+};
+
+template <>
+class DragCoeff<DragModel::stokes> {
+ public:
+  KOKKOS_INLINE_FUNCTION Real Get(const StoppingTimeParams &dp, const int id,
+                                  const Real dg, const Real Tg, const Real u,
+                                  const Real grain_density, const Real size,
+                                  const EOS &eos) const {
+    const Real cv = eos.SpecificHeatFromDensityTemperature(dg, Tg);
+    const Real gm1 = eos.GruneisenParamFromDensityTemperature(dg, Tg);
+    //  kb T/ mu = cv * gm1 * T
+    const Real vth = std::sqrt(8.0 / M_PI * gm1 * cv * Tg);
+    return dp.tau(id) * grain_density / dg * size / vth;
+  }
+};
+
+template <>
+class DragCoeff<DragModel::dp15> {
+ public:
+  KOKKOS_INLINE_FUNCTION Real Get(const StoppingTimeParams &dp, const int id,
+                                  const Real dg, const Real Tg, const Real u,
+                                  const Real grain_density, const Real size,
+                                  const EOS &eos) const {
+    const Real cv = eos.SpecificHeatFromDensityTemperature(dg, Tg);
+    const Real gm1 = eos.GruneisenParamFromDensityTemperature(dg, Tg);
+    const Real mu = dp.mass_scale * eos.MeanAtomicMass();
+    const Real gamma = gm1 + 1.;
+    const Real sgam = std::sqrt(gamma);
+    //  kb T/ mu = cv * gm1 * T
+
+    const Real vth = std::sqrt(8.0 / M_PI * gm1 * cv * Tg);
+    // Mach and Reynolds numbers
+    // Mu is non-zero, M can be zero
+    const Real Mu = std::sqrt(8. / (M_PI * gamma)) / vth;
+    const Real M = u * Mu;
+    const Real K = 5. / (32. * std::sqrt(M_PI)) * mu / SQR(dp.dh) / (dg * size * sgam);
+    // Ru is non-zero, R can be zero
+    const Real Ru = Mu / K;
+    const Real R = Ru * u;
+
+    // CD = 2 + (CS - 2) * exp(-p1 sqrt(g) K * G(R)) + CE * exp(-1/(2*K))
+
+    // The two coefficients (multiplied by u)
+    const Real CEu = 1. / (sgam * Mu) * (4.6 / (1. + M) + 1.7 /* srt(Td/Tg) */);
+    const Real CSu =
+        24. / Ru * (1. + 0.15 * std::pow(R, dp.p3)) + 0.407 * R * u / (R + 8710.);
+
+    // weight functions
+    const Real x = std::pow(R / 312., dp.p2);
+    const Real G = std::exp(2.5 * x / (1. + x));
+    const Real ws = std::exp(-dp.p1 * sgam * K * G);
+    const Real we = std::exp(-1. / (2. * K));
+
+    // The final stopping time
+    const Real CDu = 2 * u * (1. - ws) + CSu * ws + CEu * we;
+    const Real alpha = 3. / 8 * CDu * dg / (grain_density * size);
+    return dp.tau(id) / (alpha + Fuzz<Real>());
+  }
+};
+
+std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
+                                            ArtemisUtils::Constants &constants,
+                                            ArtemisUtils::Units &units);
 
 template <Coordinates GEOM>
 TaskStatus DragSource(MeshData<Real> *md, const Real time, const Real dt);
@@ -398,13 +511,8 @@ TaskStatus SimpleDragSourceImpl(MeshData<Real> *md, const Real time, const Real 
         Real fvd[3] = {0.};
         const auto nspecies = vmesh.GetSize(b, dust::cons::density());
 
-        [[maybe_unused]] auto &grain_density_ = grain_density;
-        [[maybe_unused]] Real vth = Null<Real>();
-
-        if constexpr (DRAG == DragModel::stokes) {
-          const Real gm1 = eos_d.GruneisenParamFromDensityInternalEnergy(dg, sieg);
-          vth = std::sqrt(8.0 / M_PI * gm1 * sieg);
-        }
+        DragCoeff<DRAG> drag_coeff;
+        Real Tg = eos_d.TemperatureFromDensityInternalEnergy(dg, sieg);
 
         // First pass to collect \sum rho' and \sum rho' v and compute new vg
         const Real vdt[3] = {0.0};
@@ -415,11 +523,14 @@ TaskStatus SimpleDragSourceImpl(MeshData<Real> *md, const Real time, const Real 
               vmesh(b, dust::cons::momentum(VI(n, 0)), k, j, i) / (hx[0] * dens),
               vmesh(b, dust::cons::momentum(VI(n, 1)), k, j, i) / (hx[1] * dens),
               vmesh(b, dust::cons::momentum(VI(n, 2)), k, j, i) / (hx[2] * dens)};
-          Real tc = tp.tau(id);
-          [[maybe_unused]] auto &sizes_ = sizes;
-          if constexpr (DRAG == DragModel::stokes) {
-            tc = tp.scale * grain_density_ / dg * sizes_(id) / vth;
-          }
+
+          // relative speed
+          const Real u =
+              std::sqrt(SQR(vd[0] - vg[0]) + SQR(vd[1] - vg[1]) + SQR(vd[2] - vg[2]));
+
+          // Get the stopping time
+          Real tc = drag_coeff.Get(tp, id, dg, Tg, u, grain_density, sizes(id), eos_d);
+
           const Real alpha = dt * ((tc <= 0.0) ? Big<Real>() : 1.0 / tc);
           for (int d = 0; d < 3; d++) {
             const Real rhop = dens * alpha / (1.0 + alpha + bd[d]);
@@ -447,11 +558,13 @@ TaskStatus SimpleDragSourceImpl(MeshData<Real> *md, const Real time, const Real 
               vmesh(b, dust::cons::momentum(VI(n, 0)), k, j, i) / (hx[0] * dens),
               vmesh(b, dust::cons::momentum(VI(n, 1)), k, j, i) / (hx[1] * dens),
               vmesh(b, dust::cons::momentum(VI(n, 2)), k, j, i) / (hx[2] * dens)};
-          Real tc = tp.tau(id);
-          [[maybe_unused]] auto &sizes_ = sizes;
-          if constexpr (DRAG == DragModel::stokes) {
-            tc = tp.scale * grain_density_ / dg * sizes_(id) / vth;
-          }
+          // relative speed
+          const Real u =
+              std::sqrt(SQR(vd[0] - vg[0]) + SQR(vd[1] - vg[1]) + SQR(vd[2] - vg[2]));
+
+          // Get the stopping time
+          Real tc = drag_coeff.Get(tp, id, dg, Tg, u, grain_density, sizes(id), eos_d);
+
           const Real alpha = dt * ((tc <= 0.0) ? Big<Real>() : 1.0 / tc);
           for (int d = 0; d < 3; d++) {
             Real delta_d = 0.;

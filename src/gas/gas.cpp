@@ -478,11 +478,11 @@ Real EstimateTimestepMesh(MeshData<Real> *md) {
   if (do_sts) {
     const auto sts_max_dt_ratio = params.template Get<Real>("sts_max_dt_ratio");
     // limit the timestep within the STS ratio, otherwise use the hyperbolic timestep
-    if (sts_max_dt_ratio > 0.0 && dt_hyp > sts_max_dt_ratio*diff_dt) {
-        min_dt = std::min(min_dt, max_dt_ratio * diff_dt);
+    if (sts_max_dt_ratio > 0.0 && min_dt > sts_max_dt_ratio*diff_dt) {
+        min_dt = std::min(min_dt, sts_max_dt_ratio * diff_dt);
     }
     // update the parabolic timestep
-    gas_pkg->UpdateParam("diff_dt", cfl*diff_dt);
+    gas_pkg->UpdateParam("diff_dt", cfl_number*diff_dt);
   }else{
     min_dt = std::min(min_dt, diff_dt);
   }

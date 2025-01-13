@@ -22,6 +22,7 @@
 #include "gravity/gravity.hpp"
 #include "nbody/nbody.hpp"
 #include "rotating_frame/rotating_frame.hpp"
+#include "sts/sts.hpp"
 #include "utils/artemis_utils.hpp"
 #include "utils/history.hpp"
 #include "utils/units.hpp"
@@ -84,6 +85,12 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   artemis->AddParam("do_conduction", do_conduction);
   artemis->AddParam("do_diffusion", do_conduction || do_viscosity);
   artemis->AddParam("do_radiation", do_radiation);
+  
+  PARTHENON_REQUIRE(!(do_sts) || (do_sts && do_gas),
+                    "STS requires the gas package, but there is not gas!");
+                    
+  PARTHENON_REQUIRE(!(do_sts) || (do_sts && ( do_conduction || do_viscosity)),
+                    "STS requires diffusion to be enabled!");
   PARTHENON_REQUIRE(!(do_cooling) || (do_cooling && do_gas),
                     "Cooling requires the gas package, but there is not gas!");
   PARTHENON_REQUIRE(!(do_viscosity) || (do_viscosity && do_gas),

@@ -155,15 +155,8 @@ void ArtemisDriver<GEOM>::PreStepTasks() {
         std::cout << "WARNING: ratio is > 400. Proceed at own risk." << std::endl;
       }
     }
-    auto sts_integrator = artemis_pkg->template Param<bool>("sts_integrator");
-    if (sts_integrator == STSInt::rkl1){
-      // (TODO) RKL1 : Full timestep dt_sts
-      //STSRKL1(pmesh, tm.time, tm.dt, s_sts);
-    }else if (sts_integrator == STSInt::rkl2){
-      // (TODO) RKL2 : // eq (21) using half hyperbolic timestep 
-      // due to Strang split
-      //STSRKL2(pmesh, tm.time, 0.5*tm.dt, s_sts);
-    }
+
+    STS::PreStepSTSTasks<GEOM>(pmesh, tm.time, tm.dt, s_sts);
   }
 }
 

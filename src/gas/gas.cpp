@@ -40,7 +40,8 @@ namespace Gas {
 //! \brief Adds intialization function for gas hydrodynamics package
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
                                             ArtemisUtils::Units &units,
-                                            ArtemisUtils::Constants &constants) {
+                                            ArtemisUtils::Constants &constants,
+                                            Packages_t &packages) {
   using namespace singularity::photons;
 
   auto gas = std::make_shared<StateDescriptor>("gas");
@@ -195,11 +196,12 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   params.Add("do_diffusion", do_diffusion);
 
   if (do_viscosity) {
-    Diffusion::DiffCoeffParams dp("gas/viscosity", "viscosity", pin, constants);
+    Diffusion::DiffCoeffParams dp("gas/viscosity", "viscosity", pin, constants, packages);
     params.Add("visc_params", dp);
   }
   if (do_conduction) {
-    Diffusion::DiffCoeffParams dp("gas/conductivity", "conductivity", pin, constants);
+    Diffusion::DiffCoeffParams dp("gas/conductivity", "conductivity", pin, constants,
+                                  packages);
     params.Add("cond_params", dp);
   }
 
@@ -444,9 +446,9 @@ Real EstimateTimestepMesh(MeshData<Real> *md) {
   const auto do_viscosity = params.template Get<bool>("do_viscosity");
   if (do_viscosity) {
     auto dp = params.template Get<Diffusion::DiffCoeffParams>("visc_params");
-    if (dp.type == Diffusion::DiffType::viscosity_const) {
+    if (dp.type == Diffusion::DiffType::viscosity_plaw) {
       visc_dt = Diffusion::EstimateTimestep<GEOM, Fluid::gas,
-                                            Diffusion::DiffType::viscosity_const>(
+                                            Diffusion::DiffType::viscosity_plaw>(
           md, dp, gas_pkg, eos_d, vmesh);
     } else if (dp.type == Diffusion::DiffType::viscosity_alpha) {
       visc_dt = Diffusion::EstimateTimestep<GEOM, Fluid::gas,
@@ -459,13 +461,13 @@ Real EstimateTimestepMesh(MeshData<Real> *md) {
   const auto do_conduction = params.template Get<bool>("do_conduction");
   if (do_conduction) {
     auto dp = params.template Get<Diffusion::DiffCoeffParams>("cond_params");
-    if (dp.type == Diffusion::DiffType::conductivity_const) {
+    if (dp.type == Diffusion::DiffType::conductivity_plaw) {
       cond_dt = Diffusion::EstimateTimestep<GEOM, Fluid::gas,
-                                            Diffusion::DiffType::conductivity_const>(
+                                            Diffusion::DiffType::conductivity_plaw>(
           md, dp, gas_pkg, eos_d, vmesh);
-    } else if (dp.type == Diffusion::DiffType::thermaldiff_const) {
+    } else if (dp.type == Diffusion::DiffType::thermaldiff_plaw) {
       cond_dt = Diffusion::EstimateTimestep<GEOM, Fluid::gas,
-                                            Diffusion::DiffType::thermaldiff_const>(
+                                            Diffusion::DiffType::thermaldiff_plaw>(
           md, dp, gas_pkg, eos_d, vmesh);
     }
   }
@@ -566,10 +568,10 @@ TaskStatus ViscousFlux(MeshData<Real> *md) {
 
   if (dp.type == Diffusion::DiffType::null) {
     return TaskStatus::complete;
-  } else if (dp.type == Diffusion::DiffType::viscosity_const) {
+  } else if (dp.type == Diffusion::DiffType::viscosity_plaw) {
     return Diffusion::MomentumFluxImpl<GEOM, Fluid::gas,
-                                       Diffusion::DiffType::viscosity_const>(md, dp, pkg,
-                                                                             vprim, vf);
+                                       Diffusion::DiffType::viscosity_plaw>(md, dp, pkg,
+                                                                            vprim, vf);
   } else if (dp.type == Diffusion::DiffType::viscosity_alpha) {
     return Diffusion::MomentumFluxImpl<GEOM, Fluid::gas,
                                        Diffusion::DiffType::viscosity_alpha>(md, dp, pkg,
@@ -604,14 +606,14 @@ TaskStatus ThermalFlux(MeshData<Real> *md) {
 
   if (dp.type == Diffusion::DiffType::null) {
     return TaskStatus::complete;
-  } else if (dp.type == Diffusion::DiffType::conductivity_const) {
+  } else if (dp.type == Diffusion::DiffType::conductivity_plaw) {
     return Diffusion::ThermalFluxImpl<GEOM, Fluid::gas,
-                                      Diffusion::DiffType::conductivity_const>(
-        md, dp, pkg, vprim, vf);
-  } else if (dp.type == Diffusion::DiffType::thermaldiff_const) {
-    return Diffusion::ThermalFluxImpl<GEOM, Fluid::gas,
-                                      Diffusion::DiffType::thermaldiff_const>(md, dp, pkg,
+                                      Diffusion::DiffType::conductivity_plaw>(md, dp, pkg,
                                                                               vprim, vf);
+  } else if (dp.type == Diffusion::DiffType::thermaldiff_plaw) {
+    return Diffusion::ThermalFluxImpl<GEOM, Fluid::gas,
+                                      Diffusion::DiffType::thermaldiff_plaw>(md, dp, pkg,
+                                                                             vprim, vf);
   } else {
     PARTHENON_FAIL("Invalid conductivity type");
   }

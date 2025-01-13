@@ -23,25 +23,25 @@ using ArtemisUtils::EOS;
 namespace Diffusion {
 
 enum class DiffType {
-  viscosity_const,
+  viscosity_plaw,
   viscosity_alpha,
-  conductivity_const,
-  thermaldiff_const,
+  conductivity_plaw,
+  thermaldiff_plaw,
   null
 };
 enum class DiffAvg { arithmetic, harmonic, null };
 
 inline DiffType ChooseDiffusion(std::string dtype, std::string type) {
   if (dtype == "viscosity") {
-    if (type == "constant")
-      return DiffType::viscosity_const;
+    if ((type == "constant") || (type == "powerlaw"))
+      return DiffType::viscosity_plaw;
     else if (type == "alpha")
       return DiffType::viscosity_alpha;
   } else if (dtype == "conductivity") {
-    if (type == "constant")
-      return DiffType::conductivity_const;
-    else if (type == "diffusivity_constant")
-      return DiffType::thermaldiff_const;
+    if (type == "conductivity")
+      return DiffType::conductivity_plaw;
+    else if (type == "diffusivity")
+      return DiffType::thermaldiff_plaw;
   }
 
   return DiffType::null;
@@ -61,10 +61,10 @@ struct DiffCoeffParams {
 
   // Viscosity
   // -----------------
-  // constant viscosity
+  // powerlaw viscosity
   // nu_s is the kinematic shear viscosity (cgs : cm^2/s)
   // eta is the ratio of the bulk to shear kinematic viscosity
-  Real nu_s, eta;
+  Real nu_s, eta, r_exp;
   // alpha viscosity
   // nu_s = alpha c_s^2 / Omega
   Real alpha, R0, Omega0;
@@ -75,9 +75,9 @@ struct DiffCoeffParams {
   // constant thermal diffusivity
   // kappa = K / (rho c_p) (cgs : cm^2/s)
   Real kappa_0;
-  // constant conductivity
+  // powerlaw conductivity
   // K  (cgs : erg/(cm s K) )
-  Real hcond_0;
+  Real hcond_0, temp_exp, rho_exp, T0, d0;
 
   // Diffusivity
   // -----------------
@@ -86,7 +86,7 @@ struct DiffCoeffParams {
   DiffCoeffParams() = default;
   DiffCoeffParams(std::string block_name, std::string dtype,
                   parthenon::ParameterInput *pin,
-                  const ArtemisUtils::Constants &constants) {
+                  const ArtemisUtils::Constants &constants, const Packages_t &packages) {
     // Read the parameter file
     std::string type_ = pin->GetString(block_name, "type");
     type = ChooseDiffusion(dtype, type_);
@@ -103,21 +103,30 @@ struct DiffCoeffParams {
       PARTHENON_FAIL(msg);
     }
     // Read the parameters
-    if (type == DiffType::viscosity_const) {
+    if (type == DiffType::viscosity_plaw) {
       nu_s = pin->GetReal(block_name, "nu");
       eta = pin->GetOrAddReal(block_name, "eta_bulk", 0.0);
+      R0 = pin->GetOrAddReal("problem", "r0", 1.0);
+      r_exp = pin->GetOrAddReal(block_name, "r_exp", 0.0);
     } else if (type == DiffType::viscosity_alpha) {
       alpha = pin->GetReal(block_name, "alpha");
       eta = pin->GetOrAddReal(block_name, "eta_bulk", 0.0);
 
       R0 = pin->GetOrAddReal("problem", "r0", 1.0);
-      const Real gm = constants.GetGCode() * pin->GetReal("gravity", "mass_tot") *
-                      constants.GetMsolarCode();
+      const Real gm = packages.Get("gravity")->Param<Real>("gm");
       Omega0 = std::sqrt(gm / (R0 * R0 * R0));
-    } else if (type == DiffType::thermaldiff_const) {
+    } else if (type == DiffType::thermaldiff_plaw) {
       kappa_0 = pin->GetReal(block_name, "kappa");
-    } else if (type == DiffType::conductivity_const) {
+      temp_exp = pin->GetOrAddReal(block_name, "temp_exp", 0.0);
+      rho_exp = pin->GetOrAddReal(block_name, "rho_exp", 0.0);
+      d0 = pin->GetOrAddReal(block_name, "rho_ref", 1.0);
+      T0 = pin->GetOrAddReal(block_name, "T_ref", 1.0);
+    } else if (type == DiffType::conductivity_plaw) {
       hcond_0 = pin->GetReal(block_name, "cond");
+      temp_exp = pin->GetOrAddReal(block_name, "temp_exp", 0.0);
+      rho_exp = pin->GetOrAddReal(block_name, "rho_exp", 0.0);
+      d0 = pin->GetOrAddReal(block_name, "rho_ref", 1.0);
+      T0 = pin->GetOrAddReal(block_name, "T_ref", 1.0);
     } else {
       std::stringstream msg;
       msg << type_ << " in " << block_name << " is not supported";
@@ -182,7 +191,7 @@ class DiffusionCoeff<DiffType::null, GEOM, FLUID_TYPE> {
 
 // Viscosity
 template <Coordinates GEOM, Fluid FLUID_TYPE>
-class DiffusionCoeff<DiffType::viscosity_const, GEOM, FLUID_TYPE> {
+class DiffusionCoeff<DiffType::viscosity_plaw, GEOM, FLUID_TYPE> {
   // Constant Kinematic Viscosity
   // These routines return the dynamic viscosity, rho*nu (cgs : g/(cm s))
  public:
@@ -195,15 +204,19 @@ class DiffusionCoeff<DiffType::viscosity_const, GEOM, FLUID_TYPE> {
     using TE = parthenon::TopologicalElement;
 
     PARTHENON_DEBUG_REQUIRE(
-        dp.type == DiffType::viscosity_const,
+        dp.type == DiffType::viscosity_plaw,
         "Mismatch between evaluated viscosity type and input viscosity type");
     PARTHENON_DEBUG_REQUIRE(FLUID_TYPE == Fluid::gas,
                             "Viscosity only works with the gas fluid");
 
+    auto pco = p.GetCoordinates(b);
     parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, member, il, iu,
                              [&](const int i) {
+                               geometry::Coords<GEOM> coords(pco, k, j, i);
                                const Real &dens = p(b, gas::prim::density(n), k, j, i);
-                               mu(i) = dp.nu_s * dens;
+                               const auto &xv = coords.GetCellCenter();
+                               const auto &xs = coords.ConvertToCyl(xv);
+                               mu(i) = dp.nu_s * dens * std::pow(xs[0] / dp.R0, dp.r_exp);
                              });
   }
 
@@ -211,12 +224,14 @@ class DiffusionCoeff<DiffType::viscosity_const, GEOM, FLUID_TYPE> {
                                   geometry::Coords<GEOM> coords, const Real dens,
                                   const Real sie, const EOS &eos) const {
     PARTHENON_DEBUG_REQUIRE(
-        dp.type == DiffType::viscosity_const,
+        dp.type == DiffType::viscosity_plaw,
         "Mismatch between evaluated viscosity type and input viscosity type");
     PARTHENON_DEBUG_REQUIRE(FLUID_TYPE == Fluid::gas,
                             "Viscosity only works with the gas fluid");
 
-    return dp.nu_s * dens;
+    const auto &xv = coords.GetCellCenter();
+    const auto &xs = coords.ConvertToCyl(xv);
+    return dp.nu_s * dens * std::pow(xs[0] / dp.R0, dp.r_exp);
   }
 };
 
@@ -274,7 +289,7 @@ class DiffusionCoeff<DiffType::viscosity_alpha, GEOM, FLUID_TYPE> {
 
 // Conduction
 template <Coordinates GEOM, Fluid FLUID_TYPE>
-class DiffusionCoeff<DiffType::conductivity_const, GEOM, FLUID_TYPE> {
+class DiffusionCoeff<DiffType::conductivity_plaw, GEOM, FLUID_TYPE> {
   // Conductivity
   // These routines return the conductivity, K (cgs : erg/(cm s K))
  public:
@@ -287,30 +302,38 @@ class DiffusionCoeff<DiffType::conductivity_const, GEOM, FLUID_TYPE> {
     using TE = parthenon::TopologicalElement;
 
     PARTHENON_DEBUG_REQUIRE(
-        dp.type == DiffType::conductivity_const,
+        dp.type == DiffType::conductivity_plaw,
         "Mismatch between evaluated conductivity type and input conductivity  type");
     PARTHENON_DEBUG_REQUIRE(FLUID_TYPE == Fluid::gas,
-                            "Viscosity only works with the gas fluid");
+                            "Thermal conductivity only works with the gas fluid");
 
-    parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, member, il, iu,
-                             [&](const int i) { mu(i) = dp.hcond_0; });
+    parthenon::par_for_inner(
+        DEFAULT_INNER_LOOP_PATTERN, member, il, iu, [&](const int i) {
+          const Real &dens = p(b, gas::prim::density(n), k, j, i);
+          const Real &sie = p(b, gas::prim::sie(n), k, j, i);
+          const Real T = eos.TemperatureFromDensityInternalEnergy(dens, sie);
+          mu(i) = dp.hcond_0 * std::pow(T / dp.T0, dp.temp_exp) *
+                  std::pow(dens / dp.d0, dp.rho_exp);
+        });
   }
   KOKKOS_INLINE_FUNCTION Real Get(const DiffCoeffParams &dp,
                                   geometry::Coords<GEOM> coords, const Real dens,
                                   const Real sie, const EOS &eos) const {
 
     PARTHENON_DEBUG_REQUIRE(
-        dp.type == DiffType::conductivity_const,
+        dp.type == DiffType::conductivity_plaw,
         "Mismatch between evaluated conductivity type and input conductivity  type");
     PARTHENON_DEBUG_REQUIRE(FLUID_TYPE == Fluid::gas,
-                            "Viscosity only works with the gas fluid");
+                            "Thermal conductivity only works with the gas fluid");
 
-    return dp.hcond_0;
+    const Real T = eos.TemperatureFromDensityInternalEnergy(dens, sie);
+    return dp.hcond_0 * std::pow(T / dp.T0, dp.temp_exp) *
+           std::pow(dens / dp.d0, dp.rho_exp);
   }
 };
 
 template <Coordinates GEOM, Fluid FLUID_TYPE>
-class DiffusionCoeff<DiffType::thermaldiff_const, GEOM, FLUID_TYPE> {
+class DiffusionCoeff<DiffType::thermaldiff_plaw, GEOM, FLUID_TYPE> {
   // Thermal Diffusivity
   // These routines return the conductivity, K (cgs : erg/(cm s K))
  public:
@@ -323,20 +346,20 @@ class DiffusionCoeff<DiffType::thermaldiff_const, GEOM, FLUID_TYPE> {
     using TE = parthenon::TopologicalElement;
 
     PARTHENON_DEBUG_REQUIRE(
-        dp.type == DiffType::conductivity_const,
+        dp.type == DiffType::conductivity_plaw,
         "Mismatch between evaluated conductivity type and input conductivity  type");
     PARTHENON_DEBUG_REQUIRE(FLUID_TYPE == Fluid::gas,
-                            "Viscosity only works with the gas fluid");
+                            "Thermal conductivity only works with the gas fluid");
 
     parthenon::par_for_inner(
         DEFAULT_INNER_LOOP_PATTERN, member, il, iu, [&](const int i) {
           const Real &dens = p(b, gas::prim::density(n), k, j, i);
           const Real &sie = p(b, gas::prim::sie(n), k, j, i);
           const Real cv = eos.SpecificHeatFromDensityInternalEnergy(dens, sie);
-          //       const Real T =
-          //       eos.TemperatureFromDensityInternalEnergy(dens,sie);
+          const Real T = eos.TemperatureFromDensityInternalEnergy(dens, sie);
 
-          mu(i) = dp.kappa_0 * dens * cv;
+          mu(i) = dp.kappa_0 * std::pow(T / dp.T0, dp.temp_exp) *
+                  std::pow(dens / dp.d0, dp.rho_exp) * dens * cv;
         });
   }
   KOKKOS_INLINE_FUNCTION Real Get(const DiffCoeffParams &dp,
@@ -344,13 +367,15 @@ class DiffusionCoeff<DiffType::thermaldiff_const, GEOM, FLUID_TYPE> {
                                   const Real sie, const EOS &eos) const {
 
     PARTHENON_DEBUG_REQUIRE(
-        dp.type == DiffType::thermaldiff_const,
+        dp.type == DiffType::thermaldiff_plaw,
         "Mismatch between evaluated conductivity type and input conductivity  type");
     PARTHENON_DEBUG_REQUIRE(FLUID_TYPE == Fluid::gas,
-                            "Viscosity only works with the gas fluid");
+                            "Thermal conductivity only works with the gas fluid");
     const Real cv = eos.SpecificHeatFromDensityInternalEnergy(dens, sie);
+    const Real T = eos.TemperatureFromDensityInternalEnergy(dens, sie);
 
-    return dp.kappa_0 * dens * cv;
+    return dp.kappa_0 * std::pow(T / dp.T0, dp.temp_exp) *
+           std::pow(dens / dp.d0, dp.rho_exp) * dens * cv;
   }
 };
 

@@ -86,9 +86,8 @@ omega = 1.0
 type = alpha
 alpha = 1e-3
 
-<gravity>
-mass_tot = 1.0
 <gravity/binary>
+mass = 1.0
 q = 1.0e-5
 a = 1.0
 e = 0.0

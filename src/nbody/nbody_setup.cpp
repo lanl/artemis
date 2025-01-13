@@ -647,8 +647,7 @@ int ReadPlanetarySystemBlock(ParameterInput *pin, parthenon::InputBlock *pib,
 //!
 //! You can setup a binary either with two particle blocks + a binary block
 //! or you can specify just a binary block
-void NBodySetup(ParameterInput *pin, const Real GM, const Real Rf[3], const Real Vf[3],
-                std::vector<int> &particle_id, std::vector<Particle> &particles) {
+std::map<int, ParticleParams> NBodySetup(ParameterInput *pin, const Real G, Real &mresc) {
   int npart = 0;
   parthenon::InputBlock *pib = pin->pfirst_block;
   std::map<int, ParticleParams> parts;
@@ -701,8 +700,11 @@ void NBodySetup(ParameterInput *pin, const Real GM, const Real Rf[3], const Real
     V[1] += p.m * p.vy;
     V[2] += p.m * p.vz;
   }
+  if (mresc == -Big<Real>()) {
+    mresc = mtot;
+  }
   for (auto &[id, p] : parts) {
-    parts[id].m = p.m * GM / mtot;
+    parts[id].m = p.m * mresc / mtot;
     parts[id].x = p.x - R[0];
     parts[id].y = p.y - R[1];
     parts[id].z = p.z - R[2];
@@ -710,20 +712,14 @@ void NBodySetup(ParameterInput *pin, const Real GM, const Real Rf[3], const Real
     parts[id].vy = p.vy - V[1];
     parts[id].vz = p.vz - V[2];
   }
-  if (parthenon::Globals::my_rank == 0) {
-    std::cout << npart << " Initial Particles: " << std::endl;
-    for (auto const &[id, p] : parts) {
-      PrintParticle(id, p);
-    }
-  }
+  // if (parthenon::Globals::my_rank == 0) {
+  //  std::cout << npart << " Initial Particles: " << std::endl;
+  //  for (auto const &[id, p] : parts) {
+  //    PrintParticle(id, p);
+  //  }
+  //}
 
-  // Copy into our final particle array and check that every particle was initialized
-  int count = 0;
-  for (auto const &[id, p] : parts) {
-    particle_id.push_back(count);
-    particles.push_back(Particle(p, GM, Rf, Vf));
-    count++;
-  }
+  return parts;
 }
 
 } // namespace NBody

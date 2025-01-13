@@ -13,7 +13,10 @@
 #ifndef UTILS_EOS_HPP_
 #define UTILS_EOS_HPP_
 
+#include <singularity-eos/eos/eos.hpp>
+
 #include "artemis.hpp"
+
 
 namespace ArtemisUtils {
 

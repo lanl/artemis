@@ -101,18 +101,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
 
   // Dust sizes
   const auto size_dist = pin->GetOrAddString("dust", "size_input", "direct");
-  const auto input_units = pin->GetOrAddString("dust", "input_units", "cgs");
-  Real length_conv = Null<Real>();
-  Real rho_conv = Null<Real>();
-  if (input_units == "cgs") {
-    length_conv = units.GetLengthPhysicalToCode();
-    rho_conv = units.GetMassDensityPhysicalToCode();
-  } else if (input_units == "problem") {
-    length_conv = 1.;
-    rho_conv = 1.;
-  } else {
-    PARTHENON_FAIL("dust/input_units can only be cgs or problem.");
-  }
+  const Real length_conv = units.GetLengthPhysicalToCode();
+  const Real rho_conv = units.GetMassDensityPhysicalToCode();
 
   if (size_dist == "linspace") {
     // uniform

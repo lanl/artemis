@@ -1,11 +1,6 @@
 ---
 dust:
 
-  input_units:
-    _type: string
-    _default: "cgs"
-    _description: "Unit system used when specifying dust sizes and density"
-
   cfl:
     _type: Real
     _default: "0.8"

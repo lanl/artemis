@@ -71,7 +71,7 @@ dfloor = 1.0e-10
 siefloor = 1.0e-15
 
 <gas/conductivity>
-type = constant 
+type = conductivity 
 cond = 1.0e-1
 
 <gravity/uniform>

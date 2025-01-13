@@ -104,8 +104,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
     const Real gamma = pin->GetOrAddReal("gas", "gamma", 1.66666666667);
     auto cv = Null<Real>();
     if (pin->DoesParameterExist("gas", "cv")) {
-      PARTHENON_REQUIRE(!pin->DoesParameterExist("gas", "mmw"),
-                        "Cannot specify both cv and mmw");
+      PARTHENON_REQUIRE(!pin->DoesParameterExist("gas", "mu"),
+                        "Cannot specify both cv and mu");
       cv = pin->GetReal("gas", "cv");
       PARTHENON_REQUIRE(cv > 0, "Only positive cv allowed!");
     } else {

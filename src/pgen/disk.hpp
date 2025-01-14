@@ -248,7 +248,7 @@ inline void InitDiskParams(MeshBlock *pmb, ParameterInput *pin) {
         disk_params.nu0 = disk_params.alpha * disk_params.gamma_gas *
                           SQR(disk_params.h0 * disk_params.r0 * disk_params.Omega0);
         disk_params.nu_indx = 1.5 + disk_params.q;
-      } else if (vtype == "constant") {
+      } else if (vtype == "powerlaw") {
         disk_params.const_nu = true;
         disk_params.nu0 = pin->GetReal("gas/viscosity", "nu");
         disk_params.nu_indx = pin->GetOrAddReal("gas/viscosity", "r_exp", 0.0);

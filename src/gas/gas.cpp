@@ -28,6 +28,7 @@
 #include "utils/history.hpp"
 #include "utils/opacity/opacity.hpp"
 #include "utils/refinement/amr_criteria.hpp"
+#include "utils/units.hpp"
 
 using ArtemisUtils::EOS;
 using ArtemisUtils::VI;
@@ -36,7 +37,12 @@ namespace Gas {
 //----------------------------------------------------------------------------------------
 //! \fn  StateDescriptor Gas::Initialize
 //! \brief Adds intialization function for gas hydrodynamics package
-std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
+std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
+                                            ArtemisUtils::Units &units,
+                                            ArtemisUtils::Constants &constants,
+                                            Packages_t &packages) {
+  using namespace singularity::photons;
+
   auto gas = std::make_shared<StateDescriptor>("gas");
   Params &params = gas->AllParams();
 
@@ -96,12 +102,22 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   const std::string eos_name = pin->GetOrAddString("gas", "eos", "ideal");
   if (eos_name == "ideal") {
     const Real gamma = pin->GetOrAddReal("gas", "gamma", 1.66666666667);
-    const Real cv = pin->GetOrAddReal("gas", "cv", 1. / (gamma - 1.));
+    auto cv = Null<Real>();
+    if (pin->DoesParameterExist("gas", "cv")) {
+      PARTHENON_REQUIRE(!pin->DoesParameterExist("gas", "mmw"),
+                        "Cannot specify both cv and mmw");
+      cv = pin->GetReal("gas", "cv");
+      PARTHENON_REQUIRE(cv > 0, "Only positive cv allowed!");
+    } else {
+      const Real mu = pin->GetOrAddReal("gas", "mu", 1.);
+      PARTHENON_REQUIRE(mu > 0, "Only positive mean molecular weight allowed!");
+      cv = constants.GetKBCode() / ((gamma - 1.) * constants.GetAMUCode() * mu);
+    }
     EOS eos_host = singularity::IdealGas(gamma - 1., cv);
     EOS eos_device = eos_host.GetOnDevice();
     params.Add("eos_h", eos_host);
     params.Add("eos_d", eos_device);
-    // This needs to be removed when we convert everything to EOS calls
+    // TODO This needs to be removed when we convert everything to EOS calls
     params.Add("adiabatic_index", gamma);
   }
 
@@ -110,11 +126,14 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   ArtemisUtils::Opacity opacity;
   std::string opacity_model_name =
       pin->GetOrAddString("gas/opacity/absorption", "opacity_model", "constant");
+  const Real length = units.GetLengthCodeToPhysical();
+  const Real time = units.GetTimeCodeToPhysical();
+  const Real mass = units.GetMassCodeToPhysical();
   if (opacity_model_name == "none") {
-    opacity = singularity::photons::Gray(0.0);
+    opacity = NonCGSUnits<Gray>(Gray(0.0), time, mass, length, 1.);
   } else if (opacity_model_name == "constant") {
     const Real kappa_a = pin->GetOrAddReal("gas/opacity/absorption", "kappa_a", 0.0);
-    opacity = singularity::photons::Gray(kappa_a);
+    opacity = NonCGSUnits<Gray>(Gray(kappa_a), time, mass, length, 1.);
   } else if (opacity_model_name == "shocktube_a") {
     const Real coef_kappa_a =
         pin->GetOrAddReal("gas/opacity/absorption", "coef_kappa_a", 0.0);
@@ -136,10 +155,10 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   std::string scattering_model_name =
       pin->GetOrAddString("gas/opacity/scattering", "scattering_model", "none");
   if (scattering_model_name == "none") {
-    scattering = singularity::photons::GrayS(0.0, 1.0);
+    scattering = NonCGSUnitsS<GrayS>(GrayS(0.0, 1.0), time, mass, length, 1.);
   } else if (scattering_model_name == "constant") {
     const Real kappa_s = pin->GetOrAddReal("gas/opacity/scattering", "kappa_s", 0.0);
-    scattering = singularity::photons::GrayS(kappa_s, 1.0);
+    scattering = NonCGSUnitsS<GrayS>(GrayS(kappa_s, 1.0), time, mass, length, 1.);
   } else {
     PARTHENON_FAIL("Scattering model not recognized!");
   }
@@ -168,11 +187,12 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("do_diffusion", do_diffusion);
 
   if (do_viscosity) {
-    Diffusion::DiffCoeffParams dp("gas/viscosity", "viscosity", pin);
+    Diffusion::DiffCoeffParams dp("gas/viscosity", "viscosity", pin, constants, packages);
     params.Add("visc_params", dp);
   }
   if (do_conduction) {
-    Diffusion::DiffCoeffParams dp("gas/conductivity", "conductivity", pin);
+    Diffusion::DiffCoeffParams dp("gas/conductivity", "conductivity", pin, constants,
+                                  packages);
     params.Add("cond_params", dp);
   }
 
@@ -416,9 +436,9 @@ Real EstimateTimestepMesh(MeshData<Real> *md) {
   const auto do_viscosity = params.template Get<bool>("do_viscosity");
   if (do_viscosity) {
     auto dp = params.template Get<Diffusion::DiffCoeffParams>("visc_params");
-    if (dp.type == Diffusion::DiffType::viscosity_const) {
+    if (dp.type == Diffusion::DiffType::viscosity_plaw) {
       visc_dt = Diffusion::EstimateTimestep<GEOM, Fluid::gas,
-                                            Diffusion::DiffType::viscosity_const>(
+                                            Diffusion::DiffType::viscosity_plaw>(
           md, dp, gas_pkg, eos_d, vmesh);
     } else if (dp.type == Diffusion::DiffType::viscosity_alpha) {
       visc_dt = Diffusion::EstimateTimestep<GEOM, Fluid::gas,
@@ -431,13 +451,13 @@ Real EstimateTimestepMesh(MeshData<Real> *md) {
   const auto do_conduction = params.template Get<bool>("do_conduction");
   if (do_conduction) {
     auto dp = params.template Get<Diffusion::DiffCoeffParams>("cond_params");
-    if (dp.type == Diffusion::DiffType::conductivity_const) {
+    if (dp.type == Diffusion::DiffType::conductivity_plaw) {
       cond_dt = Diffusion::EstimateTimestep<GEOM, Fluid::gas,
-                                            Diffusion::DiffType::conductivity_const>(
+                                            Diffusion::DiffType::conductivity_plaw>(
           md, dp, gas_pkg, eos_d, vmesh);
-    } else if (dp.type == Diffusion::DiffType::thermaldiff_const) {
+    } else if (dp.type == Diffusion::DiffType::thermaldiff_plaw) {
       cond_dt = Diffusion::EstimateTimestep<GEOM, Fluid::gas,
-                                            Diffusion::DiffType::thermaldiff_const>(
+                                            Diffusion::DiffType::thermaldiff_plaw>(
           md, dp, gas_pkg, eos_d, vmesh);
     }
   }
@@ -523,10 +543,10 @@ TaskStatus ViscousFlux(MeshData<Real> *md) {
 
   if (dp.type == Diffusion::DiffType::null) {
     return TaskStatus::complete;
-  } else if (dp.type == Diffusion::DiffType::viscosity_const) {
+  } else if (dp.type == Diffusion::DiffType::viscosity_plaw) {
     return Diffusion::MomentumFluxImpl<GEOM, Fluid::gas,
-                                       Diffusion::DiffType::viscosity_const>(md, dp, pkg,
-                                                                             vprim, vf);
+                                       Diffusion::DiffType::viscosity_plaw>(md, dp, pkg,
+                                                                            vprim, vf);
   } else if (dp.type == Diffusion::DiffType::viscosity_alpha) {
     return Diffusion::MomentumFluxImpl<GEOM, Fluid::gas,
                                        Diffusion::DiffType::viscosity_alpha>(md, dp, pkg,
@@ -561,14 +581,14 @@ TaskStatus ThermalFlux(MeshData<Real> *md) {
 
   if (dp.type == Diffusion::DiffType::null) {
     return TaskStatus::complete;
-  } else if (dp.type == Diffusion::DiffType::conductivity_const) {
+  } else if (dp.type == Diffusion::DiffType::conductivity_plaw) {
     return Diffusion::ThermalFluxImpl<GEOM, Fluid::gas,
-                                      Diffusion::DiffType::conductivity_const>(
-        md, dp, pkg, vprim, vf);
-  } else if (dp.type == Diffusion::DiffType::thermaldiff_const) {
-    return Diffusion::ThermalFluxImpl<GEOM, Fluid::gas,
-                                      Diffusion::DiffType::thermaldiff_const>(md, dp, pkg,
+                                      Diffusion::DiffType::conductivity_plaw>(md, dp, pkg,
                                                                               vprim, vf);
+  } else if (dp.type == Diffusion::DiffType::thermaldiff_plaw) {
+    return Diffusion::ThermalFluxImpl<GEOM, Fluid::gas,
+                                      Diffusion::DiffType::thermaldiff_plaw>(md, dp, pkg,
+                                                                             vprim, vf);
   } else {
     PARTHENON_FAIL("Invalid conductivity type");
   }

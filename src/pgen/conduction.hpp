@@ -260,67 +260,67 @@ inline void CondBoundary(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse)
   const auto dcp = pkg->template Param<Diffusion::DiffCoeffParams>("cond_params");
 
   if constexpr (BDY == IndexDomain::inner_x1) {
-    if (dcp.type == Diffusion::DiffType::conductivity_const) {
+    if (dcp.type == Diffusion::DiffType::conductivity_plaw) {
       return CondBoundaryImpl<GEOM, IndexDomain::inner_x1,
-                              Diffusion::DiffType::conductivity_const>(mbd, coarse);
-    } else if (dcp.type == Diffusion::DiffType::thermaldiff_const) {
+                              Diffusion::DiffType::conductivity_plaw>(mbd, coarse);
+    } else if (dcp.type == Diffusion::DiffType::thermaldiff_plaw) {
       return CondBoundaryImpl<GEOM, IndexDomain::inner_x1,
-                              Diffusion::DiffType::thermaldiff_const>(mbd, coarse);
+                              Diffusion::DiffType::thermaldiff_plaw>(mbd, coarse);
     } else {
       PARTHENON_FAIL(
           "Chosen conductivity type is not compatible with conductivity boundaries");
     }
   } else if constexpr (BDY == IndexDomain::outer_x1) {
-    if (dcp.type == Diffusion::DiffType::conductivity_const) {
+    if (dcp.type == Diffusion::DiffType::conductivity_plaw) {
       return CondBoundaryImpl<GEOM, IndexDomain::outer_x1,
-                              Diffusion::DiffType::conductivity_const>(mbd, coarse);
-    } else if (dcp.type == Diffusion::DiffType::thermaldiff_const) {
+                              Diffusion::DiffType::conductivity_plaw>(mbd, coarse);
+    } else if (dcp.type == Diffusion::DiffType::thermaldiff_plaw) {
       return CondBoundaryImpl<GEOM, IndexDomain::outer_x1,
-                              Diffusion::DiffType::thermaldiff_const>(mbd, coarse);
+                              Diffusion::DiffType::thermaldiff_plaw>(mbd, coarse);
     } else {
       PARTHENON_FAIL(
           "Chosen conductivity type is not compatible with conductivity boundaries");
     }
   } else if constexpr (BDY == IndexDomain::inner_x2) {
-    if (dcp.type == Diffusion::DiffType::conductivity_const) {
+    if (dcp.type == Diffusion::DiffType::conductivity_plaw) {
       return CondBoundaryImpl<GEOM, IndexDomain::inner_x2,
-                              Diffusion::DiffType::conductivity_const>(mbd, coarse);
-    } else if (dcp.type == Diffusion::DiffType::thermaldiff_const) {
+                              Diffusion::DiffType::conductivity_plaw>(mbd, coarse);
+    } else if (dcp.type == Diffusion::DiffType::thermaldiff_plaw) {
       return CondBoundaryImpl<GEOM, IndexDomain::inner_x2,
-                              Diffusion::DiffType::thermaldiff_const>(mbd, coarse);
+                              Diffusion::DiffType::thermaldiff_plaw>(mbd, coarse);
     } else {
       PARTHENON_FAIL(
           "Chosen conductivity type is not compatible with conductivity boundaries");
     }
   } else if constexpr (BDY == IndexDomain::outer_x2) {
-    if (dcp.type == Diffusion::DiffType::conductivity_const) {
+    if (dcp.type == Diffusion::DiffType::conductivity_plaw) {
       return CondBoundaryImpl<GEOM, IndexDomain::outer_x2,
-                              Diffusion::DiffType::conductivity_const>(mbd, coarse);
-    } else if (dcp.type == Diffusion::DiffType::thermaldiff_const) {
+                              Diffusion::DiffType::conductivity_plaw>(mbd, coarse);
+    } else if (dcp.type == Diffusion::DiffType::thermaldiff_plaw) {
       return CondBoundaryImpl<GEOM, IndexDomain::outer_x2,
-                              Diffusion::DiffType::thermaldiff_const>(mbd, coarse);
+                              Diffusion::DiffType::thermaldiff_plaw>(mbd, coarse);
     } else {
       PARTHENON_FAIL(
           "Chosen conductivity type is not compatible with conductivity boundaries");
     }
   } else if constexpr (BDY == IndexDomain::inner_x3) {
-    if (dcp.type == Diffusion::DiffType::conductivity_const) {
+    if (dcp.type == Diffusion::DiffType::conductivity_plaw) {
       return CondBoundaryImpl<GEOM, IndexDomain::inner_x3,
-                              Diffusion::DiffType::conductivity_const>(mbd, coarse);
-    } else if (dcp.type == Diffusion::DiffType::thermaldiff_const) {
+                              Diffusion::DiffType::conductivity_plaw>(mbd, coarse);
+    } else if (dcp.type == Diffusion::DiffType::thermaldiff_plaw) {
       return CondBoundaryImpl<GEOM, IndexDomain::inner_x3,
-                              Diffusion::DiffType::thermaldiff_const>(mbd, coarse);
+                              Diffusion::DiffType::thermaldiff_plaw>(mbd, coarse);
     } else {
       PARTHENON_FAIL(
           "Chosen conductivity type is not compatible with conductivity boundaries");
     }
   } else if constexpr (BDY == IndexDomain::outer_x3) {
-    if (dcp.type == Diffusion::DiffType::conductivity_const) {
+    if (dcp.type == Diffusion::DiffType::conductivity_plaw) {
       return CondBoundaryImpl<GEOM, IndexDomain::outer_x3,
-                              Diffusion::DiffType::conductivity_const>(mbd, coarse);
-    } else if (dcp.type == Diffusion::DiffType::thermaldiff_const) {
+                              Diffusion::DiffType::conductivity_plaw>(mbd, coarse);
+    } else if (dcp.type == Diffusion::DiffType::thermaldiff_plaw) {
       return CondBoundaryImpl<GEOM, IndexDomain::outer_x3,
-                              Diffusion::DiffType::thermaldiff_const>(mbd, coarse);
+                              Diffusion::DiffType::thermaldiff_plaw>(mbd, coarse);
     } else {
       PARTHENON_FAIL(
           "Chosen conductivity type is not compatible with conductivity boundaries");

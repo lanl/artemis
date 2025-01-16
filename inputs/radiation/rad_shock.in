@@ -13,6 +13,8 @@
 
 <artemis>
 problem = shock          # name of the pgen
+physical_units = cgs
+time = 1e-6              # microsecond
 coordinates = cartesian  # coordinate system
 
 <parthenon/job>
@@ -22,31 +24,33 @@ problem_id = shock  # problem ID: basename of output filenames
 variables = gas.prim.density,  &
             gas.prim.velocity, &
             gas.prim.sie,      &
+            rad.prim.energy, &
+            rad.prim.flux, &
             field.jaybenne.energy_tally
 file_type = hdf5   # HDF5 data dump
-dt        = 0.01   # time increment between outputs
+dt        = 1e-6   # time increment between outputs
 
 <parthenon/time>
 nlim       = -1    # cycle limit
-tlim       = 0.05  # time limit
+tlim       = 1e-3  # time limit
 integrator = rk2   # time integration algorithm
 
 <parthenon/mesh>
 nx1    = 512       # Number of zones in X1-direction
-x1min  = -0.01     # minimum value of X1
-x1max  = 0.01      # maximum value of X1
+x1min  = 0.008     # minimum value of X1
+x1max  = 0.01575   # maximum value of X1
 ix1_bc = ic        # inner-X1 boundary flag
 ox1_bc = ic        # outer-X1 boundary flag
 
 nx2    = 1         # Number of zones in X2-direction
-x2min  = -0.01     # minimum value of X2
-x2max  = 0.01      # maximum value of X2
+x2min  = -0.003875 # minimum value of X2
+x2max  = 0.003875  # maximum value of X2
 ix2_bc = periodic  # inner-X2 boundary flag
 ox2_bc = periodic  # outer-X2 boundary flag
 
 nx3    = 1         # Number of zones in X3-direction
-x3min  = -0.01     # minimum value of X3
-x3max  = 0.01      # maximum value of X3
+x3min  = -0.003875 # minimum value of X3
+x3max  = 0.003875  # maximum value of X3
 ix3_bc = periodic  # inner-X3 boundary flag
 ox3_bc = periodic  # outer-X3 boundary flag
 
@@ -59,9 +63,9 @@ ix3_bc = periodic
 ox3_bc = periodic
 
 <parthenon/meshblock>
-nx1 = 64  # Number of cells in each MeshBlock, X1-dir
-nx2 = 1   # Number of cells in each MeshBlock, X2-dir
-nx3 = 1   # Number of cells in each MeshBlock, X3-dir
+nx1 = 512  # Number of cells in each MeshBlock, X1-dir
+nx2 = 1    # Number of cells in each MeshBlock, X2-dir
+nx3 = 1    # Number of cells in each MeshBlock, X3-dir
 
 <physics>
 gas = true
@@ -70,7 +74,7 @@ radiation = true
 <gas>
 gamma = 1.666666  # adiabatic index
 mu = 1.008
-cfl = 0.8
+cfl = 0.1
 reconstruct = plm
 riemann = hllc
 dfloor = 1.0e-10
@@ -78,10 +82,30 @@ siefloor = 1.0e-10
 
 <gas/opacity/absorption>
 opacity_model = powerlaw  # absorption opacity model
-coef_kappa_a = 577.35  # kappa_a,0 constant
-rho_exp = -1.0         # dens exponent for opacity powerlaw
-temp_exp = 0.0         # temp exponent for opacity powerlaw
+coef_kappa_a = 577        # kappa_a,0 constant
+rho_exp = -1.0            # dens exponent for opacity powerlaw
+temp_exp = 0.0            # temp exponent for opacity powerlaw
 
 <jaybenne>
 num_particles = 10000
 use_ddmc = false
+
+#<radiation>
+#cfl = 0.1
+#riemann = hlle
+#reconstruction = plm
+#efloor = 1e-10
+#closure = p1
+#creduc = 43.3526011561
+#inner_iteration_tol = 1e-12
+#inner_iteration_max = 100
+#outer_iteration_tol = 1e-12
+
+<problem>
+xdisc = 0.01305
+vxl = 5.19e1
+vxr = 1.73e1
+tl =  2.18e6
+tr =  7.98e6
+rhol = 5.69
+rhor = 17.1 

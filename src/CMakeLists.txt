@@ -148,9 +148,7 @@ if (CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
    # Bake in rpath to rebound on mac
    if(${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
     set_target_properties(artemis PROPERTIES
-      BUILD_RPATH "${CMAKE_BINARY_DIR}/rebound/"
-      INSTALL_RPATH "@executable_path/../rebound"
-      INSTALL_RPATH_USE_LINK_PATH TRUE
+      BUILD_RPATH "${CMAKE_BINARY_DIR}/rebound"
     )
     add_custom_command(TARGET artemis POST_BUILD
       COMMAND install_name_tool -add_rpath @executable_path/../rebound $<TARGET_FILE:artemis>

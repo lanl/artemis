@@ -157,10 +157,6 @@ def main(**kwargs):
 
         # Build working directory and copy librebound.so into working directory
         os.makedirs(artemis.get_outputs_dir(), exist_ok=True)
-        reb_path = os.path.join(artemis.get_exe_dir(), "librebound.so")
-        if not os.path.exists(reb_path):
-            raise TestError(f'librebound.so not found at "{reb_path}"!')
-        shutil.copy(reb_path, artemis.get_outputs_dir())
 
         # Run each test
         for name in test_names:
@@ -294,16 +290,12 @@ def set_globals(args):
     if exe_path is not None:
         adir = os.path.join(artemis.get_artemis_dir(), "tst")
         out_dir = os.path.join(adir, "testing") if out_dir is None else out_dir
-        reb_path = os.path.join(os.path.dirname(exe_path), "librebound.so")
 
         if use_cwd:
             raise TestError("--cwd and --exe=PATH cannot be passed together!")
 
         if not (os.path.exists(exe_path) and os.access(exe_path, os.X_OK)):
             raise TestError(f'Provided exe "{exe_path}" not found or cannot be run!')
-
-        if not os.path.exists(reb_path):
-            raise TestError(f'librebound.so not found at "{reb_path}"!')
 
         abs_out_dir = os.path.abspath(out_dir)
         abs_exe_dir = os.path.abspath(os.path.dirname(exe_path))
@@ -318,10 +310,6 @@ def set_globals(args):
             if os.path.isfile(lpath_exe) and os.access(lpath_exe, os.X_OK):
                 exe_path = lpath_exe
                 out_dir = os.path.join(cwd, "testing") if out_dir is None else out_dir
-                reb_path = os.path.join(os.path.dirname(exe_path), "librebound.so")
-
-                if not os.path.exists(reb_path):
-                    raise TestError(f'librebound.so not found at "{reb_path}"!')
 
                 abs_out_dir = os.path.abspath(out_dir)
                 abs_exe_dir = os.path.abspath(os.path.dirname(exe_path))
@@ -331,13 +319,9 @@ def set_globals(args):
                 # Check if we are one level up from the executable
                 exe_path = read_cmakecache(lpath_cache)
                 out_dir = os.path.join(cwd, "testing") if out_dir is None else out_dir
-                reb_path = os.path.join(os.path.dirname(exe_path), "librebound.so")
 
                 if not (os.path.exists(exe_path) and os.access(exe_path, os.X_OK)):
                     raise TestError(f'No exe in "{exe_path}" or cannot be run!')
-
-                if not os.path.exists(reb_path):
-                    raise TestError(f'librebound.so not found at "{reb_path}"!')
 
                 abs_out_dir = os.path.abspath(out_dir)
                 abs_exe_dir = os.path.abspath(os.path.dirname(exe_path))

@@ -1,0 +1,227 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Boundary Conditions &mdash; artemis  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../_static/artemis_style.css?v=569d4c90" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+      <script src="../_static/collapse.js?v=5227af5a"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Input Parameters" href="parameters.html" />
+    <link rel="prev" title="artemis documentation" href="../index.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            artemis
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Boundary Conditions</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#periodic">periodic</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#reflecting">reflecting</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#outflow">outflow</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#ic">ic</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#viscous">viscous</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#extrapolate">extrapolate</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#conducting">conducting</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#inflow">inflow</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="parameters.html">Input Parameters</a></li>
+<li class="toctree-l1"><a class="reference internal" href="pgen.html">Problem Generators</a></li>
+<li class="toctree-l1"><a class="reference internal" href="physics.html">Physics Modules</a></li>
+<li class="toctree-l1"><a class="reference internal" href="running.html">Running <strong>artemis</strong></a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">artemis</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Boundary Conditions</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/src/bcs.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="boundary-conditions">
+<span id="bc"></span><h1>Boundary Conditions<a class="headerlink" href="#boundary-conditions" title="Link to this heading"></a></h1>
+<p>There are several types of boundary conditions available in <strong>artemis</strong>.
+Some of these are inherited from <code class="docutils literal notranslate"><span class="pre">parthenon</span></code>.</p>
+<p>Choosing boundary conditions is done in the <code class="docutils literal notranslate"><span class="pre">&lt;parthenon/mesh&gt;</span></code> input block.
+Each boundary in the problem can be set separately.</p>
+<p>An example input block specify periodic boundaries in the <code class="docutils literal notranslate"><span class="pre">x1</span></code>-direction and reflecting boundaries in the <code class="docutils literal notranslate"><span class="pre">x2</span></code>-direction is:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">&lt;</span><span class="n">parthenon</span><span class="o">/</span><span class="n">mesh</span><span class="o">&gt;</span>
+<span class="o">....</span>
+<span class="n">ix1_bc</span> <span class="o">=</span> <span class="n">periodic</span>
+<span class="n">ox1_bc</span> <span class="o">=</span> <span class="n">periodic</span>
+
+<span class="o">...</span>
+<span class="n">ix2_bc</span> <span class="o">=</span> <span class="n">reflecting</span>
+<span class="n">ox2_bc</span> <span class="o">=</span> <span class="n">reflecting</span>
+
+<span class="o">...</span>
+</pre></div>
+</div>
+<p>Note that there are no <code class="docutils literal notranslate"><span class="pre">user</span></code> boundary conditions in <strong>artemis</strong>, as with some other Parthenon codes.
+All boundary conditions are specified directly in the <code class="docutils literal notranslate"><span class="pre">&lt;parthenon/mesh&gt;</span></code> node.
+Also note that some boundary conditions are only compatible with certain <a class="reference internal" href="pgen.html#pgen"><span class="std std-ref">Problem Generators</span></a>.
+Below is a complete listing of available boundary conditions.</p>
+<section id="periodic">
+<h2>periodic<a class="headerlink" href="#periodic" title="Link to this heading"></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">periodic</span></code> boundary conditions connect opposite ends of the domain.</p>
+</section>
+<section id="reflecting">
+<h2>reflecting<a class="headerlink" href="#reflecting" title="Link to this heading"></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">reflecting</span></code> boundary conditions act as walls that try to keep the fluid inside the domain
+by mirroring variables across the boundary, and negating the sign of the normal component of
+vector quantities.</p>
+</section>
+<section id="outflow">
+<h2>outflow<a class="headerlink" href="#outflow" title="Link to this heading"></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">outflow</span></code> boundary conditions attempt to let material freely leave the domain.
+This is not always perfect, however, and reflections can happen.</p>
+</section>
+<section id="ic">
+<h2>ic<a class="headerlink" href="#ic" title="Link to this heading"></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">ic</span></code> boundaries keep the solution at the initial condition in the ghost zones.
+Only the <code class="docutils literal notranslate"><span class="pre">disk</span></code> problem generator works with <code class="docutils literal notranslate"><span class="pre">ic</span></code> boundaries.</p>
+</section>
+<section id="viscous">
+<h2>viscous<a class="headerlink" href="#viscous" title="Link to this heading"></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">viscous</span></code> boundary conditions are meant to provide continuous injection at the outer radial boundary and an outflow condition at the inner radial boundary of a disk calculation.
+They arise from the solution of the 1D steady-state accretion disk equations which read,</p>
+<div class="math notranslate nohighlight">
+\[\begin{split}\dot{M}  &amp; = {\rm const} \\\\
+\partial_R ( F_\nu - \dot{M} \ell) &amp; = 0\end{split}\]</div>
+<p>where <span class="math notranslate nohighlight">\(\dot{M}\)</span> is the radial mass flux, <span class="math notranslate nohighlight">\(\ell = R^2 \Omega\)</span> is the specific angular momentum, and <span class="math notranslate nohighlight">\(F_\nu = 3 \pi \nu \Sigma \ell\)</span> is the viscous flux of angular momentum.
+At the innner radial boundary we enforce:</p>
+<div class="math notranslate nohighlight">
+\[F_\nu = \dot{M} \ell\]</div>
+<p>which corresponds to keeping <span class="math notranslate nohighlight">\(\nu \Sigma = {\rm const}\)</span> across the boundary (since <span class="math notranslate nohighlight">\(\dot{M} = 3\pi \nu \Sigma\)</span>).
+At the outer boundary, we set</p>
+<div class="math notranslate nohighlight">
+\[\partial_R F_\nu = \dot{M} \partial_R \ell\]</div>
+<p>by linearly expanding <span class="math notranslate nohighlight">\(\ell\)</span> and <span class="math notranslate nohighlight">\(F_nu\)</span>. This is, therefore, and extrapolation boundary at fixed <span class="math notranslate nohighlight">\(\dot{M}\)</span>.
+Once <span class="math notranslate nohighlight">\(F_\nu\)</span> is set, the gas density is set, and from that and <span class="math notranslate nohighlight">\(\dot{M}\)</span>, the radial velocity is set.</p>
+<p>The value of the injection <span class="math notranslate nohighlight">\(\dot{M}\)</span> is set in the <code class="docutils literal notranslate"><span class="pre">&lt;problem&gt;</span></code> block:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">&lt;</span><span class="n">problem</span><span class="o">&gt;</span>
+<span class="o">...</span>
+<span class="n">mdot0</span> <span class="o">=</span> <span class="mf">1e-6</span>
+</pre></div>
+</div>
+<p>Note that the derivation above was for 1D.
+2D cylindrical simulations with planets have been shown to behave well with <code class="docutils literal notranslate"><span class="pre">viscous</span></code> boundary conditions.
+3D simulations have been largely untested, however.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">viscous</span></code> boundary condition is only allowed in the  <code class="docutils literal notranslate"><span class="pre">disk</span></code> problem generator, and only when viscosity is active.</p>
+</section>
+<section id="extrapolate">
+<h2>extrapolate<a class="headerlink" href="#extrapolate" title="Link to this heading"></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">extrapolate</span></code> boundaries are meant to provide an outflow boundary condition in situations where the fluid variables have non-trivial slopes.
+Examples include:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>maintaining vertical hydrostatic balance in the <code class="docutils literal notranslate"><span class="pre">strat</span></code> problem generator.</p></li>
+<li><p>maintaining the background shear profile at the <span class="math notranslate nohighlight">\(x\)</span> boundaries in the <code class="docutils literal notranslate"><span class="pre">strat</span></code> problem generator.</p></li>
+<li><p>maintaining radial profiles of density, temperature, and velocity in the <code class="docutils literal notranslate"><span class="pre">disk</span></code> problem generator.</p></li>
+</ul>
+</div></blockquote>
+<p>The <code class="docutils literal notranslate"><span class="pre">extrapolate</span></code> boundary condition is only allowed in the <code class="docutils literal notranslate"><span class="pre">strat</span></code> and <code class="docutils literal notranslate"><span class="pre">disk</span></code> problem generators.</p>
+</section>
+<section id="conducting">
+<h2>conducting<a class="headerlink" href="#conducting" title="Link to this heading"></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">conducting</span></code> boundaries are meant to provide a constant thermal heat flux at one boundary, while fixing the temperature at the opposite boundary.
+This allows the domain to relax to a steady-state, hydrostatic, solution with constant heat flux.
+This is mainly used for internal testing.
+When <code class="docutils literal notranslate"><span class="pre">conducting</span></code> boundaries are active, the <code class="docutils literal notranslate"><span class="pre">flux</span></code> parameter should be set under the <code class="docutils literal notranslate"><span class="pre">&lt;problem&gt;</span></code> block.
+The <code class="docutils literal notranslate"><span class="pre">conducting</span></code> boundary condition is only allowed in the <code class="docutils literal notranslate"><span class="pre">conduction</span></code> problem generator.</p>
+</section>
+<section id="inflow">
+<h2>inflow<a class="headerlink" href="#inflow" title="Link to this heading"></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">inflow</span></code> boundaries are needed for the shearing-box (See <a class="reference internal" href="pgen.html#pgen"><span class="std std-ref">Problem Generators</span></a>) in the <code class="docutils literal notranslate"><span class="pre">y</span></code>-direction.
+They are actually a combination of inflow and outflow depending on what side of <span class="math notranslate nohighlight">\(x=0\)</span> the boundary is on.
+On the inflow side, <span class="math notranslate nohighlight">\(v_y\)</span> is set to <span class="math notranslate nohighlight">\(- q \Omega x\)</span>, and the other fluid variables are set to their initial values.
+On the outflow side, outflow conditions are set.
+At the lower <span class="math notranslate nohighlight">\(y\)</span>-boundary, inflow occurs for <span class="math notranslate nohighlight">\(x&gt;0\)</span>, whereas for the upper <span class="math notranslate nohighlight">\(y\)</span>-boundary, inflow occurs for <span class="math notranslate nohighlight">\(x&lt;0\)</span>.
+This boundary condition is only compatible with the <code class="docutils literal notranslate"><span class="pre">strat</span></code> problem generator.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="../index.html" class="btn btn-neutral float-left" title="artemis documentation" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="parameters.html" class="btn btn-neutral float-right" title="Input Parameters" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 
+ (C) (or copyright) 2024. Triad National Security, LLC. All rights reserved.
+.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

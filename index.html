@@ -1,0 +1,150 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>artemis documentation &mdash; artemis  documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="_static/artemis_style.css?v=569d4c90" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+      <script src="_static/collapse.js?v=5227af5a"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Boundary Conditions" href="src/bcs.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="#" class="icon icon-home">
+            artemis
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="src/bcs.html">Boundary Conditions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="src/parameters.html">Input Parameters</a></li>
+<li class="toctree-l1"><a class="reference internal" href="src/pgen.html">Problem Generators</a></li>
+<li class="toctree-l1"><a class="reference internal" href="src/physics.html">Physics Modules</a></li>
+<li class="toctree-l1"><a class="reference internal" href="src/running.html">Running <strong>artemis</strong></a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="#">artemis</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="#" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">artemis documentation</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/index.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="artemis-documentation">
+<h1>artemis documentation<a class="headerlink" href="#artemis-documentation" title="Link to this heading"></a></h1>
+<p><strong>artemis</strong> is a performance-portable, multi-fluid, AMR hydrodynamics code built on top of the <a class="reference external" href="https://github.com/parthenon-hpc-lab/parthenon">Parthenon</a> mesh refinement library.
+<strong>artemis</strong> solves the multi-fluid Navier-Stokes equations:</p>
+<div class="math notranslate nohighlight">
+\[\begin{split}\frac{D \rho_i}{D t} &amp; = -\rho \nabla \cdot \mathbf{v_i}   \\\\
+\rho_i \frac{D \mathbf{v}_i }{D t} &amp; = -\nabla P_i + \rho_i \mathbf{g}_i + \nabla \cdot \mathbf{\Pi}_i + \sum_j \mathbf{R}_{ij}  \\\\
+\rho_i \frac{D e_i }{D t} &amp; = - P_i \nabla \cdot \mathbf{v}_i + \mathbf{\Pi}_i : \nabla \mathbf{v}_i + \Gamma - \Lambda\end{split}\]</div>
+<p>where <span class="math notranslate nohighlight">\((\rho_i, e_i, \mathbf{v}_i)\)</span> are the material density, specific internal energy, and velocitity.
+The convective derivative is defined as <span class="math notranslate nohighlight">\(D/Dt = \partial_t + \mathbf{v}_i \cdot \nabla\)</span>.
+Material temperature and pressure are specified by an equation of state EOS written in terms of the density and specific internal energy, <span class="math notranslate nohighlight">\(T_i(\rho_i,e_i)\)</span> and <span class="math notranslate nohighlight">\(P_i(\rho_i, e_i)\)</span>.
+Fluids interact via the collision operator, <span class="math notranslate nohighlight">\(\mathbf{R}_{ij}\)</span>.</p>
+<section id="key-features">
+<h2>Key Features<a class="headerlink" href="#key-features" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>Adaptive and static mesh refinement.</p></li>
+<li><p>Runs on CPUs or GPUs.</p></li>
+<li><p>First- to third-order time stepping.</p></li>
+<li><p>Full support for Cartesian or curvilinear coordinate systems, including axisymmetric, cylindrical, and spherical coordinates.</p></li>
+<li><p>Various microphysics processes such as viscosity, cooling, and conduction.</p></li>
+<li><p>Dust coagulation models</p></li>
+<li><p>Coupling to arbitrarily complicated N-Body systems.</p></li>
+<li><p>One executable design. No need to recompile.</p></li>
+</ul>
+<p>A full listing of the available physics in <strong>artemis</strong> can be found in <a class="reference internal" href="src/physics.html#physics"><span class="std std-ref">Physics Modules</span></a>.</p>
+<div class="toctree-wrapper compound">
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="src/bcs.html">Boundary Conditions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="src/parameters.html">Input Parameters</a></li>
+<li class="toctree-l1"><a class="reference internal" href="src/pgen.html">Problem Generators</a></li>
+<li class="toctree-l1"><a class="reference internal" href="src/physics.html">Physics Modules</a></li>
+<li class="toctree-l1"><a class="reference internal" href="src/running.html">Running <strong>artemis</strong></a></li>
+</ul>
+</div>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="src/bcs.html" class="btn btn-neutral float-right" title="Boundary Conditions" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 
+ (C) (or copyright) 2024. Triad National Security, LLC. All rights reserved.
+.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

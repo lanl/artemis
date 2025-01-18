@@ -1,0 +1,230 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Problem Generators &mdash; artemis  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../_static/artemis_style.css?v=569d4c90" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+      <script src="../_static/collapse.js?v=5227af5a"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Physics Modules" href="physics.html" />
+    <link rel="prev" title="Input Parameters" href="parameters.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            artemis
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="bcs.html">Boundary Conditions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="parameters.html">Input Parameters</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Problem Generators</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#disk">disk</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#strat">strat</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#internal-generators">Internal generators</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="physics.html">Physics Modules</a></li>
+<li class="toctree-l1"><a class="reference internal" href="running.html">Running <strong>artemis</strong></a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">artemis</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Problem Generators</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/src/pgen.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="problem-generators">
+<span id="pgen"></span><h1>Problem Generators<a class="headerlink" href="#problem-generators" title="Link to this heading"></a></h1>
+<p>Problem generators in <strong>artemis</strong> control the initial and (to some extent) boundary conditions of a simulation.
+The choice of problem generator is controlled by the <code class="docutils literal notranslate"><span class="pre">problem</span></code> parameter in the <code class="docutils literal notranslate"><span class="pre">&lt;artemis&gt;</span></code> input block</p>
+<p>Below is a complete listing of all possible values of <code class="docutils literal notranslate"><span class="pre">problem</span></code>.</p>
+<section id="disk">
+<h2>disk<a class="headerlink" href="#disk" title="Link to this heading"></a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">disk</span></code> problem generator sets up an axisymmetric sub-Keplerian disk in pressure-rotational equilibrium.
+To use the <code class="docutils literal notranslate"><span class="pre">disk</span></code> problem generator set:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">&lt;</span><span class="n">artemis</span><span class="o">&gt;</span>
+<span class="o">...</span>
+<span class="n">problem</span> <span class="o">=</span> <span class="n">disk</span>
+</pre></div>
+</div>
+<p>Both vertically isothermal and polytropic disks are supported.
+Corrections for inner cavities, outer exponential cutoffs, and the presence of an inner binary, are also available.</p>
+<p>The basic description of the disk starts with the aspect ratio profile:</p>
+<div class="math notranslate nohighlight">
+\[\frac{H}{R} = h_0  \left(\frac{R}{R_0} \right)^{f}\]</div>
+<p>where <span class="math notranslate nohighlight">\(H\)</span> is the disk scale height and <span class="math notranslate nohighlight">\(f\)</span> is the flaring index.
+The following parameters control the disk scale height profile:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">&lt;</span><span class="n">problem</span><span class="o">&gt;</span>
+<span class="o">...</span>
+<span class="n">r0</span> <span class="o">=</span> <span class="mf">1.0</span>      <span class="c1"># reference radius</span>
+<span class="n">h0</span> <span class="o">=</span> <span class="mf">.05</span>      <span class="c1"># aspect ratio at r0</span>
+<span class="n">flare</span> <span class="o">=</span> <span class="mf">0.25</span>  <span class="c1"># flaring index</span>
+</pre></div>
+</div>
+<p>Once we specify the disk aspect ratio, we define the mid-plane density profile:</p>
+<div class="math notranslate nohighlight">
+\[\rho_{\rm mid}(R) = \rho_0 \left(\frac{R}{R_0} \right)^{\mu} g_{\rm cav}(R) g_{\rm exp}(R)\]</div>
+<p>This includes a power-law component and aforementioned corrections through the <span class="math notranslate nohighlight">\(g(R)\)</span> functions.
+The parameters controlling the mid-plane density are:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">&lt;</span><span class="n">problem</span><span class="o">&gt;</span>
+<span class="o">...</span>
+<span class="n">rho0</span> <span class="o">=</span> <span class="mf">1.0</span>     <span class="c1"># reference density</span>
+<span class="n">dslope</span> <span class="o">=</span> <span class="o">-</span><span class="mf">1.0</span>  <span class="c1"># density power-law</span>
+<span class="n">rexp</span>  <span class="o">=</span> <span class="mf">5.0</span>    <span class="c1"># exponential cutoff</span>
+<span class="n">rcav</span>  <span class="o">=</span> <span class="mf">0.5</span>    <span class="c1"># cavity radius</span>
+<span class="n">l0</span>    <span class="o">=</span> <span class="mf">0.0</span>    <span class="c1"># optional binary accretion eigenvalue</span>
+</pre></div>
+</div>
+<p>The mid-plane density is then extended vertically depending on what polytropic index is defined.
+The polytropic index, <span class="math notranslate nohighlight">\(\Gamma\)</span> sets the temperature profile:</p>
+<div class="math notranslate nohighlight">
+\[T(R,z) = \frac{H^2 \Omega^2}{\Gamma} \left( \frac{\rho}{\rho_0} \right)^{\Gamma - 1}\]</div>
+<p>which for <span class="math notranslate nohighlight">\(\Gamma = 1\)</span> corresponds to a vertically isothermal profile, and for any other <span class="math notranslate nohighlight">\(\Gamma\)</span>, corresponds to a pressure profile that is polytropic, i.e., <span class="math notranslate nohighlight">\(P \propto \rho^\Gamma\)</span>.
+The polytropic index is controlled by the parameter</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">&lt;</span><span class="n">problem</span><span class="o">&gt;</span>
+<span class="o">...</span>
+<span class="n">polytropic_index</span> <span class="o">=</span> <span class="mf">1.0</span>
+</pre></div>
+</div>
+<p>With <span class="math notranslate nohighlight">\(\Gamma\)</span> defined, the vertical distribution of the density profile follows:</p>
+<div class="math notranslate nohighlight">
+\[\begin{split}\rho(R,z) &amp; = \rho_{\rm mid}(R)  \exp\left[ - \frac{R^2}{H^2} \left(1 - \frac{R}{\sqrt{R^2 + z^2}} \right) \right]   \qquad {\rm if} \qquad \Gamma = 1 \\\\
+          &amp; = \rho_{\rm mid}(R)  \left[ 1 - (\Gamma-1) \frac{R^2}{H^2} \left(1 - \frac{R}{\sqrt{R^2 + z^2}} \right) \right]^{1/(\Gamma-1)} \qquad {\rm if} \qquad \Gamma \neq 1\end{split}\]</div>
+<p>Lastly, we directly compute the azimuthal disk velocity, <span class="math notranslate nohighlight">\(v_\phi\)</span> by enforcing centrifugal balance,</p>
+<div class="math notranslate nohighlight">
+\[\frac{v_\phi^2}{R} = \frac{v_K^2}{R} + \frac{1}{\rho} \frac{\partial P}{\partial R}\]</div>
+<p>Disks with viscosity have additional options.
+In particular,</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">&lt;</span><span class="n">problem</span><span class="o">&gt;</span>
+<span class="o">...</span>
+<span class="n">mdot0</span> <span class="o">=</span> <span class="mf">1e-6</span>          <span class="c1"># initial mdot</span>
+<span class="n">quiet_start</span> <span class="o">=</span> <span class="n">false</span>   <span class="c1"># set a non-zero vR</span>
+</pre></div>
+</div>
+<p>An initial constant <span class="math notranslate nohighlight">\(\dot{M}\)</span> is enforced by using <span class="math notranslate nohighlight">\(v_R = -3/2 \nu/R\)</span> and internally setting the reference density <span class="math notranslate nohighlight">\(\rho_0 = \dot{M}/(3\pi\nu_0)\)</span>.
+Therefore, if <code class="docutils literal notranslate"><span class="pre">mdot0</span></code> is set, then <code class="docutils literal notranslate"><span class="pre">rho0</span></code> will be calculated from it.
+To start the disk with no radial velocity, set <code class="docutils literal notranslate"><span class="pre">quiet_start</span> <span class="pre">=</span> <span class="pre">true</span></code>.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">disk</span></code> problem allows the use of the <code class="docutils literal notranslate"><span class="pre">viscous</span></code>, <code class="docutils literal notranslate"><span class="pre">ic</span></code>, and <code class="docutils literal notranslate"><span class="pre">extrapolate</span></code> boundary conditions. See <a class="reference internal" href="bcs.html#bc"><span class="std std-ref">Boundary Conditions</span></a> for a description.</p>
+<p><code class="docutils literal notranslate"><span class="pre">disk</span></code> works in all coordinate systems by converting between the problem geometry and axisymmetric geometry.</p>
+</section>
+<section id="strat">
+<h2>strat<a class="headerlink" href="#strat" title="Link to this heading"></a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">strat</span></code> problem generator sets up a stratified shearing-box.
+To use this the following nodes must be active,</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">&lt;</span><span class="n">artemis</span><span class="o">&gt;</span>
+<span class="n">coordinates</span> <span class="o">=</span> <span class="n">cartesian</span>
+<span class="n">problem</span> <span class="o">=</span> <span class="n">strat</span>
+
+<span class="o">&lt;</span><span class="n">physics</span><span class="o">&gt;</span>
+<span class="n">rotating_frame</span> <span class="o">=</span> <span class="n">true</span>
+
+<span class="o">&lt;</span><span class="n">rotating_frame</span><span class="o">&gt;</span>
+<span class="n">omega</span> <span class="o">=</span> <span class="mf">1.0</span>
+<span class="n">q</span> <span class="o">=</span> <span class="mf">1.5</span>
+</pre></div>
+</div>
+<p>Note that this requires cartesian coordinates and the rotating frame.</p>
+<p>The initial profile is isothermal, <span class="math notranslate nohighlight">\(T = H_0^2 \Omega_0^2\)</span>, with a gaussian density profile:</p>
+<div class="math notranslate nohighlight">
+\[\rho(z) = \rho_0 \exp\left( -\frac{z^2}{2 H_0^2} \right)\]</div>
+<p>where <span class="math notranslate nohighlight">\(H_0\)</span> is the initial pressure scale height.
+The relevant parameters that can be set under <code class="docutils literal notranslate"><span class="pre">&lt;problem&gt;</span></code> are:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">&lt;</span><span class="n">problem</span><span class="o">&gt;</span>
+<span class="n">h</span> <span class="o">=</span> <span class="mf">1.0</span>      <span class="c1"># scale height</span>
+<span class="n">rho0</span> <span class="o">=</span> <span class="mf">1.0</span>   <span class="c1"># density normalization</span>
+</pre></div>
+</div>
+<p>The velocities are initially set to the steady-state background shear solution of <span class="math notranslate nohighlight">\(v_y = - q \Omega_0 x\)</span>.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">strat</span></code> problem requires the <code class="docutils literal notranslate"><span class="pre">inflow</span></code> boundaries for the <span class="math notranslate nohighlight">\(y\)</span>-direction and allows for <code class="docutils literal notranslate"><span class="pre">extrapolate</span></code> boundaries for the <span class="math notranslate nohighlight">\(x\)</span> and <span class="math notranslate nohighlight">\(z\)</span> directions boundary conditions.
+See  <a class="reference internal" href="bcs.html#bc"><span class="std std-ref">Boundary Conditions</span></a> for a description of those.</p>
+</section>
+<section id="internal-generators">
+<h2>Internal generators<a class="headerlink" href="#internal-generators" title="Link to this heading"></a></h2>
+<p>The remaining problem generators are mainly used for testing. Descriptions of their <code class="docutils literal notranslate"><span class="pre">&lt;problem&gt;</span></code> block parameters can be found in <a class="reference internal" href="parameters.html#parameters"><span class="std std-ref">Input Parameters</span></a>.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="parameters.html" class="btn btn-neutral float-left" title="Input Parameters" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="physics.html" class="btn btn-neutral float-right" title="Physics Modules" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 
+ (C) (or copyright) 2024. Triad National Security, LLC. All rights reserved.
+.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

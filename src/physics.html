@@ -1,0 +1,871 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Physics Modules &mdash; artemis  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../_static/artemis_style.css?v=569d4c90" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+      <script src="../_static/collapse.js?v=5227af5a"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Running artemis" href="running.html" />
+    <link rel="prev" title="Problem Generators" href="pgen.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            artemis
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="bcs.html">Boundary Conditions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="parameters.html">Input Parameters</a></li>
+<li class="toctree-l1"><a class="reference internal" href="pgen.html">Problem Generators</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Physics Modules</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#fluid-models">Fluid Models</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#gas">Gas</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#cooling">Cooling</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#viscosity">Viscosity</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#conduction">Conduction</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#dust">Dust</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#n-body-dynamics">N-Body Dynamics</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#building-systems">Building systems</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#particles">Particles</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#binaries">Binaries</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#triples">Triples</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#n-body-systems">N-Body systems</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#planetary-systems">Planetary systems</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#n-body-outputs">N-Body Outputs</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#external-gravity">External Gravity</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#rotating-frame">Rotating Frame</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#drag">Drag</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#radiation">Radiation</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="running.html">Running <strong>artemis</strong></a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">artemis</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Physics Modules</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/src/physics.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="physics-modules">
+<span id="physics"></span><h1>Physics Modules<a class="headerlink" href="#physics-modules" title="Link to this heading"></a></h1>
+<p>In general, to activate a physics capability, it must be set in the <code class="docutils literal notranslate"><span class="pre">&lt;physics&gt;</span></code> input block:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">&lt;</span><span class="n">physics</span><span class="o">&gt;</span>
+<span class="n">gas</span> <span class="o">=</span> <span class="n">true</span>
+<span class="n">dust</span> <span class="o">=</span> <span class="n">false</span>
+<span class="n">viscosity</span> <span class="o">=</span> <span class="n">false</span>
+<span class="n">conduction</span> <span class="o">=</span> <span class="n">false</span>
+<span class="n">cooling</span> <span class="o">=</span> <span class="n">false</span>
+<span class="n">gravity</span> <span class="o">=</span> <span class="n">false</span>
+<span class="n">nbody</span> <span class="o">=</span> <span class="n">false</span>
+<span class="n">rotating_frame</span> <span class="o">=</span> <span class="n">false</span>
+<span class="n">radiation</span> <span class="o">=</span> <span class="n">false</span>
+</pre></div>
+</div>
+<p>Below is a complete listing of the physics capabilities available in <strong>artemis</strong>.</p>
+<section id="fluid-models">
+<h2>Fluid Models<a class="headerlink" href="#fluid-models" title="Link to this heading"></a></h2>
+<section id="gas">
+<h3>Gas<a class="headerlink" href="#gas" title="Link to this heading"></a></h3>
+<p>The main fluid type available in <strong>artemis</strong> is called “gas” and is controlled by the <code class="docutils literal notranslate"><span class="pre">&lt;gas&gt;</span></code> input block.
+Gasses track the evolution of density, momentum, and energy.
+Currently, they are restricted to an ideal gas equation of state.
+<strong>artemis</strong> supports multiple gas species, controlled by the <code class="docutils literal notranslate"><span class="pre">nspecies</span></code> parameter in the <code class="docutils literal notranslate"><span class="pre">&lt;gas&gt;</span></code> block.
+When setting up a <code class="docutils literal notranslate"><span class="pre">&lt;gas&gt;</span></code> input block, you need to specify the EOS, Riemann Solver, and reconstruction method</p>
+<p>An example input block for a gas could read</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">&lt;</span><span class="n">gas</span><span class="o">&gt;</span>
+<span class="n">cfl</span> <span class="o">=</span> <span class="mf">0.3</span>
+<span class="n">eos</span> <span class="o">=</span> <span class="n">ideal</span>
+<span class="n">gamma</span> <span class="o">=</span> <span class="mf">1.4</span>
+<span class="n">riemann</span> <span class="o">=</span> <span class="n">hllc</span>     <span class="c1"># llf, hlle, hllc Riemann solvers</span>
+<span class="n">reconstruct</span> <span class="o">=</span> <span class="n">plm</span>  <span class="c1"># pcm, plm, ppm reconstructions</span>
+</pre></div>
+</div>
+<p>In order to safely model kinetic energy dominated flows, <strong>artemis</strong> uses a dual energy formalism controlled by the <code class="docutils literal notranslate"><span class="pre">de_switch</span></code> parameter under <code class="docutils literal notranslate"><span class="pre">&lt;gas&gt;</span></code>.
+When the fraction of the internal energy to the total energy in a cell is less than <code class="docutils literal notranslate"><span class="pre">de_switch</span></code>, <strong>artemis</strong> will recover the internal energy from a separately evolved internal energy variable.
+This is not conservative, but greatly enhances accuracy and stability in high Mach number flows.</p>
+<p>For simulations where AMR is active, gasses can trigger refinement based on either the magnitudes or gradients of their densities or pressures.
+These are controlled by the <code class="docutils literal notranslate"><span class="pre">refine_field</span></code>, <code class="docutils literal notranslate"><span class="pre">refine_type</span></code>, <code class="docutils literal notranslate"><span class="pre">refine_thr</span></code>, and <code class="docutils literal notranslate"><span class="pre">deref_thr</span></code> parameters.
+An example that triggers refinement when the gas density is larger than <code class="docutils literal notranslate"><span class="pre">10.0</span></code> and triggers de-refinement when the density falls below <code class="docutils literal notranslate"><span class="pre">0.02</span></code> is:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">&lt;</span><span class="n">gas</span><span class="o">&gt;</span>
+<span class="o">...</span>
+<span class="n">refine_field</span> <span class="o">=</span> <span class="n">density</span>
+<span class="n">refine_type</span> <span class="o">=</span> <span class="n">magnitude</span>
+<span class="n">refine_thr</span> <span class="o">=</span> <span class="mf">10.0</span>
+<span class="n">deref_thr</span> <span class="o">=</span> <span class="mf">0.02</span>
+</pre></div>
+</div>
+<p>Gasses support several microphysics models including <a class="reference internal" href="#cooling">Cooling</a>, <a class="reference internal" href="#viscosity">Viscosity</a>, and <a class="reference internal" href="#conduction">Conduction</a>.
+These are controlled by adding additional nodes under the <code class="docutils literal notranslate"><span class="pre">&lt;gas&gt;</span></code> node, e.g., <code class="docutils literal notranslate"><span class="pre">&lt;gas/viscosity&gt;</span></code>.
+We describe each of these below.</p>
+<section id="cooling">
+<h4>Cooling<a class="headerlink" href="#cooling" title="Link to this heading"></a></h4>
+<p>Adding a <code class="docutils literal notranslate"><span class="pre">&lt;gas/cooling&gt;</span></code> node and setting <code class="docutils literal notranslate"><span class="pre">cooling</span> <span class="pre">=</span> <span class="pre">true</span></code> under the <code class="docutils literal notranslate"><span class="pre">&lt;physics&gt;</span></code> node activates a simple heating/cooling functionality that brings the gas temperature toward a target temperature on some time scale.
+This is done by adding the following source term to the internal energy equation,</p>
+<div class="math notranslate nohighlight">
+\[\rho \frac{D e}{D t} = - C_v \frac{ T - T_0}{\tau_c}\]</div>
+<p>where <span class="math notranslate nohighlight">\(C_v\)</span> is the specific heat of the material, <span class="math notranslate nohighlight">\(T_0\)</span> is a target temperature that can be spatially dependent, and <span class="math notranslate nohighlight">\(\tau_c\)</span> is a cooling time that can also be spatially dependent.</p>
+<p><strong>artemis</strong> supports several types of <span class="math notranslate nohighlight">\(T_0\)</span> profiles and cooling times.
+These are controlled by the <code class="docutils literal notranslate"><span class="pre">tref</span></code> and <code class="docutils literal notranslate"><span class="pre">type</span></code> parameters, respectively.
+Options for <code class="docutils literal notranslate"><span class="pre">type</span></code> are:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">type</span> <span class="pre">=</span> <span class="pre">constant</span></code></p></li>
+</ul>
+<p>This simply sets the cooling time to a constant value given by the parameter <code class="docutils literal notranslate"><span class="pre">tau</span></code>. An example input block for constant cooling is</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">&lt;</span><span class="n">gas</span><span class="o">/</span><span class="n">cooling</span><span class="o">&gt;</span>
+<span class="o">...</span>
+<span class="nb">type</span> <span class="o">=</span> <span class="n">constant</span>
+<span class="n">tau</span> <span class="o">=</span> <span class="mf">1e-3</span>
+</pre></div>
+</div>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">type</span> <span class="pre">=</span> <span class="pre">beta</span></code></p></li>
+</ul>
+<p><span class="math notranslate nohighlight">\(beta\)</span>-cooling is a common cooling model in studies of accretion disks.
+The cooling time is set to scale with the local rotation rate around the central object such that <span class="math notranslate nohighlight">\(\beta = \tau_c \Omega_K\)</span>.
+<strong>artemis</strong> allows for a vertically dependent <span class="math notranslate nohighlight">\(beta\)</span> of the form:</p>
+<div class="math notranslate nohighlight">
+\[\beta(z) = \beta_{\rm min} + \beta_0 \exp\left( - {\rm exp\_scale} * z^2/T_0 \right)\]</div>
+<p>where <span class="math notranslate nohighlight">\(T_0\)</span> is the reference temperature defined by <code class="docutils literal notranslate"><span class="pre">tref</span></code>.
+An example input with constant <span class="math notranslate nohighlight">\(beta\)</span>-cooling is:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">&lt;</span><span class="n">gas</span><span class="o">/</span><span class="n">cooling</span><span class="o">&gt;</span>
+<span class="o">...</span>
+<span class="nb">type</span> <span class="o">=</span> <span class="n">beta</span>
+<span class="n">beta0</span> <span class="o">=</span> <span class="mf">10.0</span>
+</pre></div>
+</div>
+<p>Options for <code class="docutils literal notranslate"><span class="pre">tref</span></code> are:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">tref</span> <span class="pre">=</span> <span class="pre">powerlaw</span></code></p></li>
+</ul>
+<blockquote>
+<div><p>This cools the gas temperature to a power-law profile in either cylindrical (<span class="math notranslate nohighlight">\(R\)</span>) or spherical (<span class="math notranslate nohighlight">\(r\)</span>) radius.</p>
+</div></blockquote>
+<div class="math notranslate nohighlight">
+\[T_0(\mathbf{x}) = T_{\rm floor} + T_{\rm cyl} R^{{\rm cyl\_plaw}} +T_{\rm sph} r^{{\rm sph\_plaw}}\]</div>
+<p>An example input block to cool to a cylindrical power-law profile with a floor is:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">&lt;</span><span class="n">gas</span><span class="o">/</span><span class="n">cooling</span><span class="o">&gt;</span>
+<span class="o">...</span>
+<span class="n">tref</span> <span class="o">=</span> <span class="n">powerlaw</span>
+<span class="n">tcyl</span> <span class="o">=</span> <span class="mf">0.0025</span>
+<span class="n">cyl_plaw</span> <span class="o">=</span> <span class="o">-</span><span class="mf">1.0</span>
+<span class="n">tfloor</span> <span class="o">=</span> <span class="mf">1e-8</span>
+</pre></div>
+</div>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">tref</span> <span class="pre">=</span> <span class="pre">nbody</span></code></p></li>
+</ul>
+<p>The <code class="docutils literal notranslate"><span class="pre">nbody</span></code> option should be used in conjunction with an <code class="docutils literal notranslate"><span class="pre">&lt;nbody&gt;</span></code> node (see <a class="reference internal" href="#n-body-dynamics">N-Body Dynamics</a>).
+This cools the gas to a temperature profile of the form:</p>
+<div class="math notranslate nohighlight">
+\[T_0(\mathbf{x}) =  T_{\rm sph} \left(-\frac{GM}{\Phi} \right)^{{\rm sph\_plaw}}\]</div>
+<p>where <span class="math notranslate nohighlight">\(Phi\)</span> is the total gravitational potential from all N-body particles in the problem.
+Because the gravitational potential from a point-mass is <span class="math notranslate nohighlight">\(\Phi = -GM/r\)</span>, we use <span class="math notranslate nohighlight">\(-GM/Phi\)</span> as a proxy for <span class="math notranslate nohighlight">\(r\)</span>.
+This type of temperature profile is often used circumbinary disk studies.
+An example input block for <code class="docutils literal notranslate"><span class="pre">nbody</span></code> is,</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">&lt;</span><span class="n">gas</span><span class="o">/</span><span class="n">cooling</span><span class="o">&gt;</span>
+<span class="o">...</span>
+<span class="n">tref</span> <span class="o">=</span> <span class="n">nbody</span>
+<span class="n">tsph</span> <span class="o">=</span> <span class="mf">0.0025</span>
+<span class="n">sph_plaw</span> <span class="o">=</span> <span class="o">-</span><span class="mf">1.0</span>
+</pre></div>
+</div>
+</section>
+<section id="viscosity">
+<h4>Viscosity<a class="headerlink" href="#viscosity" title="Link to this heading"></a></h4>
+<p>The only available stress model for gasses is viscous stress.
+The viscous stress tensor, <span class="math notranslate nohighlight">\(Pi\)</span> is defined as,</p>
+<div class="math notranslate nohighlight">
+\[\Pi = \mu_s (\nabla \mathbf{v} + \nabla \mathbf{v}^T ) + \left( \mu_b -  \frac{2}{3} \mu_s \right) \nabla \cdot \mathbf{v}\]</div>
+<p>and is controlled by a dynamic shear viscosity, <span class="math notranslate nohighlight">\(\mu_s\)</span>, and dynamic bulk viscosity, <span class="math notranslate nohighlight">\(\mu_b\)</span>.
+These dynamic viscosities are related to the kinematic viscosities by the density, e.g., <span class="math notranslate nohighlight">\(\mu_s = \rho \nu_s\)</span>.</p>
+<p>To activate viscosity, set <code class="docutils literal notranslate"><span class="pre">viscosity</span> <span class="pre">=</span> <span class="pre">true</span></code> under the <code class="docutils literal notranslate"><span class="pre">&lt;physics&gt;</span></code> node and add a <code class="docutils literal notranslate"><span class="pre">&lt;gas/viscosity&gt;</span></code> node.
+There are two models available for the viscosity coefficients: constant, and <span class="math notranslate nohighlight">\(\alpha\)</span>-viscosity.
+These are controlled by the <code class="docutils literal notranslate"><span class="pre">type</span></code> parameter.</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">type</span> <span class="pre">=</span> <span class="pre">constant</span></code></p></li>
+</ul>
+<p>Constant viscosity sets the kinematic shear viscosity to a constant value determined by the <code class="docutils literal notranslate"><span class="pre">nu</span></code> parameter.
+The bulk viscosity is set to be a constant multiple of the shear viscosity given by the <code class="docutils literal notranslate"><span class="pre">eta_bulk</span></code> parameter.
+An example input block with constant non-zero shear viscosity and zero bulk viscosity is:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">&lt;</span><span class="n">gas</span><span class="o">/</span><span class="n">viscosity</span><span class="o">&gt;</span>
+<span class="nb">type</span> <span class="o">=</span> <span class="n">constant</span>
+<span class="n">nu</span> <span class="o">=</span> <span class="mf">1e-6</span>
+</pre></div>
+</div>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">type</span> <span class="pre">=</span> <span class="pre">alpha</span></code></p></li>
+</ul>
+<p>A common viscosity model in the simulation of accretion disks is <span class="math notranslate nohighlight">\(\alpha\)</span>-viscosity.
+The dynamic shear viscosity in this model is set to,</p>
+<div class="math notranslate nohighlight">
+\[\mu_s = \alpha \frac{B_s}{\Omega_{\rm K}} = \alpha \frac{\rho c_s^2}{\Omega_{\rm K}}\]</div>
+<p>where <span class="math notranslate nohighlight">\(\alpha\)</span> is constant and <span class="math notranslate nohighlight">\(B_s\)</span> is the material’s bulk modulus.
+For a simple ideal gas with adiabatic index <span class="math notranslate nohighlight">\(gamma\)</span>, the bulk modulus is equal to <span class="math notranslate nohighlight">\(B_s = \gamma P\)</span>.
+Note that because <strong>artemis</strong> formulates it’s <span class="math notranslate nohighlight">\(\alpha\)</span>-viscosity with the material’s bulk modulus, there can be an implicit factor of <span class="math notranslate nohighlight">\(\gamma\)</span> when comparing to other codes’ values of <span class="math notranslate nohighlight">\(\alpha\)</span>.</p>
+<p>An example input block for <span class="math notranslate nohighlight">\(\alpha\)</span>-viscosity with equal shear and bulk viscosities is:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">&lt;</span><span class="n">gas</span><span class="o">/</span><span class="n">viscosity</span><span class="o">&gt;</span>
+<span class="nb">type</span> <span class="o">=</span> <span class="n">alpha</span>
+<span class="n">alpha</span> <span class="o">=</span> <span class="mf">1e-3</span>
+<span class="n">eta_bulk</span> <span class="o">=</span> <span class="mf">1.0</span>
+</pre></div>
+</div>
+</section>
+<section id="conduction">
+<h4>Conduction<a class="headerlink" href="#conduction" title="Link to this heading"></a></h4>
+<p>Thermal conduction transports thermal energy down temperature gradients with a flux, <span class="math notranslate nohighlight">\(\mathbf{q} = - K \nabla T\)</span>, such that,</p>
+<div class="math notranslate nohighlight">
+\[\rho \frac{D e}{D t}= \nabla \cdot \mathbf{q}\]</div>
+<p>The strength of thermal conduction is set by the material’s thermal conductivity <span class="math notranslate nohighlight">\(K\)</span>, or, alternatively, the material’s thermal diffusivity, <span class="math notranslate nohighlight">\(\kappa = K/C_v\)</span>.</p>
+<p>To add thermal conduction to a problem, there needs to be a <cite>&lt;gas/conductivity&gt;</cite> node and <code class="docutils literal notranslate"><span class="pre">conduction</span> <span class="pre">=</span> <span class="pre">true</span></code> under the <code class="docutils literal notranslate"><span class="pre">&lt;physics&gt;</span></code> node.</p>
+<p>There are two types of conduction models in <strong>artemis</strong>: constant thermal conductivity or constant thermal diffusivity.
+These are chosen by setting the <code class="docutils literal notranslate"><span class="pre">type</span></code> parameter:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">type</span> <span class="pre">=</span> <span class="pre">constant</span></code></p></li>
+</ul>
+</div></blockquote>
+<p>This specifies a constant conductivity set by the <code class="docutils literal notranslate"><span class="pre">cond</span></code> parameter. An example input block for constant conductivity is,</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">&lt;</span><span class="n">gas</span><span class="o">/</span><span class="n">conductivity</span><span class="o">&gt;</span>
+<span class="nb">type</span> <span class="o">=</span> <span class="n">constant</span>
+<span class="n">cond</span> <span class="o">=</span> <span class="mf">1e-3</span>
+</pre></div>
+</div>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">type</span> <span class="pre">=</span> <span class="pre">diffusivity_constant</span></code></p></li>
+</ul>
+<p>This specifies a constant thermal diffusivity set by the <cite>kappa</cite> parameter. An example input block for constant thermal diffusivity is,</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">&lt;</span><span class="n">gas</span><span class="o">/</span><span class="n">conductivity</span><span class="o">&gt;</span>
+<span class="nb">type</span> <span class="o">=</span> <span class="n">diffusivity_constant</span>
+<span class="n">kappa</span> <span class="o">=</span> <span class="mf">1e-2</span>
+</pre></div>
+</div>
+<p>For both viscosity and conduction, <strong>artemis</strong> can average neighboring diffusion coefficients with either simple averaging where</p>
+<div class="math notranslate nohighlight">
+\[D_{\rm face} = \frac{1}{2} \left( D_{\rm left} + D_{\rm right} \right)\]</div>
+<p>or with harmonic averaging where</p>
+<div class="math notranslate nohighlight">
+\[D_{\rm face} = 2 \frac{D_{\rm left}  D_{\rm right}}{D_{\rm left} + D_{\rm right} }\]</div>
+<p>Harmonic averaging can be useful in situations where neighboring diffusion coefficients differ by orders of magnitude.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">averaging</span></code> parameter can be set to <code class="docutils literal notranslate"><span class="pre">arithmetic</span></code> or <code class="docutils literal notranslate"><span class="pre">harmonic</span></code> to choose between these two models.
+An example input block using harmonic averaging for viscosity is:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">&lt;</span><span class="n">gas</span><span class="o">/</span><span class="n">viscosity</span><span class="o">&gt;</span>
+<span class="nb">type</span> <span class="o">=</span> <span class="n">alpha</span>
+<span class="n">alpha</span> <span class="o">=</span> <span class="mf">1e-3</span>
+<span class="n">averaging</span> <span class="o">=</span> <span class="n">harmonic</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="dust">
+<h3>Dust<a class="headerlink" href="#dust" title="Link to this heading"></a></h3>
+<p>The <code class="docutils literal notranslate"><span class="pre">&lt;dust&gt;</span></code> input block adds a dust fluid to the simulation.
+Dust in <strong>artemis</strong> is modeled as a pressure-less fluid. As such, an EOS is not required.
+Just as with gas fluids, dust fluids require specification of the number of species, Riemann solver, and reconstruction scheme.
+An example dust input block reads:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">&lt;</span><span class="n">dust</span><span class="o">&gt;</span>
+<span class="n">cfl</span> <span class="o">=</span> <span class="mf">0.3</span>
+<span class="n">nspecies</span> <span class="o">=</span> <span class="mi">3</span>
+<span class="n">riemann</span> <span class="o">=</span> <span class="n">hlle</span>       <span class="c1"># llf, hlle</span>
+<span class="n">reconstruct</span> <span class="o">=</span> <span class="n">plm</span>    <span class="c1"># pcm, plm, ppm</span>
+<span class="n">grain_density</span> <span class="o">=</span> <span class="mf">1.7</span>  <span class="c1"># g/cc</span>
+<span class="n">sizes</span> <span class="o">=</span> <span class="mf">1e-4</span><span class="p">,</span> <span class="mf">1e-2</span><span class="p">,</span> <span class="mf">1e-1</span>  <span class="c1"># cm</span>
+</pre></div>
+</div>
+<p>By default, each dust species represents a dust fluid at a fixed particle size.
+To specify the sizes of each species, <strong>artemis</strong> offers several options including direct specification (as in the previous example), reading a text file, or uniform and log-uniform distrubtions.</p>
+</section>
+</section>
+<section id="n-body-dynamics">
+<h2>N-Body Dynamics<a class="headerlink" href="#n-body-dynamics" title="Link to this heading"></a></h2>
+<p><strong>artemis</strong> allows the building of an arbitrarily complicated system of gravitating particles solely through the input file.
+Particles interact with the fluids via gravity and accretion.
+Once built, the evolution of the N-body system is handled by the REBOUND library.
+<strong>artemis</strong> provides several parameters that directly control the execution of REBOUND.</p>
+<p>All simulations using the <code class="docutils literal notranslate"><span class="pre">nbody</span></code> package need to set a few global parameters specifying how the N-body system evolves.
+These include the maximum timestep, the type of N-body integrator, how to handle collisions of particles, and the frame of the N-body simulation in relation to the hydro system.</p>
+<p>An example <code class="docutils literal notranslate"><span class="pre">&lt;nbody&gt;</span></code> input block would be:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">&lt;</span><span class="n">nbody</span><span class="o">&gt;</span>
+<span class="n">dt</span> <span class="o">=</span>  <span class="mf">0.01</span>
+<span class="n">integrator</span> <span class="o">=</span> <span class="n">ias15</span>  <span class="c1"># ias15, none, whfast, leapfrog, janus, mercurius, saba, bs</span>
+<span class="n">merge_on_collision</span> <span class="o">=</span> <span class="n">true</span>
+<span class="n">frame</span> <span class="o">=</span> <span class="k">global</span>      <span class="c1"># global, local</span>
+<span class="n">box_size</span> <span class="o">=</span> <span class="mf">10.0</span>
+</pre></div>
+</div>
+<p>Note that there are multiple options for integrators corresponding to some of the integrators available in REBOUND.
+For almost all simulations, the 15th order <code class="docutils literal notranslate"><span class="pre">ias15</span></code> integrator should suffice.
+While <code class="docutils literal notranslate"><span class="pre">ias15</span></code> is expensive compared to other integrators, it is still a small fraction of the cycle cost in <strong>artemis</strong>.
+In certain situations, the <code class="docutils literal notranslate"><span class="pre">none</span></code> integrator can be useful.
+For example, if there is only a single, stationary, particle in the domain or if the simulation is the rotating frame of a static binary.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">frame</span></code> parameter is typically set to its default value of <code class="docutils literal notranslate"><span class="pre">global</span></code>.
+This means that the REBOUND simulation is in the global frame of reference.
+Note that this can be a different frame than the <strong>artemis</strong> frame if the rotating frame is active.
+Setting <code class="docutils literal notranslate"><span class="pre">frame=local</span></code> means that <strong>artemis</strong> will not apply corrections to the REBOUND frame, but caution should be used with this option.</p>
+<p><strong>artemis</strong> can also make full use of the collision functionality in REBOUND.
+Particles can be given radii defining their collisional cross-section.
+When particles encounter other particles, REBOUND calls an <strong>artemis</strong> function.
+In that function, we calculate the binding energy of the two particles, and if they are bound, and if <code class="docutils literal notranslate"><span class="pre">merge_on_collision</span> <span class="pre">=</span> <span class="pre">true</span></code>, <strong>artemis</strong> combines the particles into one.
+Alternatively, If <code class="docutils literal notranslate"><span class="pre">merge_on_collision</span> <span class="pre">=</span> <span class="pre">false</span></code>, the particles pass through each other.</p>
+<section id="building-systems">
+<h3>Building systems<a class="headerlink" href="#building-systems" title="Link to this heading"></a></h3>
+<p>Building an N-Body system is an object-orientated system centered around the creation of particles.
+Particles can be created one at a time by adding multiple <code class="docutils literal notranslate"><span class="pre">&lt;particle&gt;</span></code> blocks,</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">&lt;</span><span class="n">particle1</span><span class="o">&gt;</span>
+<span class="o">...</span>
+<span class="o">&lt;</span><span class="n">particle2</span><span class="o">&gt;</span>
+<span class="o">...</span>
+<span class="n">etc</span><span class="o">.</span>
+</pre></div>
+</div>
+<p>, or multiple particles with similar parameters can be added at the same time using the aggregate blocks described in the subsequent sections.</p>
+<p>Particles are characterized by their mass, size, initial position, initial velocity, and subgrid models.
+Below we describe how to add particles individually or in collections.</p>
+</section>
+<section id="particles">
+<h3>Particles<a class="headerlink" href="#particles" title="Link to this heading"></a></h3>
+<p>The main parameters specifying a particle are:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">&lt;</span><span class="n">particle1</span><span class="o">&gt;</span>
+<span class="n">mass</span> <span class="o">=</span> <span class="mf">1.0</span>     <span class="c1"># mass of the particle</span>
+<span class="n">radius</span> <span class="o">=</span> <span class="mf">0.1</span>   <span class="c1"># physical size of the particle</span>
+<span class="n">couple</span> <span class="o">=</span> <span class="mi">1</span>     <span class="c1"># Couple this particle to the fluid</span>
+</pre></div>
+</div>
+<p>The physical size of the particle is its <code class="docutils literal notranslate"><span class="pre">radius</span></code> (see the section on collisions below).
+To turn add particle-fluid force to the fluids, the <code class="docutils literal notranslate"><span class="pre">couple</span></code> parameter must be set to <code class="docutils literal notranslate"><span class="pre">1</span></code>.
+To de-couple a particle from the fluid, set <code class="docutils literal notranslate"><span class="pre">couple</span> <span class="pre">=</span> <span class="pre">0</span></code>.</p>
+<p>When particles are embedded in fluid, gravitational softening and mass removal are essential to control the dynamics very near the particles.
+The <code class="docutils literal notranslate"><span class="pre">&lt;particle/soft&gt;</span></code> and <code class="docutils literal notranslate"><span class="pre">&lt;particle/sink&gt;</span></code> nodes control these two subgrid models for each particle.
+One example is:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">&lt;</span><span class="n">particle1</span><span class="o">&gt;</span>
+<span class="o">....</span>
+
+<span class="o">&lt;</span><span class="n">particle1</span><span class="o">/</span><span class="n">soft</span><span class="o">&gt;</span>
+<span class="n">radius</span> <span class="o">=</span> <span class="mf">0.1</span>
+<span class="nb">type</span> <span class="o">=</span> <span class="n">spline</span>    <span class="c1"># none, spline, plummer</span>
+
+<span class="o">&lt;</span><span class="n">particle1</span><span class="o">/</span><span class="n">sink</span><span class="o">&gt;</span>
+<span class="n">radius</span> <span class="o">=</span> <span class="mf">0.1</span>
+<span class="n">gamma</span> <span class="o">=</span> <span class="mf">30.0</span>    <span class="c1"># mass removal rate</span>
+<span class="n">beta</span>  <span class="o">=</span> <span class="mf">0.0</span>     <span class="c1"># = torque-free mass removal</span>
+</pre></div>
+</div>
+<p>There are three softening models available: <code class="docutils literal notranslate"><span class="pre">none</span></code> does nothing, <code class="docutils literal notranslate"><span class="pre">spline</span></code> is the spline softening used in Gadget (Springel 2001), and <code class="docutils literal notranslate"><span class="pre">plummer</span></code> modifies <span class="math notranslate nohighlight">\(r^2 \rightarrow r^2 + r_s^2\)</span>.
+Spline softening is exactly Keplerian outside the softening radius, whereas Plummer softening asymptoically approaches Keplerian outside the softening radius.
+Roughly, the Plummer softening radius is <span class="math notranslate nohighlight">\(\sim 2.8 \times\)</span> the spline softening radius.</p>
+<p>Mass accretion is handled by a particle’s <code class="docutils literal notranslate"><span class="pre">&lt;../sink&gt;</span></code> attribute.
+<strong>artemis</strong> implements mass accretion by solving:</p>
+<div class="math notranslate nohighlight">
+\[\begin{split}\frac{\partial \rho}{\partial t} = - \gamma \rho \\
+\frac{\partial (\rho v_r)}{\partial t} = - \gamma \rho v_r \\
+\frac{\partial (\rho v_\theta)}{\partial t} = - \gamma \rho v_\theta \\
+\frac{\partial (\rho v_\phi)}{\partial t} = - \beta \rho v_\phi \\\end{split}\]</div>
+<p>where <span class="math notranslate nohighlight">\((r,\theta,\phi)\)</span> refers to a spherical coordinate system coordinate system centered on the particle.</p>
+<p>Two types of removal rates are available.
+The first, <code class="docutils literal notranslate"><span class="pre">gamma</span></code>, sets the rate of mass removal for cells inside the particle’s sink radius.
+The second, <code class="docutils literal notranslate"><span class="pre">beta</span></code>, controls the amount of angular momentum removed from the fluid.
+Typically <code class="docutils literal notranslate"><span class="pre">beta</span></code> will either be zero – corresponding to angular-momentum conserving mass removal – or equal to <code class="docutils literal notranslate"><span class="pre">gamma</span></code> – corresponding to isotropic momentum removal.</p>
+<p>When adding particles one-by-one, the initial position and velocity can be (optionally) specified with an <code class="docutils literal notranslate"><span class="pre">particle/initialize</span></code> block.
+For example, an input block that adds a stationary particle at the origin would be:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">&lt;</span><span class="n">particle1</span><span class="o">/</span><span class="n">initialize</span><span class="o">&gt;</span>
+<span class="n">x</span> <span class="o">=</span> <span class="mf">0.0</span>
+<span class="n">y</span> <span class="o">=</span> <span class="mf">0.0</span>
+<span class="n">z</span> <span class="o">=</span> <span class="mf">0.0</span>
+<span class="n">vx</span> <span class="o">=</span> <span class="mf">0.0</span>
+<span class="n">vy</span> <span class="o">=</span> <span class="mf">0.0</span>
+<span class="n">vz</span> <span class="o">=</span> <span class="mf">0.0</span>
+</pre></div>
+</div>
+<p>The momentum-conserving back-reaction fluid-particle force can be added to the particle equation of motion by setting the <code class="docutils literal notranslate"><span class="pre">live</span></code> parameter under each particle block.
+There is an additional option to scale the total fluid force by a fixed amount determined by the <code class="docutils literal notranslate"><span class="pre">mscale</span></code> parameter.</p>
+<p>An example input block that scales the fluid-particle force by <code class="docutils literal notranslate"><span class="pre">1e-4</span></code> and turns the particle “live” after a time of <code class="docutils literal notranslate"><span class="pre">0.2</span></code> is:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">&lt;</span><span class="n">nbody</span><span class="o">&gt;</span>
+<span class="o">...</span>
+<span class="n">mscale</span> <span class="o">=</span> <span class="mf">1e-4</span>
+
+<span class="o">&lt;</span><span class="n">particle1</span><span class="o">&gt;</span>
+<span class="o">....</span>
+<span class="n">live</span> <span class="o">=</span> <span class="mi">1</span>
+<span class="n">live_after</span> <span class="o">=</span> <span class="mf">0.2</span>
+</pre></div>
+</div>
+<p>When using AMR in <strong>artemis</strong>, additional refinement criteria related to the particles are available.
+In particular, each active particle can refine the mesh within a specified distance to the maximum refinement level and de-refine the mesh outside another specified distance.
+To activate this feature, the <code class="docutils literal notranslate"><span class="pre">refine_type</span></code> parameter should be set to <code class="docutils literal notranslate"><span class="pre">distance</span></code>.
+An example input block enrolling the particles in the AMR refinement criteria is:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">&lt;</span><span class="n">nbody</span><span class="o">&gt;</span>
+<span class="o">...</span>
+<span class="n">refine_type</span> <span class="o">=</span> <span class="n">distance</span>
+<span class="n">derefine_factor</span> <span class="o">=</span> <span class="mf">2.0</span>
+<span class="o">&lt;</span><span class="n">particle1</span><span class="o">&gt;</span>
+<span class="n">refine_distance</span> <span class="o">=</span> <span class="mf">0.6</span>
+</pre></div>
+</div>
+<p>One interesting feature that <strong>artemis</strong> allows is “Lagrangian” refinement regions by adding zero mass particles (i.e., test particles) with specified trajectories and refinement criteria.
+These do not interact gravitationally with the fluid or other massive particles, but instead provide unique refinement regions.</p>
+</section>
+<section id="binaries">
+<h3>Binaries<a class="headerlink" href="#binaries" title="Link to this heading"></a></h3>
+<p>There are two methods to add bound binaries.
+An example that ties two previously defined particles together into a binary:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">&lt;</span><span class="n">particle1</span><span class="o">&gt;</span>
+<span class="o">...</span>
+<span class="o">&lt;</span><span class="n">particle2</span><span class="o">&gt;</span>
+<span class="o">...</span>
+<span class="o">&lt;</span><span class="n">binary1</span><span class="o">&gt;</span>
+<span class="n">primary</span> <span class="o">=</span> <span class="mi">1</span>
+<span class="n">secondary</span> <span class="o">=</span> <span class="mi">2</span>
+<span class="n">a</span> <span class="o">=</span> <span class="mf">1.0</span>             <span class="c1"># Binary semi-major axis</span>
+<span class="n">e</span> <span class="o">=</span> <span class="mf">0.0</span>             <span class="c1"># Binary eccentricity</span>
+<span class="n">i</span> <span class="o">=</span> <span class="mf">0.0</span>             <span class="c1"># Binary inclination (in degrees)</span>
+<span class="n">omega</span> <span class="o">=</span> <span class="mf">0.0</span>         <span class="c1"># Binary argument of pericenter (in degrees)</span>
+<span class="n">Omega</span> <span class="o">=</span> <span class="mf">0.0</span>         <span class="c1"># Binary longitude of ascending node (in degrees)</span>
+<span class="n">f</span> <span class="o">=</span> <span class="mf">0.0</span>             <span class="c1"># Binary true anomaly (in degrees)</span>
+<span class="n">x</span> <span class="o">=</span> <span class="mf">0.0</span>             <span class="c1"># Center of mass x position</span>
+<span class="n">y</span> <span class="o">=</span> <span class="mf">0.0</span>             <span class="c1"># Center of mass y position</span>
+<span class="n">z</span> <span class="o">=</span> <span class="mf">0.0</span>             <span class="c1"># Center of mass z position</span>
+<span class="n">vx</span> <span class="o">=</span> <span class="mf">0.0</span>            <span class="c1"># Center of mass x velocity</span>
+<span class="n">vy</span> <span class="o">=</span> <span class="mf">0.0</span>            <span class="c1"># Center of mass y velocity</span>
+<span class="n">vz</span> <span class="o">=</span> <span class="mf">0.0</span>            <span class="c1"># Center of mass z velocity</span>
+</pre></div>
+</div>
+<p>Here, we explicitly tell the <code class="docutils literal notranslate"><span class="pre">&lt;binary1&gt;</span></code> node which particles are the primary and secondary.
+Note that all angles are in degrees.
+This is to ensure that the <span class="math notranslate nohighlight">\(sin\)</span> and <span class="math notranslate nohighlight">\(cos\)</span> functions are exact.</p>
+<p>Another example that creates a binary, including its particles, at once is:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">&lt;</span><span class="n">binary2</span><span class="o">&gt;</span>
+<span class="n">couple</span> <span class="o">=</span> <span class="mi">1</span>
+<span class="n">mass</span> <span class="o">=</span> <span class="mf">1.0</span>          <span class="c1"># Total binary mass</span>
+<span class="n">q</span> <span class="o">=</span> <span class="mf">1.0</span>             <span class="c1"># Binary mass ratio</span>
+<span class="n">a</span> <span class="o">=</span> <span class="mf">1.0</span>             <span class="c1"># Binary semi-major axis</span>
+<span class="n">e</span> <span class="o">=</span> <span class="mf">0.0</span>             <span class="c1"># Binary eccentricity</span>
+<span class="n">i</span> <span class="o">=</span> <span class="mf">0.0</span>             <span class="c1"># Binary inclination (in degrees)</span>
+<span class="n">omega</span> <span class="o">=</span> <span class="mf">0.0</span>         <span class="c1"># Binary argument of pericenter (in degrees)</span>
+<span class="n">Omega</span> <span class="o">=</span> <span class="mf">0.0</span>         <span class="c1"># Binary longitude of ascending node (in degrees)</span>
+<span class="n">f</span> <span class="o">=</span> <span class="mf">0.0</span>             <span class="c1"># Binary true anomaly (in degrees)</span>
+<span class="n">radius</span> <span class="o">=</span> <span class="mf">0.01</span>
+<span class="n">rsoft</span> <span class="o">=</span> <span class="mf">0.01</span>
+<span class="n">rsink</span> <span class="o">=</span> <span class="mf">0.01</span>
+<span class="n">gamma</span> <span class="o">=</span> <span class="mf">30.0</span>
+<span class="n">beta</span> <span class="o">=</span> <span class="mf">0.0</span>
+<span class="n">stype</span> <span class="o">=</span> <span class="n">spline</span>
+<span class="n">live</span> <span class="o">=</span> <span class="mi">0</span>
+<span class="n">live_after</span> <span class="o">=</span> <span class="mi">0</span>
+</pre></div>
+</div>
+<p>This creates two particles with the same properties for softening, accretion, coupling, etc.</p>
+</section>
+<section id="triples">
+<h3>Triples<a class="headerlink" href="#triples" title="Link to this heading"></a></h3>
+<p><strong>artemis</strong> supports the direct creation of hierarchical triples in a manner very similar to creating binaries.
+Triples can be created by tying three particles together, or from scratch.
+An example input block creating a triple from existing particles is,</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">&lt;</span><span class="n">particle1</span><span class="o">&gt;</span>
+<span class="o">...</span>
+<span class="o">&lt;</span><span class="n">particle2</span><span class="o">&gt;</span>
+<span class="o">...</span>
+<span class="o">&lt;</span><span class="n">particle3</span><span class="o">&gt;</span>
+<span class="o">...</span>
+<span class="o">&lt;</span><span class="n">triple1</span><span class="o">&gt;</span>
+<span class="n">primary</span> <span class="o">=</span> <span class="mi">1</span>
+<span class="n">secondary</span> <span class="o">=</span> <span class="mi">2</span>
+<span class="n">tertiary</span> <span class="o">=</span> <span class="mi">3</span>
+<span class="n">ao</span> <span class="o">=</span> <span class="mf">1.0</span>            <span class="c1"># Outer binary semi-major axis</span>
+<span class="n">eo</span> <span class="o">=</span> <span class="mf">0.0</span>            <span class="c1"># Outer binary eccentricity</span>
+<span class="o">...</span>                 <span class="c1"># Additional outer binary orbital parameters</span>
+<span class="n">a</span> <span class="o">=</span> <span class="mf">0.05</span>            <span class="c1"># Inner binary semi-major axis</span>
+<span class="n">e</span> <span class="o">=</span> <span class="mf">0.0</span>             <span class="c1"># Inner binary eccentricity</span>
+<span class="n">i</span> <span class="o">=</span> <span class="mf">0.0</span>             <span class="c1"># Inner binary inclination (in degrees)</span>
+<span class="n">omega</span> <span class="o">=</span> <span class="mf">0.0</span>         <span class="c1"># Inner binary argument of pericenter (in degrees)</span>
+<span class="n">Omega</span> <span class="o">=</span> <span class="mf">0.0</span>         <span class="c1"># Inner binary longitude of ascending node (in degrees)</span>
+<span class="n">f</span> <span class="o">=</span> <span class="mf">0.0</span>             <span class="c1"># Inner binary true anomaly (in degrees)</span>
+<span class="n">x</span> <span class="o">=</span> <span class="mf">0.0</span>             <span class="c1"># Center of mass x position</span>
+<span class="n">y</span> <span class="o">=</span> <span class="mf">0.0</span>             <span class="c1"># Center of mass y position</span>
+<span class="n">z</span> <span class="o">=</span> <span class="mf">0.0</span>             <span class="c1"># Center of mass z position</span>
+<span class="n">vx</span> <span class="o">=</span> <span class="mf">0.0</span>            <span class="c1"># Center of mass x velocity</span>
+<span class="n">vy</span> <span class="o">=</span> <span class="mf">0.0</span>            <span class="c1"># Center of mass y velocity</span>
+<span class="n">vz</span> <span class="o">=</span> <span class="mf">0.0</span>            <span class="c1"># Center of mass z velocity</span>
+</pre></div>
+</div>
+<p>Note that there is full specification of the inner orbit (secondary + tertiary) and outer orbit (primary + (secondary + tertiary)).
+Creating a triple system from scratch follows the <code class="docutils literal notranslate"><span class="pre">&lt;binary2&gt;</span></code> example above.</p>
+</section>
+<section id="n-body-systems">
+<h3>N-Body systems<a class="headerlink" href="#n-body-systems" title="Link to this heading"></a></h3>
+<p>When the number of particles becomes large, specifying each particle by hand can become tedious.
+To alleviate this, <strong>artemis</strong> can read an additional input file that lists the positions, velocities, and model parameters of a system of particles.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">&lt;</span><span class="n">system1</span><span class="o">&gt;</span>
+<span class="n">couple</span> <span class="o">=</span> <span class="mi">1</span>
+<span class="n">live</span> <span class="o">=</span> <span class="mi">1</span>
+<span class="n">live_after</span> <span class="o">=</span> <span class="mf">0.0</span>
+<span class="n">stype</span> <span class="o">=</span> <span class="n">spline</span>    <span class="c1"># none, plummer, spline</span>
+<span class="n">input_file</span> <span class="o">=</span> <span class="n">sys</span><span class="o">.</span><span class="n">txt</span>
+</pre></div>
+</div>
+<p>With the corresponding input file <code class="docutils literal notranslate"><span class="pre">sys.txt</span></code>:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># sys.txt</span>
+<span class="c1"># m x y z vx vy vz rs gamma beta target radius</span>
+<span class="mf">1e-3</span>  <span class="mf">1.0</span>     <span class="mf">0.0</span>     <span class="mi">0</span>       <span class="mi">0</span>       <span class="mi">0</span>       <span class="mi">0</span>       <span class="mf">6.43e-4</span> <span class="mf">1.0</span>     <span class="mi">0</span>       <span class="mf">4.8e-2</span>  <span class="mf">6.4e-3</span>
+<span class="mf">1e-5</span>  <span class="mf">0.0</span>     <span class="mf">1.0</span>     <span class="mi">0</span>       <span class="mi">0</span>       <span class="mi">0</span>       <span class="mi">0</span>       <span class="mf">6.77e-4</span> <span class="mf">1.0</span>     <span class="mi">0</span>       <span class="mf">5.0e-2</span>  <span class="mf">6.7e-3</span>
+<span class="mf">2e-2</span>   <span class="mf">0.0</span>    <span class="mf">0.0</span>     <span class="mi">0</span>       <span class="mi">0</span>       <span class="mi">0</span>       <span class="mi">0</span>       <span class="mf">7.11e-4</span> <span class="mf">1.0</span>     <span class="mi">0</span>       <span class="mf">5.3e-2</span>  <span class="mf">7.1e-3</span>
+<span class="mf">1e-4</span>  <span class="mf">1.0</span>     <span class="mf">1.0</span>     <span class="mi">0</span>       <span class="mi">0</span>       <span class="mi">0</span>       <span class="mi">0</span>       <span class="mf">7.45e-4</span> <span class="mf">1.0</span>     <span class="mi">0</span>       <span class="mf">5.5e-2</span>  <span class="mf">7.4e-3</span>
+</pre></div>
+</div>
+</section>
+<section id="planetary-systems">
+<h3>Planetary systems<a class="headerlink" href="#planetary-systems" title="Link to this heading"></a></h3>
+<p>Similarly to the <code class="docutils literal notranslate"><span class="pre">&lt;system&gt;</span></code> block, a planetary system can be easily added with a <code class="docutils literal notranslate"><span class="pre">&lt;planet&gt;</span></code> block.
+Here, instead of specifying positions and velocities, the <code class="docutils literal notranslate"><span class="pre">&lt;planet&gt;</span></code> block specifies the orbital parameters of a collection of planets.
+An example input block and configuration file to set up a system of 4 Jupiters is</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">&lt;</span><span class="n">planet1</span><span class="o">&gt;</span>
+<span class="n">couple</span> <span class="o">=</span> <span class="mi">1</span>
+<span class="n">live</span> <span class="o">=</span> <span class="mi">1</span>
+<span class="n">live_after</span> <span class="o">=</span> <span class="mf">0.0</span>
+<span class="n">stype</span> <span class="o">=</span> <span class="n">spline</span>    <span class="c1"># none, plummer, spline</span>
+<span class="n">input_file</span> <span class="o">=</span> <span class="n">psys</span><span class="o">.</span><span class="n">txt</span>
+</pre></div>
+</div>
+<p>With the corresponding input file <code class="docutils literal notranslate"><span class="pre">psys.txt</span></code>:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># psys.txt</span>
+<span class="c1"># q a e i f o O rs gamma beta target radius</span>
+<span class="mf">1e-3</span>  <span class="mf">1.0</span>     <span class="mi">0</span>       <span class="mi">0</span>       <span class="mi">0</span>       <span class="mi">0</span>       <span class="mi">0</span>       <span class="mf">6.43e-4</span> <span class="mf">1.0</span>     <span class="mi">0</span>       <span class="mf">4.8e-2</span>  <span class="mf">6.4e-3</span>
+<span class="mf">1e-3</span>  <span class="mf">2.0</span>     <span class="mi">0</span>       <span class="mi">0</span>       <span class="mi">0</span>       <span class="mi">0</span>       <span class="mi">0</span>       <span class="mf">6.77e-4</span> <span class="mf">1.0</span>     <span class="mi">0</span>       <span class="mf">5.0e-2</span>  <span class="mf">6.7e-3</span>
+<span class="mf">1e-3</span>  <span class="mf">3.0</span>     <span class="mi">0</span>       <span class="mi">0</span>       <span class="mi">0</span>       <span class="mi">0</span>       <span class="mi">0</span>       <span class="mf">7.11e-4</span> <span class="mf">1.0</span>     <span class="mi">0</span>       <span class="mf">5.3e-2</span>  <span class="mf">7.1e-3</span>
+<span class="mf">1e-3</span>  <span class="mf">4.0</span>     <span class="mi">0</span>       <span class="mi">0</span>       <span class="mi">0</span>       <span class="mi">0</span>       <span class="mi">0</span>       <span class="mf">7.45e-4</span> <span class="mf">1.0</span>     <span class="mi">0</span>       <span class="mf">5.5e-2</span>  <span class="mf">7.4e-3</span>
+</pre></div>
+</div>
+<p>All planets share the options set in the <code class="docutils literal notranslate"><span class="pre">&lt;planet&gt;</span></code> block.</p>
+<p>Note that the central object has been left unspecified.
+An additional particle can be added at the center of the system to represent the star, or a <code class="docutils literal notranslate"><span class="pre">&lt;binary&gt;</span></code> block could be added to model a circumbinary planetary sytem, or even a <code class="docutils literal notranslate"><span class="pre">&lt;system&gt;</span></code> block for a circum-cluster planetary system.</p>
+</section>
+<section id="n-body-outputs">
+<h3>N-Body Outputs<a class="headerlink" href="#n-body-outputs" title="Link to this heading"></a></h3>
+<p>There are two types of outputs that the <code class="docutils literal notranslate"><span class="pre">&lt;nbody&gt;</span></code> will produce if <code class="docutils literal notranslate"><span class="pre">dt_output</span></code> is defined.
+The first output is the <code class="docutils literal notranslate"><span class="pre">.reb</span></code> file.
+This file lists the state of each particle in the simulation at the output time, as well as the total amount of mass and momentum change since the last output.
+It is laid out as an ascii history file.
+The header for a 2 particle system looks like</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># job.reb</span>
+<span class="c1"># NBody data N = 2</span>
+<span class="c1"># [1]=time  [2]=hash  [3]=active  [4]=mass  [5]=x [6]=y [7]=z [8]=vx  [9]=vy  [10]=vz [11]=dm [12]=dmx_g  [13]=dmy_g  [14]=dmz_g  [15]=dmx_a  [16]=dmy_a  [17]=dmz_a</span>
+</pre></div>
+</div>
+<p>Note that everything is in Cartesian coordinates – regardless of the problem geometry.
+Columns 11-17 hold cumulative quantities (since the last output) of mass accreted (<code class="docutils literal notranslate"><span class="pre">dm</span></code>), momentum change due to the gravitational interaction with the fluids (<code class="docutils literal notranslate"><span class="pre">dm(x,y,z)_g</span></code>), and momentum accreted (<code class="docutils literal notranslate"><span class="pre">dm(x,y,z)_a</span></code>).
+These quantities are calculated using every timestep of the simulation.
+Because of this, very accurate time-averages can be obtained from this data.
+Each particle is written as a new line.
+Therefore, for this 2 particle example, the first two rows of data correspond to the same time.</p>
+<p>The second type of output file is the <code class="docutils literal notranslate"><span class="pre">.orb</span></code> file.
+This file takes all the data that is already in the <code class="docutils literal notranslate"><span class="pre">.reb</span></code> file and outputs derived quantities useful for analysis of binaries, e.g., orbital elements, differential forces, and average forces.
+An example header for the <code class="docutils literal notranslate"><span class="pre">.orb</span></code> file is:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># job.orb.0_1</span>
+<span class="c1"># NBody Orbit data</span>
+<span class="c1"># [1]=time  [2]=mb  [3]=xc  [4]=yc  [5]=zc  [6]=xb  [7]=yb  [8]=zb  [9]=vxc [10]=vyc  [11]=vzc  [12]=vxb  [13]=vyb  [14]=vzb  [15]=qb [16]=nb [17]=ab [18]=eb [19]=Ib [20]=o  [21]=O  [22]=pomega [23]=f  [24]=h  [25]=ex [26]=ey [27]=ix [28]=iy [29]=dm [30]=Fx_grav_com  [31]=Fy_grav_com  [32]=Fz_grav_com  [33]=Fx_acc_com [34]=Fy_acc_com [35]=Fz_acc_com [36]=Fx_grav_bin  [37]=Fy_grav_bin  [38]=Fz_grav_bin  [39]=Fx_acc_bin [40]=Fy_acc_bin [41]=Fz_acc_bin</span>
+</pre></div>
+</div>
+<p>At every output time, <strong>artemis</strong> looks for all pairs of bound particles. Each bound pair is output to their own file, e.g., particles 0 and 1 are put in <code class="docutils literal notranslate"><span class="pre">.orb.0_1</span></code>.
+Columns 3-14 provide the center of mass position/velocity and separation position/velocity.
+Columns 15-28 have the orbital elements (in addition to the mass ratio and mean motion) computed directly from REBOUND.
+Columns 29-41 combine Columns 11-17 of the <code class="docutils literal notranslate"><span class="pre">.reb</span></code> file into forces on the center of mass or the separation. In particular, forces marked with <code class="docutils literal notranslate"><span class="pre">bin</span></code> are combined as <span class="math notranslate nohighlight">\(\mu_1 f_2 - \mu_2 f_1\)</span>, where <span class="math notranslate nohighlight">\(\mu_i = m_i/m_b\)</span>.</p>
+<p>To disable these outputs, set <code class="docutils literal notranslate"><span class="pre">disable_outputs</span> <span class="pre">=</span> <span class="pre">true</span></code> in the <code class="docutils literal notranslate"><span class="pre">&lt;nbody&gt;</span></code> block.</p>
+</section>
+</section>
+<section id="external-gravity">
+<h2>External Gravity<a class="headerlink" href="#external-gravity" title="Link to this heading"></a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">&lt;gravity&gt;</span></code> node adds external gravitational forces to every fluid.
+Specifically, <strong>artemis</strong>, adds the body force,</p>
+<div class="math notranslate nohighlight">
+\[\rho \frac{D \mathbf{v}}{D t} = \rho \mathbf{g}\]</div>
+<p>To activate external gravity, there must be a subnode of <code class="docutils literal notranslate"><span class="pre">&lt;gravity&gt;</span></code> (e.g., <code class="docutils literal notranslate"><span class="pre">&lt;gravity/point&gt;</span></code>) and <code class="docutils literal notranslate"><span class="pre">gravity</span> <span class="pre">=</span> <span class="pre">true</span></code> under the <code class="docutils literal notranslate"><span class="pre">&lt;physics&gt;</span></code> node.
+The specific model for the gravitational acceleration, <span class="math notranslate nohighlight">\(\mathbf{g}\)</span>, is controlled by adding the appropriate subnode.
+Available options are:</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">&lt;gravity/constant&gt;</span></code></p>
+<p>This specifies a constant gravitational acceleration. The components of <span class="math notranslate nohighlight">\(\mathbf{g}\)</span> in each direction are required.
+An example input block that sets <span class="math notranslate nohighlight">\(\mathbf{g}=-1.0 \mathbf{\hat{z}}\)</span> is,</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">&lt;</span><span class="n">gravity</span><span class="o">/</span><span class="n">constant</span><span class="o">&gt;</span>
+<span class="n">gx1</span> <span class="o">=</span> <span class="mf">0.0</span>
+<span class="n">gx2</span> <span class="o">=</span> <span class="mf">0.0</span>
+<span class="n">gx3</span> <span class="o">=</span> <span class="o">-</span><span class="mf">1.0</span>
+</pre></div>
+</div>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&lt;gravity/point&gt;</span></code></p>
+<p>This adds the gravitational acceleration, <span class="math notranslate nohighlight">\(\mathbf{g} = - GM /r^2\)</span>, from a point mass.
+The potential can be (optionally) softened by adding a fixed number to the distance of a cell to the point mass.
+Additionally, the point mass can remove mass from cells within a specified distance at a specified rate.
+An example input block with all available parameters for a point mass are:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">&lt;</span><span class="n">gravity</span><span class="o">/</span><span class="n">point</span><span class="o">&gt;</span>
+<span class="n">mass</span> <span class="o">=</span> <span class="mf">1.0</span>
+<span class="n">x</span> <span class="o">=</span> <span class="mf">0.0</span>
+<span class="n">y</span> <span class="o">=</span> <span class="mf">0.0</span>
+<span class="n">z</span> <span class="o">=</span> <span class="mf">0.0</span>
+<span class="n">soft</span> <span class="o">=</span> <span class="mf">1e-3</span>        <span class="c1"># Softening radius</span>
+<span class="n">sink</span> <span class="o">=</span> <span class="mf">1e-3</span>        <span class="c1"># Mass accretion radius</span>
+<span class="n">sink_rate</span> <span class="o">=</span> <span class="mf">30.0</span>   <span class="c1"># Mass removal rate</span>
+</pre></div>
+</div>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&lt;gravity/binary&gt;</span></code></p>
+<p>This adds two point masses in a fixed binary orbit.
+In addition to the softening and accretion prescriptions described above, there are also parameters that describe the binary orbit.
+An example input block that adds a Sun-Jupiter binary is:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">&lt;</span><span class="n">gravity</span><span class="o">/</span><span class="n">binary</span><span class="o">&gt;</span>
+<span class="n">mass</span> <span class="o">=</span> <span class="mf">1.0</span>          <span class="c1"># Total binary mass</span>
+<span class="n">x</span> <span class="o">=</span> <span class="mf">0.0</span>             <span class="c1"># Binary x center of mass</span>
+<span class="n">y</span> <span class="o">=</span> <span class="mf">0.0</span>             <span class="c1"># Binary y center of mass</span>
+<span class="n">z</span> <span class="o">=</span> <span class="mf">0.0</span>             <span class="c1"># Binary z center of mass</span>
+<span class="n">soft1</span> <span class="o">=</span> <span class="mf">0.0</span>         <span class="c1"># Softening radius of the primary</span>
+<span class="n">soft2</span> <span class="o">=</span> <span class="mf">0.0</span>         <span class="c1"># Softening radius of the secondary</span>
+<span class="n">sink1</span> <span class="o">=</span> <span class="mf">0.0</span>         <span class="c1"># Mass accretion radius of the primary</span>
+<span class="n">sink_rate1</span> <span class="o">=</span> <span class="mf">0.0</span>    <span class="c1"># Mass removal rate of the primary</span>
+<span class="n">sink2</span> <span class="o">=</span> <span class="mf">0.01</span>        <span class="c1"># Mass accretion radius of the secondary</span>
+<span class="n">sink_rate2</span> <span class="o">=</span> <span class="mf">30.0</span>   <span class="c1"># Mass removal rate of the secondary</span>
+<span class="n">q</span> <span class="o">=</span> <span class="mi">1</span><span class="o">-</span><span class="mi">3</span>             <span class="c1"># Binary mass ratio</span>
+<span class="n">a</span> <span class="o">=</span> <span class="mf">1.0</span>             <span class="c1"># Binary semi-major axis</span>
+<span class="n">e</span> <span class="o">=</span> <span class="mf">0.0</span>             <span class="c1"># Binary eccentricity</span>
+<span class="n">i</span> <span class="o">=</span> <span class="mf">0.0</span>             <span class="c1"># Binary inclination (in degrees)</span>
+<span class="n">omega</span> <span class="o">=</span> <span class="mf">0.0</span>         <span class="c1"># Binary argument of pericenter (in degrees)</span>
+<span class="n">Omega</span> <span class="o">=</span> <span class="mf">0.0</span>         <span class="c1"># Binary longitude of ascending node (in degrees)</span>
+<span class="n">f</span> <span class="o">=</span> <span class="mf">0.0</span>             <span class="c1"># Binary true anomaly (in degrees)</span>
+</pre></div>
+</div>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&lt;gravity/nbody&gt;</span></code></p>
+<p>This indicates that the gravitational force will be calculated by the N-body system defined in the <code class="docutils literal notranslate"><span class="pre">&lt;nbody&gt;</span></code> input block.
+Unlike the other gravity nodes, <code class="docutils literal notranslate"><span class="pre">&lt;gravity/nbody&gt;</span></code> has no parameters. Instead, all parameters live under the <code class="docutils literal notranslate"><span class="pre">&lt;nbody&gt;</span></code> node.
+To activate nbody gravity, simply add:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">&lt;</span><span class="n">gravity</span><span class="o">/</span><span class="n">nbody</span><span class="o">&gt;</span>
+</pre></div>
+</div>
+</li>
+</ul>
+<p>See <a class="reference internal" href="#n-body-dynamics">N-Body Dynamics</a> for a description of how to set up the N-body system.</p>
+</section>
+<section id="rotating-frame">
+<h2>Rotating Frame<a class="headerlink" href="#rotating-frame" title="Link to this heading"></a></h2>
+<p><strong>artemis</strong> is capable of evolving the fluid in a non-inertial, rotating frame.
+This adds the Coriolis and centrifugal forces,</p>
+<div class="math notranslate nohighlight">
+\[\rho \frac{D \mathbf{v}}{D t} = - 2 \rho \mathbf{\Omega} \times \mathbf{v} - \rho \mathbf{\Omega} \times \mathbf{\Omega} \times \mathbf{r}\]</div>
+<p>and the corresponding centrifugal work term to the total energy equation.</p>
+<p>In order to use the rotating frame capability, there needs to be a <code class="docutils literal notranslate"><span class="pre">&lt;rotating_frame&gt;</span></code> input block and  <code class="docutils literal notranslate"><span class="pre">rotating_frame</span> <span class="pre">=</span> <span class="pre">true</span></code> under the <code class="docutils literal notranslate"><span class="pre">&lt;physics&gt;</span></code> block.</p>
+<p>For simplicity, <strong>artemis</strong> assumes that the rotation vector, <span class="math notranslate nohighlight">\(\mathbf{\Omega}\)</span>, is constant in time and aligned with the <span class="math notranslate nohighlight">\(z\)</span>-axis.
+Moreover, the <code class="docutils literal notranslate"><span class="pre">&lt;rotating_frame&gt;</span></code> block takes on different meanings in different coordinate systems.</p>
+<p>In axisymmetric, cylindrical, or spherical geometries, <span class="math notranslate nohighlight">\(\mathbf{\Omega} = \Omega_0 \mathbf{\hat{z}}\)</span>.
+There is only parameter under <code class="docutils literal notranslate"><span class="pre">&lt;rotating_frame&gt;</span></code>, <code class="docutils literal notranslate"><span class="pre">omega</span></code>, that sets the rotation rate <span class="math notranslate nohighlight">\(\Omega_0\)</span>.
+An example input block that sets the rotation rate to unity is:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">&lt;</span><span class="n">rotating_frame</span><span class="o">&gt;</span>
+<span class="n">omega</span> <span class="o">=</span> <span class="mf">1.0</span>
+</pre></div>
+</div>
+<p>In Cartesian problems, <code class="docutils literal notranslate"><span class="pre">&lt;rotating_frame&gt;</span></code> activates the “shearing-box” approximation.
+The shearing-box is a local approximation of an accretion disk at some fixed radius.
+The central potential is approximated as a constant value plus a linear shear:</p>
+<div class="math notranslate nohighlight">
+\[\rho \frac{D \mathbf{v}}{D t} = - 2 \Omega_0 \rho \mathbf{\hat{z}} \times \mathbf{v} + \rho \Omega_0^2 ( 2 q x \mathbf{\hat{x}} - z \mathbf{\hat{z}} )\]</div>
+<p>where <span class="math notranslate nohighlight">\(q = -d \ln \Omega / d \ln r\)</span> is the shear rate.
+An example input block for a Keplerian shearing-box is</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">&lt;</span><span class="n">rotating_frame</span><span class="o">&gt;</span>
+<span class="n">omega</span> <span class="o">=</span> <span class="mf">1.0</span>
+<span class="n">q</span>  <span class="o">=</span> <span class="mf">1.5</span>
+</pre></div>
+</div>
+</section>
+<section id="drag">
+<h2>Drag<a class="headerlink" href="#drag" title="Link to this heading"></a></h2>
+<p><strong>artemis</strong> supports limited fluid-fluid interactions.
+The simplest such interaction is drag – specifically, drag between the gas and dust fluids.
+To enable drag, <code class="docutils literal notranslate"><span class="pre">drag</span></code> needs to be set to <code class="docutils literal notranslate"><span class="pre">true</span></code> under the <code class="docutils literal notranslate"><span class="pre">&lt;physics&gt;</span></code> node.
+In the case of a single gas species interacting with many dust species, <strong>artemis</strong> adds the following forces to the fluid momenta equations,</p>
+<div class="math notranslate nohighlight">
+\[\begin{split}\frac{D \mathbf{v}_g}{Dt} = - \sum_j \alpha_j (\mathbf{v}_g - \mathbf{v}_j ) - \beta_g (\mathbf{v}_g - \mathbf{u}_g) \\\\
+\frac{D \mathbf{v}_j}{Dt} =  \alpha_j (\mathbf{v}_g - \mathbf{v}_j ) - \beta_j (\mathbf{v}_j - \mathbf{u}_j)\end{split}\]</div>
+<p>where <span class="math notranslate nohighlight">\(\alpha_j\)</span> are the coupling rates between dust species <span class="math notranslate nohighlight">\(j\)</span> and the gas.
+<strong>artemis</strong> supports constant values of the coupling rates and a Stokes model where,</p>
+<div class="math notranslate nohighlight">
+\[\alpha_j = \frac{\rho_g v_{th}}{\rho_{grain} a_{grain}}\]</div>
+<p>where <span class="math notranslate nohighlight">\(\rho_{grain}\)</span> is the grain density (not the fluid density), <span class="math notranslate nohighlight">\(a_{grain}\)</span> is the grain size, and <span class="math notranslate nohighlight">\(v_{th}\)</span> is the thermal speed in the gas.
+In addition to the dust-gas drag, <strong>artemis</strong> also allows for self-drag that damps each fluid velocity to a target value (<span class="math notranslate nohighlight">\(\mathbf{u}_j\)</span>) at the rate <span class="math notranslate nohighlight">\(\beta_j\)</span>.</p>
+<p>An example calculation that includes both a Stokes drag model and self-drag for both the gas and dust is:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">&lt;</span><span class="n">gas</span><span class="o">&gt;</span>
+ <span class="o">....</span>
+<span class="o">&lt;</span><span class="n">dust</span><span class="o">&gt;</span>
+<span class="o">....</span>
+<span class="n">sizes</span> <span class="o">=</span> <span class="mf">1e-6</span><span class="p">,</span> <span class="mf">1e-4</span><span class="p">,</span> <span class="mf">1e-2</span>  <span class="c1"># grain sizes</span>
+<span class="n">grain_density</span> <span class="o">=</span> <span class="mf">1.4</span>       <span class="c1"># grain density</span>
+
+<span class="o">&lt;</span><span class="n">dust</span><span class="o">/</span><span class="n">stopping_time</span><span class="o">&gt;</span>
+<span class="nb">type</span> <span class="o">=</span>  <span class="n">stokes</span>
+
+<span class="o">&lt;</span><span class="n">gas</span><span class="o">/</span><span class="n">damping</span><span class="o">&gt;</span>
+<span class="n">inner_x1</span> <span class="o">=</span> <span class="mf">0.45</span>
+<span class="n">outer_x2</span> <span class="o">=</span> <span class="mf">2.8</span>
+<span class="n">inner_x1_rate</span> <span class="o">=</span> <span class="mf">30.0</span>
+<span class="n">inner_x2_rate</span> <span class="o">=</span> <span class="mf">30.0</span>
+
+<span class="o">&lt;</span><span class="n">dust</span><span class="o">/</span><span class="n">damping</span><span class="o">&gt;</span>
+<span class="n">inner_x1</span> <span class="o">=</span> <span class="mf">0.45</span>
+<span class="n">outer_x2</span> <span class="o">=</span> <span class="mf">2.8</span>
+<span class="n">inner_x1_rate</span> <span class="o">=</span> <span class="mf">30.0</span>
+<span class="n">inner_x2_rate</span> <span class="o">=</span> <span class="mf">30.0</span>
+
+<span class="o">&lt;</span><span class="n">drag</span><span class="o">&gt;</span>
+<span class="nb">type</span> <span class="o">=</span> <span class="n">simple_dust</span>
+</pre></div>
+</div>
+<p>Note that the grain sizes and density must be in code units.</p>
+</section>
+<section id="radiation">
+<h2>Radiation<a class="headerlink" href="#radiation" title="Link to this heading"></a></h2>
+<p><strong>artemis</strong> supports gray photon transport via coupling to the <strong>jaybenne</strong> package.  The gray
+representation of the radiation transport equation is</p>
+<div class="math notranslate nohighlight">
+\[\partial_t I + c \mathbf{n} \cdot \nabla I = c \left(j - \alpha I \right),\]</div>
+<p>where <span class="math notranslate nohighlight">\(I\)</span> is the frequency integrated specific intensity, <span class="math notranslate nohighlight">\(j\)</span> is the
+frequency integrated emissivity, and <span class="math notranslate nohighlight">\(\alpha\)</span> is the frequency integrated
+absorptivity.  <strong>jaybenne</strong> evolves the transport equation via history-based, implicit Monte
+Carlo.  Currently, <strong>jaybenne</strong> only supports emissivity/absorptivity decompositions into an
+isotropic, elastic scattering component and a thermal emission/absorption component
+(following the gray form of Kirchoff’s law, hence assuming LTE).</p>
+<p>The resolution element in <strong>jaybenne</strong> is the number of particles used to sample photon
+phase space. Particles are handled via Parthenon’s swarm API.  By default, Parthenon’s
+swarm API permits periodic and outflow boundary conditions on particles.  Additionally,
+<strong>jaybenne</strong> supplies reflecting boundary conditions.  Boundary conditions are enrolled as
+follows:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">&lt;</span><span class="n">parthenon</span><span class="o">/</span><span class="n">swarm</span><span class="o">&gt;</span>
+<span class="n">ix1_bc</span> <span class="o">=</span> <span class="n">jaybenne_reflecting</span>
+<span class="n">ox1_bc</span> <span class="o">=</span> <span class="n">jaybenne_reflecting</span>
+<span class="n">ix2_bc</span> <span class="o">=</span> <span class="n">periodic</span>
+<span class="n">ox2_bc</span> <span class="o">=</span> <span class="n">periodic</span>
+<span class="n">ix3_bc</span> <span class="o">=</span> <span class="n">periodic</span>
+<span class="n">ox3_bc</span> <span class="o">=</span> <span class="n">periodic</span>
+</pre></div>
+</div>
+<p>An <strong>artemis</strong> input file interfaces with <strong>jaybenne</strong> via a <code class="docutils literal notranslate"><span class="pre">&lt;jaybenne&gt;</span></code> node, e.g.,</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">&lt;</span><span class="n">jaybenne</span><span class="o">&gt;</span>
+<span class="n">dt</span> <span class="o">=</span> <span class="mf">1.0</span>
+<span class="n">num_particles</span> <span class="o">=</span> <span class="mi">10000</span>
+<span class="n">do_emission</span> <span class="o">=</span> <span class="n">true</span>
+<span class="n">do_feedback</span> <span class="o">=</span> <span class="n">true</span>
+</pre></div>
+</div>
+<p>where <code class="docutils literal notranslate"><span class="pre">dt</span></code> defines a constant timestep by which radiation limits the global timestep (if
+desired), <code class="docutils literal notranslate"><span class="pre">num_particles</span></code> sets the resolution element for IMC, <code class="docutils literal notranslate"><span class="pre">do_emission</span></code> enables
+thermal emission, and <code class="docutils literal notranslate"><span class="pre">do_feedback</span></code> triggers coupling between the radiation field and
+the relevant <strong>artemis</strong> energy field (momentum coupling is not yet implemented).  Remaining
+<code class="docutils literal notranslate"><span class="pre">&lt;jaybenne&gt;</span></code> runtime parameters will be defined in forthcoming <code class="docutils literal notranslate"><span class="pre">jaybenne</span></code>
+documentation.</p>
+<p>Finally, <strong>jaybenne</strong> interfaces with <strong>artemis</strong> gas fields via absorption and scattering
+opacities constructed with <code class="docutils literal notranslate"><span class="pre">singularity-opac</span></code>.  A user interfaces with opacity models
+via additional input nodes, e.g.,</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">&lt;</span><span class="n">gas</span><span class="o">/</span><span class="n">opacity</span><span class="o">/</span><span class="n">absorption</span><span class="o">&gt;</span>
+<span class="n">opacity_model</span> <span class="o">=</span> <span class="n">constant</span>
+<span class="n">kappa_a</span> <span class="o">=</span> <span class="mf">1.0</span>
+
+<span class="o">&lt;</span><span class="n">gas</span><span class="o">/</span><span class="n">opacity</span><span class="o">/</span><span class="n">scattering</span><span class="o">&gt;</span>
+<span class="n">scattering_model</span> <span class="o">=</span> <span class="n">constant</span>
+<span class="n">kappa_s</span> <span class="o">=</span> <span class="mf">1.0</span>
+</pre></div>
+</div>
+<p>where the above enrolls constant specific absorption and scattering opacities <code class="docutils literal notranslate"><span class="pre">kappa_a</span></code>
+and <code class="docutils literal notranslate"><span class="pre">kappa_s</span></code>, respectively.  By default, <code class="docutils literal notranslate"><span class="pre">jaybenne</span></code> operates in assumed CGS units.
+Often test problems invoke custom code units; see <code class="docutils literal notranslate"><span class="pre">opacity_model</span> <span class="pre">=</span> <span class="pre">thermalization</span></code>
+and/or <code class="docutils literal notranslate"><span class="pre">opacity_model</span> <span class="pre">==</span> <span class="pre">shocktube_a</span></code> implementations for custom units enrollment.</p>
+<p>In a <code class="docutils literal notranslate"><span class="pre">&lt;parthenon/output...&gt;</span></code> block, a user can pass <code class="docutils literal notranslate"><span class="pre">field.jaybenne.energy_tally</span></code> to
+dump the radiation energy density, as computed by <strong>jaybenne</strong>.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="pgen.html" class="btn btn-neutral float-left" title="Problem Generators" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="running.html" class="btn btn-neutral float-right" title="Running artemis" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 
+ (C) (or copyright) 2024. Triad National Security, LLC. All rights reserved.
+.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

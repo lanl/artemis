@@ -23,7 +23,9 @@
 #include "nbody/nbody.hpp"
 #include "rotating_frame/rotating_frame.hpp"
 #include "utils/artemis_utils.hpp"
+#include "utils/eos/eos.hpp"
 #include "utils/history.hpp"
+#include "utils/opacity/opacity.hpp"
 #include "utils/units.hpp"
 
 // Jaybenne includes
@@ -104,11 +106,12 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   if (do_dust) packages.Add(Dust::Initialize(pin.get(), units));
   if (do_rotating_frame) packages.Add(RotatingFrame::Initialize(pin.get()));
   if (do_cooling) packages.Add(Gas::Cooling::Initialize(pin.get()));
-  if (do_drag) packages.Add(Drag::Initialize(pin.get()));
+  if (do_drag) packages.Add(Drag::Initialize(pin.get(), constants, units));
   if (do_radiation) {
-    auto eos_h = packages.Get("gas")->Param<EOS>("eos_h");
-    auto opacity_h = packages.Get("gas")->Param<Opacity>("opacity_h");
-    auto scattering_h = packages.Get("gas")->Param<Scattering>("scattering_h");
+    auto eos_h = packages.Get("gas")->Param<ArtemisUtils::EOS>("eos_h");
+    auto opacity_h = packages.Get("gas")->Param<ArtemisUtils::Opacity>("opacity_h");
+    auto scattering_h =
+        packages.Get("gas")->Param<ArtemisUtils::Scattering>("scattering_h");
     packages.Add(jaybenne::Initialize(pin.get(), opacity_h, scattering_h, eos_h));
     PARTHENON_REQUIRE(coords == Coordinates::cartesian,
                       "Jaybenne currently supports only Cartesian coordinates!");

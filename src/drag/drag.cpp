@@ -16,13 +16,16 @@
 #include "artemis.hpp"
 #include "geometry/geometry.hpp"
 #include "utils/eos/eos.hpp"
+#include "utils/units.hpp"
 
 using ArtemisUtils::EOS;
 namespace Drag {
 //----------------------------------------------------------------------------------------
 //! \fn  StateDescriptor Drag::Initialize
 //! \brief Adds intialization function for damping package
-std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
+std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
+                                            ArtemisUtils::Constants &constants,
+                                            ArtemisUtils::Units &units) {
   auto drag = std::make_shared<StateDescriptor>("drag");
   Params &params = drag->AllParams();
 
@@ -82,7 +85,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
     // Enforce 1 gas species
 
-    params.Add("stopping_time_params", StoppingTimeParams("dust/stopping_time", pin));
+    params.Add("stopping_time_params",
+               StoppingTimeParams("dust/stopping_time", pin, constants, units));
   }
 
   return drag;

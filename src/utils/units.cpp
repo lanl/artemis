@@ -32,25 +32,29 @@ Units::Units(ParameterInput *pin, std::shared_ptr<StateDescriptor> pkg) {
   } else {
     PARTHENON_FAIL("Physical unit system not recognized! Choices are [scalefree, cgs]");
   }
-
-  if (physical_units_ == PhysicalUnits::scalefree) {
-    length_ = 1.;
-    time_ = 1.;
-    mass_ = 1.;
-  } else {
+  length_ = 1.;
+  time_ = 1.;
+  mass_ = 1.;
+  temp_ = 1.;
+  if (physical_units_ != PhysicalUnits::scalefree) {
     std::string unit_conversion =
         pin->GetOrAddString("artemis", "unit_conversion", "base");
-    if (unit_conversion == "base") {
-      length_ = pin->GetOrAddReal("artemis", "length", 1.);
-      time_ = pin->GetOrAddReal("artemis", "time", 1.);
-      mass_ = pin->GetOrAddReal("artemis", "mass", 1.);
-    } else if (unit_conversion == "ppd") {
+    if (unit_conversion == "ppd") {
       length_ = AU;
       mass_ = Msolar;
       time_ = Year / (2. * M_PI);
+    } else if (unit_conversion == "base") {
+      // do nothing
     } else {
       PARTHENON_FAIL("Unit conversion not recognized! Choices are [base, ppd]");
     }
+    // not that these multiplied by whatever values were previously set.
+    // For example, if unit_conversion=ppd and mass = 10.0, then
+    // that sets mass_ to 10 MSolar.
+    length_ *= pin->GetOrAddReal("artemis", "length", 1.);
+    time_ *= pin->GetOrAddReal("artemis", "time", 1.);
+    mass_ *= pin->GetOrAddReal("artemis", "mass", 1.);
+    temp_ *= pin->GetOrAddReal("artemis", "temperature", 1.);
   }
 
   // Remaining conversion factors
@@ -99,16 +103,17 @@ Constants::Constants(Units &units) {
   const Real length = units.GetLengthCodeToPhysical();
   const Real time = units.GetTimeCodeToPhysical();
   const Real mass = units.GetMassCodeToPhysical();
+  const Real temp = units.GetTemperatureCodeToPhysical();
+  const Real energy = mass * std::pow(length / time, 2);
 
   // Convert constants to code units
   G_code_ = G_ * std::pow(length, -3) / mass * std::pow(time, 2);
-  kb_code_ =
-      kb_ * std::pow(time, 2) / mass * std::pow(length, -2); // 1 K = 1 code unit temp
+  kb_code_ = kb_ * temp / energy;
   c_code_ = c_ * time / length;
-  h_code_ = h_ * time / mass * std::pow(length, -2);
-  ar_code_ = ar_ * length * time * time / mass;
+  h_code_ = h_ / (energy * time);
+  ar_code_ = ar_ * std::pow(temp, 4) * std::pow(length, 3) / energy;
   amu_code_ = amu_ / mass;
-  eV_code_ = eV_ * std::pow(time, 2) / mass * std::pow(length, -2);
+  eV_code_ = eV_ / energy;
   Msolar_code_ = Msolar_ / mass;
   AU_code_ = AU_ / length;
   Rjup_code_ = Rjup_ / length;

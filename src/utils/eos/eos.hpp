@@ -17,7 +17,6 @@
 
 #include "artemis.hpp"
 
-
 namespace ArtemisUtils {
 
 // Maximum size of lambda array for optional extra EOS arguments.

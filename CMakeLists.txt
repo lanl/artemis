@@ -186,7 +186,8 @@ set(ARTEMIS_SINGULARITY_INCLUDE_PATHS
     ${CMAKE_CURRENT_SOURCE_DIR}/external/singularity-eos/utils/variant/include
     ${CMAKE_CURRENT_SOURCE_DIR}/external/singularity-opac/utils
     ${CMAKE_CURRENT_SOURCE_DIR}/src
-    ${CMAKE_CURRENT_SOURCE_DIR})
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/generated>)
 
 # Set Jaybenne config options and paths
 # NOTE(@pdmullen): For the life of us, we are still not sure why we can't treat

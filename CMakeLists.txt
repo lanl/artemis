@@ -119,6 +119,11 @@ if(ARTEMIS_ENABLE_ASAN)
   add_link_options(-fsanitize=address -fsanitize=undefined)
 endif()
 
+if(${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
+  # silence sprintf warnings on mac
+  add_compile_options(-Wno-deprecated-declarations)
+endif()
+
 # NOTE(@jonahm): For some reason, order still matters for including
 # parthenon and singularity. Likely has to do with project
 # includes other than Kokkos. MPI and OpenMP likely culprits.

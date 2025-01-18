@@ -152,8 +152,9 @@ struct StoppingTimeParams {
       p1 = pin->GetOrAddReal(block_name, "p1", 3.07);
       p2 = pin->GetOrAddReal(block_name, "p2", 0.6688);
       p3 = pin->GetOrAddReal(block_name, "p3", 0.681);
-      // save this so that we don't have to pass units struct to the Get() routines
-      mass_scale = units.GetMassPhysicalToCode();
+      // save this so that we don't have to pass units and constants struct to the Get()
+      // routines
+      mass_scale = units.GetMassPhysicalToCode() * constants.GetAMUCode();
 
     } else {
       PARTHENON_FAIL("bad type for stopping time model");

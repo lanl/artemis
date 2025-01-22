@@ -58,8 +58,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
     if (!var->IsAllocated()) pmb->AllocateSparse(var->label());
   }
   static auto desc =
-      MakePackDescriptor<gas::prim::density, gas::prim::velocity, gas::prim::sie,
-                         rad::prim::energy, rad::prim::flux>(
+      MakePackDescriptor<gas::prim::density, gas::prim::velocity, gas::prim::sie>(
           (pmb->resolved_packages).get());
   auto v = desc.GetPack(md.get());
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);

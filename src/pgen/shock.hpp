@@ -83,8 +83,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
     if (!var->IsAllocated()) pmb->AllocateSparse(var->label());
   }
   static auto desc =
-      MakePackDescriptor<gas::prim::density, gas::prim::velocity, gas::prim::sie,
-                         rad::prim::energy, rad::prim::flux>(
+      MakePackDescriptor<gas::prim::density, gas::prim::velocity, gas::prim::sie>(
           (pmb->resolved_packages).get());
   auto v = desc.GetPack(md.get());
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
@@ -131,8 +130,7 @@ inline void ShockInnerX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse)
 
   static auto descriptors =
       ArtemisUtils::GetBoundaryPackDescriptorMap<gas::prim::density, gas::prim::velocity,
-                                                 gas::prim::sie, rad::prim::energy,
-                                                 rad::prim::flux>(mbd);
+                                                 gas::prim::sie>(mbd);
   auto v = descriptors[coarse].GetPack(mbd.get());
   if (v.GetMaxNumberOfVars() > 0) {
     pmb->par_for_bndry(
@@ -166,8 +164,7 @@ inline void ShockOuterX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse)
 
   static auto descriptors =
       ArtemisUtils::GetBoundaryPackDescriptorMap<gas::prim::density, gas::prim::velocity,
-                                                 gas::prim::sie, rad::prim::energy,
-                                                 rad::prim::flux>(mbd);
+                                                 gas::prim::sie>(mbd);
   auto v = descriptors[coarse].GetPack(mbd.get());
   if (v.GetMaxNumberOfVars() > 0) {
     pmb->par_for_bndry(

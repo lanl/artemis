@@ -43,12 +43,14 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const bool do_radiation = artemis_pkg->Param<bool>("do_radiation");
   PARTHENON_REQUIRE(do_gas, "Thermalization problem requires gas!");
   PARTHENON_REQUIRE(!(do_dust), "Thermalization problem does not permit dust!");
+  auto gas_pkg = pmb->packages.Get("gas");
 
   const Real rho = pin->GetOrAddReal("problem", "rho", 1.0);
   const Real vx = pin->GetOrAddReal("problem", "vx", 0.0);
   const Real tgas = pin->GetOrAddReal("problem", "tgas", 2.0);
   const Real trad = pin->GetOrAddReal("problem", "trad", 1.0);
-  const Real cv = pin->GetOrAddReal("gas", "cv", 8.0);
+
+  const auto eos = gas_pkg->Param<EOS>("eos_d");
 
   // packing and capture variables for kernel
   auto &md = pmb->meshblock_data.Get();
@@ -56,7 +58,8 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
     if (!var->IsAllocated()) pmb->AllocateSparse(var->label());
   }
   static auto desc =
-      MakePackDescriptor<gas::prim::density, gas::prim::velocity, gas::prim::sie>(
+      MakePackDescriptor<gas::prim::density, gas::prim::velocity, gas::prim::sie,
+                         rad::prim::energy, rad::prim::flux>(
           (pmb->resolved_packages).get());
   auto v = desc.GetPack(md.get());
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
@@ -68,8 +71,10 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       "thermalization::trad", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
         v(0, gas::prim::density(), k, j, i) = rho;
-        v(0, gas::prim::sie(), k, j, i) = cv * trad;
+        v(0, gas::prim::sie(), k, j, i) =
+            eos.InternalEnergyFromDensityTemperature(rho, trad);
       });
+
   if (do_radiation) jaybenne::InitializeRadiation(md.get(), true);
 
   // Now reset fluid state out of thermal equilibrium via tgas
@@ -80,7 +85,8 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         v(0, gas::prim::velocity(0), k, j, i) = vx;
         v(0, gas::prim::velocity(1), k, j, i) = 0.0;
         v(0, gas::prim::velocity(2), k, j, i) = 0.0;
-        v(0, gas::prim::sie(), k, j, i) = cv * tgas;
+        v(0, gas::prim::sie(), k, j, i) =
+            eos.InternalEnergyFromDensityTemperature(rho, tgas);
       });
 }
 

@@ -46,6 +46,7 @@ using ThermalizationOpacity =
 // Reduced absorption variant for this codebase
 using Opacity = singularity::photons::impl::Variant<
     singularity::photons::NonCGSUnits<singularity::photons::Gray>,
+    singularity::photons::NonCGSUnits<singularity::photons::PowerLaw>,
     singularity::photons::NonCGSUnits<singularity::photons::EPBremss>, ShocktubeAOpacity,
     ThermalizationOpacity>;
 

@@ -32,29 +32,28 @@ Units::Units(ParameterInput *pin, std::shared_ptr<StateDescriptor> pkg) {
   } else {
     PARTHENON_FAIL("Physical unit system not recognized! Choices are [scalefree, cgs]");
   }
-  length_ = 1.;
-  time_ = 1.;
-  mass_ = 1.;
-  temp_ = 1.;
-  if (physical_units_ != PhysicalUnits::scalefree) {
+
+  if (physical_units_ == PhysicalUnits::scalefree) {
+    length_ = 1.;
+    time_ = 1.;
+    mass_ = 1.;
+    temp_ = 1.;
+  } else {
     std::string unit_conversion =
         pin->GetOrAddString("artemis", "unit_conversion", "base");
-    if (unit_conversion == "ppd") {
+    if (unit_conversion == "base") {
+      length_ = pin->GetOrAddReal("artemis", "length", 1.);
+      time_ = pin->GetOrAddReal("artemis", "time", 1.);
+      mass_ = pin->GetOrAddReal("artemis", "mass", 1.);
+      temp_ = pin->GetOrAddReal("artemis", "temperature", 1.);
+    } else if (unit_conversion == "ppd") {
       length_ = AU;
       mass_ = Msolar;
       time_ = Year / (2. * M_PI);
-    } else if (unit_conversion == "base") {
-      // do nothing
+      temp_ = 1.0;
     } else {
       PARTHENON_FAIL("Unit conversion not recognized! Choices are [base, ppd]");
     }
-    // not that these multiplied by whatever values were previously set.
-    // For example, if unit_conversion=ppd and mass = 10.0, then
-    // that sets mass_ to 10 MSolar.
-    length_ *= pin->GetOrAddReal("artemis", "length", 1.);
-    time_ *= pin->GetOrAddReal("artemis", "time", 1.);
-    mass_ *= pin->GetOrAddReal("artemis", "mass", 1.);
-    temp_ *= pin->GetOrAddReal("artemis", "temperature", 1.);
   }
 
   // Remaining conversion factors

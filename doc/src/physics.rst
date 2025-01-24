@@ -673,10 +673,7 @@ Specifically, |code|, adds the body force,
 .. math::
    \rho \frac{D \mathbf{v}}{D t} = \rho \mathbf{g}
 
-To activate external gravity, there must be a ``<gravity>`` node and ``gravity = true`` under the ``<physics>`` node.
-The ``<gravity>`` requires setting the parameter ``gm``, typically this is set to ``gm = 1.0``.
-In addition to ``gm``, the ``tstart`` and ``tstop`` parameters control when gravity is active.
-
+To activate external gravity, there must be a subnode of ``<gravity>`` (e.g., ``<gravity/point>``) and ``gravity = true`` under the ``<physics>`` node.
 The specific model for the gravitational acceleration, :math:`\mathbf{g}`, is controlled by adding the appropriate subnode.
 Available options are:
 
@@ -687,8 +684,6 @@ Available options are:
 
   ::
 
-   <gravity>
-   gm = 1.0
    <gravity/constant>
    gx1 = 0.0
    gx2 = 0.0
@@ -703,9 +698,8 @@ Available options are:
 
   ::
 
-   <gravity>
-   gm = 1.0
    <gravity/point>
+   mass = 1.0
    x = 0.0
    y = 0.0
    z = 0.0
@@ -721,9 +715,8 @@ Available options are:
 
   ::
 
-   <gravity>
-   gm = 1.0            # Binary total GM
    <gravity/binary>
+   mass = 1.0          # Total binary mass
    x = 0.0             # Binary x center of mass
    y = 0.0             # Binary y center of mass
    z = 0.0             # Binary z center of mass
@@ -745,14 +738,11 @@ Available options are:
 * ``<gravity/nbody>``
 
   This indicates that the gravitational force will be calculated by the N-body system defined in the ``<nbody>`` input block.
-  The only parameter required is the ``gm`` parameter.
-  Note that the total mass of the system defined in the ``<nbody>`` block will be rescaled to ``gm``.
-  An example input block would thus read:
+  Unlike the other gravity nodes, ``<gravity/nbody>`` has no parameters. Instead, all parameters live under the ``<nbody>`` node.
+  To activate nbody gravity, simply add:
 
   ::
 
-   <gravity>
-   gm = 1.0
    <gravity/nbody>
 
 See `N-Body Dynamics`_ for a description of how to set up the N-body system.

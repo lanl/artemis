@@ -39,7 +39,8 @@ namespace Gas {
 //! \brief Adds intialization function for gas hydrodynamics package
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
                                             ArtemisUtils::Units &units,
-                                            ArtemisUtils::Constants &constants) {
+                                            ArtemisUtils::Constants &constants,
+                                            Packages_t &packages) {
   using namespace singularity::photons;
 
   auto gas = std::make_shared<StateDescriptor>("gas");
@@ -113,9 +114,11 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
       PARTHENON_REQUIRE(mu > 0, "Only positive mean molecular weight allowed!");
       cv = constants.GetKBCode() / ((gamma - 1.) * constants.GetAMUCode() * mu);
     }
-    // store cv for outputs
-    params.Add("cv", cv);
-    EOS eos_host = singularity::IdealGas(gamma - 1., cv);
+    EOS eos_host = singularity::UnitSystem<singularity::IdealGas>(
+        singularity::IdealGas(gamma - 1., cv),
+        singularity::eos_units_init::LengthTimeUnitsInit(), units.GetTimeCodeToPhysical(),
+        units.GetMassCodeToPhysical(), units.GetLengthCodeToPhysical(),
+        units.GetTemperatureCodeToPhysical());
     EOS eos_device = eos_host.GetOnDevice();
     params.Add("eos_h", eos_host);
     params.Add("eos_d", eos_device);
@@ -131,20 +134,12 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   const Real length = units.GetLengthCodeToPhysical();
   const Real time = units.GetTimeCodeToPhysical();
   const Real mass = units.GetMassCodeToPhysical();
+  const Real temp = units.GetTemperatureCodeToPhysical();
   if (opacity_model_name == "none") {
-    opacity = NonCGSUnits<Gray>(Gray(0.0), time, mass, length, 1.);
+    opacity = NonCGSUnits<Gray>(Gray(0.0), time, mass, length, temp);
   } else if (opacity_model_name == "constant") {
     const Real kappa_a = pin->GetOrAddReal("gas/opacity/absorption", "kappa_a", 0.0);
-    opacity = NonCGSUnits<Gray>(Gray(kappa_a), time, mass, length, 1.);
-  } else if (opacity_model_name == "powerlaw") {
-    const Real coef_kappa_a =
-        pin->GetOrAddReal("gas/opacity/absorption", "coef_kappa_a", 0.0);
-    const Real rho_exp = pin->GetOrAddReal("gas/opacity/absorption", "rho_exp", 0.0);
-    const Real temp_exp = pin->GetOrAddReal("gas/opacity/absorption", "temp_exp", 0.0);
-
-    opacity = NonCGSUnits<PowerLaw>(PowerLaw(coef_kappa_a, rho_exp, temp_exp), time, mass,
-                                    length, 1.);
-
+    opacity = NonCGSUnits<Gray>(Gray(kappa_a), time, mass, length, temp);
   } else if (opacity_model_name == "shocktube_a") {
     const Real coef_kappa_a =
         pin->GetOrAddReal("gas/opacity/absorption", "coef_kappa_a", 0.0);
@@ -166,10 +161,10 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   std::string scattering_model_name =
       pin->GetOrAddString("gas/opacity/scattering", "scattering_model", "none");
   if (scattering_model_name == "none") {
-    scattering = NonCGSUnitsS<GrayS>(GrayS(0.0, 1.0), time, mass, length, 1.);
+    scattering = NonCGSUnitsS<GrayS>(GrayS(0.0, 1.0), time, mass, length, temp);
   } else if (scattering_model_name == "constant") {
     const Real kappa_s = pin->GetOrAddReal("gas/opacity/scattering", "kappa_s", 0.0);
-    scattering = NonCGSUnitsS<GrayS>(GrayS(kappa_s, 1.0), time, mass, length, 1.);
+    scattering = NonCGSUnitsS<GrayS>(GrayS(kappa_s, 1.0), time, mass, length, temp);
   } else {
     PARTHENON_FAIL("Scattering model not recognized!");
   }
@@ -198,11 +193,12 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   params.Add("do_diffusion", do_diffusion);
 
   if (do_viscosity) {
-    Diffusion::DiffCoeffParams dp("gas/viscosity", "viscosity", pin, constants);
+    Diffusion::DiffCoeffParams dp("gas/viscosity", "viscosity", pin, constants, packages);
     params.Add("visc_params", dp);
   }
   if (do_conduction) {
-    Diffusion::DiffCoeffParams dp("gas/conductivity", "conductivity", pin, constants);
+    Diffusion::DiffCoeffParams dp("gas/conductivity", "conductivity", pin, constants,
+                                  packages);
     params.Add("cond_params", dp);
   }
 
@@ -446,9 +442,9 @@ Real EstimateTimestepMesh(MeshData<Real> *md) {
   const auto do_viscosity = params.template Get<bool>("do_viscosity");
   if (do_viscosity) {
     auto dp = params.template Get<Diffusion::DiffCoeffParams>("visc_params");
-    if (dp.type == Diffusion::DiffType::viscosity_const) {
+    if (dp.type == Diffusion::DiffType::viscosity_plaw) {
       visc_dt = Diffusion::EstimateTimestep<GEOM, Fluid::gas,
-                                            Diffusion::DiffType::viscosity_const>(
+                                            Diffusion::DiffType::viscosity_plaw>(
           md, dp, gas_pkg, eos_d, vmesh);
     } else if (dp.type == Diffusion::DiffType::viscosity_alpha) {
       visc_dt = Diffusion::EstimateTimestep<GEOM, Fluid::gas,
@@ -461,13 +457,13 @@ Real EstimateTimestepMesh(MeshData<Real> *md) {
   const auto do_conduction = params.template Get<bool>("do_conduction");
   if (do_conduction) {
     auto dp = params.template Get<Diffusion::DiffCoeffParams>("cond_params");
-    if (dp.type == Diffusion::DiffType::conductivity_const) {
+    if (dp.type == Diffusion::DiffType::conductivity_plaw) {
       cond_dt = Diffusion::EstimateTimestep<GEOM, Fluid::gas,
-                                            Diffusion::DiffType::conductivity_const>(
+                                            Diffusion::DiffType::conductivity_plaw>(
           md, dp, gas_pkg, eos_d, vmesh);
-    } else if (dp.type == Diffusion::DiffType::thermaldiff_const) {
+    } else if (dp.type == Diffusion::DiffType::thermaldiff_plaw) {
       cond_dt = Diffusion::EstimateTimestep<GEOM, Fluid::gas,
-                                            Diffusion::DiffType::thermaldiff_const>(
+                                            Diffusion::DiffType::thermaldiff_plaw>(
           md, dp, gas_pkg, eos_d, vmesh);
     }
   }
@@ -553,10 +549,10 @@ TaskStatus ViscousFlux(MeshData<Real> *md) {
 
   if (dp.type == Diffusion::DiffType::null) {
     return TaskStatus::complete;
-  } else if (dp.type == Diffusion::DiffType::viscosity_const) {
+  } else if (dp.type == Diffusion::DiffType::viscosity_plaw) {
     return Diffusion::MomentumFluxImpl<GEOM, Fluid::gas,
-                                       Diffusion::DiffType::viscosity_const>(md, dp, pkg,
-                                                                             vprim, vf);
+                                       Diffusion::DiffType::viscosity_plaw>(md, dp, pkg,
+                                                                            vprim, vf);
   } else if (dp.type == Diffusion::DiffType::viscosity_alpha) {
     return Diffusion::MomentumFluxImpl<GEOM, Fluid::gas,
                                        Diffusion::DiffType::viscosity_alpha>(md, dp, pkg,
@@ -591,14 +587,14 @@ TaskStatus ThermalFlux(MeshData<Real> *md) {
 
   if (dp.type == Diffusion::DiffType::null) {
     return TaskStatus::complete;
-  } else if (dp.type == Diffusion::DiffType::conductivity_const) {
+  } else if (dp.type == Diffusion::DiffType::conductivity_plaw) {
     return Diffusion::ThermalFluxImpl<GEOM, Fluid::gas,
-                                      Diffusion::DiffType::conductivity_const>(
-        md, dp, pkg, vprim, vf);
-  } else if (dp.type == Diffusion::DiffType::thermaldiff_const) {
-    return Diffusion::ThermalFluxImpl<GEOM, Fluid::gas,
-                                      Diffusion::DiffType::thermaldiff_const>(md, dp, pkg,
+                                      Diffusion::DiffType::conductivity_plaw>(md, dp, pkg,
                                                                               vprim, vf);
+  } else if (dp.type == Diffusion::DiffType::thermaldiff_plaw) {
+    return Diffusion::ThermalFluxImpl<GEOM, Fluid::gas,
+                                      Diffusion::DiffType::thermaldiff_plaw>(md, dp, pkg,
+                                                                             vprim, vf);
   } else {
     PARTHENON_FAIL("Invalid conductivity type");
   }

@@ -13,17 +13,16 @@
 #ifndef DUST_DUST_HPP_
 #define DUST_DUST_HPP_
 
-// Parthenon includes
-#include <parthenon/package.hpp>
-
 // Artemis includes
 #include "artemis.hpp"
+#include "utils/units.hpp"
 
 using namespace parthenon::package::prelude;
 
 namespace Dust {
 
-std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
+std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
+                                            ArtemisUtils::Units &units);
 
 template <Coordinates GEOM>
 Real EstimateTimestepMesh(MeshData<Real> *md);

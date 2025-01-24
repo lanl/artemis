@@ -96,16 +96,13 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         v(0, gas::prim::velocity(2), k, j, i) = 0.0;
         v(0, gas::prim::sie(), k, j, i) =
             eos.InternalEnergyFromDensityTemperature(rho, tgas);
-        ;
+
         if (do_moment) {
           v(0, rad::prim::energy(), k, j, i) = ar * SQR(SQR(trad));
           v(0, rad::prim::flux(0), k, j, i) = 0.0;
           v(0, rad::prim::flux(1), k, j, i) = 0.0;
           v(0, rad::prim::flux(2), k, j, i) = 0.0;
         }
-        printf("%lg %lg\n",
-               v(0, gas::prim::sie(), k, j, i) * v(0, gas::prim::density(), k, j, i),
-               v(0, rad::prim::energy(), k, j, i));
       });
 }
 

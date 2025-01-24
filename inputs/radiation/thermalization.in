@@ -13,6 +13,8 @@
 
 <artemis>
 problem = thermalization  # name of the pgen
+physical_units = cgs
+unit_conversion = base
 coordinates = cartesian   # coordinate system
 
 <parthenon/job>
@@ -69,7 +71,7 @@ dfloor = 1.0e-10
 siefloor = 1.0e-10
 
 <gas/opacity/absorption>
-opacity_model = thermalization
+opacity_model = constant 
 kappa_a = 1.0
 
 # <gas/opacity/scattering>

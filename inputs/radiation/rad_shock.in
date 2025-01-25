@@ -24,6 +24,7 @@ problem_id = shock  # problem ID: basename of output filenames
 variables = gas.prim.density,  &
             gas.prim.velocity, &
             gas.prim.sie,      &
+            rad.prim.energy, &
             field.jaybenne.energy_tally
 file_type = hdf5    # HDF5 data dump
 dt        = 1e-10   # time increment between outputs
@@ -84,9 +85,15 @@ coef_kappa_a = 577.       # kappa_a,0 constant
 rho_exp = -1.0            # dens exponent for opacity powerlaw
 temp_exp = 0.0            # temp exponent for opacity powerlaw
 
-<jaybenne>
-num_particles = 1000000
-use_ddmc = false
+# <jaybenne>
+# num_particles = 1000000
+# use_ddmc = false
+
+<radiation>
+cfl = 0.3
+riemann = hlle
+reconstruct = plm
+creduc = 43.3
 
 <problem>
 xdisc = 0.01305

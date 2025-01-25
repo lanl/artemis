@@ -73,7 +73,7 @@ radiation = true
 <gas>
 gamma = 1.666666  # adiabatic index
 mu = 1.008
-cfl = 0.8
+cfl = 0.1
 reconstruct = plm
 riemann = hllc
 dfloor = 1.0e-10
@@ -94,6 +94,12 @@ cfl = 0.3
 riemann = hlle
 reconstruct = plm
 creduc = 43.3
+efloor = 1e-10
+closure = p1
+creduc = 43.3526011561
+inner_iteration_tol = 1e-12
+inner_iteration_max = 100
+outer_iteration_tol = 1e-12
 
 <problem>
 xdisc = 0.01305

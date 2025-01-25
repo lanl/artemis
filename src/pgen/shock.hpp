@@ -15,15 +15,11 @@
 //! \file shock.hpp
 //! \brief
 //!
-<<<<<<< HEAD
-//!  mu = mH, gamma = 5/3, rho*kappa = 577 /cm
-//!  c/chat = 43.3526011561
-=======
 //! This is the Mach=3 problem from Lowrie & Edwards (2008).
 //! The specific values are taken from the Fornax and Quokka code papers
 //!
 //!  mu = mH, gamma = 5/3, rho*kappa = 577 /cm
->>>>>>> dempsey/rad_cgs
+//!  c/chat = 43.3526011561
 //!  left state:         |  right state:
 //!      T = 2.18e6 K    |   T = 7.98e6 K
 //!    rho = 5.69 g/cc   | rho = 17.1 g/cc

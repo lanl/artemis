@@ -144,17 +144,23 @@ def analyze():
         rtol=1e-12,
         atol=1e-12,
     )
-    root = fsolve(lambda x: eg0 + er0 - _rho * cv * x - _ar * x**4.0, 0.5 * (_tr0 + _tg0))
+    root = fsolve(
+        lambda x: eg0 + er0 - _rho * cv * x - _ar * x**4.0, 0.5 * (_tr0 + _tg0)
+    )
 
     # Plot results
     os.makedirs(artemis.get_fig_dir(), exist_ok=True)
     fig = plt.figure(figsize=(12, 8))
     ax1 = fig.add_subplot(1, 1, 1)
-    ax1.plot(tt, tgas[:, 0], label="$T_\\mathrm{gas}$", lw=4, alpha=0.25, color=colors[0])
+    ax1.plot(
+        tt, tgas[:, 0], label="$T_\\mathrm{gas}$", lw=4, alpha=0.25, color=colors[0]
+    )
     ax1.plot(tt, tgas[:, 1], lw=4, alpha=0.25, color=colors[0])
     ax1.plot(tt, tgas[:, 2], lw=4, alpha=0.25, color=colors[0])
     ax1.plot(tt, tgas[:, 3], lw=4, alpha=0.25, color=colors[0])
-    ax1.plot(tt, trad[:, 0], label="$T_\\mathrm{rad}$", lw=4, alpha=0.25, color=colors[1])
+    ax1.plot(
+        tt, trad[:, 0], label="$T_\\mathrm{rad}$", lw=4, alpha=0.25, color=colors[1]
+    )
     ax1.plot(tt, trad[:, 1], lw=4, alpha=0.25, color=colors[1])
     ax1.plot(tt, trad[:, 2], lw=4, alpha=0.25, color=colors[1])
     ax1.plot(tt, trad[:, 3], lw=4, alpha=0.25, color=colors[1])

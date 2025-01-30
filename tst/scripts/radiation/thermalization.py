@@ -40,6 +40,7 @@ sys.path.insert(
 )
 from phdf import phdf
 
+# Plotting style
 plt.rc("text", usetex=True)
 plt.rc("font", family="serif", size=20)
 colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]

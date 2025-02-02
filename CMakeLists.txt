@@ -119,6 +119,11 @@ if(ARTEMIS_ENABLE_ASAN)
   add_link_options(-fsanitize=address -fsanitize=undefined)
 endif()
 
+if(${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
+  # silence sprintf warnings on mac
+  add_compile_options(-Wno-deprecated-declarations)
+endif()
+
 # NOTE(@jonahm): For some reason, order still matters for including
 # parthenon and singularity. Likely has to do with project
 # includes other than Kokkos. MPI and OpenMP likely culprits.
@@ -186,7 +191,8 @@ set(ARTEMIS_SINGULARITY_INCLUDE_PATHS
     ${CMAKE_CURRENT_SOURCE_DIR}/external/singularity-eos/utils/variant/include
     ${CMAKE_CURRENT_SOURCE_DIR}/external/singularity-opac/utils
     ${CMAKE_CURRENT_SOURCE_DIR}/src
-    ${CMAKE_CURRENT_SOURCE_DIR})
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/generated>)
 
 # Set Jaybenne config options and paths
 # NOTE(@pdmullen): For the life of us, we are still not sure why we can't treat

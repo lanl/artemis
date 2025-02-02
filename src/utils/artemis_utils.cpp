@@ -53,6 +53,7 @@ void PrintArtemisConfiguration(Packages_t &packages) {
     printf("                  [L] = %.2e\n", units.GetLengthCodeToPhysical());
     printf("                  [M] = %.2e\n", units.GetMassCodeToPhysical());
     printf("                  [T] = %.2e\n", units.GetTimeCodeToPhysical());
+    printf("                  [K] = %.2e\n", units.GetTemperatureCodeToPhysical());
     printf("    Active physics:  %s", msg.c_str());
 
     if (params.Get<bool>("do_nbody")) {

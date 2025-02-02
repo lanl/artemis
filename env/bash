@@ -19,39 +19,35 @@ export ARTEMIS_HOME="${exec_dir%/env}"
 
 export MAKE_PROGRAM=${MAKE_PROGRAM:-make}
 
-export PARTITION="venado-gh"
-
 #  Identify partitions based on  SLURM_JOB_PARTITION and HOSTNAME variables
-#PARTITION="unknown"
-#if [[ $HOSTNAME == ch-fe*  ||  $SLURM_CLUSTER_NAME == "chicoma" ]]; then
-#    if [[ $SLURM_JOB_PARTITION == *gpu* ]]; then
-#        PARTITION="chicoma-gpu"
-#    else
-#        PARTITION="chicoma-cpu"
-#    fi
-#elif [[ "$HOSTNAME" =~ ^ve-rfe[1-7]$ || "$HOSTNAME" =~ ^ve-fe[1-7]$ ]]; then
-#    if [[ $SLURM_GPUS_ON_NODE > 0 || ("$HOSTNAME" =~ ^ve-rfe[1-3]$ || "$HOSTNAME" =~ ^ve-fe[1-3]$) ]]; then
-#        PARTITION="venado-gh"
-#    elif [[ $SLURM_GPUS_ON_NODE == 0 || ("$HOSTNAME" =~ ^ve-rfe[4-7]$ || "$HOSTNAME" =~ ^ve-fe[4-7]$) ]]; then
-#        PARTITION="venado-gg"
-#    fi
-#else # Catch-all for Darwin
-#    if [ -z "$SLURM_JOB_PARTITION" ]; then
-#        if [[ $HOSTNAME == darwin-fe* ]]; then
-#            echo "Do not compile on Darwin frontend nodes; use a specific partition!"
-#            echo "Supported partitions are"
-#            echo "  skylake-gold"
-#            echo "  volta-x86"
-#            echo "...setup FAILED"
-#        fi
-#    elif [[ $SLURM_JOB_PARTITION == "power9-rhel7" ]]; then
-#        PARTITION="darwin-power9-rhel7"
-#    elif [[ $SLURM_JOB_PARTITION == "skylake-gold" ]]; then
-#        PARTITION="darwin-skylake-gold"
-#    elif [[ $SLURM_JOB_PARTITION == "volta-x86" ]]; then
-#        PARTITION="darwin-volta-x86"
-#    fi
-#fi
+PARTITION="unknown"
+if [[ $HOSTNAME == ch-fe*  ||  $SLURM_CLUSTER_NAME == "chicoma" ]]; then
+    if [[ $SLURM_JOB_PARTITION == *gpu* ]]; then
+        PARTITION="chicoma-gpu"
+    else
+        PARTITION="chicoma-cpu"
+    fi
+elif [[ "$HOST" =~ ^ve-rfe[1-7]$ || "$HOST" =~ ^ve-fe[1-7]$ ]]; then
+    if [[ $SLURM_GPUS_ON_NODE > 0 || ("$HOST" =~ ^ve-rfe[1-3]$ || "$HOST" =~ ^ve-fe[1-3]$) ]]; then
+        PARTITION="venado-gh"
+    elif [[ $SLURM_GPUS_ON_NODE == 0 || ("$HOST" =~ ^ve-rfe[4-7]$ || "$HOST" =~ ^ve-fe[4-7]$) ]]; then
+        PARTITION="venado-gg"
+    fi
+else # Catch-all for Darwin
+    if [[ $HOSTNAME == darwin-fe* ]]; then
+        echo "Currently on darwin frontend node; formatting is supported but not compilation"
+        echo "Supported partitions are"
+        echo "  skylake-gold"
+        echo "  volta-x86"
+        PARTITION="darwin-fe"
+    elif [[ $SLURM_JOB_PARTITION == "power9-rhel7" ]]; then
+        PARTITION="darwin-power9-rhel7"
+    elif [[ $SLURM_JOB_PARTITION == "skylake-gold" ]]; then
+        PARTITION="darwin-skylake-gold"
+    elif [[ $SLURM_JOB_PARTITION == "volta-x86" ]]; then
+        PARTITION="darwin-volta-x86"
+    fi
+fi
 
 # Absolute path for conda environment can be too long
 function shorten_prompt {

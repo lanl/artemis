@@ -213,8 +213,6 @@ TaskStatus SelfDragSourceImpl(MeshData<Real> *md, const Real time, const Real dt
         const auto &hx = coords.GetScaleFactors();
         const auto &[xcyl, ex1, ex2, ex3] = coords.ConvertToCylWithVec(xv);
 
-        const Real PI_2 = 1.5707963267948966;
-
         // Compute the ramp for this cell
         // Ramps are quadratic, eg. the left regions is SQR( (X - ix)/(ix - xmin) )
         if (do_gas) {
@@ -223,11 +221,7 @@ TaskStatus SelfDragSourceImpl(MeshData<Real> *md, const Real time, const Real dt
               dt * (gasp.irate[0] * ((xv[0] < gasp.ix[0]) *
                                      SQR((xv[0] - gasp.ix[0]) / (gasp.ix[0] - x1min))) +
                     gasp.orate[0] * ((xv[0] > gasp.ox[0]) *
-                                     SQR((xv[0] - gasp.ox[0]) / (gasp.ox[0] - x1max))));// + 
-                    //gasp.irate[1] * ((xv[0] >= gasp.ix[0]) * (xcyl[2] > gasp.ix[1]*H) * // pos z
-                    //                 SQR((xcyl[2] - gasp.ix[1]*H) / (gasp.ix[0]*H - xv[0]*std::cos(x2min)))) +
-                    //gasp.orate[1] * ((xv[0] <= gasp.ox[0]) * (xcyl[2] < -gasp.ox[1]*H) * // neg z
-                    //                 SQR((xcyl[2] + gasp.ox[1]*H) / (-gasp.ox[0]*H - xv[0]*std::cos(x2max)))));
+                                     SQR((xv[0] - gasp.ox[0]) / (gasp.ox[0] - x1max))));
           const Real fx2 =
               multi_d * dt *
               (gasp.irate[1] * ((xv[1] < gasp.ix[1]) *
@@ -240,7 +234,6 @@ TaskStatus SelfDragSourceImpl(MeshData<Real> *md, const Real time, const Real dt
                                 SQR((xv[2] - gasp.ix[2]) / (gasp.ix[2] - x3min))) +
                gasp.orate[2] * ((xv[2] > gasp.ox[2]) *
                                 SQR((xv[2] - gasp.ox[2]) / (gasp.ox[2] - x3max))));
-
           for (int n = 0; n < vmesh.GetSize(b, gas::cons::density()); ++n) {
             const Real &dens = vmesh(b, gas::cons::density(n), k, j, i);
             const Real vg[3] = {
@@ -268,68 +261,15 @@ TaskStatus SelfDragSourceImpl(MeshData<Real> *md, const Real time, const Real dt
               ArtemisUtils::VDot(vcyl, ex2),
               ArtemisUtils::VDot(vcyl, ex3)
             };
-            //Real vd[3] = {
-            //  vR,
-            //  0.,
-            //  vp - omf * xcyl[0],
-            //};
-
-            //if (i==2 && j==2 && k==2) {
-            //  std::cout << "(" << i << ", " << j << ", " << k << ")" << std::endl;
-            //  std::cout << i << j << k << std::endl;
-            //  std::cout << "drag vd:" << std::fixed << std::setprecision(12) << vd[0]
-            //            << ", " << vd[1] << ", " << vd[2] << std::endl;
-            //  std::cout << "drag fx1:" << fx1 << std::endl;
-            //}
-            //if (i==2 && j==32 && k==2) {
-            //  std::cout << "(" << i << ", " << j << ", " << k << ")" << std::endl;
-            //  std::cout << "drag vd:" << std::fixed << std::setprecision(12) << vd[0]
-            //            << ", " << vd[1] << ", " << vd[2] << std::endl;
-            //  std::cout << "drag fx1:" << fx1 << std::endl;
-            //}
-            //if (i==64 && j==2 && k==2) {
-            //  std::cout << "(" << i << ", " << j << ", " << k << ")" << std::endl;
-            //  std::cout << "drag vd:" << std::fixed << std::setprecision(12) << vd[0]
-            //            << ", " << vd[1] << ", " << vd[2] << std::endl;
-            //  std::cout << "drag fx1:" << fx1 << std::endl;
-            //}
-            //if (i==64 && j==32 && k==2) {
-            //  std::cout << "(" << i << ", " << j << ", " << k << ")" << std::endl;
-            //  std::cout << "drag vd:" << std::fixed << std::setprecision(12) << vd[0]
-            //            << ", " << vd[1] << ", " << vd[2] << std::endl;
-            //  std::cout << "drag fx1:" << fx1 << std::endl;
-            //}
-            // debugging code
-
-            // std::cout << "drag:" << i << ", " << j << ", " << k << std::endl;
 
             // Ep - E = 0.5 d ( vp^2 - v^2 )
             //  (vp-v) . (vp + v) = dv . (2v + dv) =  2 dv.v + dv.dv
             const Real dm1 = -fx1 * dens * (vg[0] - vd[0]) / (1.0 + fx1);
             const Real dm2 = -fx2 * dens * (vg[1] - vd[1]) / (1.0 + fx2);
             const Real dm3 = -fx3 * dens * (vg[2] - vd[2]) / (1.0 + fx3);
-
             vmesh(b, gas::cons::momentum(VI(n, 0)), k, j, i) += hx[0] * dm1;
             vmesh(b, gas::cons::momentum(VI(n, 1)), k, j, i) += hx[1] * dm2;
             vmesh(b, gas::cons::momentum(VI(n, 2)), k, j, i) += hx[2] * dm3;
-
-            //if (i==2 && j==2 && k==2) {
-            //  std::cout << std::fixed << std::setprecision(12) << "drag nu: " << nu << std::endl;
-            //  std::cout << "gas vel after damping:" 
-            //            << std::fixed << std::setprecision(12)
-            //            << vmesh(b, gas::cons::momentum(VI(n, 0)), k, j, i)/dens << ", "
-            //            << vmesh(b, gas::cons::momentum(VI(n, 1)), k, j, i)/dens << ", "
-            //            << vmesh(b, gas::cons::momentum(VI(n, 2)), k, j, i)/dens << std::endl;
-            //  std::cout << "drag cc:" << std::fixed << std::setprecision(12) << xv[0]
-            //            << ", " << xv[1] << ", " << xv[2] << std::endl;
-            //  std::cout << "drag vd:" << std::fixed << std::setprecision(12) << vd[0]
-            //            << ", " << vd[1] << ", " << vd[2] << std::endl;
-            //  std::cout << "drag vcyl:" << std::fixed << std::setprecision(12) << vcyl[0]
-            //            << ", " << vcyl[1] << ", " << vcyl[2] << std::endl;
-            //  std::cout << "drag ex1:" << std::fixed << std::setprecision(12)<< ex1[0] 
-            //            << ", " << ex1[1] << ", " << ex1[2] << std::endl;
-            //}
-
             vmesh(b, gas::cons::total_energy(n), k, j, i) +=
                 dm1 * (vg[0] + 0.5 * dm1 / dens) + dm2 * (vg[1] + 0.5 * dm2 / dens) +
                 dm3 * (vg[2] + 0.5 * dm3 / dens);

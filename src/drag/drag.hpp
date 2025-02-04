@@ -14,7 +14,6 @@
 #define DRAG_DRAG_HPP_
 
 // Parthenon includes
-#include <iostream>
 #include <parthenon/package.hpp>
 
 // Artemis includes
@@ -87,24 +86,25 @@ struct SelfDragParams {
   }
   SelfDragParams(std::string block_name, ParameterInput *pin) {
     ix[0] = pin->GetOrAddReal(block_name, "inner_x1", -Big<Real>());
-    ix[1] = pin->GetOrAddReal(block_name, "pos_z_sh", Big<Real>());
+    ix[1] = pin->GetOrAddReal(block_name, "inner_x2", -Big<Real>());
+    ix[2] = pin->GetOrAddReal(block_name, "inner_x3", -Big<Real>());
     irate[0] = pin->GetOrAddReal(block_name, "inner_x1_rate", 0.0);
-    irate[1] = pin->GetOrAddReal(block_name, "z_rate", 0.0);
+    irate[1] = pin->GetOrAddReal(block_name, "inner_x2_rate", 0.0);
+    irate[2] = pin->GetOrAddReal(block_name, "inner_x3_rate", 0.0);
 
     ox[0] = pin->GetOrAddReal(block_name, "outer_x1", Big<Real>());
-    ox[1] = pin->GetOrAddReal(block_name, "neg_z_sh", Big<Real>());
+    ox[1] = pin->GetOrAddReal(block_name, "outer_x2", Big<Real>());
+    ox[2] = pin->GetOrAddReal(block_name, "outer_x3", Big<Real>());
     orate[0] = pin->GetOrAddReal(block_name, "outer_x1_rate", 0.0);
-    orate[1] = pin->GetOrAddReal(block_name, "z_rate", 0.0);
-
+    orate[1] = pin->GetOrAddReal(block_name, "outer_x2_rate", 0.0);
+    orate[2] = pin->GetOrAddReal(block_name, "outer_x3_rate", 0.0);
     damp_to_visc = pin->GetOrAddBoolean(block_name, "damp_to_visc", false);
 
     for (int i = 0; i < 3; i++) {
       PARTHENON_REQUIRE(irate[i] >= 0.0,
                         "The damping rate in the x1 direction must be >= 0");
-      if (i != 2) {
       PARTHENON_REQUIRE(ix[i] <= ox[i],
                         "The damping bounds must have inner_x1 <= outer_x1");
-      }
     }
   }
 };
@@ -185,6 +185,7 @@ TaskStatus SelfDragSourceImpl(MeshData<Real> *md, const Real time, const Real dt
   const int multi_d = (ndim >= 2);
   const int three_d = (ndim == 3);
 
+  const str::string profile = drag_pkg->template Param<str::string>("profile");
   const Real p = drag_pkg->template Param<Real>("dslope");
   const Real q = drag_pkg->template Param<Real>("tslope");
   const Real h0 = drag_pkg->template Param<Real>("h0");
@@ -216,7 +217,6 @@ TaskStatus SelfDragSourceImpl(MeshData<Real> *md, const Real time, const Real dt
         // Compute the ramp for this cell
         // Ramps are quadratic, eg. the left regions is SQR( (X - ix)/(ix - xmin) )
         if (do_gas) {
-          const Real H = xcyl[0] * h0 * std::pow(xcyl[0] / r0, flare);
           const Real fx1 =
               dt * (gasp.irate[0] * ((xv[0] < gasp.ix[0]) *
                                      SQR((xv[0] - gasp.ix[0]) / (gasp.ix[0] - x1min))) +
@@ -244,50 +244,62 @@ TaskStatus SelfDragSourceImpl(MeshData<Real> *md, const Real time, const Real dt
             const Real sieg = ArtemisUtils::GetSpecificInternalEnergy(
                 vmesh, b, n, k, j, i, de_switch, dflr_gas, sieflr_gas, hx);
 
-            // Keplerian angular velocity at the midplane (z=0)
-            //    Ω_K = sqrt(GM / R³), where R = xcyl[0] (cylindrical radius)
-            const Real OmKmid = std::sqrt(gm / (xcyl[0] * xcyl[0] * xcyl[0]));
-            // Adjusted angular velocity including pressure corrections and vertical stratification:
-            //    Ω = Ω_K * [1 + 0.5*(H/R)²*(p + q + 0.5q(z/H)²)]
-            //    - H: Disk scale height (vertical pressure scale)
-            //    - p: Surface density power-law index (Σ ∝ R⁻ᵖ)
-            //    - q: Temperature power-law index (T ∝ R⁻ᵠ)
-            //    - The (H/R)² term accounts for radial pressure support
-            //    - The (z/H)² term adds vertical stratification effects
-            const Real Omg = OmKmid * (1 + 0.5 * SQR(H / xcyl[0]) *
-                                               (p + q + 0.5 * q * SQR(xcyl[2] / H)));
-            // Azimuthal velocity: v_φ = Ω * R
-            //    Orbital speed modified by pressure gradients
-            const Real vp = Omg * xcyl[0];
-            // Radial velocity (viscosity-driven accretion):
-            //    v_R = -ν * [6p - 2q + 3 + (5q + 9)(z/H)²] / (2R)
-            //    - ν: Kinematic viscosity
-            //    - Negative sign = inward accretion flow
-            //    - Coefficients (6p, 2q, etc.) derive from viscous stress equations
-            //    - Vertical dependence (z/H)² adds height-dependent accretion
-            const Real vR = -nu *
-                            (6 * p - 2 * q + 3 + (5 * q + 9) * SQR(xcyl[2] / H)) /
-                            (2 * xcyl[0]);
+            if (profile == "default") {
+            Diffusion::DiffusionCoeff<DTYP, GEOM, Fluid::gas> dcoeff;
+            const Real mu = dcoeff.Get(dp, coords, dens, sieg, eos_d);
+            const Real vR = -1.5 * mu / (xcyl[0] * dens);
+            const Real vd[3] = {ex1[0] * vR, ex2[0] * vR, ex3[0] * vR};
+            } else if (profile == "nudisk") {
+              const Real H = xcyl[0] * h0 * std::pow(xcyl[0] / r0, flare);
+              // Keplerian angular velocity at the midplane (z=0)
+              //    Ω_K = sqrt(GM / R³), where R = xcyl[0] (cylindrical radius)
+              const Real OmKmid = std::sqrt(gm / (xcyl[0] * xcyl[0] * xcyl[0]));
+              // Adjusted angular velocity including pressure corrections and vertical
+              // stratification:
+              //    Ω = Ω_K * [1 + 0.5*(H/R)²*(p + q + 0.5q(z/H)²)]
+              //    - H: Disk scale height (vertical pressure scale)
+              //    - p: Surface density power-law index (Σ ∝ R⁻ᵖ)
+              //    - q: Temperature power-law index (T ∝ R⁻ᵠ)
+              //    - The (H/R)² term accounts for radial pressure support
+              //    - The (z/H)² term adds vertical stratification effects
+              const Real Omg = OmKmid * (1 + 0.5 * SQR(H / xcyl[0]) *
+                                                 (p + q + 0.5 * q * SQR(xcyl[2] / H)));
+              // Azimuthal velocity: v_φ = Ω * R
+              //    Orbital speed modified by pressure gradients
+              const Real vp = Omg * xcyl[0];
+              // Radial velocity (viscosity-driven accretion):
+              //    v_R = -ν * [6p - 2q + 3 + (5q + 9)(z/H)²] / (2R)
+              //    - ν: Kinematic viscosity
+              //    - Negative sign = inward accretion flow
+              //    - Coefficients (6p, 2q, etc.) derive from viscous stress equations
+              //    - Vertical dependence (z/H)² adds height-dependent accretion
+              const Real vR = -nu * (6 * p - 2 * q + 3 + (5 * q + 9) * SQR(xcyl[2] / H)) /
+                              (2 * xcyl[0]);
 
-            // Vertical velocity:
-            //    v_z = -p * (z/R) * v_R
-            //    - Driven by radial accretion (v_R) and mass conservation
-            //    - Above midplane (z > 0), inward flow (v_R < 0) causes upward motion (v_z > 0)
-            //    - Proportional to p (surface density gradient)
-            //    - meridional circulation
-            const Real vz = (-p)*xcyl[2]/xcyl[0]*vR;
+              // Vertical velocity:
+              //    v_z = -p * (z/R) * v_R
+              //    - Driven by radial accretion (v_R) and mass conservation
+              //    - Above midplane (z > 0), inward flow (v_R < 0) causes upward motion
+              //    (v_z > 0)
+              //    - Proportional to p (surface density gradient)
+              //    - meridional circulation
+              const Real vz = (-p) * xcyl[2] / xcyl[0] * vR;
 
-            // Combine cylindrical velocity components
-            // Term: vp - omf * R
-            // Purpose: Subtracts the velocity of a rotating frame (omf = frame angular speed), common in simulations to handle fast orbital motion numerically.
-            const Real vcyl[3] = {vR, vp - omf * xcyl[0], vz};
+              // Combine cylindrical velocity components
+              // Term: vp - omf * R
+              // Purpose: Subtracts the velocity of a rotating frame (omf = frame angular
+              // speed), common in simulations to handle fast orbital motion numerically.
+              const Real vcyl[3] = {vR, vp - omf * xcyl[0], vz};
 
-            // Transform velocities to another coordinate system 
-            const Real vd[3] = {
-              ArtemisUtils::VDot(vcyl, ex1),
-              ArtemisUtils::VDot(vcyl, ex2),
-              ArtemisUtils::VDot(vcyl, ex3)
-            };
+              // Transform velocities to another coordinate system
+              const Real vd[3] = {ArtemisUtils::VDot(vcyl, ex1),
+                                  ArtemisUtils::VDot(vcyl, ex2),
+                                  ArtemisUtils::VDot(vcyl, ex3)};
+            } else {
+              std::stringstream msg;
+              msg << "Unknown disk profile: " << profile;
+              PARTHENON_FAIL(msg.str());
+            }
 
             // Ep - E = 0.5 d ( vp^2 - v^2 )
             //  (vp-v) . (vp + v) = dv . (2v + dv) =  2 dv.v + dv.dv

@@ -15,6 +15,11 @@ nbody:
     whfast:
       _type: opt
       _description: "A fast, symplectic Wisdom-Holman integrator."
+  mtot:
+    _type: Real
+    _default: "-&infin;"
+    _description: "When set, all particles are rescaled so that the total mass is this value."
+    _units: "g"
   mscale:
     _type: Real
     _default: "1.0"

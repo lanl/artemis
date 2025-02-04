@@ -110,9 +110,8 @@ riemann = hlle
 dfloor = 1.0e-10
 pfloor = 1.0e-15
 
-<gravity>
-mass_tot = 1.0
 <gravity/point>
+mass = 1.0
 
 <problem>
 r0 = 1.0

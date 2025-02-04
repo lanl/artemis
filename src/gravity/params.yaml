@@ -1,11 +1,6 @@
 ---
 gravity:
   _description: "External gravitational sources"
-  mass_tot:
-    _type: Real
-    _description: "Normalization parameter setting GM."
-    _default: "NaN"
-    _units: "Msolar"
   tstart:
     _type: Real
     _description: "When to turn gravity on."
@@ -28,6 +23,10 @@ gravity:
   point:
     _type: node
     _description: "Point mass gravity."
+    mass:
+      _type: Real
+      _description: "Mass of the body"
+      _units: "g"
     soft:
       _type: Real
       _description: "Plummer softening radius of the body"
@@ -62,6 +61,10 @@ gravity:
   binary:
     _type: node
     _description: "Binary mass gravity."
+    mass:
+      _type: Real
+      _description: "Total mass of the binary"
+      _units: "g"
     soft(1,2):
       _type: Real
       _description: "Plummer softening radius of the primary/secondary"

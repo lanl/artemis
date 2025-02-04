@@ -244,18 +244,45 @@ TaskStatus SelfDragSourceImpl(MeshData<Real> *md, const Real time, const Real dt
             const Real sieg = ArtemisUtils::GetSpecificInternalEnergy(
                 vmesh, b, n, k, j, i, de_switch, dflr_gas, sieflr_gas, hx);
 
+            // Keplerian angular velocity at the midplane (z=0)
+            //    Ω_K = sqrt(GM / R³), where R = xcyl[0] (cylindrical radius)
             const Real OmKmid = std::sqrt(gm / (xcyl[0] * xcyl[0] * xcyl[0]));
+            // Adjusted angular velocity including pressure corrections and vertical stratification:
+            //    Ω = Ω_K * [1 + 0.5*(H/R)²*(p + q + 0.5q(z/H)²)]
+            //    - H: Disk scale height (vertical pressure scale)
+            //    - p: Surface density power-law index (Σ ∝ R⁻ᵖ)
+            //    - q: Temperature power-law index (T ∝ R⁻ᵠ)
+            //    - The (H/R)² term accounts for radial pressure support
+            //    - The (z/H)² term adds vertical stratification effects
             const Real Omg = OmKmid * (1 + 0.5 * SQR(H / xcyl[0]) *
                                                (p + q + 0.5 * q * SQR(xcyl[2] / H)));
+            // Azimuthal velocity: v_φ = Ω * R
+            //    Orbital speed modified by pressure gradients
             const Real vp = Omg * xcyl[0];
+            // Radial velocity (viscosity-driven accretion):
+            //    v_R = -ν * [6p - 2q + 3 + (5q + 9)(z/H)²] / (2R)
+            //    - ν: Kinematic viscosity
+            //    - Negative sign = inward accretion flow
+            //    - Coefficients (6p, 2q, etc.) derive from viscous stress equations
+            //    - Vertical dependence (z/H)² adds height-dependent accretion
             const Real vR = -nu *
                             (6 * p - 2 * q + 3 + (5 * q + 9) * SQR(xcyl[2] / H)) /
                             (2 * xcyl[0]);
 
+            // Vertical velocity:
+            //    v_z = -p * (z/R) * v_R
+            //    - Driven by radial accretion (v_R) and mass conservation
+            //    - Above midplane (z > 0), inward flow (v_R < 0) causes upward motion (v_z > 0)
+            //    - Proportional to p (surface density gradient)
+            //    - meridional circulation
             const Real vz = (-p)*xcyl[2]/xcyl[0]*vR;
 
+            // Combine cylindrical velocity components
+            // Term: vp - omf * R
+            // Purpose: Subtracts the velocity of a rotating frame (omf = frame angular speed), common in simulations to handle fast orbital motion numerically.
             const Real vcyl[3] = {vR, vp - omf * xcyl[0], vz};
 
+            // Transform velocities to another coordinate system 
             const Real vd[3] = {
               ArtemisUtils::VDot(vcyl, ex1),
               ArtemisUtils::VDot(vcyl, ex2),

@@ -13,12 +13,12 @@
 
 <artemis>
 problem = dust_coagulation           # name of the pgen
-coordinates = cartesian	# coordinate system
-unit_conversion	= ppd	# ppd (code unit: AU, Msun, year/(2*pi)
-r0_length	= 10.	# AU
-mstar	= 1.0		# M_sun
-rho0	= 2e-5		# prefactor for density profile
-physical_units	= cgs	# 	
+coordinates = cartesian		     # coordinate system
+length	= 1.495978707e14  	     # 10AU in cgs unit
+mass	= 3.976832e+28		     # 2e-5*M_sun in cgs unit
+time	= 158718203.29271033	     # cgs unit in year/(2*pi)/(r0**3/mstar)**0.5
+physical_units	= cgs		     #
+
 
 <parthenon/job>
 problem_id = coag   # problem ID: basename of output filenames

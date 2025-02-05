@@ -160,6 +160,7 @@ ComputeDiskProfile(const struct DiskParams pgen, const parthenon::Coordinates_t 
           : xcyl[0];
   gtemp = TempProfile(pgen, rt, xcyl[2]);
 
+  Real vcyl[3] = {0.0, 0.0, 0.0};
   if (pgen.profile == "default") {
   // Construct grad(P) for this zone
   const std::array<Real, 3> fx1m{coords.bnds.x1[0], xv[1], xv[2]};
@@ -236,7 +237,9 @@ ComputeDiskProfile(const struct DiskParams pgen, const parthenon::Coordinates_t 
   const Real vr = pgen.quiet_start ? 0.0 : -1.5 * nu / xcyl[0];
 
   // Construct the total cylindrical velocity
-  const Real vcyl[3] = {vr, vp - pgen.omf * xcyl[0], 0.0};
+  vcyl[0] = vr;
+  vcyl[1] = vp - pgen.omf * xcyl[0];
+  vcyl[2] = 0.0;
   } else if (pgen.profile == "nudisk") {
     const Real H = xcyl[0] * pgen.h0 * std::pow(xcyl[0] / pgen.r0, pgen.flare);
     const Real OmKmid = std::sqrt(pgen.gm / (xcyl[0] * xcyl[0] * xcyl[0]));
@@ -251,11 +254,11 @@ ComputeDiskProfile(const struct DiskParams pgen, const parthenon::Coordinates_t 
     const Real vz = (-pgen.p) * xcyl[2] / xcyl[0] * vr;
 
     // Construct the total cylindrical velocity
-    const Real vcyl[3] = {vr, vp - pgen.omf * xcyl[0], vz};
+    vcyl[0] = vr;
+    vcyl[1] = vp - pgen.omf * xcyl[0];
+    vcyl[2] = vz;
   } else {
-    std::stringstream msg;
-    msg << "Unknown disk profile: " << pgen.profile;
-    PARTHENON_FAIL(msg.str());
+    PARTHENON_FAIL("Unknown disk profile");
   }
 
   // and convert it to the problem geometry

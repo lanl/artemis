@@ -187,6 +187,8 @@ TaskStatus SelfDragSourceImpl(MeshData<Real> *md, const Real time, const Real dt
   const int three_d = (ndim == 3);
 
   const std::string profile = drag_pkg->template Param<std::string>("profile");
+  const bool default_profile = (profile == "default");
+  const bool nudisk_profile = (profile == "nudisk");
   const Real p = drag_pkg->template Param<Real>("dslope");
   const Real q = drag_pkg->template Param<Real>("tslope");
   const Real h0 = drag_pkg->template Param<Real>("h0");
@@ -246,12 +248,12 @@ TaskStatus SelfDragSourceImpl(MeshData<Real> *md, const Real time, const Real dt
                 vmesh, b, n, k, j, i, de_switch, dflr_gas, sieflr_gas, hx);
 
             Real vcyl[3] = {0.0, 0.0, 0.0};
-            if (profile == "default") {
+            if (default_profile) {
             Diffusion::DiffusionCoeff<DTYP, GEOM, Fluid::gas> dcoeff;
             const Real mu = dcoeff.Get(dp, coords, dens, sieg, eos_d);
             const Real vR = -1.5 * mu / (xcyl[0] * dens);
             vcyl[0] = vR;
-            } else if (profile == "nudisk") {
+            } else if (nudisk_profile) {
               const Real H = xcyl[0] * h0 * std::pow(xcyl[0] / r0, flare);
               // Keplerian angular velocity at the midplane (z=0)
               //    Ω_K = sqrt(GM / R³), where R = xcyl[0] (cylindrical radius)
@@ -295,9 +297,7 @@ TaskStatus SelfDragSourceImpl(MeshData<Real> *md, const Real time, const Real dt
               vcyl[1] = vp - omf * xcyl[0];
               vcyl[2] = vz;
             } else {
-              std::stringstream msg;
-              msg << "Unknown disk profile: " << profile;
-              PARTHENON_FAIL(msg.str());
+              PARTHENON_FAIL("Unknown disk profile");
             }
 
             // Transform velocities to another coordinate system

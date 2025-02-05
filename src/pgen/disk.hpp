@@ -48,7 +48,8 @@ namespace disk {
 //! \struct DiskParams
 //! \brief container for disk parameters
 struct DiskParams {
-  std::string profile;
+  bool default_profile;
+  bool nudisk_profile;
   Real r0, h0;
   Real p, q, flare;
   Real rho0, dens_min, pres_min;
@@ -71,7 +72,7 @@ struct DiskParams {
 //! \brief Computes density profile at cylindrical R and z
 KOKKOS_INLINE_FUNCTION
 Real DenProfile(struct DiskParams pgen, const Real R, const Real z) {
-  if (pgen.profile == "default") {
+  if (pgen.default_profile) {
   const Real r = std::sqrt(R * R + z * z);
   const Real h = pgen.h0 * std::pow(R / pgen.r0, pgen.flare);
   const Real sig0 = pgen.rho0; // / (std::sqrt(2.0 * M_PI) * pgen.h0 * pgen.r0);
@@ -90,14 +91,11 @@ Real DenProfile(struct DiskParams pgen, const Real R, const Real z) {
   return std::max(pgen.dens_min,
                   dmid * std::pow(pfac + Fuzz<Real>(), 1. / (pgen.Gamma - 1)));
   }
-  else if (pgen.profile == "nudisk") {
+  else if (pgen.nudisk_profile) {
   const Real H = R * pgen.h0 * std::pow(R / pgen.r0, pgen.flare);
   return std::max(pgen.dens_min, pgen.rho0*std::pow(R/pgen.r0, pgen.p)*std::exp(-0.5*SQR(z/H)));
-  }
-  else {
-    std::stringstream msg;
-    msg << "Unknown disk profile: " << pgen.profile;
-    PARTHENON_FAIL(msg.str());
+  } else {
+    PARTHENON_FAIL("Unknown disk profile");
   }
 }
 
@@ -165,7 +163,7 @@ ComputeDiskProfile(const struct DiskParams pgen, const parthenon::Coordinates_t 
   const Real vk2 = omk2 * SQR(xcyl[0]);
 
   Real vcyl[3] = {0.0, 0.0, 0.0};
-  if (pgen.profile == "default") {
+  if (pgen.default_profile) {
   // Construct grad(P) for this zone
   const std::array<Real, 3> fx1m{coords.bnds.x1[0], xv[1], xv[2]};
   const std::array<Real, 3> fx1p{coords.bnds.x1[1], xv[1], xv[2]};
@@ -241,7 +239,7 @@ ComputeDiskProfile(const struct DiskParams pgen, const parthenon::Coordinates_t 
   vcyl[0] = vr;
   vcyl[1] = vp - pgen.omf * xcyl[0];
   vcyl[2] = 0.0;
-  } else if (pgen.profile == "nudisk") {
+  } else if (pgen.nudisk_profile) {
     const Real H = xcyl[0] * pgen.h0 * std::pow(xcyl[0] / pgen.r0, pgen.flare);
     const Real OmKmid = std::sqrt(pgen.gm / (xcyl[0] * xcyl[0] * xcyl[0]));
     const Real Omg =
@@ -292,6 +290,9 @@ inline void InitDiskParams(MeshBlock *pmb, ParameterInput *pin) {
     auto &grav_pkg = pmb->packages.Get("gravity");
     auto &gas_pkg = pmb->packages.Get("gas");
 
+    const std::string profile = pin->GetOrAddString("problem", "profile", "default");
+    disk_params.default_profile = (profile == "default");
+    disk_params.nudisk_profile = (profile == "nudisk");
     disk_params.gm = grav_pkg->Param<Real>("gm");
     disk_params.r0 = pin->GetOrAddReal("problem", "r0", 1.0);
     disk_params.Omega0 =

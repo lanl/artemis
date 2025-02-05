@@ -160,6 +160,10 @@ ComputeDiskProfile(const struct DiskParams pgen, const parthenon::Coordinates_t 
           : xcyl[0];
   gtemp = TempProfile(pgen, rt, xcyl[2]);
 
+  const Real r = pgen.nbody_temp ? rt : std::sqrt(SQR(xcyl[0]) + SQR(xcyl[2]));
+  const Real omk2 = pgen.gm / (r * r * r);
+  const Real vk2 = omk2 * SQR(xcyl[0]);
+
   Real vcyl[3] = {0.0, 0.0, 0.0};
   if (pgen.profile == "default") {
   // Construct grad(P) for this zone
@@ -229,9 +233,6 @@ ComputeDiskProfile(const struct DiskParams pgen, const parthenon::Coordinates_t 
 
   // Set v_phi to centrifugal equilibrium
   //   vp^2/R = grad(p) + vk^2/R
-  const Real r = pgen.nbody_temp ? rt : std::sqrt(SQR(xcyl[0]) + SQR(xcyl[2]));
-  const Real omk2 = pgen.gm / (r * r * r);
-  const Real vk2 = omk2 * SQR(xcyl[0]);
   const Real vp = std::sqrt(vk2 + dpdr * xcyl[0] / gdens);
   const Real nu = ViscosityProfile(pgen, eos_d, rt, xcyl[2]);
   const Real vr = pgen.quiet_start ? 0.0 : -1.5 * nu / xcyl[0];

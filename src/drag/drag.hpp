@@ -245,11 +245,12 @@ TaskStatus SelfDragSourceImpl(MeshData<Real> *md, const Real time, const Real dt
             const Real sieg = ArtemisUtils::GetSpecificInternalEnergy(
                 vmesh, b, n, k, j, i, de_switch, dflr_gas, sieflr_gas, hx);
 
+            Real vcyl[3] = {0.0, 0.0, 0.0};
             if (profile == "default") {
             Diffusion::DiffusionCoeff<DTYP, GEOM, Fluid::gas> dcoeff;
             const Real mu = dcoeff.Get(dp, coords, dens, sieg, eos_d);
             const Real vR = -1.5 * mu / (xcyl[0] * dens);
-            const Real vd[3] = {ex1[0] * vR, ex2[0] * vR, ex3[0] * vR};
+            vcyl[0] = vR;
             } else if (profile == "nudisk") {
               const Real H = xcyl[0] * h0 * std::pow(xcyl[0] / r0, flare);
               // Keplerian angular velocity at the midplane (z=0)
@@ -290,18 +291,19 @@ TaskStatus SelfDragSourceImpl(MeshData<Real> *md, const Real time, const Real dt
               // Term: vp - omf * R
               // Purpose: Subtracts the velocity of a rotating frame (omf = frame angular
               // speed), common in simulations to handle fast orbital motion numerically.
-              const Real vcyl[3] = {vR, vp - omf * xcyl[0], vz};
-
-              // Transform velocities to another coordinate system
-              const Real vd[3] = {ArtemisUtils::VDot(vcyl, ex1),
-                                  ArtemisUtils::VDot(vcyl, ex2),
-                                  ArtemisUtils::VDot(vcyl, ex3)};
+              vcyl[0] = vR;
+              vcyl[1] = vp - omf * xcyl[0];
+              vcyl[2] = vz;
             } else {
               std::stringstream msg;
               msg << "Unknown disk profile: " << profile;
               PARTHENON_FAIL(msg.str());
             }
 
+            // Transform velocities to another coordinate system
+            const Real vd[3] = {ArtemisUtils::VDot(vcyl, ex1),
+                                ArtemisUtils::VDot(vcyl, ex2),
+                                ArtemisUtils::VDot(vcyl, ex3)};
             // Ep - E = 0.5 d ( vp^2 - v^2 )
             //  (vp-v) . (vp + v) = dv . (2v + dv) =  2 dv.v + dv.dv
             const Real dm1 = -fx1 * dens * (vg[0] - vd[0]) / (1.0 + fx1);

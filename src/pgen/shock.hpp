@@ -14,6 +14,15 @@
 #define PGEN_SHOCK_HPP_
 //! \file shock.hpp
 //! \brief
+//!
+//! This is the Mach=3 problem from Lowrie & Edwards (2008).
+//! The specific values are taken from the Fornax and Quokka code papers
+//!
+//!  mu = mH, gamma = 5/3, rho*kappa = 577 /cm
+//!  left state:         |  right state:
+//!      T = 2.18e6 K    |   T = 7.98e6 K
+//!    rho = 5.69 g/cc   | rho = 17.1 g/cc
+//!     vx = 5.19e7 cm/s |  vx = 1.73e7 cm/s
 
 // artemis headers
 #include "artemis.hpp"
@@ -32,7 +41,6 @@ namespace shock {
 struct ShockParams {
   Real rhol, vxl, tl;
   Real rhor, vxr, tr;
-  Real cv;
   Real xdisc;
 };
 
@@ -44,14 +52,13 @@ inline void InitShockParams(MeshBlock *pmb, ParameterInput *pin) {
   Params &params = artemis_pkg->AllParams();
   if (!(params.hasKey("shock_params"))) {
     ShockParams shock_params;
-    shock_params.rhol = pin->GetOrAddReal("problem", "rhol", 1.0);
-    shock_params.vxl = pin->GetOrAddReal("problem", "vxl", 2.0);
-    shock_params.tl = pin->GetOrAddReal("problem", "tl", 0.6);
-    shock_params.rhor = pin->GetOrAddReal("problem", "rhor", 2.285714);
-    shock_params.vxr = pin->GetOrAddReal("problem", "vxr", 0.875000);
-    shock_params.tr = pin->GetOrAddReal("problem", "tr", 1.246875);
+    shock_params.rhol = pin->GetOrAddReal("problem", "rhol", 5.69);
+    shock_params.vxl = pin->GetOrAddReal("problem", "vxl", 5.19e7);
+    shock_params.tl = pin->GetOrAddReal("problem", "tl", 2.18e6);
+    shock_params.rhor = pin->GetOrAddReal("problem", "rhor", 17.1);
+    shock_params.vxr = pin->GetOrAddReal("problem", "vxr", 1.73e7);
+    shock_params.tr = pin->GetOrAddReal("problem", "tr", 7.98e6);
     shock_params.xdisc = pin->GetOrAddReal("problem", "xdisc", 0.0005);
-    shock_params.cv = pin->GetOrAddReal("gas", "cv", 1.5);
     params.Add("shock_params", shock_params);
   }
 }
@@ -98,12 +105,13 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         const bool upwind = (xi[0] <= shkp.xdisc);
         const Real rho = upwind ? shkp.rhol : shkp.rhor;
         const Real vx = upwind ? shkp.vxl : shkp.vxr;
-        const Real sie = upwind ? shkp.cv * shkp.tl : shkp.cv * shkp.tr;
+        const Real T = upwind ? shkp.tl : shkp.tr;
         v(0, gas::prim::density(0), k, j, i) = rho;
         v(0, gas::prim::velocity(0), k, j, i) = vx;
         v(0, gas::prim::velocity(1), k, j, i) = 0.0;
         v(0, gas::prim::velocity(2), k, j, i) = 0.0;
-        v(0, gas::prim::sie(0), k, j, i) = sie;
+        v(0, gas::prim::sie(0), k, j, i) =
+            eos_d.InternalEnergyFromDensityTemperature(rho, T);
       });
 
   if (do_radiation) jaybenne::InitializeRadiation(md.get(), true);
@@ -119,6 +127,7 @@ inline void ShockInnerX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse)
 
   auto artemis_pkg = pmb->packages.Get("artemis");
   auto shkp = artemis_pkg->Param<ShockParams>("shock_params");
+  auto eos_d = pmb->packages.Get("gas")->Param<EOS>("eos_d");
   const auto nb = IndexRange{0, 0};
 
   static auto descriptors =
@@ -134,7 +143,8 @@ inline void ShockInnerX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse)
           v(0, gas::prim::velocity(0), k, j, i) = shkp.vxl;
           v(0, gas::prim::velocity(1), k, j, i) = 0.0;
           v(0, gas::prim::velocity(2), k, j, i) = 0.0;
-          v(0, gas::prim::sie(0), k, j, i) = shkp.cv * shkp.tl;
+          v(0, gas::prim::sie(0), k, j, i) =
+              eos_d.InternalEnergyFromDensityTemperature(shkp.rhol, shkp.tl);
         });
   }
 
@@ -151,6 +161,7 @@ inline void ShockOuterX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse)
 
   auto artemis_pkg = pmb->packages.Get("artemis");
   auto shkp = artemis_pkg->Param<ShockParams>("shock_params");
+  auto eos_d = pmb->packages.Get("gas")->Param<EOS>("eos_d");
   const auto nb = IndexRange{0, 0};
 
   static auto descriptors =
@@ -166,7 +177,8 @@ inline void ShockOuterX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse)
           v(0, gas::prim::velocity(0), k, j, i) = shkp.vxr;
           v(0, gas::prim::velocity(1), k, j, i) = 0.0;
           v(0, gas::prim::velocity(2), k, j, i) = 0.0;
-          v(0, gas::prim::sie(0), k, j, i) = shkp.cv * shkp.tr;
+          v(0, gas::prim::sie(0), k, j, i) =
+              eos_d.InternalEnergyFromDensityTemperature(shkp.rhor, shkp.tr);
         });
   }
 

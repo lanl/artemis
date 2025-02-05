@@ -13,6 +13,7 @@
 #ifndef DRAG_DRAG_HPP_
 #define DRAG_DRAG_HPP_
 
+#include <string>
 // Parthenon includes
 #include <parthenon/package.hpp>
 
@@ -185,7 +186,7 @@ TaskStatus SelfDragSourceImpl(MeshData<Real> *md, const Real time, const Real dt
   const int multi_d = (ndim >= 2);
   const int three_d = (ndim == 3);
 
-  const str::string profile = drag_pkg->template Param<str::string>("profile");
+  const std::string profile = drag_pkg->template Param<std::string>("profile");
   const Real p = drag_pkg->template Param<Real>("dslope");
   const Real q = drag_pkg->template Param<Real>("tslope");
   const Real h0 = drag_pkg->template Param<Real>("h0");

@@ -96,6 +96,16 @@ problem(constant):
 
 problem(disk):
   _description: "<problem> block parameters when artemis/problem=disk"
+  profile:
+    _type: string
+    _default: default
+    _description: "Reconstruction option."
+    default:
+      _type: opt
+      _description: "Default initial profile"
+    nudisk:
+      _type: opt
+      _description: "Nudisk initial profile"
   r0:
     _type: Real
     _default: 1.0

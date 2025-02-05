@@ -22,7 +22,7 @@ namespace ArtemisUtils {
 static constexpr int lambda_max_vals = 1;
 
 // Variant containing all EOSs to be used in Artemis.
-using EOS = singularity::Variant<singularity::IdealGas>;
+using EOS = singularity::Variant<singularity::UnitSystem<singularity::IdealGas>>;
 
 } // namespace ArtemisUtils
 

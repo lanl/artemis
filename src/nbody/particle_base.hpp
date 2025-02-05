@@ -198,7 +198,9 @@ class Particle {
     const Real dv2 = SQR(dv[0]) + SQR(dv[1]) + SQR(dv[2]);
 
     // Convert the gas coordinates to a spherical system centered on the particle
-    const auto &[dr, er, et, ep] = CartToSph(dx);
+    const auto &[dr, ex1, ex2, ex3] = CartToSph(dx);
+    std::array<Real, 3> et{ex1[1], ex2[1], ex3[1]};
+    std::array<Real, 3> ep{ex1[2], ex2[2], ex3[2]};
 
     // Pull out the tangential relative velociteis
     const Real dvt = dv[0] * et[0] + dv[1] * et[1] + dv[2] * et[2];

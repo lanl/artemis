@@ -42,6 +42,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("x2max", pin->GetReal("parthenon/mesh", "x2max"));
   params.Add("x3max", pin->GetReal("parthenon/mesh", "x3max"));
 
+  params.Add("profile",pin->GetString("problem", "profile"));
   params.Add("dslope",pin->GetReal("problem", "dslope"));
   params.Add("tslope",pin->GetReal("problem", "tslope"));
   params.Add("h0",pin->GetReal("problem", "h0"));

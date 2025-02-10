@@ -53,6 +53,11 @@ class Units {
   Real GetMassPhysicalToCode() const { return 1. / mass_; }
 
   KOKKOS_INLINE_FUNCTION
+  Real GetTemperatureCodeToPhysical() const { return temp_; }
+  KOKKOS_INLINE_FUNCTION
+  Real GetTemperaturePhysicalToCode() const { return 1. / temp_; }
+
+  KOKKOS_INLINE_FUNCTION
   Real GetSpeedCodeToPhysical() const { return length_ / time_; }
   KOKKOS_INLINE_FUNCTION
   Real GetSpeedPhysicalToCode() const { return time_ / mass_; }
@@ -83,9 +88,9 @@ class Units {
   Real GetOpacityPhysicalToCode() const { return mass_ / (length_ * length_); }
 
   KOKKOS_INLINE_FUNCTION
-  Real GetSpecificHeatCodeToPhysical() const { return energy_ / mass_; }
+  Real GetSpecificHeatCodeToPhysical() const { return energy_ / (mass_ * temp_); }
   KOKKOS_INLINE_FUNCTION
-  Real GetSpecificHeatPhysicalToCode() const { return mass_ / energy_; }
+  Real GetSpecificHeatPhysicalToCode() const { return mass_ * temp_ / energy_; }
 
   inline std::string GetSystemName() const {
     return (physical_units_ == PhysicalUnits::scalefree) ? "Scale free" : "CGS";
@@ -98,6 +103,7 @@ class Units {
   Real length_;
   Real time_;
   Real mass_;
+  Real temp_;
 
   Real energy_;
   Real number_density_;

@@ -25,6 +25,10 @@ option(ARTEMIS_ENABLE_OPENMP "Enable OpenMP for artemis and parthenon" OFF)
 option(ARTEMIS_ENABLE_COMPILE_TIMING "Enable timing of compilation of artemis" ON)
 option(ARTEMIS_ENABLE_ASAN "Enable AddressSanitizer to detect memory errors" OFF)
 
+# Force -03 optimization for RelWithDebInfo
+set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O3 -g -DNDEBUG" CACHE STRING "Force -O3 in RelWithDebInfo mode" FORCE)
+set(CMAKE_C_FLAGS_RELWITHDEBINFO "-O3 -g -DNDEBUG" CACHE STRING "Force -O3 in RelWithDebInfo mode" FORCE)
+
 # Timing of compilation
 if (ARTEMIS_ENABLE_COMPILE_TIMING)
   set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE
@@ -117,6 +121,11 @@ endif()
 if(ARTEMIS_ENABLE_ASAN)
   add_compile_options(-fsanitize=address -fsanitize=undefined)
   add_link_options(-fsanitize=address -fsanitize=undefined)
+endif()
+
+if(${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
+  # silence sprintf warnings on mac
+  add_compile_options(-Wno-deprecated-declarations)
 endif()
 
 # NOTE(@jonahm): For some reason, order still matters for including

@@ -19,36 +19,11 @@
 
 namespace ArtemisUtils {
 
-// Custom units/opacity model for ShocktubeA problem
-// c=1732.05, arad=7.716e-4
-struct BasePhysicalConstantsShocktubeA : singularity::BaseUnity {
-  static constexpr Real speed_of_light = 1732.05;
-  static constexpr Real planck = 0.0344;
-};
-using PhysicalConstantsShocktubeA =
-    singularity::PhysicalConstants<BasePhysicalConstantsShocktubeA,
-                                   singularity::UnitConversionDefault>;
-using ShocktubeAOpacity =
-    singularity::photons::PowerLawOpacity<PhysicalConstantsShocktubeA>;
-
-// Custom units/opacity model for Thermalization problem
-// c=1.0, arad=1.0
-struct BasePhysicalConstantsThermalization : singularity::BaseUnity {
-  static constexpr Real speed_of_light = 1.0;
-  static constexpr Real planck = 5.46490601180566;
-};
-using PhysicalConstantsThermalization =
-    singularity::PhysicalConstants<BasePhysicalConstantsThermalization,
-                                   singularity::UnitConversionDefault>;
-using ThermalizationOpacity =
-    singularity::photons::GrayOpacity<PhysicalConstantsThermalization>;
-
 // Reduced absorption variant for this codebase
 using Opacity = singularity::photons::impl::Variant<
     singularity::photons::NonCGSUnits<singularity::photons::Gray>,
     singularity::photons::NonCGSUnits<singularity::photons::PowerLaw>,
-    singularity::photons::NonCGSUnits<singularity::photons::EPBremss>, ShocktubeAOpacity,
-    ThermalizationOpacity>;
+    singularity::photons::NonCGSUnits<singularity::photons::EPBremss>>;
 
 // Reduced scattering variant for this codebase
 using Scattering = singularity::photons::impl::S_Variant<

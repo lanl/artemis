@@ -107,8 +107,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
     auto cv = Null<Real>();
     auto mu = Null<Real>();
     if (pin->DoesParameterExist("gas", "cv")) {
-      PARTHENON_REQUIRE(!pin->DoesParameterExist("gas", "mmw"),
-                        "Cannot specify both cv and mmw");
+      PARTHENON_REQUIRE(!pin->DoesParameterExist("gas", "mu"),
+                        "Cannot specify both cv and mu");
       cv = pin->GetReal("gas", "cv");
       PARTHENON_REQUIRE(cv > 0, "Only positive cv allowed!");
       mu = constants.GetKBCode() / ((gamma - 1.) * constants.GetAMUCode() * cv);
@@ -120,7 +120,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
     params.Add("mu", mu);
     params.Add("cv", cv);
     EOS eos_host = singularity::UnitSystem<singularity::IdealGas>(
-        singularity::IdealGas(gamma - 1., cv),
+        singularity::IdealGas(gamma - 1., cv * units.GetSpecificHeatCodeToPhysical()),
         singularity::eos_units_init::LengthTimeUnitsInit(), units.GetTimeCodeToPhysical(),
         units.GetMassCodeToPhysical(), units.GetLengthCodeToPhysical(),
         units.GetTemperatureCodeToPhysical());
@@ -150,7 +150,6 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
         pin->GetOrAddReal("gas/opacity/absorption", "coef_kappa_a", 0.0);
     const Real rho_exp = pin->GetOrAddReal("gas/opacity/absorption", "rho_exp", 0.0);
     const Real temp_exp = pin->GetOrAddReal("gas/opacity/absorption", "temp_exp", 0.0);
-
     opacity = NonCGSUnits<PowerLaw>(PowerLaw(coef_kappa_a, rho_exp, temp_exp), time, mass,
                                     length, temp);
   } else {

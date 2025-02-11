@@ -26,12 +26,12 @@ variables = gas.prim.density,  &
             gas.prim.sie,      &
             field.jaybenne.energy_tally
 file_type = hdf5   # HDF5 data dump
-dt        = 0.01   # time increment between outputs
+dt        = 1.0e-9 # time increment between outputs
 
 <parthenon/time>
-nlim       = -1    # cycle limit
-tlim       = 5.0   # time limit
-integrator = rk2   # time integration algorithm
+nlim       = -1      # cycle limit
+tlim       = 6.0e-8  # time limit
+integrator = rk1     # time integration algorithm
 
 <parthenon/mesh>
 nx1    = 4         # Number of zones in X1-direction
@@ -62,8 +62,8 @@ gas = true
 radiation = true
 
 <gas>
-gamma = 2.0  # adiabatic index
-cv = 8.0     # specific heat
+gamma = 1.4  # adiabatic index
+mu = 28.96   # mean molecular weight
 cfl = 0.8
 reconstruct = plm
 riemann = hllc
@@ -71,13 +71,14 @@ dfloor = 1.0e-10
 siefloor = 1.0e-10
 
 <gas/opacity/absorption>
-opacity_model = constant 
-kappa_a = 1.0
+opacity_model = constant
+kappa_a = 2.0
 
 # <gas/opacity/scattering>
 # scattering_model = constant
 # kappa_s = 10.0
 
 <jaybenne>
-dt = 0.01
+dt = 1.0e-10
 num_particles = 1000
+use_ddmc = true

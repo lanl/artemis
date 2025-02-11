@@ -97,11 +97,15 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   dcv.iso_cs = pin->GetOrAddReal("gas", "iso_sound_speed", 1e-1);
 
   const Real gdens = 1.0;
-  const Real gtemp = SQR(dcv.iso_cs);
+  const auto mu = gas_pkg->Param<Real>("mu");
+  auto &constants = artemis_pkg->Param<ArtemisUtils::Constants>("constants");
+  const Real kbmu = constants.GetKBCode() / (mu * constants.GetAMUCode());
+  const Real gtemp = SQR(dcv.iso_cs) / kbmu / dcv.gamma;
   const Real gsie = eos_d.InternalEnergyFromDensityTemperature(gdens, gtemp);
+  const Real pres = eos_d.PressureFromDensityTemperature(gdens, gtemp);
   if (pmb->gid == 0) {
     std::cout << "gamma,cs,pre=" << dcv.gamma << " " << dcv.iso_cs << " "
-              << gsie * dcv.gm1 * gdens << std::endl;
+              << gsie * dcv.gm1 * gdens << " " << pres << std::endl;
   }
 
   const Real vx_g = 0.0;

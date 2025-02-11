@@ -17,6 +17,7 @@ coordinates = cartesian		     # coordinate system
 length	= 1.495978707e14  	     # 10AU in cgs unit
 mass	= 3.17305460032e+29	     # 1.59577e-4*M_sun in cgs unit
 time	= 158718203.29271033	     # cgs unit in year/(2*pi)/(r0**3/mstar)**0.5
+temperature = 24753.531              # kevin (vel**2/kb*mu*mp)
 physical_units	= cgs		     # 	
 
 <parthenon/job>
@@ -39,7 +40,7 @@ dt 	  = 628
 
 <parthenon/time>
 nlim       = -1   	# cycle limit
-tlim       = 6280. 	# time limit
+tlim       = 3768. 	# time limit
 integrator = rk2    	# time integration algorithm
 ncycle_out = 1    	# interval for stdout summary info
 
@@ -79,7 +80,8 @@ coagulation = true
 cfl = 0.9		# gas cfl number
 gamma = 1.00001		# adiabatic index
 iso_sound_speed = 0.05	# code unit
-cv = 1e5		# code unit: 1/(gamma-1)
+mu = 2.3                # mean molecular weight
+
 
 <dust>
 cfl = 0.9		# dust cfl number

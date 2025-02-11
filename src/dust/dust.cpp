@@ -489,7 +489,7 @@ TaskStatus CoagulationOneStep(MeshData<Real> *md, const Real time, const Real dt
           parthenon::par_for_inner(
               DEFAULT_INNER_LOOP_PATTERN, mbr, 0, nm - 1, [&](const int n) {
                 // calculate the stopping time on fly
-                stime(n) = st0 * dust_size(n);
+                stime(n) = st0 * dust_size(n) * length0;
                 if (vmesh(b, dust::prim::density(n), k, j, i) > dfloor) {
                   rhod(n) = vmesh(b, dust::prim::density(n), k, j, i) * rho0;
                   for (int d = 0; d < nvel; d++) {

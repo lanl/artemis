@@ -121,4 +121,7 @@ dust:
         _type: opt
         _description: "Stopping times between the gas and dust fluid are in the Stokes regime"
       
-     
+  surface_density_flag:
+    _type: bool
+    _default: "true"
+    _description: "Turn on the surface density flag" 

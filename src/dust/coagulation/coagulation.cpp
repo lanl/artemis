@@ -45,7 +45,10 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin, Params &dustPar
       pin->GetOrAddBoolean("dust/coagulation", "coag_use_adaptiveStep", true);
   cpars.mom_coag = pin->GetOrAddBoolean("dust/coagulation", "coag_mom_preserve", true);
   cpars.nCall_mx = pin->GetOrAddInteger("dust/coagulation", "coag_nsteps_mx", 1000);
-  cpars.rho_p = rho_p;
+
+  // convert back to cgs unit
+  cpars.rho0 = units.GetMassDensityCodeToPhysical();
+  cpars.rho_p = rho_p * cpars.rho0;
 
   const bool const_omega = pin->GetOrAddBoolean("problem", "const_coag_omega", false);
   cpars.const_omega = const_omega;
@@ -55,11 +58,12 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin, Params &dustPar
   int coord_type = 0; // density
 
   const bool isurface_den = pin->GetOrAddBoolean("dust", "surface_density_flag", true);
-  if (isurface_den) coord_type = 1;
-  cpars.coord = coord_type; // 1--surface density, 0: 3D
+  if (isurface_den) {
+    cpars.rho0 *= units.GetLengthCodeToPhysical();
+    coord_type = 1;
+  }
 
-  cpars.rho0 = units.GetMassDensityCodeToPhysical();
-  if (isurface_den) cpars.rho0 *= units.GetLengthCodeToPhysical();
+  cpars.coord = coord_type; // 1--surface density, 0: 3D
 
   cpars.err_eps = 1.0e-1;
   cpars.S = 0.9;
@@ -84,7 +88,18 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin, Params &dustPar
     cpars.errcon = std::pow((5. / cpars.S), (1. / cpars.pgrow));
   }
 
-  auto h_sizes = dustPars.template Get<ParArray1D<Real>>("h_sizes");
+  ParArray1D<Real> dust_size("dsize", nm);
+  auto h_sizes = dust_size.GetHostMirror();
+
+  auto hsizes = dustPars.template Get<ParArray1D<Real>>("h_sizes");
+  // convert back to CGS unit
+  const Real length0 = units.GetLengthCodeToPhysical();
+  for (int i = 0; i < nm; i++) {
+    h_sizes(i) = hsizes(i) * length0;
+  }
+
+  dust_size.DeepCopy(h_sizes);
+
   const Real cond = 3.0 / (1.0 - nm) * std::log(h_sizes(0) / h_sizes(nm - 1));
   if (std::exp(cond) > std::sqrt(2.0)) {
     std::stringstream msg;
@@ -93,8 +108,6 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin, Params &dustPar
         << " instead of " << nm << std::endl;
     PARTHENON_FAIL(msg);
   }
-
-  auto dust_size = dustPars.template Get<ParArray1D<Real>>("sizes");
 
   // allocate array and assign values
   cpars.klf = ParArray2D<int>("klf", nm, nm);

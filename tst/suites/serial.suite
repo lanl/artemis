@@ -20,3 +20,6 @@ hydro/linwave
 ssheet/ssheet
 diffusion/alpha_disk
 drag/drag
+radiation/rad_shock
+radiation/thermalization
+coagulation/coagulation

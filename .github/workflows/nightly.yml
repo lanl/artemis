@@ -56,14 +56,14 @@ jobs:
             --log_file=ci_cpu_log.txt
       - name: Upload CPU test log
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: ci_cpu_log.txt
           path: tst/ci_cpu_log.txt
           retention-days: 3
       - name: Upload figures
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: figs
           path: tst/figs

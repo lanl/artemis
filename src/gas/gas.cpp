@@ -26,6 +26,7 @@
 #include "utils/eos/eos.hpp"
 #include "utils/fluxes/fluid_fluxes.hpp"
 #include "utils/history.hpp"
+#include "utils/integrators/artemis_integrator.hpp"
 #include "utils/opacity/opacity.hpp"
 #include "utils/refinement/amr_criteria.hpp"
 #include "utils/units.hpp"
@@ -617,7 +618,24 @@ TaskStatus ZeroDiffusionFlux(MeshData<Real> *md) {
           resolved_pkgs.get(), {}, {parthenon::PDOpt::WithFluxes});
 
   auto vf = desc_flux.GetPack(md);
-  return Diffusion::ZeroDiffusionImpl(md, vf);
+  return ArtemisUtils::ZeroFluxImpl(md, vf);
+}
+
+//----------------------------------------------------------------------------------------
+//! \fn  TaskStatus Gas::ZeroDiffusionFlux
+//  \brief Resets the diffusion flux
+TaskStatus ZeroFluxes(MeshData<Real> *md) {
+  auto pm = md->GetParentPointer();
+  auto &pkg = pm->packages.Get("gas");
+
+  auto &resolved_pkgs = pm->resolved_packages;
+  static auto desc_flux =
+      parthenon::MakePackDescriptor<gas::cons::momentum, gas::cons::total_energy,
+                                    gas::cons::internal_energy>(
+          resolved_pkgs.get(), {}, {parthenon::PDOpt::WithFluxes});
+
+  auto vf = desc_flux.GetPack(md);
+  return ArtemisUtils::ZeroFluxImpl(md, vf);
 }
 
 //----------------------------------------------------------------------------------------

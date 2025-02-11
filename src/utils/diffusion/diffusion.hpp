@@ -24,46 +24,6 @@ using ArtemisUtils::VI;
 
 namespace Diffusion {
 
-template <typename SparsePackFlux>
-TaskStatus ZeroDiffusionImpl(MeshData<Real> *md, SparsePackFlux vf) {
-
-  IndexRange ib = md->GetBoundsI(IndexDomain::interior);
-  IndexRange jb = md->GetBoundsJ(IndexDomain::interior);
-  IndexRange kb = md->GetBoundsK(IndexDomain::interior);
-
-  auto pm = md->GetParentPointer();
-  const auto multi_d = (pm->ndim > 1);
-  const auto three_d = (pm->ndim > 2);
-
-  parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, PARTHENON_AUTO_LABEL, parthenon::DevExecSpace(), 0,
-      md->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
-      KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
-        for (int n = vf.GetLowerBound(b); n <= vf.GetUpperBound(b); ++n) {
-          vf(b, TE::F1, n, k, j, i) = 0.0;
-          vf(b, TE::F2, n, k, j, i) = 0.0;
-          vf(b, TE::F3, n, k, j, i) = 0.0;
-        }
-        if (i == ib.e) {
-          for (int n = vf.GetLowerBound(b); n <= vf.GetUpperBound(b); ++n) {
-            vf(b, TE::F1, n, k, j, ib.e + 1) = 0.0;
-          }
-        }
-        if ((j == jb.e) && (multi_d)) {
-          for (int n = vf.GetLowerBound(b); n <= vf.GetUpperBound(b); ++n) {
-            vf(b, TE::F2, n, k, jb.e + 1, i) = 0.0;
-          }
-        }
-        if ((k == kb.e) && (three_d)) {
-          for (int n = vf.GetLowerBound(b); n <= vf.GetUpperBound(b); ++n) {
-            vf(b, TE::F3, n, kb.e + 1, j, i) = 0.0;
-          }
-        }
-      });
-
-  return TaskStatus::complete;
-}
-
 template <Coordinates GEOM, Fluid FLUID_TYPE, DiffType DIFF, typename PKG,
           typename SparsePackPrim>
 Real EstimateTimestep(MeshData<Real> *md, DiffCoeffParams &dp, PKG &pkg, const EOS &eos,

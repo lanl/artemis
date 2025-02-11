@@ -38,6 +38,7 @@ template <Coordinates GEOM>
 TaskStatus ViscousFlux(MeshData<Real> *md);
 
 TaskStatus ZeroDiffusionFlux(MeshData<Real> *md);
+TaskStatus ZeroFluxes(MeshData<Real> *md);
 
 void AddHistory(Coordinates coords, Params &params);
 

@@ -300,7 +300,7 @@ TaskListStatus ArtemisDriver<GEOM>::RadiationDriver() {
 
   if (tm.ncycle % tm.ncycle_out == 0) {
     if (Globals::my_rank == 0) {
-      std::cout << tm.dt << " " << dtr << "\nTaking " << nsteps << " radiation substeps"
+      std::cout << "\nTaking " << nsteps << " radiation substeps"
                 << " at dt=" << dtr << std::endl;
     }
   }
@@ -355,19 +355,20 @@ TaskCollection ArtemisDriver<GEOM>::RadiationTasks() {
       auto start_flx_recv = tl.AddTask(none, parthenon::StartReceiveFluxCorrections, u0);
 
       // Compute hydrodynamic fluxes
-      // NOTE(AMD): 1st stage of VL2 uses piecewise constant reconstruction
-      const bool do_pcm = false; //((stage == 1) && (integrator->GetName() == "vl2"));
-      TaskID rad_flx = tl.AddTask(none, Radiation::CalculateFluxes, u0.get(), do_pcm);
+      auto rad_flx = tl.AddTask(none, Radiation::CalculateFluxes, u0.get());
+      auto gas_flx = tl.AddTask(none, Gas::ZeroFluxes, u0.get());
 
       // Communicate and set fluxes
-      auto send_flx = tl.AddTask(
-          rad_flx, parthenon::SendBoundBufs<parthenon::BoundaryType::flxcor_send>, u0);
+      auto send_flx =
+          tl.AddTask(rad_flx | gas_flx,
+                     parthenon::SendBoundBufs<parthenon::BoundaryType::flxcor_send>, u0);
       auto recv_flx = tl.AddTask(start_flx_recv, parthenon::ReceiveFluxCorrections, u0);
       auto set_flx = tl.AddTask(recv_flx, parthenon::SetFluxCorrections, u0);
 
       // Apply flux divergence
-      auto update = tl.AddTask(rad_flx | set_flx, Radiation::ApplyUpdate<GEOM>, u0.get(),
-                               u1.get(), stage, gam0[stage - 1], gam1[stage - 1], bdt);
+      auto update =
+          tl.AddTask(rad_flx | gas_flx | set_flx, Radiation::ApplyUpdate<GEOM>, u0.get(),
+                     u1.get(), stage, gam0[stage - 1], gam1[stage - 1], bdt);
 
       // Apply "coordinate source terms"
       auto coord_src = tl.AddTask(update, Radiation::FluxSource, u0.get(), bdt);

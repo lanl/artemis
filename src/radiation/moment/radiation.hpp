@@ -24,7 +24,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
 template <Coordinates GEOM>
 Real EstimateTimestepMesh(MeshData<Real> *md);
 
-TaskStatus CalculateFluxes(MeshData<Real> *md, const bool pcm);
+TaskStatus CalculateFluxes(MeshData<Real> *md);
 TaskStatus FluxSource(MeshData<Real> *md, const Real dt);
 
 template <Coordinates GEOM>

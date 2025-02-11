@@ -310,7 +310,7 @@ Real EstimateTimestepMesh(MeshData<Real> *md) {
 //----------------------------------------------------------------------------------------
 //! \fn  TaskStatus Radiation::CalculateFluxes
 //! \brief Evaluates advective fluxes for radiation evolution
-TaskStatus CalculateFluxes(MeshData<Real> *md, const bool pcm) {
+TaskStatus CalculateFluxes(MeshData<Real> *md) {
   auto pm = md->GetParentPointer();
   auto &resolved_pkgs = pm->resolved_packages;
 
@@ -330,10 +330,10 @@ TaskStatus CalculateFluxes(MeshData<Real> *md, const bool pcm) {
   auto fluid_type = pkg->Param<Fluid>("fluid_type");
   if (fluid_type == Fluid::greyM1) {
     return ArtemisUtils::CalculateFluxes<Fluid::greyM1>(md, pkg, vprim, vflux, vface,
-                                                        pcm);
+                                                        false);
   } else if (fluid_type == Fluid::greyP1) {
     return ArtemisUtils::CalculateFluxes<Fluid::greyP1>(md, pkg, vprim, vflux, vface,
-                                                        pcm);
+                                                        false);
   }
   return TaskStatus::complete;
 }
@@ -377,8 +377,11 @@ TaskStatus ApplyUpdate(MeshData<Real> *u0, MeshData<Real> *u1, const int stage,
   auto pm = u0->GetParentPointer();
   auto &resolved_pkgs = pm->resolved_packages;
   // Packing and indexing
-  static auto desc = parthenon::MakePackDescriptor<rad::cons::energy, rad::cons::flux>(
-      resolved_pkgs.get(), {}, {parthenon::PDOpt::WithFluxes});
+  static auto desc =
+      parthenon::MakePackDescriptor<rad::cons::energy, rad::cons::flux,
+                                    gas::cons::momentum, gas::cons::total_energy,
+                                    gas::cons::internal_energy>(
+          resolved_pkgs.get(), {}, {parthenon::PDOpt::WithFluxes});
 
   const auto v0 = desc.GetPack(u0);
   const auto v1 = desc.GetPack(u1);
@@ -432,9 +435,9 @@ TaskStatus MatterCoupling(MeshData<Real> *u0, MeshData<Real> *u1, const Real dt)
   auto &radiation_pkg = pm->packages.Get("radiation");
   auto fluid_type = radiation_pkg->template Param<Fluid>("fluid_type");
   if (fluid_type == Fluid::greyM1) {
-    return MatterCouplingImpl<GEOM, Fluid::greyM1>(u0, u1, dt);
+    return MatterCouplingSingleImpl<GEOM, Fluid::greyM1>(u0, u1, dt);
   } else if (fluid_type == Fluid::greyP1) {
-    return MatterCouplingImpl<GEOM, Fluid::greyP1>(u0, u1, dt);
+    return MatterCouplingSingleImpl<GEOM, Fluid::greyP1>(u0, u1, dt);
   }
   return TaskStatus::complete;
 }

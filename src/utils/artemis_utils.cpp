@@ -47,6 +47,7 @@ void PrintArtemisConfiguration(Packages_t &packages) {
     printf("    problem:         %s\n", params.Get<std::string>("pgen_name").c_str());
     printf("    coordinates:     %dD %s\n", nd,
            params.Get<std::string>("coord_sys").c_str());
+    printf("    integrator:      %s\n", params.Get<std::string>("integrator").c_str());
     printf("    MPI ranks:       %d\n", parthenon::Globals::nranks);
     printf("    dimensions:      %dx%dx%d\n", nx[0], nx[1], nx[2]);
     printf("    meshblock:       %dx%dx%d\n", nb[0], nb[1], nb[2]);

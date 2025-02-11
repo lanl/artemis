@@ -45,6 +45,7 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   // Store selected pgen name
   artemis->AddParam("pgen_name", pin->GetString("artemis", "problem"));
   artemis->AddParam("job_name", pin->GetString("parthenon/job", "problem_id"));
+  artemis->AddParam("integrator", pin->GetString("parthenon/time", "integrator"));
   std::array<int, 3> nx{pin->GetInteger("parthenon/mesh", "nx1"),
                         pin->GetInteger("parthenon/mesh", "nx2"),
                         pin->GetInteger("parthenon/mesh", "nx3")};

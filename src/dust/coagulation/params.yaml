@@ -1,0 +1,60 @@
+---
+coagulation:
+
+  vfrag:
+    _type: Real
+    _default: "1e3"
+    _description:  "Dust fragmentation velocity"
+    _units: "cm / s"
+
+  coag_int:
+    _type: int
+    _default: 3
+    _description: "Coagulation time integration method[forward Euler(1), Heun's method(3)]" 
+
+  coag_use_adaptiveStep:
+    _type: bool
+    _default: "true"
+    _description: "Turn on adaptive time integration"
+
+  coag_mom_preserve:
+    _type: bool
+    _default: "true"
+    _description: "Turn on momentum-preserving coagulation"
+  
+  coag_nsteps_mx:
+    _type: int
+    _default: 1000
+    _description: "Maximum number of time-steps per coagulation call"
+
+  const_coag_omega:
+    _type: bool
+    _default: "false"
+    _description: "Constant Keplerian angular velcity [e.g, sharingbox]"
+
+  coag_bounce:
+    _type: bool
+    _default: "false"
+    _description: "Turn on the bouncing impact on coagulation"
+    _units: "cm"
+
+  nstep1Coag:
+    _type: int
+    _default: 50
+    _description: "Number of hydro steps between two coagulation calls"
+
+  coag_alpha:
+    _type: Real
+    _default: 1e-3
+    _description: "Turbulence alpha used in the coagulation algorithm"
+
+  coag_scr_level:
+    _type: int
+    _default: 0
+    _description: "Coagulation scratch memory level"
+
+  coag_info_out:
+    _type: bool
+    _default: "false"
+    _description: "Turn on output coagualtion info after each call"
+

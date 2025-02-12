@@ -394,11 +394,12 @@ TaskStatus CoagulationOneStep(MeshData<Real> *md, const Real time, const Real dt
   size_t scr_size = ScratchPad1D<Real>::shmem_size(isize);
 
   auto pmb = md->GetBlockData(0)->GetBlockPointer();
-  ParArray3D<int> nCalls;
+  ParArray4D<int> nCalls;
   int maxCalls, maxSize, maxSize0;
   Real massd0, massd;
   if (info_out_flag) {
-    nCalls = ParArray3D<int>("coag_nCalls", pmb->cellbounds.ncellsk(IndexDomain::entire),
+    nCalls = ParArray4D<int>("coag_nCalls", md->NumBlocks(),
+                             pmb->cellbounds.ncellsk(IndexDomain::entire),
                              pmb->cellbounds.ncellsj(IndexDomain::entire),
                              pmb->cellbounds.ncellsi(IndexDomain::entire));
     maxCalls = 0;
@@ -435,134 +436,131 @@ TaskStatus CoagulationOneStep(MeshData<Real> *md, const Real time, const Real dt
 #endif // MPI_PARALLEL
   }    // end if (info_out_flag)
 
-  for (int b = 0; b < md->NumBlocks(); b++) {
-    parthenon::par_for_outer(
-        DEFAULT_OUTER_LOOP_PATTERN, "Dust::Coagulation", parthenon::DevExecSpace(),
-        scr_size, scr_level, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
-        KOKKOS_LAMBDA(parthenon::team_mbr_t mbr, const int k, const int j, const int i) {
-          // code-to-physical unit
-          // one-cell coagulation
-          const int nDust_live = (vmesh.GetUpperBound(b, dust::prim::density()) -
-                                  vmesh.GetLowerBound(b, dust::prim::density()) + 1);
+  ArtemisUtils::par_for_outer(
+      DEFAULT_OUTER_LOOP_PATTERN, "Dust::Coagulation", parthenon::DevExecSpace(),
+      scr_size, scr_level, 0, md->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      KOKKOS_LAMBDA(parthenon::team_mbr_t mbr, const int b, const int k, const int j,
+                    const int i) {
+        // code-to-physical unit
+        // one-cell coagulation
+        const int nDust_live = (vmesh.GetUpperBound(b, dust::prim::density()) -
+                                vmesh.GetLowerBound(b, dust::prim::density()) + 1);
 
-          const Real dens_g = vmesh(b, gas::prim::density(0), k, j, i);
-          Real dt_sync = dt * time0;
+        const Real dens_g = vmesh(b, gas::prim::density(0), k, j, i);
+        Real dt_sync = dt * time0;
 
-          geometry::Coords<GEOM> coords(vmesh.GetCoordinates(b), k, j, i);
-          const auto &hx = coords.GetScaleFactors();
-          const auto &xv = coords.GetCellCenter();
-          const auto &xcyl = coords.ConvertToCyl(xv);
+        geometry::Coords<GEOM> coords(vmesh.GetCoordinates(b), k, j, i);
+        const auto &hx = coords.GetScaleFactors();
+        const auto &xv = coords.GetCellCenter();
+        const auto &xcyl = coords.ConvertToCyl(xv);
 
-          const Real rad = coag.const_omega ? 1.0 : xcyl[0]; // cylindrical
+        const Real rad = coag.const_omega ? 1.0 : xcyl[0]; // cylindrical
 
-          const Real Omega_k = 1.0 / std::sqrt(rad) / rad;
+        const Real Omega_k = 1.0 / std::sqrt(rad) / rad;
 
-          int nCall1 = 0;
+        int nCall1 = 0;
 
-          const Real sie = vmesh(b, gas::prim::sie(0), k, j, i);
-          const Real bulk = eos_d.BulkModulusFromDensityInternalEnergy(dens_g, sie);
-          const Real cs1 = std::sqrt(bulk / dens_g) * vel0;
-          const Real omega1 = Omega_k / time0;
-          const int nm = nspecies;
-          const Real time1 = time * time0;
-          const Real dens_g1 = dens_g * rho0;
+        const Real sie = vmesh(b, gas::prim::sie(0), k, j, i);
+        const Real bulk = eos_d.BulkModulusFromDensityInternalEnergy(dens_g, sie);
+        const Real cs1 = std::sqrt(bulk / dens_g) * vel0;
+        const Real omega1 = Omega_k / time0;
+        const int nm = nspecies;
+        const Real time1 = time * time0;
+        const Real dens_g1 = dens_g * rho0;
 
-          ScratchPad1D<Real> rhod(mbr.team_scratch(scr_level), nspecies);
-          ScratchPad1D<Real> stime(mbr.team_scratch(scr_level), nspecies);
-          ScratchPad1D<Real> vel(mbr.team_scratch(scr_level), nvel * nspecies);
-          ScratchPad1D<Real> source(mbr.team_scratch(scr_level), nspecies);
-          ScratchPad1D<Real> Q(mbr.team_scratch(scr_level), nspecies);
-          ScratchPad1D<Real> nQs(mbr.team_scratch(scr_level), nspecies);
-          [[maybe_unused]] ScratchPad1D<Real> Q2;
-          if (coag.integrator == 3 && coag.mom_coag) {
-            Q2 = ScratchPad1D<Real>(mbr.team_scratch(scr_level), nspecies);
-          }
+        ScratchPad1D<Real> rhod(mbr.team_scratch(scr_level), nspecies);
+        ScratchPad1D<Real> stime(mbr.team_scratch(scr_level), nspecies);
+        ScratchPad1D<Real> vel(mbr.team_scratch(scr_level), nvel * nspecies);
+        ScratchPad1D<Real> source(mbr.team_scratch(scr_level), nspecies);
+        ScratchPad1D<Real> Q(mbr.team_scratch(scr_level), nspecies);
+        ScratchPad1D<Real> nQs(mbr.team_scratch(scr_level), nspecies);
+        [[maybe_unused]] ScratchPad1D<Real> Q2;
+        if (coag.integrator == 3 && coag.mom_coag) {
+          Q2 = ScratchPad1D<Real>(mbr.team_scratch(scr_level), nspecies);
+        }
 
-          // calculate the stopping time on the fly
-          Real st0 = 1.0;
-          if (coag.coord) { // surface density
-            st0 = 0.5 * M_PI * coag.rho_p / dens_g1 / omega1;
-          } else {
-            st0 = std::sqrt(M_PI / 8.0) * coag.rho_p / dens_g1 / cs1;
-          }
+        // calculate the stopping time on the fly
+        Real st0 = 1.0;
+        if (coag.coord) { // surface density
+          st0 = 0.5 * M_PI * coag.rho_p / dens_g1 / omega1;
+        } else {
+          st0 = std::sqrt(M_PI / 8.0) * coag.rho_p / dens_g1 / cs1;
+        }
 
-          parthenon::par_for_inner(
-              DEFAULT_INNER_LOOP_PATTERN, mbr, 0, nm - 1, [&](const int n) {
-                // calculate the stopping time on fly
-                stime(n) = st0 * dust_size(n) * length0;
-                if (vmesh(b, dust::prim::density(n), k, j, i) > dfloor) {
-                  rhod(n) = vmesh(b, dust::prim::density(n), k, j, i) * rho0;
-                  for (int d = 0; d < nvel; d++) {
-                    vel(VI(n, d)) =
-                        vmesh(b, dust::prim::velocity(VI(n, d)), k, j, i) * vel0;
-                  }
-                } else {
-                  rhod(n) = 0.0;
-                  for (int d = 0; d < nvel; d++) {
-                    vel(VI(n, d)) = 0.0;
-                  }
+        parthenon::par_for_inner(
+            DEFAULT_INNER_LOOP_PATTERN, mbr, 0, nm - 1, [&](const int n) {
+              // calculate the stopping time on fly
+              stime(n) = st0 * dust_size(n) * length0;
+              if (vmesh(b, dust::prim::density(n), k, j, i) > dfloor) {
+                rhod(n) = vmesh(b, dust::prim::density(n), k, j, i) * rho0;
+                for (int d = 0; d < nvel; d++) {
+                  vel(VI(n, d)) =
+                      vmesh(b, dust::prim::velocity(VI(n, d)), k, j, i) * vel0;
                 }
-              });
-
-          Coagulation::CoagulationOneCell(mbr, i, time1, dt_sync, dens_g1, rhod, stime,
-                                          vel, nvel, Q, nQs, alpha, cs1, omega1, coag,
-                                          source, nCall1, Q2);
-
-          if (info_out_flag) nCalls(k, j, i) = nCall1;
-
-          // update dust density and velocity after coagulation
-          parthenon::par_for_inner(
-              DEFAULT_INNER_LOOP_PATTERN, mbr, 0, nm - 1, [&](const int n) {
-                // for (int n = 0; n < nspecies; ++n) {
-                if (rhod(n) > 0.0) {
-                  const Real rhod1 = rhod(n);
-                  vmesh(b, dust::cons::density(n), k, j, i) = rhod1 / rho0;
-                  for (int d = 0; d < nvel; d++) {
-                    vmesh(b, dust::cons::momentum(VI(n, d)), k, j, i) =
-                        rhod1 * vel(VI(n, d)) * hx[d] / vel0;
-                  }
-                } else {
-                  vmesh(b, dust::cons::density(n), k, j, i) = 0.0;
-                  for (int d = 0; d < nvel; d++) {
-                    vmesh(b, dust::cons::momentum(VI(n, d)), k, j, i) = 0.0;
-                  }
+              } else {
+                rhod(n) = 0.0;
+                for (int d = 0; d < nvel; d++) {
+                  vel(VI(n, d)) = 0.0;
                 }
-              });
-        });
-
-    if (info_out_flag) {
-      Real sumd0 = 0.0;
-      int maxCalls1 = 1, maxSize1 = 1;
-      Kokkos::parallel_reduce(
-          "coag::nCallsMaximum",
-          Kokkos::MDRangePolicy<Kokkos::Rank<3>>({kb.s, jb.s, ib.s},
-                                                 {kb.e + 1, jb.e + 1, ib.e + 1}),
-          KOKKOS_LAMBDA(const int k, const int j, const int i, Real &lsum, int &lmax1,
-                        int &lmax2) {
-            geometry::Coords<GEOM> coords(vmesh.GetCoordinates(b), k, j, i);
-            const Real vol00 = coords.Volume();
-            for (int n = 0; n < nspecies; ++n) {
-              Real &dens_d = vmesh(b, dust::cons::density(n), k, j, i);
-              lsum += dens_d * vol00;
-            }
-            lmax1 = std::max(lmax1, nCalls(k, j, i));
-            for (int n = nspecies - 1; n >= 0; --n) {
-              Real &dens_d = vmesh(b, dust::cons::density(n), k, j, i);
-              if (dens_d > dfloor) {
-                lmax2 = std::max(lmax2, n);
-                break;
               }
-            }
-          },
-          Kokkos::Sum<Real>(sumd0), Kokkos::Max<int>(maxCalls1),
-          Kokkos::Max<int>(maxSize1));
-      massd += sumd0;
-      maxCalls = std::max(maxCalls, maxCalls1);
-      maxSize = std::max(maxSize, maxSize1);
-    } // end if (info_out_flag)
-  }   // loop of blocks
+            });
+
+        Coagulation::CoagulationOneCell(mbr, i, time1, dt_sync, dens_g1, rhod, stime, vel,
+                                        nvel, Q, nQs, alpha, cs1, omega1, coag, source,
+                                        nCall1, Q2);
+
+        if (info_out_flag) nCalls(b, k, j, i) = nCall1;
+
+        // update dust density and velocity after coagulation
+        parthenon::par_for_inner(
+            DEFAULT_INNER_LOOP_PATTERN, mbr, 0, nm - 1, [&](const int n) {
+              // for (int n = 0; n < nspecies; ++n) {
+              if (rhod(n) > 0.0) {
+                const Real rhod1 = rhod(n);
+                vmesh(b, dust::cons::density(n), k, j, i) = rhod1 / rho0;
+                for (int d = 0; d < nvel; d++) {
+                  vmesh(b, dust::cons::momentum(VI(n, d)), k, j, i) =
+                      rhod1 * vel(VI(n, d)) * hx[d] / vel0;
+                }
+              } else {
+                vmesh(b, dust::cons::density(n), k, j, i) = 0.0;
+                for (int d = 0; d < nvel; d++) {
+                  vmesh(b, dust::cons::momentum(VI(n, d)), k, j, i) = 0.0;
+                }
+              }
+            });
+      }); // end of par_for_outer
 
   if (info_out_flag) {
+    Real sumd0 = 0.0;
+    int maxCalls1 = 1, maxSize1 = 1;
+    Kokkos::parallel_reduce(
+        "coag::nCallsMaximum",
+        Kokkos::MDRangePolicy<Kokkos::Rank<4>>(
+            {0, kb.s, jb.s, ib.s}, {md->NumBlocks(), kb.e + 1, jb.e + 1, ib.e + 1}),
+        KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, Real &lsum,
+                      int &lmax1, int &lmax2) {
+          geometry::Coords<GEOM> coords(vmesh.GetCoordinates(b), k, j, i);
+          const Real vol00 = coords.Volume();
+          for (int n = 0; n < nspecies; ++n) {
+            Real &dens_d = vmesh(b, dust::cons::density(n), k, j, i);
+            lsum += dens_d * vol00;
+          }
+          lmax1 = std::max(lmax1, nCalls(b, k, j, i));
+          for (int n = nspecies - 1; n >= 0; --n) {
+            Real &dens_d = vmesh(b, dust::cons::density(n), k, j, i);
+            if (dens_d > dfloor) {
+              lmax2 = std::max(lmax2, n);
+              break;
+            }
+          }
+        },
+        Kokkos::Sum<Real>(sumd0), Kokkos::Max<int>(maxCalls1),
+        Kokkos::Max<int>(maxSize1));
+    massd += sumd0;
+    maxCalls = std::max(maxCalls, maxCalls1);
+    maxSize = std::max(maxSize, maxSize1);
+
 #ifdef MPI_PARALLEL
     // over all processors
     MPI_Reduce(MPI_IN_PLACE, &maxCalls, 1, MPI_INT, MPI_MAX, 0, MPI_COMM_WORLD);

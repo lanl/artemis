@@ -28,13 +28,14 @@ _file_id = "coag"
 _massunit = ["3.976832e28", "3.17305460032e29"]
 _surfden = ["true", "false"]
 _tlim = 3768.0
-         
+
+
 # Run Artemis
 def run(**kwargs):
     logger.debug("Runnning test " + __name__)
-    for ii, im in enumeriate(_massunit):
+    for ii, im in enumerate(_massunit):
         arguments = [
-            "artemis/mass=" +_im,
+            "artemis/mass=" + _im,
             "parthenon/job/problem_id=" + _file_id,
             "parthenon/time/tlim={:.8f}".format(_tlim),
             "dust/surface_density_flag=" + _surfden[ii],
@@ -48,23 +49,28 @@ def analyze():
 
     # Grab referenece solution
     dat_sden = np.loadtxt(
-        os.path.join(artemis.get_artemis_dir(),
-                     "tst/scripts/coagulation/coag_info_sden.dat"),
+        os.path.join(
+            artemis.get_artemis_dir(), "tst/scripts/coagulation/coag_info_sden.dat"
+        ),
         unpack=True,
     )
     dat_den = np.loadtxt(
-        os.path.join(artemis.get_artemis_dir(),
-                     "tst/scripts/coagulation/coag_info_den.dat"),
+        os.path.join(
+            artemis.get_artemis_dir(), "tst/scripts/coagulation/coag_info_den.dat"
+        ),
         unpack=True,
     )
 
-    data_ref = np.array([dat_sden[2:5,:], dat_den[2:5,:]])
-    
-    fname = os.path.join(artemis.get_data_dir(), _file_id + "_info.dat")
-    data = np.loadtxt(fname, unpack=True,)
-    data_tst = data[2:5,:].reshape([len(_surfden), 3, data_ref.shape[-1]]);
+    data_ref = np.array([dat_sden[2:5, :], dat_den[2:5, :]])
 
-    errs = data_ref - data_tst;
+    fname = os.path.join(artemis.get_data_dir(), _file_id + "_info.dat")
+    data = np.loadtxt(
+        fname,
+        unpack=True,
+    )
+    data_tst = data[2:5, :].reshape([len(_surfden), 3, data_ref.shape[-1]])
+
+    errs = data_ref - data_tst
     errors = np.array(errs).ravel()
     fail = np.any(errors > 0)
     return not fail

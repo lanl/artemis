@@ -35,7 +35,7 @@ def run(**kwargs):
     logger.debug("Runnning test " + __name__)
     for ii, im in enumerate(_massunit):
         arguments = [
-            "artemis/mass=" + _im,
+            "artemis/mass=" + im,
             "parthenon/job/problem_id=" + _file_id,
             "parthenon/time/tlim={:.8f}".format(_tlim),
             "dust/surface_density_flag=" + _surfden[ii],

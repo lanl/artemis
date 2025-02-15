@@ -1,0 +1,107 @@
+# ========================================================================================
+#  (C) (or copyright) 2023-2024. Triad National Security, LLC. All rights reserved.
+#
+#  This program was produced under U.S. Government contract 89233218CNA000001 for Los
+#  Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
+#  for the U.S. Department of Energy/National Nuclear Security Administration. All rights
+#  in the program are reserved by Triad National Security, LLC, and the U.S. Department
+#  of Energy/National Nuclear Security Administration. The Government is granted for
+#  itself and others acting on its behalf a nonexclusive, paid-up, irrevocable worldwide
+#  license in this material to reproduce, prepare derivative works, distribute copies to
+#  the public, perform publicly and display publicly, and to permit others to do so.
+# ========================================================================================
+
+<artemis>
+problem = shock          # name of the pgen
+coordinates = cartesian  # coordinate system
+physical_units = cgs     # not scale-free
+unit_conversion = base   
+
+<parthenon/job>
+problem_id = shock  # problem ID: basename of output filenames
+
+<parthenon/output1>
+variables = gas.prim.density,  &
+            gas.prim.velocity, &
+            gas.prim.sie,      &
+            rad.prim.energy, &
+            field.jaybenne.energy_tally
+file_type = hdf5  # HDF5 data dump
+dt        = 1e-10   # time increment between outputs
+use_final_label = false
+
+<parthenon/time>
+nlim       = -1   # cycle limit
+tlim       = 6e-10  # time limit
+integrator = rk1  # time integration algorithm
+
+<parthenon/mesh>
+nx1    = 128       # Number of zones in X1-direction
+x1min  = 0.0       # minimum value of X1
+x1max  = 0.01575       # maximum value of X1
+ix1_bc = ic        # inner-X1 boundary flag
+ox1_bc = ic        # outer-X1 boundary flag
+
+nx2    = 1         # Number of zones in X2-direction
+x2min  = 0.0       # minimum value of X2
+x2max  = 1.0       # maximum value of X2
+ix2_bc = periodic  # inner-X2 boundary flag
+ox2_bc = periodic  # outer-X2 boundary flag
+
+nx3    = 1         # Number of zones in X3-direction
+x3min  = 0.0       # minimum value of X3
+x3max  = 1.0       # maximum value of X3
+ix3_bc = periodic  # i9nner-X3 boundary flag
+ox3_bc = periodic  # outer-X3 boundary flag
+
+# <parthenon/swarm>
+# ix1_bc = jaybenne_reflecting  # inner-X1 boundary flag for swarms
+# ox1_bc = jaybenne_reflecting  # outer-X1 boundary flag for swarms
+# ix2_bc = periodic  # inner-X2 boundary flag for swarms
+# ox2_bc = periodic  # outer-X2 boundary flag for swarms
+# ix3_bc = periodic  # inner-X3 boundary flag for swarms
+# ox3_bc = periodic  # outer-X3 boundary flag for swarms
+
+<parthenon/meshblock>
+nx1 = 128  # Number of cells in each MeshBlock, X1-dir
+nx2 = 1    # Number of cells in each MeshBlock, X2-dir
+nx3 = 1    # Number of cells in each MeshBlock, X3-dir
+
+<physics>
+gas = true        # enable gas hydrodynamics
+radiation = true  # enable IMC radiation
+
+<gas>
+gamma = 1.666666    # adiabatic index
+mu = 1.008          # mean molecular weight
+cfl = 0.3         # CFL number
+reconstruct = plm   # reconstruction algorithm
+riemann = hllc      # Riemann solver
+
+<gas/opacity/absorption>
+opacity_model = powerlaw  # absorption opacity model
+coef_kappa_a = 577.0      # kappa_a,0 constant (must be passed in cgs)
+rho_exp = -1.0            # dens exponent for opacity powerlaw
+temp_exp = 0.0            # temp exponent for opacity powerlaw
+
+<radiation>
+cfl = 0.3
+riemann = hlle
+reconstruct = plm
+efloor = 1e-16
+closure = p1
+creduc = 43.3526011561
+
+# <jaybenne>
+# num_particles = 100000  # particle resolution
+# use_ddmc = false        # use DDMC?
+
+
+<problem>
+rhol = 5.69    # density (left)
+rhor = 17.1    # density (right)
+vxl = 5.19e7   # x-velocity (left)
+vxr = 1.73e7   # x-velocity (right)
+tl = 2.18e6    # gas and radiation temp (left)
+tr = 7.98e6    # gas and radiation temp (right)
+xdisc = 0.013  # discontinuity position

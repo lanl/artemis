@@ -63,8 +63,8 @@ TaskStatus MatterCouplingSingleImpl(MeshData<Real> *u0, MeshData<Real> *u1,
           resolved_pkgs.get());
   static auto desc_guess =
       parthenon::MakePackDescriptor<gas::prim::density, gas::prim::sie,
-                                    gas::prim::velocity, rad::cons::energy,
-                                    rad::cons::flux>(resolved_pkgs.get());
+                                    gas::prim::velocity, rad::prim::energy,
+                                    rad::prim::flux>(resolved_pkgs.get());
 
   const auto v0 = desc.GetPack(u0);
   const auto v1 = desc_guess.GetPack(u1);
@@ -82,132 +82,81 @@ TaskStatus MatterCouplingSingleImpl(MeshData<Real> *u0, MeshData<Real> *u1,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
         geometry::Coords<GEOM> coords(v0.GetCoordinates(b), k, j, i);
         const auto &hx = coords.GetScaleFactors();
+        // y = U^(0) + dt S(y)
 
-        // The state after the explicit update
-        const Real &dens = v0(b, gas::cons::density(0), k, j, i);
-        const Real &e0 = v0(b, gas::cons::total_energy(0), k, j, i);
-        const std::array<Real, 3> p0{v0(b, gas::cons::momentum(0), k, j, i) / hx[0],
-                                     v0(b, gas::cons::momentum(1), k, j, i) / hx[1],
-                                     v0(b, gas::cons::momentum(2), k, j, i) / hx[2]};
-        const Real ke0 =
-            (SQR(p0[0] / hx[0]) + SQR(p0[1] / hx[1]) + SQR(p0[2] / hx[2])) / (2. * dens);
-        const Real Er0 = v0(b, rad::cons::energy(0), k, j, i);
+        // U^(0) values
+        const Real dens = v0(b, gas::cons::density(), k, j, i);
+        const Real e0 = v0(b, gas::cons::internal_energy(), k, j, i);
+        std::array<Real, 3> v{v0(b, gas::cons::momentum(0), k, j, i) / (hx[0] * dens),
+                              v0(b, gas::cons::momentum(1), k, j, i) / (hx[1] * dens),
+                              v0(b, gas::cons::momentum(2), k, j, i) / (hx[2] * dens)};
+        const Real Er0 = v0(b, rad::cons::energy(), k, j, i);
         std::array<Real, 3> Fr0{v0(b, rad::cons::flux(0), k, j, i) / hx[0],
                                 v0(b, rad::cons::flux(1), k, j, i) / hx[1],
                                 v0(b, rad::cons::flux(2), k, j, i) / hx[2]};
 
-        // The initial guesses use u1 register as that is fully synced
-        Real Tg = eos_d.TemperatureFromDensityInternalEnergy(
-            v1(b, gas::prim::density(), k, j, i), v1(b, gas::prim::sie(), k, j, i));
-        Real B = arad * SQR(SQR(Tg));
-        std::array<Real, 3> v{v1(b, gas::prim::velocity(0), k, j, i),
-                              v1(b, gas::prim::velocity(1), k, j, i),
-                              v1(b, gas::prim::velocity(2), k, j, i)};
-        Real E = v1(b, rad::cons::energy(), k, j, i);
-        std::array<Real, 3> F{v1(b, rad::cons::flux(0), k, j, i),
-                              v1(b, rad::cons::flux(1), k, j, i),
-                              v1(b, rad::cons::flux(2), k, j, i)};
+        // initial guess from U^(1)
 
-        Real e = 0.5 * dens * (SQR(v[0]) + SQR(v[1]) + SQR(v[2])) +
-                 dens * v1(b, gas::prim::sie(), k, j, i);
+        Real e = v1(b, gas::prim::sie(), k, j, i);
+        Real E = v1(b, rad::prim::energy(), k, j, i);
+        std::array<Real, 3> Fr{v1(b, rad::prim::flux(0), k, j, i) * c * E,
+                               v1(b, rad::prim::flux(1), k, j, i) * c * E,
+                               v1(b, rad::prim::flux(2), k, j, i) * c * E};
 
-        int outer_iter = 0;
+        Real T = eos_d.TemperatureFromDensityInternalEnergy(dens, e);
+        Real B = arad * SQR(SQR(T));
+        Real etot = e + c / chat * E;
+
+        // S(y) = sigma*chat*(E-B)
+        //
         int inner_iter = 0;
-        Real outer_err = 0.0;
-        Real inner_err = 0.0;
-        bool outer_conv = false;
-        while (not outer_conv) {
-          bool inner_conv = false;
-          std::array<Real, 3> f0{F[0] / (c * E + Fuzz<Real>()),
-                                 F[1] / (c * E + Fuzz<Real>()),
-                                 F[2] / (c * E + Fuzz<Real>())};
-          auto fedd = EddingtonTensor<CLOSURE>(f0);
-          Real ke = 0.5 * dens * (SQR(v[0]) + SQR(v[1]) + SQR(v[2]));
-          inner_err = 0.0;
-          while (not inner_conv) {
-            // Compute new B,E
-            Real T = std::pow(B / arad, 0.25);
-            Real et = ke + dens * eos_d.InternalEnergyFromDensityTemperature(dens, T);
-            const Real Cv = dens * eos_d.SpecificHeatFromDensityTemperature(dens, T);
+        Real inner_err = 0.;
+        for (inner_iter = 0; inner_iter < inner_max; inner_iter++) {
+          T = std::pow(B / arad, 0.25);
+          e = eos_d.InternalEnergyFromDensityTemperature(dens, T) * dens;
+          const Real Cv = dens * eos_d.SpecificHeatFromDensityTemperature(dens, T);
+          const Real a = chat * dt * opac_d.AbsorptionCoefficient(dens, T, 1.0);
+          const Real f = FleckFactor(arad, T, Cv);
+          const Real Ri = a * (B - E);
+          const Real Fi = (e - e0) + c / chat * Ri;
+          const Real Fr = (E - Er0) - Ri;
+          const Real scale = 1. + c / chat * f * a;
+          Real dE = (-Fr + a * f * Fi * scale) / (1. + a * scale);
+          Real dB = (-Fi + c / chat * a * dE) * f * scale;
 
-            auto sigp = dt * opac_d.AbsorptionCoefficient(dens, T, 1.0);
-            auto sigr = dt * opac_d.AbsorptionCoefficient(dens, T, 1.0);
-
-            const auto f = FleckFactor(arad, T, Cv);
-
-            const auto &[a, b, d] = EnergyExchangeCoeffs(sigp, sigr, v, F, fedd, c, chat);
-
-            const auto &[Ri, Fi] = EnergyRHS(Cv, a, b, d, et, e0, E, B, c / chat);
-
-            const Real scale = 1.0 / (1.0 + c / chat * f * a);
-            Real ca = -(b - a) * scale;
-            Real cb = -Fi * f * (b - a) * scale;
-            Real Fr = (E - Er0) - Ri;
-            // rad energy and B changes
-            Real dE = (-Fr + cb) / (1.0 + ca);
-            Real dB = -f * Fi * scale + cb * dE * scale;
-
-            // Get relative change for this iteration and update
-            inner_err = std::max(inner_err, std::abs(dE) / (E + Fuzz<Real>()));
-            inner_err = std::max(inner_err, std::abs(dB) / (B + Fuzz<Real>()));
-            B += dB;
-            E += dE;
-
-            inner_iter++;
-            inner_conv = (inner_err <= inner_tol) || (inner_iter >= inner_max);
-          } // Done inner
-
-          // With the new T, compute the change in E from conservation
-          // Etot = Eg + chat/c Erad
-          Real T = std::pow(B / arad, 0.25);
-          e = ke + dens * eos_d.InternalEnergyFromDensityTemperature(dens, T);
-          E = Er0 - c / chat * (e - e0);
-
-          // Now get new Fr at fixed T and E
-
-          auto sigp = chat * dt * opac_d.AbsorptionCoefficient(dens, T, 1.0);
-          auto sigr = chat * dt * opac_d.AbsorptionCoefficient(dens, T, 1.0);
-
-          // the order v/c solution
-          const Real ifac = 1. / (1. + sigr);
-          std::array<Real, 3> dF{
-              ifac * (-sigr * Fr0[0] + (sigp * (B - E) + sigr * E) * v[0] +
-                      sigr * E *
-                          (v[0] * fedd[TensIdx::X11] + v[1] * fedd[TensIdx::X12] +
-                           v[2] * fedd[TensIdx::X13])),
-              ifac * (-sigr * Fr0[1] + (sigp * (B - E) + sigr * E) * v[1] +
-                      sigr * E *
-                          (v[0] * fedd[TensIdx::X12] + v[1] * fedd[TensIdx::X22] +
-                           v[2] * fedd[TensIdx::X23])),
-              ifac * (-sigr * Fr0[2] + (sigp * (B - E) + sigr * E) * v[2] +
-                      sigr * E *
-                          (v[0] * fedd[TensIdx::X13] + v[1] * fedd[TensIdx::X23] +
-                           v[2] * fedd[TensIdx::X33]))};
-
-          // Momentum conservation sets rho*v
-          // Ptot = rho*v + F/(c chat)
-          const Real icc = 1. / (c * chat * dens);
-          std::array<Real, 3> dv{-icc * dF[0], -icc * dF[1], -icc * dF[2]};
-
-          // Get relative change and update
-          for (int d = 0; d < 3; d++) {
-            outer_err =
-                std::max(outer_err, std::abs(dv[d]) / (std::abs(v[d]) + Fuzz<Real>()));
-            outer_err =
-                std::max(outer_err, std::abs(dF[d]) / (std::abs(F[d]) + Fuzz<Real>()));
-            v[d] += dv[d];
-            F[d] += dF[d];
+          E += dE;
+          B += dB;
+          inner_iter++;
+          inner_err = std::max((std::abs(Fi) / etot), (c / chat * std::abs(Fr) / etot));
+          if (inner_err <= inner_tol) {
+            break;
           }
-          outer_iter++;
-          outer_conv = (outer_err <= outer_tol) || (outer_iter >= outer_max);
-        } // done oterr
+        }
+        if (inner_iter == inner_max) {
+          printf("(%d,%d,%d,%d)  %lg > %lg after %d iterations\n", b, k, j, i, inner_err,
+                 inner_tol, inner_max);
+          PARTHENON_FAIL("NOT CONVERGED");
+        }
+        T = std::pow(B / arad, 0.25);
+        e = eos_d.InternalEnergyFromDensityTemperature(dens, T) * dens;
+        const Real dEg = e - e0;
+        Real a = chat * dt * opac_d.AbsorptionCoefficient(dens, T, 1.0);
+        std::array<Real, 3> dF{-a / (1. + a) * Fr0[0], -a / (1. + a) * Fr0[1],
+                               -a / (1. + a) * Fr0[2]};
+        const Real icc = -1. / (c * chat * dens);
+        std::array<Real, 3> dv{-icc * dF[0], -icc * dF[1], -icc * dF[2]};
+        std::array<Real, 3> vn{v[0] + dv[0], v[1] + dv[1], v[2] + dv[2]};
 
-        // Converged values, now update the registers
-        v0(b, gas::cons::total_energy(), k, j, i) = e;
-        v0(b, rad::cons::energy(), k, j, i) = E;
+        const Real dEk = 0.5 * dens *
+                         ((SQR(vn[0]) - SQR(v[0])) + (SQR(vn[1]) - SQR(v[1])) +
+                          (SQR(vn[2]) - SQR(v[2])));
+
+        v0(b, rad::cons::energy(), k, j, i) += dEk - chat / c * dEg;
+        v0(b, gas::cons::total_energy(), k, j, i) += dEg + dEk;
+        v0(b, gas::cons::internal_energy(), k, j, i) += dEg;
         for (int d = 0; d < 3; d++) {
-          v0(b, gas::cons::momentum(d), k, j, i) = dens * v[d] * hx[d];
-          v0(b, rad::cons::flux(d), k, j, i) = F[d];
+          v0(b, rad::cons::flux(d), k, j, i) += dF[d] * hx[d];
+          v0(b, gas::cons::momentum(d), k, j, i) += dv[d] * dens * hx[d];
         }
       });
 
@@ -215,7 +164,8 @@ TaskStatus MatterCouplingSingleImpl(MeshData<Real> *u0, MeshData<Real> *u1,
 }
 
 // template <Coordinates GEOM, Fluid CLOSURE>
-// TaskStatus MatterCouplingImpl(MeshData<Real> *u0, MeshData<Real> *u1, const Real dt) {
+// TaskStatus MatterCouplingImpl(MeshData<Real> *u0, MeshData<Real> *u1, const Real dt)
+// {
 //   using parthenon::MakePackDescriptor;
 //   using parthenon::variable_names::any;
 //   auto pm = u0->GetParentPointer();
@@ -276,7 +226,8 @@ TaskStatus MatterCouplingSingleImpl(MeshData<Real> *u0, MeshData<Real> *u1,
 //   parthenon::par_for_outer(
 //       DEFAULT_OUTER_LOOP_PATTERN, "MatterCoupling", DevExecSpace(), scr_size,
 //       scr_level, 0, u0->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e,
-//       KOKKOS_LAMBDA(parthenon::team_mbr_t mbr, const int b, const int k, const int j) {
+//       KOKKOS_LAMBDA(parthenon::team_mbr_t mbr, const int b, const int k, const int j)
+//       {
 //         ScratchPad2D<Real> cv(mbr.team_scratch(scr_level), ngas, ncells1);
 //         ScratchPad2D<Real> B(mbr.team_scratch(scr_level), ngas, ncells1);
 //         ScratchPad2D<Real> vx1(mbr.team_scratch(scr_level), ngas, ncells1);
@@ -301,8 +252,8 @@ TaskStatus MatterCouplingSingleImpl(MeshData<Real> *u0, MeshData<Real> *u1,
 //                     v0, b, n, k, j, i, de_switch, dflr, sieflr, hx);
 //                 cv(n, i) = dens * eos_d.SpecificHeatFromDensityInternalEnergy(dens,
 //                 sie); const Real T = eos_d.TemperatureFromDensityInternalEnergy(dens,
-//                 sie); e0(n, i) = v0(b, gas::cons::total_energy(n), k, j, i); eg(n, i) =
-//                 e0(n, i); vx1(n, i) =
+//                 sie); e0(n, i) = v0(b, gas::cons::total_energy(n), k, j, i); eg(n, i)
+//                 = e0(n, i); vx1(n, i) =
 //                     v0(b, gas::cons::momentum(VI(n, 0)), k, j, i) / (dens * hx[0]);
 //                 vx2(n, i) =
 //                     v0(b, gas::cons::momentum(VI(n, 1)), k, j, i) / (dens * hx[1]);
@@ -426,8 +377,8 @@ TaskStatus MatterCouplingSingleImpl(MeshData<Real> *u0, MeshData<Real> *u1,
 //                     B(n, i) += dB;
 //                   }
 //                   // dE *= c / chat;
-//                   inner_err = std::max(inner_err, std::abs(dE / (Er + Fuzz<Real>())));
-//                   Er = Er0 + dE;
+//                   inner_err = std::max(inner_err, std::abs(dE / (Er +
+//                   Fuzz<Real>()))); Er = Er0 + dE;
 
 //                   // Ek += dEk;
 //                   inner_iter++;
@@ -445,7 +396,8 @@ TaskStatus MatterCouplingSingleImpl(MeshData<Real> *u0, MeshData<Real> *u1,
 //                 // for (int n = 0; n < ngas; n++) {
 //                 //   const std::array<Real, 3> v{vx1(n, i), vx2(n, i), vx3(n, i)};
 //                 //   const Real &dens = v0(b, gas::cons::density(n), k, j, i);
-//                 //   const Real ke = 0.5 * dens * (SQR(v[0]) + SQR(v[1]) + SQR(v[2]));
+//                 //   const Real ke = 0.5 * dens * (SQR(v[0]) + SQR(v[1]) +
+//                 SQR(v[2]));
 //                 //   const Real T = std::pow(B(n, i) / arad, 0.25);
 //                 //   const Real e =
 //                 //       ke + dens * eos_d.InternalEnergyFromDensityTemperature(dens,
@@ -483,7 +435,8 @@ TaskStatus MatterCouplingSingleImpl(MeshData<Real> *u0, MeshData<Real> *u1,
 //                   const Real ke = 0.5 * dens * (SQR(v[0]) + SQR(v[1]) + SQR(v[2]));
 //                   const Real eint = (eg(n, i) - ke);
 //                   const Real T = std::pow(B(n, i) / arad, 0.25);
-//                   //    eos_d.TemperatureFromDensityInternalEnergy(dens, eint / dens);
+//                   //    eos_d.TemperatureFromDensityInternalEnergy(dens, eint /
+//                   dens);
 //                   // const Real B = arad * SQR(SQR(T));
 //                   // Evaluate opacities once per iteration
 //                   chip(n, i) = opac_d.AbsorptionCoefficient(dens, T, 1.0);
@@ -574,7 +527,8 @@ TaskStatus MatterCouplingSingleImpl(MeshData<Real> *u0, MeshData<Real> *u1,
 //                   Real err_ =
 //                       std::sqrt(SQR(vnx1 - vx[0]) + SQR(vnx2 - vx[1]) +
 //                                 SQR(vnx3 - vx[2])) /
-//                       (std::sqrt(SQR(vx[0]) + SQR(vx[1]) + SQR(vx[2])) + Fuzz<Real>());
+//                       (std::sqrt(SQR(vx[0]) + SQR(vx[1]) + SQR(vx[2])) +
+//                       Fuzz<Real>());
 //                   outer_err = std::max(outer_err, err_);
 //                   vx1(n, i) = vnx1;
 //                   vx2(n, i) = vnx2;
@@ -585,7 +539,8 @@ TaskStatus MatterCouplingSingleImpl(MeshData<Real> *u0, MeshData<Real> *u1,
 //                 outer_conv = (outer_err < outer_tol) || (outer_iter > outer_max);
 //               }
 //               // #ifdef DEBUG
-//               // printf("inner: (%d, %lg), outer: (%d, %lg)\n", inner_iter, inner_err,
+//               // printf("inner: (%d, %lg), outer: (%d, %lg)\n", inner_iter,
+//               inner_err,
 //               //        outer_iter, outer_err);
 //               // #endif
 //               if ((outer_iter > outer_max) && (outer_err > outer_tol)) {

@@ -102,6 +102,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   params.Add("c", light);
   const Real creduc = pin->GetOrAddReal("radiation", "creduc", 1.0);
   params.Add("chat", light / creduc);
+
   const Real arad = constants.GetARCode();
   params.Add("arad", arad);
 
@@ -118,11 +119,11 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   params.Add("outer_iteration_max",
              pin->GetOrAddInteger("radiation", "outer_iteration_max", 100));
   params.Add("inner_iteration_max",
-             pin->GetOrAddInteger("radiation", "inner_iteration_max", 100));
+             pin->GetOrAddInteger("radiation", "inner_iteration_max", 400));
   params.Add("outer_iteration_tol",
-             pin->GetOrAddReal("radiation", "outer_iteration_tol", 1e-8));
+             pin->GetOrAddReal("radiation", "outer_iteration_tol", 1e-10));
   params.Add("inner_iteration_tol",
-             pin->GetOrAddReal("radiation", "inner_iteration_tol", 1e-8));
+             pin->GetOrAddReal("radiation", "inner_iteration_tol", 1e-10));
 
   std::vector<int> fluidids;
   for (int n = 0; n < nspecies; ++n)

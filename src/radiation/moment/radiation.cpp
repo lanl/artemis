@@ -98,6 +98,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
 
   params.Add("nstages", pin->GetOrAddInteger("radiation", "nstages", 2));
 
+  params.Add("full_coupling", pin->GetOrAddBoolean("radiation", "full_coupling", true));
+
   const Real light = constants.GetCCode();
   params.Add("c", light);
   const Real creduc = pin->GetOrAddReal("radiation", "creduc", 1.0);
@@ -435,10 +437,20 @@ TaskStatus MatterCoupling(MeshData<Real> *u0, MeshData<Real> *u1, const Real dt)
 
   auto &radiation_pkg = pm->packages.Get("radiation");
   auto fluid_type = radiation_pkg->template Param<Fluid>("fluid_type");
+  auto full_coupling = radiation_pkg->template Param<bool>("full_coupling");
+
   if (fluid_type == Fluid::greyM1) {
-    return MatterCouplingSingleImpl<GEOM, Fluid::greyM1>(u0, u1, dt);
+    if (full_coupling) {
+      return MatterCouplingFullSingleImpl<GEOM, Fluid::greyM1>(u0, u1, dt);
+    } else {
+      return MatterCouplingSingleImpl<GEOM, Fluid::greyM1>(u0, u1, dt);
+    }
   } else if (fluid_type == Fluid::greyP1) {
-    return MatterCouplingSingleImpl<GEOM, Fluid::greyP1>(u0, u1, dt);
+    if (full_coupling) {
+      return MatterCouplingFullSingleImpl<GEOM, Fluid::greyP1>(u0, u1, dt);
+    } else {
+      return MatterCouplingSingleImpl<GEOM, Fluid::greyP1>(u0, u1, dt);
+    }
   }
   return TaskStatus::complete;
 }

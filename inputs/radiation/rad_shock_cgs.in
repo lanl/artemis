@@ -33,10 +33,10 @@ use_final_label = false
 <parthenon/time>
 nlim       = -1   # cycle limit
 tlim       = 6e-10  # time limit
-integrator = rk1  # time integration algorithm
+integrator = rk2  # time integration algorithm
 
 <parthenon/mesh>
-nx1    = 128       # Number of zones in X1-direction
+nx1    = 512       # Number of zones in X1-direction
 x1min  = 0.0       # minimum value of X1
 x1max  = 0.01575       # maximum value of X1
 ix1_bc = ic        # inner-X1 boundary flag
@@ -63,7 +63,7 @@ ox3_bc = periodic  # outer-X3 boundary flag
 # ox3_bc = periodic  # outer-X3 boundary flag for swarms
 
 <parthenon/meshblock>
-nx1 = 128  # Number of cells in each MeshBlock, X1-dir
+nx1 = 512  # Number of cells in each MeshBlock, X1-dir
 nx2 = 1    # Number of cells in each MeshBlock, X2-dir
 nx3 = 1    # Number of cells in each MeshBlock, X3-dir
 

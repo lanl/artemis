@@ -373,30 +373,10 @@ TaskCollection ArtemisDriver<GEOM>::RadiationTasks() {
       // Apply "coordinate source terms"
       auto coord_src = tl.AddTask(update, Radiation::FluxSource, u0.get(), bdt);
 
-      // Apply rotating frame source term
-      // TaskID rframe_src = coord_src;
-      // if (do_rotating_frame) {
-      //   rframe_src = tl.AddTask(gravity_src, RotatingFrame::RotatingFrameForce,
-      //   u0.get(),
-      //                           time, bdt);
-      // }
-
       // Apply matter-coupling step
       // This is the first task to update the gas/dust values
       auto coupling =
-          tl.AddTask(coord_src, Radiation::MatterCoupling<GEOM>, u0.get(), u1.get(), bdt);
-
-      // // Set fields to be communicated
-      // auto pre_comm = tl.AddTask(coupling, PreCommFillDerived<MeshData<Real>>,
-      // u0.get());
-
-      // // Set boundary conditions (both physical and logical)
-      // auto bcs = parthenon::AddBoundaryExchangeTasks(pre_comm, tl, u0,
-      // pmesh->multilevel);
-
-      // // Update primitive variables
-      // auto c2p = tl.AddTask(TQ::local_sync, bcs, FillDerived<MeshData<Real>>,
-      // u0.get());
+          tl.AddTask(coord_src, Radiation::MatterCoupling<GEOM>, u0.get(), bdt);
 
       // Set auxillary fields
       auto set_aux =

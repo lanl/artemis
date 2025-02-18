@@ -28,7 +28,7 @@ TaskStatus CalculateFluxes(MeshData<Real> *md);
 TaskStatus FluxSource(MeshData<Real> *md, const Real dt);
 
 template <Coordinates GEOM>
-TaskStatus MatterCoupling(MeshData<Real> *u0, MeshData<Real> *u1, const Real dt);
+TaskStatus MatterCoupling(MeshData<Real> *u0, const Real dt);
 
 template <Coordinates GEOM>
 TaskStatus ApplyUpdate(MeshData<Real> *u0, MeshData<Real> *u1, const int stage,

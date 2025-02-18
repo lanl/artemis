@@ -28,8 +28,7 @@ using ArtemisUtils::VI;
 namespace Radiation {
 
 template <Coordinates GEOM, Fluid CLOSURE>
-TaskStatus MatterCouplingSingleImpl(MeshData<Real> *u0, MeshData<Real> *u1,
-                                    const Real dt) {
+TaskStatus MatterCouplingSimpleImpl(MeshData<Real> *u0, const Real dt) {
   using parthenon::MakePackDescriptor;
   using parthenon::variable_names::any;
   auto pm = u0->GetParentPointer();
@@ -61,13 +60,8 @@ TaskStatus MatterCouplingSingleImpl(MeshData<Real> *u0, MeshData<Real> *u1,
                                     gas::cons::density, gas::cons::momentum,
                                     gas::cons::internal_energy, gas::cons::total_energy>(
           resolved_pkgs.get());
-  static auto desc_guess =
-      parthenon::MakePackDescriptor<gas::prim::density, gas::prim::sie,
-                                    gas::prim::velocity, rad::prim::energy,
-                                    rad::prim::flux>(resolved_pkgs.get());
 
   const auto v0 = desc.GetPack(u0);
-  const auto v1 = desc_guess.GetPack(u1);
   const auto ib = u0->GetBoundsI(IndexDomain::interior);
   const auto jb = u0->GetBoundsJ(IndexDomain::interior);
   const auto kb = u0->GetBoundsK(IndexDomain::interior);
@@ -86,7 +80,7 @@ TaskStatus MatterCouplingSingleImpl(MeshData<Real> *u0, MeshData<Real> *u1,
 
         // U^(0) values
         const Real dens = v0(b, gas::cons::density(), k, j, i);
-        const Real e0 = v0(b, gas::cons::internal_energy(), k, j, i);
+        Real e0 = v0(b, gas::cons::internal_energy(), k, j, i);
         std::array<Real, 3> v{v0(b, gas::cons::momentum(0), k, j, i) / (hx[0] * dens),
                               v0(b, gas::cons::momentum(1), k, j, i) / (hx[1] * dens),
                               v0(b, gas::cons::momentum(2), k, j, i) / (hx[2] * dens)};
@@ -95,17 +89,24 @@ TaskStatus MatterCouplingSingleImpl(MeshData<Real> *u0, MeshData<Real> *u1,
                                 v0(b, rad::cons::flux(1), k, j, i) / hx[1],
                                 v0(b, rad::cons::flux(2), k, j, i) / hx[2]};
 
-        // initial guess from U^(1)
+                // Note(AMD): There is some floating point difference between the internal energy
+        // used to compute the temperature and the internal energy obtained from that
+        // temperature: T = eos_d.TemperatureFromDensityInternalEnergy(dens, eg/dens); eg
+        // /= dens * eos_d.InternalEnergyFromDensityTemperature(dens,T)
+        //
+        // Because of this, zero opacity problems will not result in zero change as
+        // expected. Thus, we recalculate the internal and total energies from the
+        // temperature. This does not affect energy conservation because at the end of the
+        // step we update the energy with an increment.
 
-        Real e = v1(b, gas::prim::sie(), k, j, i);
-        Real E = v1(b, rad::prim::energy(), k, j, i);
-        std::array<Real, 3> F{v1(b, rad::prim::flux(0), k, j, i) * c * E,
-                              v1(b, rad::prim::flux(1), k, j, i) * c * E,
-                              v1(b, rad::prim::flux(2), k, j, i) * c * E};
-
-        Real T = eos_d.TemperatureFromDensityInternalEnergy(dens, e);
+        Real T = eos_d.TemperatureFromDensityInternalEnergy(dens, e0 / dens);
+        e0 = dens * eos_d.InternalEnergyFromDensityTemperature(dens, T);
+        Real e = e0;
         Real B = arad * SQR(SQR(T));
-        Real etot = dens * e + c / chat * E;
+
+        Real E = Er0;
+        auto F = Fr0;
+        Real etot = e + c / chat * E;
 
         // S(y) = sigma*chat*(E-B)
         //
@@ -116,13 +117,14 @@ TaskStatus MatterCouplingSingleImpl(MeshData<Real> *u0, MeshData<Real> *u1,
           e = eos_d.InternalEnergyFromDensityTemperature(dens, T) * dens;
           const Real Cv = dens * eos_d.SpecificHeatFromDensityTemperature(dens, T);
           const Real a = chat * dt * opac_d.AbsorptionCoefficient(dens, T, 1.0);
-          const Real f = FleckFactor(arad, T, Cv);
-          const Real Ri = a * (B - E);
-          const Real Fi = (e - e0) + c / chat * Ri;
-          const Real Fr = (E - Er0) - Ri;
-          const Real scale = 1. + c / chat * f * a;
-          Real dE = (-Fr + a * f * Fi * scale) / (1. + a * scale);
-          Real dB = (-Fi + c / chat * a * dE) * f * scale;
+          const Real fleck = FleckFactor(arad, T, Cv);
+
+          const Real Ri = a * (E - B);
+          const Real Fi = (e - e0) - c / chat * Ri;
+          const Real Fr = (E - Er0) + Ri;
+          const Real idet = 1. / (1. + a + c / chat * fleck * a);
+          Real dE = ((1. + c / chat * fleck * a) * (-Fr) + a * (-fleck * Fi)) * idet;
+          Real dB = ((c / chat * fleck * a) * (-Fr) + (1. + a) * (-fleck * Fi)) * idet;
 
           E += dE;
           B += dB;
@@ -165,8 +167,7 @@ TaskStatus MatterCouplingSingleImpl(MeshData<Real> *u0, MeshData<Real> *u1,
 }
 
 template <Coordinates GEOM, Fluid CLOSURE>
-TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, MeshData<Real> *u1,
-                                        const Real dt) {
+TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
   using parthenon::MakePackDescriptor;
   using parthenon::variable_names::any;
   auto pm = u0->GetParentPointer();
@@ -198,13 +199,8 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, MeshData<Real> *u1,
                                     gas::cons::density, gas::cons::momentum,
                                     gas::cons::internal_energy, gas::cons::total_energy>(
           resolved_pkgs.get());
-  static auto desc_guess =
-      parthenon::MakePackDescriptor<gas::prim::density, gas::prim::sie,
-                                    gas::prim::velocity, rad::prim::energy,
-                                    rad::prim::flux>(resolved_pkgs.get());
 
   const auto v0 = desc.GetPack(u0);
-  const auto v1 = desc_guess.GetPack(u1);
   const auto ib = u0->GetBoundsI(IndexDomain::interior);
   const auto jb = u0->GetBoundsJ(IndexDomain::interior);
   const auto kb = u0->GetBoundsK(IndexDomain::interior);
@@ -223,8 +219,20 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, MeshData<Real> *u1,
 
         // U^(0) values
         const Real &dens = v0(b, gas::cons::density(), k, j, i);
-        const Real &et0 = v0(b, gas::cons::total_energy(), k, j, i);
-        const Real &eg0 = v0(b, gas::cons::internal_energy(), k, j, i);
+
+        // Note(AMD): There is some floating point difference between the internal energy
+        // used to compute the temperature and the internal energy obtained from that
+        // temperature: T = eos_d.TemperatureFromDensityInternalEnergy(dens, eg/dens); eg
+        // /= dens * eos_d.InternalEnergyFromDensityTemperature(dens,T)
+        //
+        // Because of this, zero opacity problems will not result in zero change as
+        // expected. Thus, we recalculate the internal and total energies from the
+        // temperature. This does not affect energy conservation because at the end of the
+        // step we update the energy with an increment.
+        Real T = eos_d.TemperatureFromDensityInternalEnergy(
+            dens, v0(b, gas::cons::internal_energy(), k, j, i) / dens);
+        const Real eg0 = dens * eos_d.InternalEnergyFromDensityTemperature(dens, T);
+
         const std::array<Real, 3> p0{v0(b, gas::cons::momentum(0), k, j, i) / hx[0],
                                      v0(b, gas::cons::momentum(1), k, j, i) / hx[1],
                                      v0(b, gas::cons::momentum(2), k, j, i) / hx[2]};
@@ -234,23 +242,13 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, MeshData<Real> *u1,
                                       v0(b, rad::cons::flux(1), k, j, i) / hx[1],
                                       v0(b, rad::cons::flux(2), k, j, i) / hx[2]};
 
-        // initial guess from U^(1)
-
-        std::array<Real, 3> v{v1(b, gas::prim::velocity(0), k, j, i),
-                              v1(b, gas::prim::velocity(1), k, j, i),
-                              v1(b, gas::prim::velocity(2), k, j, i)};
-        Real T = eos_d.TemperatureFromDensityInternalEnergy(
-            dens, v1(b, gas::prim::sie(), k, j, i));
+        std::array<Real, 3> v{p0[0] / dens, p0[1] / dens, p0[2] / dens};
+        const Real ke0 = 0.5 * dens * (SQR(v[0]) + SQR(v[1]) + SQR(v[2]));
+        const Real et0 = ke0 + eg0;
         Real B = arad * SQR(SQR(T));
 
-        Real E = v1(b, rad::prim::energy(), k, j, i);
-        std::array<Real, 3> F{v1(b, rad::prim::flux(0), k, j, i),
-                              v1(b, rad::prim::flux(1), k, j, i),
-                              v1(b, rad::prim::flux(2), k, j, i)};
-        std::array<Real, 6> fedd = EddingtonTensor<CLOSURE>(F);
-        F[0] *= c * E;
-        F[1] *= c * E;
-        F[2] *= c * E;
+        Real E = E0;
+        auto F = Fr0;
 
         // Start outer iteration
 
@@ -265,17 +263,20 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, MeshData<Real> *u1,
         Real dEg = 0.0;
         Real dEr = 0.0;
         const Real icc = 1. / (c * chat * dens);
+        Real escale = et0 + c / chat * E;
 
         for (outer_iter = 1; outer_iter <= outer_max; outer_iter++) {
 
           // Set some v and F quantities
           Real ke = 0.5 * dens * (SQR(v[0]) + SQR(v[1]) + SQR(v[2]));
-          Real escale = ke + eos_d.InternalEnergyFromDensityTemperature(dens, T) * dens +
-                        c / chat * E;
           std::array<Real, 3> beta{v[0] / c, v[1] / c, v[2] / c};
           const Real beta2 = SQR(beta[0]) + SQR(beta[1]) + SQR(beta[2]);
           const Real g2 = 1. / (1. - beta2);
           const Real g = std::sqrt(g2);
+
+          auto fedd =
+              EddingtonTensor<CLOSURE>({F[0] / (c * E), F[1] / (c * E), F[2] / (c * E)});
+
           std::array<Real, 3> bdp{
               beta[0] * fedd[TensIdx::X11] + beta[1] * fedd[TensIdx::X12] +
                   beta[2] * fedd[TensIdx::X13],
@@ -289,7 +290,8 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, MeshData<Real> *u1,
           // start inner iteration for (B,E)
           for (inner_iter = 1; inner_iter <= inner_max; inner_iter++) {
             T = std::pow(B / arad, 0.25);
-            Real et = ke + dens * eos_d.InternalEnergyFromDensityTemperature(dens, T);
+            Real eint = dens * eos_d.InternalEnergyFromDensityTemperature(dens, T);
+            Real et = ke + eint;
             const Real Cv = dens * eos_d.SpecificHeatFromDensityTemperature(dens, T);
             const Real fleck = FleckFactor(arad, T, Cv);
 
@@ -305,19 +307,19 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, MeshData<Real> *u1,
             const Real Fi = (et - et0) - c / chat * G0;
             const Real Fr = (E - E0) + G0;
 
-            inner_err =
-                std::max((std::abs(Fi) / escale), (c / chat * std::abs(Fr) / escale));
-            if (inner_err <= inner_tol) {
-              // converged, so don't compute new E and B;
-              break;
-            }
-
             // not converged yet
             const Real idet = 1. / (1. + a + c / chat * fleck * b);
             Real dE = ((1. + c / chat * fleck * b) * (-Fr) + b * (-fleck * Fi)) * idet;
             Real dB = ((c / chat * fleck * a) * (-Fr) + (1. + a) * (-fleck * Fi)) * idet;
             E += dE;
             B += dB;
+
+            inner_err =
+                std::max((std::abs(Fi) / escale), (c / chat * std::abs(Fr) / escale));
+            if (inner_err <= inner_tol) {
+              // converged, so don't compute new E and B;
+              break;
+            }
           } // inner_iter
           if (inner_iter > inner_max) {
             printf("(%d,%d,%d,%d)  %lg > %lg after %d iterations\n", b, k, j, i,
@@ -343,7 +345,7 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, MeshData<Real> *u1,
                                         Fr0[1] + d1 * beta[1] + d2 * bdp[1],
                                         Fr0[2] + d1 * beta[2] + d2 * bdp[2]};
 
-          F = SolveRadFlux(1. + a, -b, beta, rhs);
+          F = SolveRadFlux(1. + a, b, beta, rhs);
 
           for (int d = 0; d < 3; d++) {
             dF[d] = F[d] - Fr0[d];
@@ -351,14 +353,15 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, MeshData<Real> *u1,
             v[d] = p0[d] / dens + dv[d];
           }
 
-          std::array<Real, 3> vn{p0[0] / dens + dv[0], p0[1] / dens + dv[1],
-                                 p0[2] / dens + dv[2]};
-
-          dEk = 0.5 * dens * (SQR(v[0]) + SQR(v[1]) + SQR(v[2])) - ke;
+          const Real dEk_prev = dEk;
+          dEk = 0.5 * dens *
+                (dv[0] * (v[0] + p0[0] / dens) + dv[1] * (v[1] + p0[1] / dens) +
+                 dv[2] * (v[2] + p0[2] / dens));
           dEr = -chat / c * (dEg + dEk);
           E = E0 + dEr;
 
-          outer_err = std::abs(dEk) / escale;
+          // This needs to be something else related to the change from the last iteration
+          outer_err = std::abs(dEk - dEk_prev) / escale;
           if (outer_err <= outer_tol) {
             break;
           }
@@ -369,6 +372,8 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, MeshData<Real> *u1,
                  outer_tol, outer_max);
           PARTHENON_FAIL("Outer not converged");
         }
+
+        // Update the registers
         v0(b, gas::cons::internal_energy(), k, j, i) += dEg;
         v0(b, gas::cons::total_energy(), k, j, i) += dEg + dEk;
         v0(b, rad::cons::energy(), k, j, i) += dEr;

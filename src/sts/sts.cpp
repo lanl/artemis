@@ -24,7 +24,12 @@
 #include "sts.hpp"
 #include "utils/artemis_utils.hpp"
 
+using ArtemisUtils::VI;
+
 namespace STS{
+
+IntegratorPtr_t sts_integrator;
+
 //----------------------------------------------------------------------------------------
 //! \fn  StateDescriptor STS ::Initialize
 //! \brief Adds intialization function for STS package
@@ -52,22 +57,26 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   }
 
   // Getting the integrator & time ratio between hyperbolic and parabolic terms
-  std::string sts_integrator = pin->GetOrAddString("sts", "integrator", "none");
+  std::string sts_intg_mothod = pin->GetOrAddString("sts", "integrator", "none");
   Real sts_max_dt_ratio  = pin->GetOrAddReal("sts","sts_max_dt_ratio", -1.0);
+  const bool info_output = pin->GetOrAddBoolean("sts", "info_output", false);
 
-  STSInt sts_integrator_param = STSInt::null;
-  if (sts_integrator == "rkl1") {
-    sts_integrator_param = STSInt::rkl1;
-  } else if (sts_integrator == "rkl2") {
+  STSInt sts_intg_mothod_param = STSInt::null;
+  if (sts_intg_mothod == "rkl1") {
+    sts_intg_mothod_param = STSInt::rkl1;
+    sts_integrator = std::make_unique<Integrator_t>("rk1");
+  } else if (sts_intg_mothod == "rkl2") {
     PARTHENON_FAIL("rkl2 STS integrator not implemented!");
-    sts_integrator_param = STSInt::rkl2;
+    sts_intg_mothod_param = STSInt::rkl2;
   } else {
     PARTHENON_FAIL("STS integrator not recognized!");
   }
 
-  params.Add("sts_integrator", sts_integrator_param);
+  params.Add("sts_intg_mothod", sts_intg_mothod_param);
   params.Add("sts_max_dt_ratio", sts_max_dt_ratio);
+  params.Add("info_output", info_output);
   
+  return STS;
 }
 
 //----------------------------------------------------------------------------------------
@@ -78,85 +87,50 @@ void PreStepSTSTasks(Mesh *pmesh, const Real time, Real dt, int nstages) {
 
   // Getting the integrator & time ratio between hyperbolic and parabolic terms
   auto &sts = pmesh->packages.Get("STS");
-  const STSInt sts_integrator = sts->Param<STSInt>("sts_integrator");
+  const STSInt sts_intg_mothod = sts->Param<STSInt>("sts_intg_mothod");
 
   // Check if the integrator is set
-  if (sts_integrator == STSInt::null) {
+  if (sts_intg_mothod == STSInt::null) {
     PARTHENON_FAIL("STS integrator not set!");
   }
 
   // Execute the integrator tasks
-  if (sts_integrator == STSInt::rkl1) {
-    // (TODO) RKL1 : Full timestep dt_sts
-    STSRKL1<GEOM>(pmesh, time, dt, nstages);
-  } else if (sts_integrator == STSInt::rkl2) {
+  if (sts_intg_mothod == STSInt::rkl1) {
+    // RKL1 : Full timestep dt_sts
+    for (int stage = 1; stage <= nstages; ++stage) {
+      //-----------------------------------------------------------------
+      // RKL1 STS update
+      // Y_{j} = nuj*Y_{j-2} + muj*Y_{j-1} + dt_sts*muj_tilde*F_diff(Y_{j-1}), 
+      //  where F_diff(Y_{j-1}) = divf/vol
+      //
+      // Set up the STS stage coefficients
+      // gam1 = nuj = (2.*j - 1.)/j;
+      // gam0 = muj = (1. - j)/j;
+      // beta_dt/dt = muj_tilde = pm->muj*2./(std::pow(s, 2.) + s);
+      //
+      // Update strategy for the registers
+      // Let u0 = Y_{j-1}, u1 = Y_{j-2}
+      // 1. After ApplyUpdate: u1 = nuj*Y_{j-2} + muj*Y_{j-1}, u1 -> Y'_{j}
+      // 2. swap u0 <-> u1, u0 -> Y'_{j}, u0 -> Y_{j-1}
+      // 3. After DiffusionUpdate: u0 = Y_{j}, u1 = Y_{j-1}
+
+      Real muj = (2.*stage - 1.)/stage;
+      Real nuj = (1. - stage)/stage;
+      Real muj_tilde = muj * 2./(std::pow(nstages, 2.) + nstages);
+      Real bdt = muj_tilde * dt;
+  
+      // We always use the stage 1 state for the coefficients
+      sts_integrator->beta[0] = 0.0;
+      sts_integrator->gam0[0] = nuj; // since we swap u0 and u1
+      sts_integrator->gam1[0] = muj;
+      STSRKL1<GEOM>(pmesh, time, bdt, stage, nstages).Execute();
+    }
+  } else if (sts_intg_mothod == STSInt::rkl2) {
+    PARTHENON_FAIL("STS rkl2 integrator not implemented!");
     // (TODO) RKL2 : // eq (21) using half hyperbolic timestep 
     // due to Strang split
     //STSRKL2FirstStage<GEOM>(pmesh, time, 0.5*dt, nstages);
   }
-}
-
-//----------------------------------------------------------------------------------------
-//! \fn RKL1FluxUpadte
-//! \brief Applies the STS RKL1 update to the conserved variables
-template <Coordinates GEOM>
-TaskStatus RKL1FluxUpadte(MeshData<Real> *u0, MeshData<Real> *u1, const Real dt,
-                        const Real muj, const Real nuj, const Real muj_tilde) {
-  using parthenon::MakePackDescriptor;
-  using parthenon::variable_names::any;
-  auto pm = u0->GetParentPointer();
-
-  // Packing and indexing
-  std::vector<MetadataFlag> flags({Metadata::Conserved, Metadata::WithFluxes});
-  static auto desc = MakePackDescriptor<any>(u0, flags, {parthenon::PDOpt::WithFluxes});
-  const auto v0 = desc.GetPack(u0);
-  const auto v1 = desc.GetPack(u1);
-  const auto ib = u0->GetBoundsI(IndexDomain::interior);
-  const auto jb = u0->GetBoundsJ(IndexDomain::interior);
-  const auto kb = u0->GetBoundsK(IndexDomain::interior);
-  const bool multi_d = (pm->ndim > 1);
-  const bool three_d = (pm->ndim > 2);
-
-  parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "RKL1FluxUpadte", parthenon::DevExecSpace(), 0,
-      u0->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
-      KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
-        // Extract coordinates
-        using parthenon::TopologicalElement;
-        geometry::Coords<GEOM> coords(v0.GetCoordinates(b), k, j, i);
-
-        const auto ax1 = coords.GetFaceAreaX1();
-        const auto ax2 = (multi_d) ? coords.GetFaceAreaX2() : NewArray<Real, 2>(0.0);
-        const auto ax3 = (three_d) ? coords.GetFaceAreaX3() : NewArray<Real, 2>(0.0);
-
-        const Real vol = coords.Volume();
-
-        for (int n = v0.GetLowerBound(b); n <= v0.GetUpperBound(b); ++n) {
-          // compute flux divergence
-          Real divf = (ax1[0] * v0.flux(b, X1DIR, n, k, j, i) -
-                       ax1[1] * v0.flux(b, X1DIR, n, k, j, i + 1));
-          if (multi_d)
-            divf += (ax2[0] * v0.flux(b, X2DIR, n, k, j, i) -
-                     ax2[1] * v0.flux(b, X2DIR, n, k, j + 1, i));
-          if (three_d)
-            divf += (ax3[0] * v0.flux(b, X3DIR, n, k, j, i) -
-                     ax3[1] * v0.flux(b, X3DIR, n, k + 1, j, i));
-
-          //----------------------------------------------------------------------------------------
-          // Apply STS RKL1 update
-          // Y_{m} = nuj*Y_{j-2} + muj*Y_{j-1} + dt_sts*muj_tilde*M(Y_{j-1})
-          //       = nuj*Y_{j-2} + muj*Y_{j-1} + dt_sts*muj_tilde*(divf/vol)
-          // v0 = Y_{j-1}, v1 = Y_{j-2}
-          Real Y_jm2 = v0(b, n, k, j, i);
-          v0(b, n, k, j, i) =
-              nuj * v1(b, n, k, j, i) + muj * v0(b, n, k, j, i) + divf * dt * muj_tilde/ vol;
-          
-          // ----------------------------------------------------------------------------------------
-          // Rearrange the variables for the next step
-          v1(b, n, k, j, i) = Y_jm2;
-        }
-      });
-  return TaskStatus::complete;
 }
 
 //----------------------------------------------------------------------------------------
@@ -177,33 +151,27 @@ void STSRKL2SecondStage( Mesh *pm, const Real time, Real dt, int nstages) {
 
 //----------------------------------------------------------------------------------------
 //! template instantiations
+typedef Coordinates C;
 typedef Mesh M;
-//RK1 template instantiations
-template void STSRKL1<Coordinates::cartesian>(M *m, const Real time, Real dt, int nstages);
-template void STSRKL1<Coordinates::cylindrical>( M *m, const Real time, Real dt, int nstages);
-template void STSRKL1<Coordinates::spherical1D>( M *m, const Real time, Real dt, int nstages);
-template void STSRKL1<Coordinates::spherical2D>( M *m, const Real time, Real dt, int nstages);
-template void STSRKL1<Coordinates::spherical3D>( M *m, const Real time, Real dt, int nstages);
-template void STSRKL1<Coordinates::axisymmetric>( M *m, const Real time, Real dt, int nstages);
 //RK2 first stage template instantiations
-template void STSRKL2FirstStage<Coordinates::cartesian>(M *m, const Real time, Real dt, int nstages);
-template void STSRKL2FirstStage<Coordinates::cylindrical>(M *m, const Real time, Real dt, int nstages);
-template void STSRKL2FirstStage<Coordinates::spherical1D>(M *m, const Real time, Real dt, int nstages);
-template void STSRKL2FirstStage<Coordinates::spherical2D>(M *m, const Real time, Real dt, int nstages);
-template void STSRKL2FirstStage<Coordinates::spherical3D>(M *m, const Real time, Real dt, int nstages);
-template void STSRKL2FirstStage<Coordinates::axisymmetric>(M *m, const Real time, Real dt, int nstages);
+template void STSRKL2FirstStage<C::cartesian>(M *m, const Real time, Real dt, int nstages);
+template void STSRKL2FirstStage<C::cylindrical>(M *m, const Real time, Real dt, int nstages);
+template void STSRKL2FirstStage<C::spherical1D>(M *m, const Real time, Real dt, int nstages);
+template void STSRKL2FirstStage<C::spherical2D>(M *m, const Real time, Real dt, int nstages);
+template void STSRKL2FirstStage<C::spherical3D>(M *m, const Real time, Real dt, int nstages);
+template void STSRKL2FirstStage<C::axisymmetric>(M *m, const Real time, Real dt, int nstages);
 //RK2 second stage template instantiations
-template void STSRKL2SecondStage<Coordinates::cartesian>(M *m, const Real time, Real dt, int nstages);
-template void STSRKL2SecondStage<Coordinates::cylindrical>(M *m, const Real time, Real dt, int nstages);
-template void STSRKL2SecondStage<Coordinates::spherical1D>(M *m, const Real time, Real dt, int nstages);
-template void STSRKL2SecondStage<Coordinates::spherical2D>(M *m, const Real time, Real dt, int nstages);
-template void STSRKL2SecondStage<Coordinates::spherical3D>(M *m, const Real time, Real dt, int nstages);
-template void STSRKL2SecondStage<Coordinates::axisymmetric>(M *m, const Real time, Real dt, int nstages);
+template void STSRKL2SecondStage<C::cartesian>(M *m, const Real time, Real dt, int nstages);
+template void STSRKL2SecondStage<C::cylindrical>(M *m, const Real time, Real dt, int nstages);
+template void STSRKL2SecondStage<C::spherical1D>(M *m, const Real time, Real dt, int nstages);
+template void STSRKL2SecondStage<C::spherical2D>(M *m, const Real time, Real dt, int nstages);
+template void STSRKL2SecondStage<C::spherical3D>(M *m, const Real time, Real dt, int nstages);
+template void STSRKL2SecondStage<C::axisymmetric>(M *m, const Real time, Real dt, int nstages);
 //PreStepSTSTasks template instantiations
-template void PreStepSTSTasks<Coordinates::cartesian>(M *m, const Real time, Real dt, int nstages);
-template void PreStepSTSTasks<Coordinates::cylindrical>(M *m, const Real time, Real dt, int nstages);
-template void PreStepSTSTasks<Coordinates::spherical1D>(M *m, const Real time, Real dt, int nstages);
-template void PreStepSTSTasks<Coordinates::spherical2D>(M *m, const Real time, Real dt, int nstages);
-template void PreStepSTSTasks<Coordinates::spherical3D>(M *m, const Real time, Real dt, int nstages);
-template void PreStepSTSTasks<Coordinates::axisymmetric>(M *m,const Real time, Real dt, int nstages);
+template void PreStepSTSTasks<C::cartesian>(M *m, const Real time, Real dt, int nstages);
+template void PreStepSTSTasks<C::cylindrical>(M *m, const Real time, Real dt, int nstages);
+template void PreStepSTSTasks<C::spherical1D>(M *m, const Real time, Real dt, int nstages);
+template void PreStepSTSTasks<C::spherical2D>(M *m, const Real time, Real dt, int nstages);
+template void PreStepSTSTasks<C::spherical3D>(M *m, const Real time, Real dt, int nstages);
+template void PreStepSTSTasks<C::axisymmetric>(M *m,const Real time, Real dt, int nstages);
 } // namespace STS

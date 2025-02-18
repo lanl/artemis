@@ -147,6 +147,6 @@ template void PreStepSTSTasks<C::spherical2D>(M *m, const Real time, Real dt,
                                               int nstages);
 template void PreStepSTSTasks<C::spherical3D>(M *m, const Real time, Real dt,
                                               int nstages);
-template void PreStepSTSTasks<C::axisymmetric>(M *m,const Real time, Real dt,
+template void PreStepSTSTasks<C::axisymmetric>(M *m, const Real time, Real dt,
                                                int nstages);
 } // namespace STS

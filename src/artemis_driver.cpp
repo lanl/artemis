@@ -169,7 +169,6 @@ void ArtemisDriver<GEOM>::STSFirstStage() {
   STS::PreStepSTSTasks<GEOM>(pmesh, tm.time, tm.dt, s_sts);
 }
 
-
 //----------------------------------------------------------------------------------------
 //! \fn TaskCollection ArtemisDriver::PreStepTasks
 //! \brief Defines the main integrator's TaskCollection for the ArtemisDriver

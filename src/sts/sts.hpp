@@ -21,7 +21,7 @@
 #include "utils/artemis_utils.hpp"
 #include "utils/integrators/artemis_integrator.hpp"
 
-namespace STS{
+namespace STS {
 
 using Integrator_t = parthenon::LowStorageIntegrator;
 using IntegratorPtr_t = std::unique_ptr<Integrator_t>;
@@ -30,10 +30,6 @@ using IntegratorPtr_t = std::unique_ptr<Integrator_t>;
 extern IntegratorPtr_t sts_integrator;
 
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
-template <Coordinates GEOM>
-void STSRKL2FirstStage( Mesh *pm, const Real time, Real dt, int nstages);
-template <Coordinates GEOM>
-void STSRKL2SecondStage( Mesh *pm, const Real time, Real dt, int nstages);
 
 //----------------------------------------------------------------------------------------
 //! \fn STSRKL1
@@ -66,13 +62,13 @@ TaskCollection STSRKL1(Mesh *pmesh, const Real time, Real dt, int stage, int nst
       tl.AddTask(none, ArtemisUtils::DeepCopyConservedData, u1.get(), u0.get());
     }
   }
-  
+
   TaskRegion &tr = tc.AddRegion(num_partitions);
   for (int i = 0; i < num_partitions; i++) {
     auto &tl = tr[i];
     auto &u0 = pmesh->mesh_data.GetOrAdd("u0", i);
     auto &u1 = pmesh->mesh_data.GetOrAdd("u1", i);
-    
+
     // Start looking for incoming messages (including for flux correction)
     auto start_recv_u0 = tl.AddTask(none, parthenon::StartReceiveBoundBufs<any>, u0);
     auto start_flx_recv_u0 = tl.AddTask(none, parthenon::StartReceiveFluxCorrections, u0);
@@ -88,16 +84,16 @@ TaskCollection STSRKL1(Mesh *pmesh, const Real time, Real dt, int stage, int nst
     // TODO(KWHO) Dust diffusion fluxes in the future
 
     // Communicate and set fluxes
-    auto send_flx =
-        tl.AddTask(diff_flx,
-                  parthenon::SendBoundBufs<parthenon::BoundaryType::flxcor_send>, u0);
-    auto recv_flx_u0 = tl.AddTask(start_flx_recv_u0, parthenon::ReceiveFluxCorrections, u0);
-    auto set_flx_u0  = tl.AddTask(recv_flx_u0, parthenon::SetFluxCorrections, u0);
+    auto send_flx = tl.AddTask(
+      diff_flx, parthenon::SendBoundBufs<parthenon::BoundaryType::flxcor_send>, u0);
+    auto recv_flx_u0 = 
+        tl.AddTask(start_flx_recv_u0, parthenon::ReceiveFluxCorrections, u0);
+    auto set_flx_u0 = tl.AddTask(recv_flx_u0, parthenon::SetFluxCorrections, u0);
 
     // Apply flux divergence
     auto update = none;
-    update =  tl.AddTask(diff_flx | set_flx_u0, ArtemisUtils::ApplyUpdate<GEOM>,
-                        u1.get(), u0.get(), 1, sts_integrator.get());
+    update = tl.AddTask(diff_flx | set_flx_u0, ArtemisUtils::ApplyUpdate<GEOM>, u1.get(),
+                        u0.get(), 1, sts_integrator.get());
    
     // swap u0 <-> u1
     auto swap_data_1 = tl.AddTask(update, ArtemisUtils::SwapData, u0.get(), u1.get());
@@ -107,22 +103,24 @@ TaskCollection STSRKL1(Mesh *pmesh, const Real time, Real dt, int stage, int nst
     if (do_gas) gas_coord_src = tl.AddTask(swap_data_1, Gas::FluxSource, u0.get(), dt);
 
     TaskID gas_diff_src = gas_coord_src | diff_flx | set_flx_u0;
-    gas_diff_src = tl.AddTask( gas_coord_src | diff_flx | set_flx_u0,
+    gas_diff_src = tl.AddTask(gas_coord_src | diff_flx | set_flx_u0,
                               Gas::DiffusionUpdate<GEOM>, u0.get(), dt);
 
     // Set auxillary fields
     auto set_aux_u0 =
-    tl.AddTask(gas_diff_src, ArtemisDerived::SetAuxillaryFields<GEOM>, u0.get());
+        tl.AddTask(gas_diff_src, ArtemisDerived::SetAuxillaryFields<GEOM>, u0.get());
 
     // Set (remaining) fields to be communicated
-    auto pre_comm_u0 = tl.AddTask(set_aux_u0, // update, 
+    auto pre_comm_u0 = tl.AddTask(set_aux_u0, // update,
                                   PreCommFillDerived<MeshData<Real>>, u0.get());
 
     // Set boundary conditions (both physical and logical)
-    auto bcs_u0 = parthenon::AddBoundaryExchangeTasks(pre_comm_u0, tl, u0, pmesh->multilevel);
+    auto bcs_u0 = 
+        parthenon::AddBoundaryExchangeTasks(pre_comm_u0, tl, u0, pmesh->multilevel);
 
     // Update primitive variables
-    auto c2p_u0 = tl.AddTask(TQ::local_sync, bcs_u0, FillDerived<MeshData<Real>>, u0.get());
+    auto c2p_u0 = 
+        tl.AddTask(TQ::local_sync, bcs_u0, FillDerived<MeshData<Real>>, u0.get());
 
   }
 
@@ -133,6 +131,6 @@ TaskCollection STSRKL1(Mesh *pmesh, const Real time, Real dt, int stage, int nst
 template <Coordinates GEOM>
 void PreStepSTSTasks(Mesh *pmesh, const Real time, Real dt, int nstages);
 
-}
+} // namespace STS
 
 #endif // STS_STS_HPP_

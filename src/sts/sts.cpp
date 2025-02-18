@@ -58,7 +58,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
   // Getting the integrator & time ratio between hyperbolic and parabolic terms
   std::string sts_intg_mothod = pin->GetOrAddString("sts", "integrator", "none");
-  Real sts_max_dt_ratio  = pin->GetOrAddReal("sts","sts_max_dt_ratio", -1.0);
+  Real sts_max_dt_ratio = pin->GetOrAddReal("sts", "sts_max_dt_ratio", -1.0);
   const bool info_output = pin->GetOrAddBoolean("sts", "info_output", false);
 
   STSInt sts_intg_mothod_param = STSInt::null;
@@ -75,7 +75,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("sts_intg_mothod", sts_intg_mothod_param);
   params.Add("sts_max_dt_ratio", sts_max_dt_ratio);
   params.Add("info_output", info_output);
-  
+
   return STS;
 }
 
@@ -100,7 +100,7 @@ void PreStepSTSTasks(Mesh *pmesh, const Real time, Real dt, int nstages) {
     for (int stage = 1; stage <= nstages; ++stage) {
       //-----------------------------------------------------------------
       // RKL1 STS update
-      // Y_{j} = nuj*Y_{j-2} + muj*Y_{j-1} + dt_sts*muj_tilde*F_diff(Y_{j-1}), 
+      // Y_{j} = nuj*Y_{j-2} + muj*Y_{j-1} + dt_sts*muj_tilde*F_diff(Y_{j-1}),
       //  where F_diff(Y_{j-1}) = divf/vol
       //
       // Set up the STS stage coefficients
@@ -114,11 +114,11 @@ void PreStepSTSTasks(Mesh *pmesh, const Real time, Real dt, int nstages) {
       // 2. swap u0 <-> u1, u0 -> Y'_{j}, u0 -> Y_{j-1}
       // 3. After DiffusionUpdate: u0 = Y_{j}, u1 = Y_{j-1}
 
-      Real muj = (2.*stage - 1.)/stage;
-      Real nuj = (1. - stage)/stage;
-      Real muj_tilde = muj * 2./(std::pow(nstages, 2.) + nstages);
+      Real muj = (2. * stage - 1.) / stage;
+      Real nuj = (1. - stage) / stage;
+      Real muj_tilde = muj * 2. / (std::pow(nstages, 2.) + nstages);
       Real bdt = muj_tilde * dt;
-  
+
       // We always use the stage 1 state for the coefficients
       sts_integrator->beta[0] = 0.0;
       sts_integrator->gam0[0] = nuj; // since we swap u0 and u1
@@ -127,51 +127,27 @@ void PreStepSTSTasks(Mesh *pmesh, const Real time, Real dt, int nstages) {
     }
   } else if (sts_intg_mothod == STSInt::rkl2) {
     PARTHENON_FAIL("STS rkl2 integrator not implemented!");
-    // (TODO) RKL2 : // eq (21) using half hyperbolic timestep 
+    // (TODO) RKL2 : // eq (21) using half hyperbolic timestep
     // due to Strang split
-    //STSRKL2FirstStage<GEOM>(pmesh, time, 0.5*dt, nstages);
+    // STSRKL2FirstStage<GEOM>(pmesh, time, 0.5*dt, nstages);
   }
-}
-
-//----------------------------------------------------------------------------------------
-//! \fn STSRKL2FirstStage
-//! \brief Assembles the tasks for first stage of the STS RKL2 integrator
-template <Coordinates GEOM>
-void STSRKL2FirstStage( Mesh *pm, const Real time, Real dt, int nstages) {
-  // TODO: Implement RKL2 STS integration
-}
-
-//----------------------------------------------------------------------------------------
-//! \fn STSRKL2SecondStage
-//! \brief Assembles the tasks for first stage of the STS RKL2 integrator
-template <Coordinates GEOM>
-void STSRKL2SecondStage( Mesh *pm, const Real time, Real dt, int nstages) {
-  // TODO: Implement RKL2 STS integration
 }
 
 //----------------------------------------------------------------------------------------
 //! template instantiations
 typedef Coordinates C;
 typedef Mesh M;
-//RK2 first stage template instantiations
-template void STSRKL2FirstStage<C::cartesian>(M *m, const Real time, Real dt, int nstages);
-template void STSRKL2FirstStage<C::cylindrical>(M *m, const Real time, Real dt, int nstages);
-template void STSRKL2FirstStage<C::spherical1D>(M *m, const Real time, Real dt, int nstages);
-template void STSRKL2FirstStage<C::spherical2D>(M *m, const Real time, Real dt, int nstages);
-template void STSRKL2FirstStage<C::spherical3D>(M *m, const Real time, Real dt, int nstages);
-template void STSRKL2FirstStage<C::axisymmetric>(M *m, const Real time, Real dt, int nstages);
-//RK2 second stage template instantiations
-template void STSRKL2SecondStage<C::cartesian>(M *m, const Real time, Real dt, int nstages);
-template void STSRKL2SecondStage<C::cylindrical>(M *m, const Real time, Real dt, int nstages);
-template void STSRKL2SecondStage<C::spherical1D>(M *m, const Real time, Real dt, int nstages);
-template void STSRKL2SecondStage<C::spherical2D>(M *m, const Real time, Real dt, int nstages);
-template void STSRKL2SecondStage<C::spherical3D>(M *m, const Real time, Real dt, int nstages);
-template void STSRKL2SecondStage<C::axisymmetric>(M *m, const Real time, Real dt, int nstages);
 //PreStepSTSTasks template instantiations
-template void PreStepSTSTasks<C::cartesian>(M *m, const Real time, Real dt, int nstages);
-template void PreStepSTSTasks<C::cylindrical>(M *m, const Real time, Real dt, int nstages);
-template void PreStepSTSTasks<C::spherical1D>(M *m, const Real time, Real dt, int nstages);
-template void PreStepSTSTasks<C::spherical2D>(M *m, const Real time, Real dt, int nstages);
-template void PreStepSTSTasks<C::spherical3D>(M *m, const Real time, Real dt, int nstages);
-template void PreStepSTSTasks<C::axisymmetric>(M *m,const Real time, Real dt, int nstages);
+template void PreStepSTSTasks<C::cartesian>(M *m, const Real time, Real dt, 
+                                            int nstages);
+template void PreStepSTSTasks<C::cylindrical>(M *m, const Real time, Real dt, 
+                                              int nstages);
+template void PreStepSTSTasks<C::spherical1D>(M *m, const Real time, Real dt, 
+                                              int nstages);
+template void PreStepSTSTasks<C::spherical2D>(M *m, const Real time, Real dt, 
+                                              int nstages);
+template void PreStepSTSTasks<C::spherical3D>(M *m, const Real time, Real dt, 
+                                              int nstages);
+template void PreStepSTSTasks<C::axisymmetric>(M *m,const Real time, Real dt, 
+                                               int nstages);
 } // namespace STS

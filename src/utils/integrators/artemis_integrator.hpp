@@ -66,8 +66,8 @@ inline TaskStatus SwapData(MeshData<Real> *u0, MeshData<Real> *u1) {
   const auto kbe = u0->GetBoundsK(IndexDomain::entire);
 
   parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "SwapData", parthenon::DevExecSpace(), 0,
-      u0->NumBlocks() - 1, kbe.s, kbe.e, jbe.s, jbe.e, ibe.s, ibe.e,
+      DEFAULT_LOOP_PATTERN, "SwapData", parthenon::DevExecSpace(), 0, u0->NumBlocks() - 1,
+      kbe.s, kbe.e, jbe.s, jbe.e, ibe.s, ibe.e,
       KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
         for (int n = vt.GetLowerBound(b); n <= vt.GetUpperBound(b); ++n) {
           auto swap_data = vt(b, n, k, j, i);
@@ -132,7 +132,6 @@ TaskStatus ApplyUpdate(MeshData<Real> *u0, MeshData<Real> *u1, const int stage,
           v0(b, n, k, j, i) =
               gam0 * v0(b, n, k, j, i) + gam1 * v1(b, n, k, j, i) + divf * beta_dt / vol;
         }
-
       });
   return TaskStatus::complete;
 }

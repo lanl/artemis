@@ -102,7 +102,6 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   // Equation of state
   const std::string eos_name = pin->GetOrAddString("gas", "eos", "ideal");
   if (eos_name == "ideal") {
-    auto pc = parthenon::constants::PhysicalConstants<parthenon::constants::CGS>();
     const Real gamma = pin->GetOrAddReal("gas", "gamma", 1.66666666667);
     auto cv = Null<Real>();
     auto mu = Null<Real>();

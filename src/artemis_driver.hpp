@@ -46,6 +46,7 @@ class ArtemisDriver : public EvolutionDriver {
                 const bool is_restart_in);
   TaskListStatus Step();
   void PreStepTasks();
+  void STSFirstStage();
   TaskCollection StepTasks();
   TaskCollection PostStepTasks();
 

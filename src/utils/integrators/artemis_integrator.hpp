@@ -51,6 +51,34 @@ inline TaskStatus DeepCopyConservedData(MeshData<Real> *to, MeshData<Real> *from
 }
 
 //----------------------------------------------------------------------------------------
+//! \fn  TaskStatus ArtemisUtils::SwapData
+//! \brief swap data between two MeshData objects
+inline TaskStatus SwapData(MeshData<Real> *u0, MeshData<Real> *u1) {
+  using parthenon::MakePackDescriptor;
+  using parthenon::variable_names::any;
+
+  std::vector<MetadataFlag> flags({Metadata::Conserved});
+  static auto desc = MakePackDescriptor<any>(u0, flags);
+  const auto vt = desc.GetPack(u0);
+  const auto vf = desc.GetPack(u1);
+  const auto ibe = u0->GetBoundsI(IndexDomain::entire);
+  const auto jbe = u0->GetBoundsJ(IndexDomain::entire);
+  const auto kbe = u0->GetBoundsK(IndexDomain::entire);
+
+  parthenon::par_for(
+      DEFAULT_LOOP_PATTERN, "SwapData", parthenon::DevExecSpace(), 0, u0->NumBlocks() - 1,
+      kbe.s, kbe.e, jbe.s, jbe.e, ibe.s, ibe.e,
+      KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
+        for (int n = vt.GetLowerBound(b); n <= vt.GetUpperBound(b); ++n) {
+          auto swap_data = vt(b, n, k, j, i);
+          vt(b, n, k, j, i) = vf(b, n, k, j, i);
+          vf(b, n, k, j, i) = swap_data;
+        }
+      });
+  return TaskStatus::complete;
+}
+
+//----------------------------------------------------------------------------------------
 //! \fn  TaskStatus ArtemisUtils::ApplyUpdate
 //! \brief
 template <Coordinates GEOM>
@@ -75,7 +103,6 @@ TaskStatus ApplyUpdate(MeshData<Real> *u0, MeshData<Real> *u1, const int stage,
   const auto kb = u0->GetBoundsK(IndexDomain::interior);
   const bool multi_d = (pm->ndim > 1);
   const bool three_d = (pm->ndim > 2);
-
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "ApplyUpdate", parthenon::DevExecSpace(), 0,
       u0->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,

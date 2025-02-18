@@ -188,8 +188,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   params.Add("do_sts", do_sts);
 
   if (do_sts) {
-    Real diff_dt = Big<Real>();
-    params.Add("diff_dt", diff_dt);
+    params.Add("diff_dt", std::numeric_limits<Real>::max(), Params::Mutability::Mutable);
+    Real sts_max_dt_ratio = pin->GetOrAddReal("sts", "sts_max_dt_ratio", -1.0);
+    params.Add("sts_max_dt_ratio", sts_max_dt_ratio);
   }
 
   const bool do_diffusion = do_viscosity || do_conduction;
@@ -474,22 +475,23 @@ Real EstimateTimestepMesh(MeshData<Real> *md) {
   Real diff_dt = std::min(visc_dt, cond_dt);
 
   const auto cfl_number = params.template Get<Real>("cfl");
-  
+
   // STS Time Stepping Control
   const auto do_sts = params.template Get<bool>("do_sts");
   if (do_sts) {
     const auto sts_max_dt_ratio = params.template Get<Real>("sts_max_dt_ratio");
+    auto dt_ratio = min_dt / diff_dt;
     // limit the timestep within the STS ratio, otherwise use the hyperbolic timestep
-    if (sts_max_dt_ratio > 0.0 && min_dt > sts_max_dt_ratio*diff_dt) {
-        min_dt = std::min(min_dt, sts_max_dt_ratio * diff_dt);
+    if (sts_max_dt_ratio > 0.0 && dt_ratio > sts_max_dt_ratio) {
+      min_dt = sts_max_dt_ratio * diff_dt;
     }
     // update the parabolic timestep
-    gas_pkg->UpdateParam("diff_dt", cfl_number*diff_dt);
-  }else{
+    gas_pkg->UpdateParam("diff_dt", cfl_number * diff_dt);
+  } else {
     min_dt = std::min(min_dt, diff_dt);
   }
 
-  return cfl_number*min_dt;
+  return cfl_number * min_dt;
 }
 
 //----------------------------------------------------------------------------------------

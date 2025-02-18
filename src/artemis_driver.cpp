@@ -29,8 +29,8 @@
 #include "nbody/nbody.hpp"
 #include "radiation/imc/imc.hpp"
 #include "rotating_frame/rotating_frame.hpp"
-#include "utils/integrators/artemis_integrator.hpp"
 #include "sts/sts.hpp"
+#include "utils/integrators/artemis_integrator.hpp"
 
 using namespace parthenon::driver::prelude;
 
@@ -109,9 +109,9 @@ TaskListStatus ArtemisDriver<GEOM>::Step() {
   if (do_sts) STSFirstStage();
 
   // Execute explicit, unsplit physics
-  auto status = StepTasks().Execute(); 
+  auto status = StepTasks().Execute();
   if (status != TaskListStatus::complete) return status;
-  
+
   // STS_second_stage();
   // Execute operator split physics
   if (do_radiation) status = IMC::JaybenneIMC<GEOM>(pmesh, tm.time, tm.dt);

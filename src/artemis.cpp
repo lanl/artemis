@@ -88,7 +88,6 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
 
   PARTHENON_REQUIRE(!(do_sts) || (do_sts && do_gas),
                     "STS requires the gas package, but there is not gas!");
-                    
   PARTHENON_REQUIRE(!(do_sts) || (do_sts && (do_conduction || do_viscosity)),
                     "STS requires diffusion to be enabled!");
   PARTHENON_REQUIRE(!(do_cooling) || (do_cooling && do_gas),
@@ -96,7 +95,7 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   PARTHENON_REQUIRE(!(do_viscosity) || (do_viscosity && do_gas),
                     "Viscosity requires the gas package, but there is not gas!");
   PARTHENON_REQUIRE(!(do_conduction) || (do_conduction && do_gas),
-                    "Conduction requires the gas package, but there is not gas!");       
+                    "Conduction requires the gas package, but there is not gas!");
   PARTHENON_REQUIRE(!(do_radiation) || (do_radiation && do_gas),
                     "Radiation requires the gas package, but there is not gas!");
 

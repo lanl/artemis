@@ -26,7 +26,7 @@
 
 using ArtemisUtils::VI;
 
-namespace STS{
+namespace STS {
 
 IntegratorPtr_t sts_integrator;
 
@@ -137,17 +137,16 @@ void PreStepSTSTasks(Mesh *pmesh, const Real time, Real dt, int nstages) {
 //! template instantiations
 typedef Coordinates C;
 typedef Mesh M;
-//PreStepSTSTasks template instantiations
-template void PreStepSTSTasks<C::cartesian>(M *m, const Real time, Real dt, 
-                                            int nstages);
-template void PreStepSTSTasks<C::cylindrical>(M *m, const Real time, Real dt, 
+// PreStepSTSTasks template instantiations
+template void PreStepSTSTasks<C::cartesian>(M *m, const Real time, Real dt, int nstages);
+template void PreStepSTSTasks<C::cylindrical>(M *m, const Real time, Real dt,
                                               int nstages);
-template void PreStepSTSTasks<C::spherical1D>(M *m, const Real time, Real dt, 
+template void PreStepSTSTasks<C::spherical1D>(M *m, const Real time, Real dt,
                                               int nstages);
-template void PreStepSTSTasks<C::spherical2D>(M *m, const Real time, Real dt, 
+template void PreStepSTSTasks<C::spherical2D>(M *m, const Real time, Real dt,
                                               int nstages);
-template void PreStepSTSTasks<C::spherical3D>(M *m, const Real time, Real dt, 
+template void PreStepSTSTasks<C::spherical3D>(M *m, const Real time, Real dt,
                                               int nstages);
-template void PreStepSTSTasks<C::axisymmetric>(M *m,const Real time, Real dt, 
+template void PreStepSTSTasks<C::axisymmetric>(M *m,const Real time, Real dt,
                                                int nstages);
 } // namespace STS

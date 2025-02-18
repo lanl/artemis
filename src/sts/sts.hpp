@@ -17,9 +17,9 @@
 #include "derived/fill_derived.hpp"
 #include "gas/gas.hpp"
 #include "geometry/geometry.hpp"
-#include "utils/units.hpp"
 #include "utils/artemis_utils.hpp"
 #include "utils/integrators/artemis_integrator.hpp"
+#include "utils/units.hpp"
 
 namespace STS {
 
@@ -85,8 +85,8 @@ TaskCollection STSRKL1(Mesh *pmesh, const Real time, Real dt, int stage, int nst
 
     // Communicate and set fluxes
     auto send_flx = tl.AddTask(
-      diff_flx, parthenon::SendBoundBufs<parthenon::BoundaryType::flxcor_send>, u0);
-    auto recv_flx_u0 = 
+        diff_flx, parthenon::SendBoundBufs<parthenon::BoundaryType::flxcor_send>, u0);
+    auto recv_flx_u0 =
         tl.AddTask(start_flx_recv_u0, parthenon::ReceiveFluxCorrections, u0);
     auto set_flx_u0 = tl.AddTask(recv_flx_u0, parthenon::SetFluxCorrections, u0);
 
@@ -94,7 +94,7 @@ TaskCollection STSRKL1(Mesh *pmesh, const Real time, Real dt, int stage, int nst
     auto update = none;
     update = tl.AddTask(diff_flx | set_flx_u0, ArtemisUtils::ApplyUpdate<GEOM>, u1.get(),
                         u0.get(), 1, sts_integrator.get());
-   
+
     // swap u0 <-> u1
     auto swap_data_1 = tl.AddTask(update, ArtemisUtils::SwapData, u0.get(), u1.get());
 
@@ -115,13 +115,12 @@ TaskCollection STSRKL1(Mesh *pmesh, const Real time, Real dt, int stage, int nst
                                   PreCommFillDerived<MeshData<Real>>, u0.get());
 
     // Set boundary conditions (both physical and logical)
-    auto bcs_u0 = 
+    auto bcs_u0 =
         parthenon::AddBoundaryExchangeTasks(pre_comm_u0, tl, u0, pmesh->multilevel);
 
     // Update primitive variables
-    auto c2p_u0 = 
+    auto c2p_u0 =
         tl.AddTask(TQ::local_sync, bcs_u0, FillDerived<MeshData<Real>>, u0.get());
-
   }
 
   return tc;

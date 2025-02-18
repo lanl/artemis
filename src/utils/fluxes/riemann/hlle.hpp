@@ -155,6 +155,8 @@ class RiemannSolver<RSolver::hlle, FLUID_TYPE> {
             Real scalel = 1.0;
             Real scaler = 1.0;
             Real qscale = 1.0;
+            Real norml = 1.0;
+            Real normr = 1.0;
             [[maybe_unused]] Real pscalel = Null<Real>();
             [[maybe_unused]] Real pscaler = Null<Real>();
 
@@ -173,6 +175,12 @@ class RiemannSolver<RSolver::hlle, FLUID_TYPE> {
               sl = std::min(wroe_ivx, wl_ivx);
               sr = std::max(wroe_ivx, wr_ivx);
             } else if constexpr (is_grey<FLUID_TYPE>()) {
+              wl_ivx = (std::abs(wl_ivx) <= 1e-20) ? 0.0 : wl_ivx;
+              wl_ivy = (std::abs(wl_ivy) <= 1e-20) ? 0.0 : wl_ivy;
+              wl_ivz = (std::abs(wl_ivz) <= 1e-20) ? 0.0 : wl_ivz;
+              wr_ivx = (std::abs(wr_ivx) <= 1e-20) ? 0.0 : wr_ivx;
+              wr_ivy = (std::abs(wr_ivy) <= 1e-20) ? 0.0 : wr_ivy;
+              wr_ivz = (std::abs(wr_ivz) <= 1e-20) ? 0.0 : wr_ivz;
               Real fl = std::sqrt(SQR(wl_ivx) + SQR(wl_ivy) + SQR(wl_ivz));
               Real fr = std::sqrt(SQR(wr_ivx) + SQR(wr_ivy) + SQR(wr_ivz));
               const Real nlx = wl_ivx / (fl + Fuzz<Real>());
@@ -188,8 +196,10 @@ class RiemannSolver<RSolver::hlle, FLUID_TYPE> {
               sr = std::max(sra, srb);
               pscalel = chat * c * 0.5 * (1.0 - chil);
               pscaler = chat * c * 0.5 * (1.0 - chir);
-              scalel = c * 0.5 * (3. * chil - 1.) / (fl * fl + Fuzz<Real>());
-              scaler = c * 0.5 * (3. * chir - 1.) / (fr * fr + Fuzz<Real>());
+              norml = fl * fl;
+              normr = fr * fr;
+              scalel = c * 0.5 * (3. * chil - 1.);
+              scaler = c * 0.5 * (3. * chir - 1.);
             }
 
             // following min/max set to TINY_NUMBER to fix bug found in converging
@@ -204,14 +214,14 @@ class RiemannSolver<RSolver::hlle, FLUID_TYPE> {
             Real fl_d = wl_idn * qa;
             Real fr_d = wr_idn * qb;
 
-            Real fl_mx = scalel * wl_idn * wl_ivx * qa;
-            Real fr_mx = scaler * wr_idn * wr_ivx * qb;
+            Real fl_mx = scalel * wl_idn * qa * (wl_ivx / (norml + Fuzz<Real>()));
+            Real fr_mx = scaler * wr_idn * qb * (wr_ivx / (normr + Fuzz<Real>()));
 
-            Real fl_my = scalel * wl_idn * wl_ivy * qa;
-            Real fr_my = scaler * wr_idn * wr_ivy * qb;
+            Real fl_my = scalel * wl_idn * qa * (wl_ivy / (norml + Fuzz<Real>()));
+            Real fr_my = scaler * wr_idn * qb * (wr_ivy / (normr + Fuzz<Real>()));
 
-            Real fl_mz = scalel * wl_idn * wl_ivz * qa;
-            Real fr_mz = scaler * wr_idn * wr_ivz * qb;
+            Real fl_mz = scalel * wl_idn * qa * (wl_ivz / (norml + Fuzz<Real>()));
+            Real fr_mz = scaler * wr_idn * qb * (wr_ivz / (normr + Fuzz<Real>()));
 
             [[maybe_unused]] Real fl_e = Null<Real>();
             [[maybe_unused]] Real fr_e = Null<Real>();
@@ -241,6 +251,7 @@ class RiemannSolver<RSolver::hlle, FLUID_TYPE> {
             q.flux(b, dir, ivx, k, j, i) = 0.5 * (fl_mx + fr_mx) + qa * (fl_mx - fr_mx);
             q.flux(b, dir, ivy, k, j, i) = 0.5 * (fl_my + fr_my) + qa * (fl_my - fr_my);
             q.flux(b, dir, ivz, k, j, i) = 0.5 * (fl_mz + fr_mz) + qa * (fl_mz - fr_mz);
+
             if constexpr (FLUID_TYPE == Fluid::gas) {
               q.flux(b, dir, IEN, k, j, i) = 0.5 * (fl_e + fr_e) + qa * (fl_e - fr_e);
 

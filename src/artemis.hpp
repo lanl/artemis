@@ -78,7 +78,6 @@ namespace prim {
 ARTEMIS_VARIABLE(rad.prim, energy);
 ARTEMIS_VARIABLE(rad.prim, pressure);
 ARTEMIS_VARIABLE(rad.prim, flux);
-ARTEMIS_VARIABLE(rad.prim, edd);
 } // namespace prim
 } // namespace rad
 

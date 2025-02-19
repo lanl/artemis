@@ -98,41 +98,44 @@ Real EstimateTimeStep(parthenon::Mesh *pmesh) {
   auto &radiation_pkg = pmesh->packages.Get("radiation");
   auto &params = radiation_pkg->AllParams();
   Real dxmin = Big<Real>();
-  for (auto const &pmb : pmesh->block_list) {
-    //   if constexpr (geometry::is_cartesian<GEOM>()) {
-    const auto &reg = pmb->block_size;
-    for (int d = 0; d < pmesh->ndim; d++) {
-      const Real dx = (reg.xmax_[d] - reg.xmin_[d]) / reg.nx_[d];
-      dxmin = std::min(dxmin, dx);
-    }
-    // } else {
-    //   const auto &md = pmb->meshblock_data.Get().get();
-    //   PackDescriptor desc;
-    //   auto vmesh = desc.GetPack(md);
-    //   IndexRange ib = md->GetBoundsI(IndexDomain::interior);
-    //   IndexRange jb = md->GetBoundsJ(IndexDomain::interior);
-    //   IndexRange kb = md->GetBoundsK(IndexDomain::interior);
-    //   Real min_dx = Big<Real>();
-    //   const auto ndim = pmesh->ndim;
-    //  parthenon::par_reduce(
-    //     parthenon::loop_pattern_mdrange_tag, "Radiation::EstimateTimestepMesh",
-    //     DevExecSpace(), 0, md->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
-    //     KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, Real &ldx_m)
-    //     {
-    //     // Extract coordinates
-    //     geometry::Coords<GEOM> coords(vmesh.GetCoordinates(b), k, j, i);
-    //     const auto &dx = coords.GetCellWidths();
-    //     Real dx_m = Big<Real>();
-    //     for (int d = 0; d < ndim; d++) {
-    //       dx_m = std::min(dx_m, dx[d]);
-    //     }
-    //     ldx_m = std::min(ldx_m, dx_m);
-    //   },
-    //   Kokkos::Min<Real>(min_dx));
+  if constexpr (not geometry::is_cartesian<GEOM>()) {
+    for (int partition = 0; partition < pmesh->DefaultNumPartitions(); partition++) {
+      auto md = pmesh->mesh_data.GetOrAdd("u0", partition).get();
+      auto desc = MakeDefaultPackDescriptor();
+      auto vmesh = desc.GetPack(md);
+      IndexRange ib = md->GetBoundsI(IndexDomain::interior);
+      IndexRange jb = md->GetBoundsJ(IndexDomain::interior);
+      IndexRange kb = md->GetBoundsK(IndexDomain::interior);
+      Real min_dx = Big<Real>();
+      const auto ndim = pmesh->ndim;
+      parthenon::par_reduce(
+          parthenon::loop_pattern_mdrange_tag, "Radiation::EstimateTimestepMesh",
+          DevExecSpace(), 0, md->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+          KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, Real &ldx_m) {
+            // Extract coordinates
+            geometry::Coords<GEOM> coords(vmesh.GetCoordinates(b), k, j, i);
+            const auto &dx = coords.GetCellWidths();
+            Real dx_m = Big<Real>();
+            for (int d = 0; d < ndim; d++) {
+              dx_m = std::min(dx_m, dx[d]);
+            }
+            ldx_m = std::min(ldx_m, dx_m);
+          },
+          Kokkos::Min<Real>(min_dx));
 
-    //   dxmin = std::min(dxmin, min_dx);
-    // }
+      dxmin = std::min(dxmin, min_dx);
+    }
+  } else {
+    // If cartesian, we don't need a kernel.
+    for (auto const &pmb : pmesh->block_list) {
+      const auto &reg = pmb->block_size;
+      for (int d = 0; d < pmesh->ndim; d++) {
+        const Real dx = (reg.xmax_[d] - reg.xmin_[d]) / reg.nx_[d];
+        dxmin = std::min(dxmin, dx);
+      }
+    }
   }
+
 #ifdef MPI_PARALLEL
   PARTHENON_MPI_CHECK(MPI_Allreduce(MPI_IN_PLACE, &dxmin, 1, MPI_PARTHENON_REAL, MPI_MIN,
                                     MPI_COMM_WORLD));

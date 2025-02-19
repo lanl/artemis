@@ -105,7 +105,6 @@ TaskStatus MatterCouplingSimpleImpl(MeshData<Real> *u0, const Real dt) {
         Real B = arad * SQR(SQR(T));
 
         Real E = Er0;
-        auto F = Fr0;
         Real etot = e + c / chat * E;
 
         // S(y) = sigma*chat*(E-B)

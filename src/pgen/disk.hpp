@@ -271,8 +271,8 @@ inline void InitDiskParams(MeshBlock *pmb, ParameterInput *pin) {
 
     PARTHENON_REQUIRE(disk_params.Gamma >= 1, "problem/gamma needs to be >= 1");
 
-    disk_params.dens_min = pin->GetOrAddReal("problem", "dens_min", 1.0e-5);
-    disk_params.pres_min = pin->GetOrAddReal("problem", "pres_min", 1.0e-8);
+    disk_params.dens_min = pin->GetOrAddReal("problem", "dens_min", 1.0e-20);
+    disk_params.pres_min = pin->GetOrAddReal("problem", "pres_min", 1.0e-24);
     disk_params.rexp = pin->GetOrAddReal("problem", "rexp", 0.0);
     disk_params.rcav = pin->GetOrAddReal("problem", "rcav", 0.0);
     disk_params.l0 = pin->GetOrAddReal("problem", "l0", 0.0);

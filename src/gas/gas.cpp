@@ -616,7 +616,7 @@ TaskStatus ZeroDiffusionFlux(MeshData<Real> *md) {
           resolved_pkgs.get(), {}, {parthenon::PDOpt::WithFluxes});
 
   auto vf = desc_flux.GetPack(md);
-  return Diffusion::ZeroDiffusionImpl(md,vf);
+  return Diffusion::ZeroDiffusionImpl(md, vf);
 }
 
 //----------------------------------------------------------------------------------------

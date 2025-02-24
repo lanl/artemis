@@ -89,7 +89,7 @@ TaskStatus MatterCouplingSimpleImpl(MeshData<Real> *u0, const Real dt) {
                                 v0(b, rad::cons::flux(1), k, j, i) / hx[1],
                                 v0(b, rad::cons::flux(2), k, j, i) / hx[2]};
 
-                // Note(AMD): There is some floating point difference between the internal energy
+        // Note(AMD): There is some floating point difference between the internal energy
         // used to compute the temperature and the internal energy obtained from that
         // temperature: T = eos_d.TemperatureFromDensityInternalEnergy(dens, eg/dens); eg
         // /= dens * eos_d.InternalEnergyFromDensityTemperature(dens,T)

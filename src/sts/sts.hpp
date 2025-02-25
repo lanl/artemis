@@ -46,7 +46,7 @@ TaskCollection STSRKL1(Mesh *pmesh, const Real time, Real dt, int stage, int nst
   const auto any = parthenon::BoundaryType::any;
   const int num_partitions = pmesh->DefaultNumPartitions();
 
-  auto &pkg = pmesh->packages.Get("STS");
+  auto &pkg = pmesh->packages.Get("artemis");
   const auto do_viscosity = pkg->template Param<bool>("do_viscosity");
   const auto do_conduction = pkg->template Param<bool>("do_conduction");
   const auto do_diffusion = pkg->template Param<bool>("do_diffusion");
@@ -98,12 +98,8 @@ TaskCollection STSRKL1(Mesh *pmesh, const Real time, Real dt, int stage, int nst
     // swap u0 <-> u1
     auto swap_data_1 = tl.AddTask(update, ArtemisUtils::SwapData, u0.get(), u1.get());
 
-    // Apply "coordinate source terms"
-    TaskID gas_coord_src = swap_data_1, dust_coord_src = swap_data_1;
-    if (do_gas) gas_coord_src = tl.AddTask(swap_data_1, Gas::FluxSource, u0.get(), dt);
-
-    TaskID gas_diff_src = gas_coord_src | diff_flx | set_flx_u0;
-    gas_diff_src = tl.AddTask(gas_coord_src | diff_flx | set_flx_u0,
+    TaskID gas_diff_src = swap_data_1 | diff_flx | set_flx_u0;
+    gas_diff_src = tl.AddTask(swap_data_1 | diff_flx | set_flx_u0,
                               Gas::DiffusionUpdate<GEOM>, u0.get(), dt);
 
     // Set auxillary fields

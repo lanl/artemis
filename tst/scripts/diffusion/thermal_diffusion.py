@@ -51,6 +51,7 @@ def run(**kwargs):
             "parthenon/job/problem_id=" + name,
             "artemis/coordinates=" + g,
             "parthenon/time/tlim=50.0",
+            "physics/sts=true",
             "gas/conductivity/cond={:.8f}".format(_kcond),
             "gravity/uniform/gx1={:.8f}".format(_gx1),
             "problem/flux={:.8f}".format(_flux),
@@ -96,7 +97,7 @@ def analyze():
             "final", dir=artemis.get_data_dir(), base="{}.out1".format(name)
         )
         xc = 0.5 * (x[1:] + x[:-1])
-        ans = Tans(xc.ravel(), f=_flux, T0=_gtemp, x0=1.2, xi=0.2, d=dind[g], k=_kcond)
+        ans = Tans(xc.ravel(), f=_flux, T0=_gtemp, x0=1.2, xi=0.2, d=())[g], k=_kcond)
         temp = T[0, :].ravel()
         err = abs(temp / ans - 1.0)
         ax.plot(xc, ans, "--k")

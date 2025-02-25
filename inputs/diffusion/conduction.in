@@ -61,6 +61,11 @@ gas = true
 gravity = true
 conduction = true
 drag = true
+sts = false
+
+<sts>
+integrator = rkl1
+sts_max_dt_ratio = 200.0
 
 <gas>
 cfl = 0.3

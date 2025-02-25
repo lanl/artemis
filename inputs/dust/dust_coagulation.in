@@ -43,7 +43,7 @@ dt 	  = 628
 nlim       = -1   	# cycle limit
 tlim       = 3768. 	# time limit
 integrator = rk2    	# time integration algorithm
-ncycle_out = 1    	# interval for stdout summary info
+ncycle_out = 10    	# interval for stdout summary info
 
 <parthenon/mesh>
 nghost = 2

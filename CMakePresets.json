@@ -22,7 +22,8 @@
         "CMAKE_MAKE_PROGRAM": "$env{MAKE_PROGRAM}",
         "CMAKE_C_COMPILER": "gcc",
         "CMAKE_CXX_COMPILER": "g++",
-        "CMAKE_BUILD_TYPE": "RelWithDebInfo"
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+	"PARTHENON_DISABLE_HDF5_COMPRESSION": "ON"
       }
     },
     {
@@ -33,7 +34,8 @@
         "Kokkos_ENABLE_DEBUG_BOUNDS_CHECK": "ON",
         "CMAKE_CXX_COMPILER": "$env{ARTEMIS_HOME}/external/parthenon/external/Kokkos/bin/nvcc_wrapper",
         "ARTEMIS_ENABLE_CUDA": "ON",
-        "Kokkos_ARCH_VOLTA70": "ON"
+        "Kokkos_ARCH_VOLTA70": "ON",
+        "PARTHENON_DISABLE_HDF5_COMPRESSION": "ON"
       }
     },
     {
@@ -43,7 +45,8 @@
         "CMAKE_BUILD_TYPE": "Release",
         "CMAKE_CXX_COMPILER": "$env{ARTEMIS_HOME}/external/parthenon/external/Kokkos/bin/nvcc_wrapper",
         "ARTEMIS_ENABLE_CUDA": "ON",
-        "Kokkos_ARCH_VOLTA70": "ON"
+        "Kokkos_ARCH_VOLTA70": "ON",
+	"PARTHENON_DISABLE_HDF5_COMPRESSION": "ON"
       }
     },
     {

@@ -96,8 +96,6 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   const Real cfl_number = pin->GetOrAddReal("radiation", "cfl", 0.8);
   params.Add("cfl", cfl_number);
 
-  params.Add("nstages", pin->GetOrAddInteger("radiation", "nstages", 2));
-
   params.Add("full_coupling", pin->GetOrAddBoolean("radiation", "full_coupling", true));
 
   const Real light = constants.GetCCode();

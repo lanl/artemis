@@ -68,12 +68,17 @@ ArtemisDriver<GEOM>::ArtemisDriver(ParameterInput *pin, ApplicationInput *app_in
   do_diffusion = do_viscosity || do_conduction;
   do_imc = artemis_pkg->template Param<bool>("do_imc");
   do_moment = artemis_pkg->template Param<bool>("do_moment");
+
   if (do_moment) {
-    rad_stages = pm->packages.Get("radiation").get()->template Param<int>("nstages");
+    auto rad_int = pin->GetOrAddString("radiation", "integrator", "rk2");
+    PARTHENON_REQUIRE(((rad_int == "rk1") || (rad_int == "rk2") || (rad_int == "rk3")),
+                      "radiation/integrator must be rk1,rk2, or rk3.")
+    rad_integrator = std::make_unique<Integrator_t>(rad_int);
   }
   // NBody initialization tasks
   if (do_nbody) {
     // NBody coupling integrator (not to be confused with the rebound integrator)
+    // NOTE(AMD): I bet this can be done with the parthenon Butcher integrator
     nbody_integrator = std::make_unique<Integrator_t>(pin);
     nbody_integrator->beta[0] = integrator->beta[0];
     for (int stage = 2; stage <= nbody_integrator->nstages; stage++) {
@@ -335,14 +340,12 @@ TaskCollection ArtemisDriver<GEOM>::RadiationTasks() {
     tl.AddTask(none, ArtemisUtils::DeepCopyConservedData, u1.get(), u0.get());
   }
 
-  const int nstages = rad_stages;
-  const std::array<Real, 2> beta{1.0, 0.5};
-  const std::array<Real, 2> gam0{0.0, 0.5};
-  const std::array<Real, 2> gam1{1.0, 0.5};
   // Now do explicit integration of unsplit physics
-  for (int stage = 1; stage <= nstages; stage++) {
+  for (int stage = 1; stage <= rad_integrator->nstages; stage++) {
     const Real time = trad;
-    const Real bdt = beta[stage - 1] * dtr;
+    const Real bdt = rad_integrator->beta[stage - 1] * dtr;
+    const Real gam0 = rad_integrator->gam0[stage - 1];
+    const Real gam1 = rad_integrator->gam1[stage - 1];
 
     TaskRegion &tr = tc.AddRegion(num_partitions);
     for (int i = 0; i < num_partitions; i++) {
@@ -366,9 +369,8 @@ TaskCollection ArtemisDriver<GEOM>::RadiationTasks() {
       auto set_flx = tl.AddTask(recv_flx, parthenon::SetFluxCorrections, u0);
 
       // Apply flux divergence
-      auto update =
-          tl.AddTask(rad_flx | gas_flx | set_flx, Radiation::ApplyUpdate<GEOM>, u0.get(),
-                     u1.get(), stage, gam0[stage - 1], gam1[stage - 1], bdt);
+      auto update = tl.AddTask(rad_flx | gas_flx | set_flx, Radiation::ApplyUpdate<GEOM>,
+                               u0.get(), u1.get(), stage, gam0, gam1, bdt);
 
       // Apply "coordinate source terms"
       auto coord_src = tl.AddTask(update, Radiation::FluxSource, u0.get(), bdt);

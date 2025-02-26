@@ -271,8 +271,8 @@ inline void InitDiskParams(MeshBlock *pmb, ParameterInput *pin) {
 
     PARTHENON_REQUIRE(disk_params.Gamma >= 1, "problem/gamma needs to be >= 1");
 
-    disk_params.dens_min = pin->GetOrAddReal("problem", "dens_min", 1.0e-5);
-    disk_params.pres_min = pin->GetOrAddReal("problem", "pres_min", 1.0e-8);
+    disk_params.dens_min = pin->GetOrAddReal("problem", "dens_min", 1.0e-20);
+    disk_params.pres_min = pin->GetOrAddReal("problem", "pres_min", 1.0e-24);
     disk_params.rexp = pin->GetOrAddReal("problem", "rexp", 0.0);
     disk_params.rcav = pin->GetOrAddReal("problem", "rcav", 0.0);
     disk_params.l0 = pin->GetOrAddReal("problem", "l0", 0.0);
@@ -581,7 +581,7 @@ void DiskBoundaryVisc(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) {
             const Real dvp1p = ArtemisUtils::VDot(dvp1, epp1) + dp.omf * xcylp1[0];
             const Real dvm1p = ArtemisUtils::VDot(dvm1, epm1) + dp.omf * xcylm1[0];
             const Real ddvp = std::log(dvp1p / dvm1p);
-            const Real dvcyl[3] = {dvR, dvp * std::exp(dgvp * xmadx) - dp.omf * xcyl[0],
+            const Real dvcyl[3] = {dvR, dvp * std::exp(ddvp * xmadx) - dp.omf * xcyl[0],
                                    dvz};
             const Real dvel[3] = {ArtemisUtils::VDot(dvcyl, ex1),
                                   ArtemisUtils::VDot(dvcyl, ex2),
@@ -804,7 +804,7 @@ void DiskBoundaryExtrap(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) 
             const Real dvp1p = ArtemisUtils::VDot(dvp1, epp1) + dp.omf * xcylp1[0];
             const Real dvm1p = ArtemisUtils::VDot(dvm1, epm1) + dp.omf * xcylm1[0];
             const Real ddvp = std::log(dvp1p / dvm1p);
-            const Real dvcyl[3] = {dvR, dvp * std::exp(dgvp * xmadx) - dp.omf * xcyl[0],
+            const Real dvcyl[3] = {dvR, dvp * std::exp(ddvp * xmadx) - dp.omf * xcyl[0],
                                    dvz};
             const Real dvel[3] = {ArtemisUtils::VDot(dvcyl, ex1),
                                   ArtemisUtils::VDot(dvcyl, ex2),

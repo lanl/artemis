@@ -69,7 +69,7 @@ def analyze():
         unpack=True,
     )
 
-    errs = data_ref - data_tst
+    errs = data_ref - data_tst[2:5, :]
     errors = np.array(errs).ravel()
     fail = np.any(errors > 0)
     return not fail

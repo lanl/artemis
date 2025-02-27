@@ -4,6 +4,7 @@
 [submodule "external/singularity-eos"]
 	path = external/singularity-eos
 	url = https://github.com/lanl/singularity-eos.git
+	branch = develop
 [submodule "external/rebound"]
 	path = external/rebound
 	url = https://github.com/hannorein/rebound
@@ -13,3 +14,4 @@
 [submodule "external/jaybenne"]
 	path = external/jaybenne
 	url = https://github.com/lanl/jaybenne.git
+	branch = develop

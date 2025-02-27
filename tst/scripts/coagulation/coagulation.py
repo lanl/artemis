@@ -61,14 +61,13 @@ def analyze():
         unpack=True,
     )
 
-    data_ref = np.array([dat_sden[2:5, :], dat_den[2:5, :]])
+    data_ref = np.hstack([dat_sden[2:5, :], dat_den[2:5, :]])
 
     fname = os.path.join(artemis.get_data_dir(), _file_id + "_info.dat")
-    data = np.loadtxt(
+    data_tst = np.loadtxt(
         fname,
         unpack=True,
     )
-    data_tst = data[2:5, :].reshape([len(_surfden), 3, data_ref.shape[-1]])
 
     errs = data_ref - data_tst
     errors = np.array(errs).ravel()

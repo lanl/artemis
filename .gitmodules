@@ -1,7 +1,6 @@
 [submodule "external/parthenon"]
 	path = external/parthenon
 	url = https://github.com/parthenon-hpc-lab/parthenon.git
-	branch = develop
 [submodule "external/singularity-eos"]
 	path = external/singularity-eos
 	url = https://github.com/lanl/singularity-eos.git
@@ -14,4 +13,3 @@
 [submodule "external/jaybenne"]
 	path = external/jaybenne
 	url = https://github.com/lanl/jaybenne.git
-	branch = develop

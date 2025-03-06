@@ -49,6 +49,8 @@ struct StratParams {
   Real gm1;
   Real d2g;
   Real temp0;
+  Real r0;
+  Real kbmu;
 };
 
 //----------------------------------------------------------------------------------------
@@ -64,11 +66,21 @@ inline void InitStratParams(MeshBlock *pmb, ParameterInput *pin) {
     strat_params.Om0 = pmb->packages.Get("rotating_frame")->Param<Real>("omega");
     strat_params.h = pin->GetOrAddReal("problem", "h", 1.0);
     strat_params.rho0 = pin->GetOrAddReal("problem", "rho0", 1.0);
+    strat_params.r0 = pin->GetOrAddReal("problem", "r0", 1.0);
     strat_params.dens_min = pin->GetOrAddReal("problem", "dens_min", 1.0e-5);
     strat_params.pres_min = pin->GetOrAddReal("problem", "pres_min", 1.0e-8);
     strat_params.d2g = pin->GetOrAddReal("problem", "dust_to_gas", 0.01);
-    strat_params.temp0 = SQR(strat_params.h * strat_params.Om0);
-    strat_params.pres0 = strat_params.rho0 * strat_params.temp0;
+
+    auto &gas_pkg = pmb->packages.Get("gas");
+    auto &artemis_pkg = pmb->packages.Get("artemis");
+    const auto mu = gas_pkg->Param<Real>("mu");
+    const auto eos = gas_pkg->Param<EOS>("eos_h");
+    auto &constants = artemis_pkg->Param<ArtemisUtils::Constants>("constants");
+    strat_params.kbmu = constants.GetKBCode() / (mu * constants.GetAMUCode());
+    strat_params.temp0 =
+        SQR(strat_params.h * strat_params.r0 * strat_params.Om0) / strat_params.kbmu;
+    strat_params.pres0 = eos.PressureFromDensityTemperature(
+        strat_params.rho0, strat_params.temp0); // strat_params.rho0 * strat_params.temp0;
     params.Add("strat_params", strat_params);
   }
 }
@@ -129,7 +141,8 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         const Real vx2 = -pars.q * pars.Om0 * x;
         const Real vx3 = 0.0;
         const Real temp = pars.temp0;
-        const Real efac = (three_d) ? std::exp(-SQR(z) / (2.0 * SQR(pars.h))) : 1.0;
+        const Real efac =
+            (three_d) ? std::exp(-SQR(z) / (2.0 * SQR(pars.h * pars.r0))) : 1.0;
         const Real dens = std::max(pars.dens_min, efac * pars.rho0);
         const Real sie = eos_d.InternalEnergyFromDensityTemperature(dens, temp);
 

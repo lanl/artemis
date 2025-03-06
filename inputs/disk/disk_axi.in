@@ -14,6 +14,8 @@
 <artemis>
 problem = disk              # name of the pgen
 coordinates = axisymmetric  # coordinate system
+physical_units = cgs
+unit_conversion = ppd
 
 <parthenon/job>
 problem_id = disk  # problem ID: basename of output filenames

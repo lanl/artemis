@@ -106,7 +106,7 @@ Constants::Constants(Units &units) {
   const Real energy = mass * std::pow(length / time, 2);
 
   // Convert constants to code units
-  G_code_ = G_ * std::pow(length, -3) / mass * std::pow(time, 2);
+  G_code_ = G_ * std::pow(length, -3) * mass * std::pow(time, 2);
   kb_code_ = kb_ * temp / energy;
   c_code_ = c_ * time / length;
   h_code_ = h_ / (energy * time);

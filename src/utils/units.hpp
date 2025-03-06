@@ -29,7 +29,6 @@ class Units {
   Units(ParameterInput *pin, std::shared_ptr<StateDescriptor> pkg);
 
   // Copy constructor must be marked with KOKKOS_FUNCTION
-  KOKKOS_FUNCTION
   Units(const Units &other) = default;
 
   // Return physical unit system
@@ -118,7 +117,6 @@ class Constants {
   KOKKOS_FUNCTION
   Constants(Units &units);
 
-  KOKKOS_FUNCTION
   Constants(const Constants &other) = default;
 
   KOKKOS_INLINE_FUNCTION

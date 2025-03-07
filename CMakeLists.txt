@@ -24,6 +24,7 @@ option(ARTEMIS_ENABLE_MPI "Enable MPI for artemis and all dependencies" ON)
 option(ARTEMIS_ENABLE_OPENMP "Enable OpenMP for artemis and parthenon" OFF)
 option(ARTEMIS_ENABLE_COMPILE_TIMING "Enable timing of compilation of artemis" ON)
 option(ARTEMIS_ENABLE_ASAN "Enable AddressSanitizer to detect memory errors" OFF)
+option(ARTEMIS_PORTABLE_RESTART "Enable portable data types for REBOUND restarts" ON)
 
 # Force -03 optimization for RelWithDebInfo
 set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O3 -g -DNDEBUG" CACHE STRING "Force -O3 in RelWithDebInfo mode" FORCE)

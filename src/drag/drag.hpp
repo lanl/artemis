@@ -462,7 +462,7 @@ TaskStatus SimpleDragSourceImpl(MeshData<Real> *md, const Real time, const Real 
 
         // Compute the ramp for this cell
         // Ramps are quadratic, eg. the left regions is SQR( (X - ix)/(ix - xmin) )
-        const Real bg[3] = {
+        const std::array<Real, 3> bg{
             dt * (gasp.irate[0] * ((xv[0] < gasp.ix[0]) *
                                    SQR((xv[0] - gasp.ix[0]) / (gasp.ix[0] - x1min))) +
                   gasp.orate[0] * ((xv[0] > gasp.ox[0]) *
@@ -477,7 +477,7 @@ TaskStatus SimpleDragSourceImpl(MeshData<Real> *md, const Real time, const Real 
                                   SQR((xv[2] - gasp.ix[2]) / (gasp.ix[2] - x3min))) +
                  gasp.orate[2] * ((xv[2] > gasp.ox[2]) *
                                   SQR((xv[2] - gasp.ox[2]) / (gasp.ox[2] - x3max))))};
-        const Real bd[3] = {
+        const std::array<Real, 3> bd{
             dt * (dustp.irate[0] * ((xv[0] < dustp.ix[0]) *
                                     SQR((xv[0] - dustp.ix[0]) / (dustp.ix[0] - x1min))) +
                   dustp.orate[0] * ((xv[0] > dustp.ox[0]) *
@@ -494,7 +494,7 @@ TaskStatus SimpleDragSourceImpl(MeshData<Real> *md, const Real time, const Real 
                                    SQR((xv[2] - dustp.ox[2]) / (dustp.ox[2] - x3max))))};
 
         const Real &dg = vmesh(b, gas::cons::density(0), k, j, i);
-        const Real vg[3] = {
+        const std::array<Real, 3> vg{
             vmesh(b, gas::cons::momentum(VI(0, 0)), k, j, i) / (hx[0] * dg),
             vmesh(b, gas::cons::momentum(VI(0, 1)), k, j, i) / (hx[1] * dg),
             vmesh(b, gas::cons::momentum(VI(0, 2)), k, j, i) / (hx[2] * dg)};
@@ -506,21 +506,21 @@ TaskStatus SimpleDragSourceImpl(MeshData<Real> *md, const Real time, const Real 
         Diffusion::DiffusionCoeff<DTYP, GEOM, Fluid::gas> dcoeff;
         const Real mu = dcoeff.Get(dp, coords, dg, sieg, eos_d);
         const Real vR = -1.5 * mu / (xcyl[0] * dg);
-        const Real vt[3] = {ex1[0] * vR, ex2[0] * vR, ex3[0] * vR};
+        const std::array<Real, 3> vt{ex1[0] * vR, ex2[0] * vR, ex3[0] * vR};
 
-        Real fd[3] = {0.};
-        Real fvd[3] = {0.};
+        std::array<Real, 3> fd{0.0, 0.0, 0.0};
+        std::array<Real, 3> fvd{0.0, 0.0, 0.0};
         const auto nspecies = vmesh.GetSize(b, dust::cons::density());
 
         DragCoeff<DRAG> drag_coeff;
         Real Tg = eos_d.TemperatureFromDensityInternalEnergy(dg, sieg);
 
         // First pass to collect \sum rho' and \sum rho' v and compute new vg
-        const Real vdt[3] = {0.0};
+        std::array<Real, 3> vdt{0.0, 0.0, 0.0};
         for (int n = 0; n < nspecies; ++n) {
           const auto id = vmesh(b, dust::cons::density(n)).sparse_id;
           const Real &dens = vmesh(b, dust::cons::density(n), k, j, i);
-          const Real vd[3] = {
+          const std::array<Real, 3> vd{
               vmesh(b, dust::cons::momentum(VI(n, 0)), k, j, i) / (hx[0] * dens),
               vmesh(b, dust::cons::momentum(VI(n, 1)), k, j, i) / (hx[1] * dens),
               vmesh(b, dust::cons::momentum(VI(n, 2)), k, j, i) / (hx[2] * dens)};
@@ -540,7 +540,7 @@ TaskStatus SimpleDragSourceImpl(MeshData<Real> *md, const Real time, const Real 
           }
         }
         // New vgas
-        Real vgp[3] = {Null<Real>()};
+        std::array<Real, 3> vgp{Null<Real>(), Null<Real>(), Null<Real>()};
         for (int d = 0; d < 3; d++) {
           vgp[d] = (dg * (vg[d] + bg[d] * vt[d]) + fvd[d]) / (dg * (1.0 + bg[d]) + fd[d]);
         }
@@ -548,14 +548,14 @@ TaskStatus SimpleDragSourceImpl(MeshData<Real> *md, const Real time, const Real 
         // Second pass to update all momenta
 
         // Total gas momentum change
-        Real delta_g[3] = {0.0};
+        std::array<Real, 3> delta_g{0.0, 0.0, 0.0};
         for (int d = 0; d < 3; d++) {
           fvd[d] = 0.;
         }
         for (int n = 0; n < nspecies; ++n) {
           const auto id = vmesh(b, dust::cons::density(n)).sparse_id;
           const Real &dens = vmesh(b, dust::cons::density(n), k, j, i);
-          const Real vd[3] = {
+          const std::array<Real, 3> vd{
               vmesh(b, dust::cons::momentum(VI(n, 0)), k, j, i) / (hx[0] * dens),
               vmesh(b, dust::cons::momentum(VI(n, 1)), k, j, i) / (hx[1] * dens),
               vmesh(b, dust::cons::momentum(VI(n, 2)), k, j, i) / (hx[2] * dens)};
@@ -582,14 +582,16 @@ TaskStatus SimpleDragSourceImpl(MeshData<Real> *md, const Real time, const Real 
             vmesh(b, dust::cons::momentum(VI(n, d)), k, j, i) += hx[d] * delta_d;
           }
         }
+
+        // Final update gas momenta and energy
         for (int d = 0; d < 3; d++) {
           const Real prefac = dg * bg[d] / (1.0 + bg[d] + fd[d]);
           delta_g[d] -= prefac * (dg * (vg[d] - vt[d]) + fvd[d]);
           vmesh(b, gas::cons::momentum(VI(0, d)), k, j, i) += hx[d] * delta_g[d];
+          const Real vn = vg[d] + delta_g[d] / dg;
           vmesh(b, gas::cons::total_energy(0), k, j, i) +=
-              0.5 * (vg[d] + vgp[d]) * delta_g[d];
+              0.5 * (vg[d] + vn) * delta_g[d];
         }
-        // Update gas momenta
       });
 
   return TaskStatus::complete;

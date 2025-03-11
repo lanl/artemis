@@ -1,5 +1,5 @@
 //========================================================================================
-// (C) (or copyright) 2024. Triad National Security, LLC. All rights reserved.
+// (C) (or copyright) 2024-2025. Triad National Security, LLC. All rights reserved.
 //
 // This program was produced under U.S. Government contract 89233218CNA000001 for Los
 // Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -29,7 +29,6 @@ class Units {
   Units(ParameterInput *pin, std::shared_ptr<StateDescriptor> pkg);
 
   // Copy constructor must be marked with KOKKOS_FUNCTION
-  KOKKOS_FUNCTION
   Units(const Units &other) = default;
 
   // Return physical unit system
@@ -118,7 +117,6 @@ class Constants {
   KOKKOS_FUNCTION
   Constants(Units &units);
 
-  KOKKOS_FUNCTION
   Constants(const Constants &other) = default;
 
   KOKKOS_INLINE_FUNCTION

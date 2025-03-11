@@ -33,7 +33,7 @@ artemis:
     cgs:
       _type: opt
       _description: "CGS unit system"
-  unit_specifier:
+  unit_conversion:
     _type: "string"
     _default: "base"
     _description: "How to provide unit conversions between code and physical units"

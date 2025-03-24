@@ -209,6 +209,8 @@ set(JAYBENNE_EOS_TYPE "ArtemisUtils::EOS")
 set(JAYBENNE_OPACITY_HEADER "${CMAKE_CURRENT_SOURCE_DIR}/src/utils/opacity/opacity.hpp")
 set(JAYBENNE_ABSORPTION_OPACITY_TYPE "ArtemisUtils::Opacity")
 set(JAYBENNE_SCATTERING_OPACITY_TYPE "ArtemisUtils::Scattering")
+set(JAYBENNE_ABSORPTION_MEAN_OPACITY_TYPE "ArtemisUtils::MeanOpacity")
+set(JAYBENNE_SCATTERING_MEAN_OPACITY_TYPE "ArtemisUtils::MeanScattering")
 set(JAYBENNE_SINGULARITY_INCLUDE_PATHS ${ARTEMIS_SINGULARITY_INCLUDE_PATHS})
 
 # Point Jaybenne at the correct Artemis variables

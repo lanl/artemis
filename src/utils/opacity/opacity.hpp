@@ -14,21 +14,29 @@
 #define UTILS_OPACITY_OPACITY_HPP_
 
 // Singularity-opac includes
+#include <singularity-opac/photons/mean_opacity_photons.hpp>
+#include <singularity-opac/photons/mean_s_opacity_photons.hpp>
 #include <singularity-opac/photons/opac_photons.hpp>
 #include <singularity-opac/photons/s_opac_photons.hpp>
 
 namespace ArtemisUtils {
 
 // Reduced absorption variant for this codebase
-using Opacity = singularity::photons::impl::Variant<
-    singularity::photons::NonCGSUnits<singularity::photons::Gray>,
-    singularity::photons::NonCGSUnits<singularity::photons::PowerLaw>,
-    singularity::photons::NonCGSUnits<singularity::photons::EPBremss>>;
+using Opacity = singularity::photons::impl::Variant<singularity::photons::Gray,
+                                                    singularity::photons::PowerLaw,
+                                                    singularity::photons::EPBremss>;
 
 // Reduced scattering variant for this codebase
-using Scattering = singularity::photons::impl::S_Variant<
-    singularity::photons::NonCGSUnitsS<singularity::photons::GrayS>,
-    singularity::photons::NonCGSUnitsS<singularity::photons::ThomsonS>>;
+using Scattering = singularity::photons::impl::S_Variant<singularity::photons::GrayS,
+                                                         singularity::photons::ThomsonS>;
+
+// Reduced variant for mean absorption opacities
+using MeanOpacity =
+    singularity::photons::MeanNonCGSUnits<singularity::photons::MeanOpacityBase>;
+
+// Reduced variant for mean scattering opacities
+using MeanScattering =
+    singularity::photons::MeanNonCGSUnitsS<singularity::photons::MeanSOpacityCGS>;
 
 } // namespace ArtemisUtils
 

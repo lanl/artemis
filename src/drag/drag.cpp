@@ -143,6 +143,10 @@ TaskStatus DragSource(MeshData<Real> *md, const Real time, const Real dt) {
           return SimpleDragSourceImpl<Diffusion::DiffType::viscosity_plaw,
                                       DragModel::constant, GEOM>(
               md, time, dt, dp, eos_d, gas_self_par, dust_self_par, stop_par);
+        } else if (stop_par.model == DragModel::powerlaw) {
+          return SimpleDragSourceImpl<Diffusion::DiffType::viscosity_plaw,
+                                      DragModel::powerlaw, GEOM>(
+              md, time, dt, dp, eos_d, gas_self_par, dust_self_par, stop_par);
         } else if (stop_par.model == DragModel::stokes) {
           return SimpleDragSourceImpl<Diffusion::DiffType::viscosity_plaw,
                                       DragModel::stokes, GEOM>(
@@ -152,6 +156,10 @@ TaskStatus DragSource(MeshData<Real> *md, const Real time, const Real dt) {
         if (stop_par.model == DragModel::constant) {
           return SimpleDragSourceImpl<Diffusion::DiffType::viscosity_alpha,
                                       DragModel::constant, GEOM>(
+              md, time, dt, dp, eos_d, gas_self_par, dust_self_par, stop_par);
+        } else if (stop_par.model == DragModel::powerlaw) {
+          return SimpleDragSourceImpl<Diffusion::DiffType::viscosity_alpha,
+                                      DragModel::powerlaw, GEOM>(
               md, time, dt, dp, eos_d, gas_self_par, dust_self_par, stop_par);
         } else if (stop_par.model == DragModel::stokes) {
           return SimpleDragSourceImpl<Diffusion::DiffType::viscosity_alpha,
@@ -165,6 +173,9 @@ TaskStatus DragSource(MeshData<Real> *md, const Real time, const Real dt) {
       Diffusion::DiffCoeffParams dp;
       if (stop_par.model == DragModel::constant) {
         return SimpleDragSourceImpl<Diffusion::DiffType::null, DragModel::constant, GEOM>(
+            md, time, dt, dp, eos_d, gas_self_par, dust_self_par, stop_par);
+      } else if (stop_par.model == DragModel::powerlaw) {
+        return SimpleDragSourceImpl<Diffusion::DiffType::null, DragModel::powerlaw, GEOM>(
             md, time, dt, dp, eos_d, gas_self_par, dust_self_par, stop_par);
       } else if (stop_par.model == DragModel::stokes) {
         return SimpleDragSourceImpl<Diffusion::DiffType::null, DragModel::stokes, GEOM>(

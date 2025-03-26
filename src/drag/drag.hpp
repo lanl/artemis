@@ -55,7 +55,7 @@ namespace Drag {
 */
 
 enum class Coupling { simple_dust, self, null };
-enum class DragModel { constant, stokes, dp15, null };
+enum class DragModel { constant, stokes, dp15, powerlaw, null };
 
 inline Coupling ChooseDrag(const std::string choice) {
   if (choice == "self") {
@@ -112,7 +112,7 @@ struct SelfDragParams {
 
 struct StoppingTimeParams {
 
-  Real scale, dh, mass_scale, p1, p2, p3;
+  Real scale, dh, mass_scale, p1, p2, p3, rho_plaw;
   DragModel model;
   ParArray1D<Real> tau;
   StoppingTimeParams(std::string block_name, ParameterInput *pin,
@@ -156,6 +156,16 @@ struct StoppingTimeParams {
       // routines
       mass_scale = units.GetMassPhysicalToCode() * constants.GetAMUCode();
 
+    } else if (choice == "powerlaw") {
+      model = DragModel::constant;
+      scale = pin->GetOrAddReal(block_name, "scale", 1.0);
+      rho_plaw = pin->GetOrAddReal(block_name, "density_plaw", 0.0);
+      std::vector<Real> taus = pin->GetVector<Real>(block_name, "tau");
+      auto h_tau = tau.GetHostMirror();
+      for (int n = 0; n < nd; n++) {
+        h_tau(n) = scale * taus[n];
+      }
+      tau.DeepCopy(h_tau);
     } else {
       PARTHENON_FAIL("bad type for stopping time model");
     }
@@ -193,6 +203,17 @@ class DragCoeff<DragModel::constant> {
                                   const Real grain_density, const Real size,
                                   const EOS &eos) const {
     return dp.tau(id);
+  }
+};
+
+template <>
+class DragCoeff<DragModel::powerlaw> {
+ public:
+  KOKKOS_INLINE_FUNCTION Real Get(const StoppingTimeParams &dp, const int id,
+                                  const Real dg, const Real Tg, const Real u,
+                                  const Real grain_density, const Real size,
+                                  const EOS &eos) const {
+    return dp.tau(id) * std::pow(dg, dp.rho_plaw);
   }
 };
 

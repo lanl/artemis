@@ -78,7 +78,7 @@ def run(**kwargs):
         "gas/opacity/absorption/opacity_model=constant",
         "gas/opacity/absorption/kappa_a={:24.16e}".format(_ka),
         "jaybenne/dt=1.0e-10",
-        "jaybenne/num_particles=1000",
+        "jaybenne/num_particles=200000",
         "jaybenne/use_ddmc=true",
         "problem/rho={:24.16e}".format(_rho),
         "problem/vx=0.0",

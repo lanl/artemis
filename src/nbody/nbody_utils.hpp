@@ -203,6 +203,37 @@ static void enable_stderr(int stderr_save_fd) {
   }
 }
 
+inline void write_bytes_to_file(std::string filename, std::vector<BYTE> &bytes) {
+  std::ofstream outfile(filename.c_str(), std::ios::binary);
+  if (outfile.is_open()) {
+    outfile.write(reinterpret_cast<char *>(bytes.data()), bytes.size());
+    outfile.close();
+    return;
+  }
+  PARTHENON_FAIL("Unable to open binary file to write");
+}
+
+inline std::vector<BYTE> read_bytes_from_file(std::string filename) {
+  std::ifstream file(NBody::rebound_filename, std::ios::binary | std::ios::ate);
+  if (file.is_open()) {
+    auto size = file.tellg();
+    if (size == 0) {
+      PARTHENON_FAIL("Tried reading binary file, but it has zero size");
+    }
+    file.seekg(0, std::ios::beg);
+    std::vector<BYTE> buff(size);
+    if (!file.read(reinterpret_cast<char *>(buff.data()), size)) {
+      PARTHENON_FAIL("Error reading binary file");
+    }
+    file.close();
+    return buff;
+  }
+  PARTHENON_FAIL("Error opening temporary rebound output file!");
+  // unused since we've crashed out
+  std::vector<BYTE> buff;
+  return buff;
+}
+
 } // namespace NBody
 
 #endif

@@ -177,7 +177,7 @@ def analyze():
     dx = xc[1] - xc[0]
     l1_tgas = dx * np.sum(np.abs(tgas - tgas_exact)) / _temperature / _length
     l1_trad = dx * np.sum(np.abs(trad - trad_exact)) / _temperature / _length
-    print(l1_tgas, l1_trad)
+    print("l1_tgas: ", l1_tgas, "l1_trad: ", l1_trad)
     if l1_tgas > _thr_gas:
         logger.warning(
             "Error in gas temperature solution is greater than threshold: "

@@ -134,7 +134,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   ParArray2D<Real> particle_force_tot("particle_force_tot", npart, 7);
   params.Add("particle_force", particle_force);
   params.Add("particle_force_step", particle_force_step);
-  params.Add("particle_force_tot", particle_force_tot);
+  params.Add("particle_force_tot", particle_force_tot, Params::Mutability::Restart);
 
   // Create vector for Rebound restart
   std::vector<BYTE> reb_sim_restart;

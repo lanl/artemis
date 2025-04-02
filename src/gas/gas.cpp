@@ -1,5 +1,5 @@
 //========================================================================================
-// (C) (or copyright) 2023-2024. Triad National Security, LLC. All rights reserved.
+// (C) (or copyright) 2023-2025. Triad National Security, LLC. All rights reserved.
 //
 // This program was produced under U.S. Government contract 89233218CNA000001 for Los
 // Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -129,46 +129,69 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
     params.Add("adiabatic_index", gamma);
   }
 
-  // Absorption opacity model
-  // TODO(@pdmullen): This may not be the right place for this... how about dust opacity?
-  ArtemisUtils::Opacity opacity;
-  std::string opacity_model_name =
-      pin->GetOrAddString("gas/opacity/absorption", "opacity_model", "constant");
-  const Real length = units.GetLengthCodeToPhysical();
+  // Opacity models
   const Real time = units.GetTimeCodeToPhysical();
   const Real mass = units.GetMassCodeToPhysical();
+  const Real length = units.GetLengthCodeToPhysical();
   const Real temp = units.GetTemperatureCodeToPhysical();
+
+  // Absorption opacity model
+  ArtemisUtils::Opacity model;
+  std::string opacity_model_name =
+      pin->GetOrAddString("gas/opacity/absorption", "opacity_model", "constant");
   if (opacity_model_name == "none") {
-    opacity = NonCGSUnits<Gray>(Gray(0.0), time, mass, length, temp);
+    model = Gray(0.0);
   } else if (opacity_model_name == "constant") {
     const Real kappa_a = pin->GetOrAddReal("gas/opacity/absorption", "kappa_a", 0.0);
-    opacity = NonCGSUnits<Gray>(Gray(kappa_a), time, mass, length, temp);
+    model = Gray(kappa_a);
   } else if (opacity_model_name == "powerlaw") {
     const Real coef_kappa_a =
         pin->GetOrAddReal("gas/opacity/absorption", "coef_kappa_a", 0.0);
     const Real rho_exp = pin->GetOrAddReal("gas/opacity/absorption", "rho_exp", 0.0);
     const Real temp_exp = pin->GetOrAddReal("gas/opacity/absorption", "temp_exp", 0.0);
-    opacity = NonCGSUnits<PowerLaw>(PowerLaw(coef_kappa_a, rho_exp, temp_exp), time, mass,
-                                    length, temp);
+    model = PowerLaw(coef_kappa_a, rho_exp, temp_exp);
   } else {
     PARTHENON_FAIL("Opacity model not recognized!");
   }
+  // Instantiate mean absorption opacity object (i.e., table)
+  const Real lRhoMin_a = pin->GetOrAddReal("gas/opacity/absorption", "lRhoMin", -1.0);
+  const Real lRhoMax_a = pin->GetOrAddReal("gas/opacity/absorption", "lRhoMax", 1.0);
+  const int NRho_a = pin->GetOrAddInteger("gas/opacity/absorption", "NRho", 2);
+  const Real lTMin_a = pin->GetOrAddReal("gas/opacity/absorption", "lTMin", -1.0);
+  const Real lTMax_a = pin->GetOrAddReal("gas/opacity/absorption", "lTMax", 1.0);
+  const int NT_a = pin->GetOrAddInteger("gas/opacity/absorption", "NT", 2);
+  ArtemisUtils::MeanOpacity opacity =
+      singularity::photons::MeanNonCGSUnits<singularity::photons::MeanOpacityBase>(
+          singularity::photons::MeanOpacityBase(model, lRhoMin_a, lRhoMax_a, NRho_a,
+                                                lTMin_a, lTMax_a, NT_a),
+          time, mass, length, temp);
   params.Add("opacity_h", opacity);
   params.Add("opacity_d", opacity.GetOnDevice());
 
   // Scattering opacity model
-  // TODO(@pdmullen): This may not be the right place for this... how about dust opacity?
-  ArtemisUtils::Scattering scattering;
+  ArtemisUtils::Scattering smodel;
   std::string scattering_model_name =
       pin->GetOrAddString("gas/opacity/scattering", "scattering_model", "none");
   if (scattering_model_name == "none") {
-    scattering = NonCGSUnitsS<GrayS>(GrayS(0.0, 1.0), time, mass, length, temp);
+    smodel = GrayS(0.0, 1.0);
   } else if (scattering_model_name == "constant") {
     const Real kappa_s = pin->GetOrAddReal("gas/opacity/scattering", "kappa_s", 0.0);
-    scattering = NonCGSUnitsS<GrayS>(GrayS(kappa_s, 1.0), time, mass, length, temp);
+    smodel = GrayS(kappa_s, 1.0);
   } else {
     PARTHENON_FAIL("Scattering model not recognized!");
   }
+  // Instantiate mean scattering opacity object (i.e., table)
+  const Real lRhoMin_s = pin->GetOrAddReal("gas/opacity/scattering", "lRhoMin", -1.0);
+  const Real lRhoMax_s = pin->GetOrAddReal("gas/opacity/scattering", "lRhoMax", 1.0);
+  const int NRho_s = pin->GetOrAddInteger("gas/opacity/scattering", "NRho", 2);
+  const Real lTMin_s = pin->GetOrAddReal("gas/opacity/scattering", "lTMin", -1.0);
+  const Real lTMax_s = pin->GetOrAddReal("gas/opacity/scattering", "lTMax", 1.0);
+  const int NT_s = pin->GetOrAddInteger("gas/opacity/scattering", "NT", 2);
+  ArtemisUtils::MeanScattering scattering =
+      singularity::photons::MeanNonCGSUnitsS<singularity::photons::MeanSOpacityCGS>(
+          singularity::photons::MeanSOpacityCGS(smodel, lRhoMin_s, lRhoMax_s, NRho_s,
+                                                lTMin_s, lTMax_s, NT_s),
+          time, mass, length, temp);
   params.Add("scattering_h", scattering);
   params.Add("scattering_d", scattering.GetOnDevice());
 

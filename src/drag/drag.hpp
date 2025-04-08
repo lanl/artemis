@@ -112,7 +112,7 @@ struct SelfDragParams {
 
 struct StoppingTimeParams {
 
-  Real scale, dh, mass_scale, p1, p2, p3, rho_plaw;
+  Real scale, dh, mass_scale, p1, p2, p3, rho_plaw, x_plaw;
   DragModel model;
   ParArray1D<Real> tau;
   StoppingTimeParams(std::string block_name, ParameterInput *pin,
@@ -160,6 +160,7 @@ struct StoppingTimeParams {
       model = DragModel::constant;
       scale = pin->GetOrAddReal(block_name, "scale", 1.0);
       rho_plaw = pin->GetOrAddReal(block_name, "density_plaw", 0.0);
+      x_plaw = pin->GetOrAddReal(block_name, "r_plaw", 0.0);
       std::vector<Real> taus = pin->GetVector<Real>(block_name, "tau");
       auto h_tau = tau.GetHostMirror();
       for (int n = 0; n < nd; n++) {
@@ -176,9 +177,9 @@ template <DragModel DTYP>
 class DragCoeff {
  public:
   KOKKOS_INLINE_FUNCTION Real Get(const StoppingTimeParams &dp, const int id,
-                                  const Real dg, const Real Tg, const Real u,
-                                  const Real grain_density, const Real size,
-                                  const EOS &eos) const {
+                                  const std::array<Real, 3> xc, const Real dg,
+                                  const Real Tg, const Real u, const Real grain_density,
+                                  const Real size, const EOS &eos) const {
     PARTHENON_FAIL("No default implementation for drag coefficient");
   }
 };
@@ -188,9 +189,9 @@ template <>
 class DragCoeff<DragModel::null> {
  public:
   KOKKOS_INLINE_FUNCTION Real Get(const StoppingTimeParams &dp, const int id,
-                                  const Real dg, const Real Tg, const Real u,
-                                  const Real grain_density, const Real size,
-                                  const EOS &eos) const {
+                                  const std::array<Real, 3> xc, const Real dg,
+                                  const Real Tg, const Real u, const Real grain_density,
+                                  const Real size, const EOS &eos) const {
     return Big<Real>();
   }
 };
@@ -199,9 +200,9 @@ template <>
 class DragCoeff<DragModel::constant> {
  public:
   KOKKOS_INLINE_FUNCTION Real Get(const StoppingTimeParams &dp, const int id,
-                                  const Real dg, const Real Tg, const Real u,
-                                  const Real grain_density, const Real size,
-                                  const EOS &eos) const {
+                                  const std::array<Real, 3> xc, const Real dg,
+                                  const Real Tg, const Real u, const Real grain_density,
+                                  const Real size, const EOS &eos) const {
     return dp.tau(id);
   }
 };
@@ -210,10 +211,10 @@ template <>
 class DragCoeff<DragModel::powerlaw> {
  public:
   KOKKOS_INLINE_FUNCTION Real Get(const StoppingTimeParams &dp, const int id,
-                                  const Real dg, const Real Tg, const Real u,
-                                  const Real grain_density, const Real size,
-                                  const EOS &eos) const {
-    return dp.tau(id) * std::pow(dg, dp.rho_plaw);
+                                  const std::array<Real, 3> xc, const Real dg,
+                                  const Real Tg, const Real u, const Real grain_density,
+                                  const Real size, const EOS &eos) const {
+    return dp.tau(id) * std::pow(dg, dp.rho_plaw) * std::pow(std::abs(xc[0]), dp.x_plaw);
   }
 };
 
@@ -221,9 +222,9 @@ template <>
 class DragCoeff<DragModel::stokes> {
  public:
   KOKKOS_INLINE_FUNCTION Real Get(const StoppingTimeParams &dp, const int id,
-                                  const Real dg, const Real Tg, const Real u,
-                                  const Real grain_density, const Real size,
-                                  const EOS &eos) const {
+                                  const std::array<Real, 3> xc, const Real dg,
+                                  const Real Tg, const Real u, const Real grain_density,
+                                  const Real size, const EOS &eos) const {
     const Real cv = eos.SpecificHeatFromDensityTemperature(dg, Tg);
     const Real gm1 = eos.GruneisenParamFromDensityTemperature(dg, Tg);
     //  kb T/ mu = cv * gm1 * T
@@ -236,9 +237,9 @@ template <>
 class DragCoeff<DragModel::dp15> {
  public:
   KOKKOS_INLINE_FUNCTION Real Get(const StoppingTimeParams &dp, const int id,
-                                  const Real dg, const Real Tg, const Real u,
-                                  const Real grain_density, const Real size,
-                                  const EOS &eos) const {
+                                  const std::array<Real, 3> xc, const Real dg,
+                                  const Real Tg, const Real u, const Real grain_density,
+                                  const Real size, const EOS &eos) const {
     const Real cv = eos.SpecificHeatFromDensityTemperature(dg, Tg);
     const Real gm1 = eos.GruneisenParamFromDensityTemperature(dg, Tg);
     const Real mu = dp.mass_scale * eos.MeanAtomicMass();
@@ -551,7 +552,8 @@ TaskStatus SimpleDragSourceImpl(MeshData<Real> *md, const Real time, const Real 
               std::sqrt(SQR(vd[0] - vg[0]) + SQR(vd[1] - vg[1]) + SQR(vd[2] - vg[2]));
 
           // Get the stopping time
-          Real tc = drag_coeff.Get(tp, id, dg, Tg, u, grain_density, sizes(id), eos_d);
+          Real tc =
+              drag_coeff.Get(tp, id, xv, dg, Tg, u, grain_density, sizes(id), eos_d);
 
           const Real alpha = dt * ((tc <= 0.0) ? Big<Real>() : 1.0 / tc);
           for (int d = 0; d < 3; d++) {
@@ -585,7 +587,8 @@ TaskStatus SimpleDragSourceImpl(MeshData<Real> *md, const Real time, const Real 
               std::sqrt(SQR(vd[0] - vg[0]) + SQR(vd[1] - vg[1]) + SQR(vd[2] - vg[2]));
 
           // Get the stopping time
-          Real tc = drag_coeff.Get(tp, id, dg, Tg, u, grain_density, sizes(id), eos_d);
+          Real tc =
+              drag_coeff.Get(tp, id, xv, dg, Tg, u, grain_density, sizes(id), eos_d);
 
           const Real alpha = dt * ((tc <= 0.0) ? Big<Real>() : 1.0 / tc);
           for (int d = 0; d < 3; d++) {

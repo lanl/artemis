@@ -106,6 +106,10 @@ set (SRC_LIST
   utils/refinement/restriction.hpp
 )
 
+if (ARTEMIS_PORTABLE_RESTART)
+  add_compile_definitions(PORTABLE_RESTART)
+endif()
+
 # Generate library
 add_library(artemislib ${SRC_LIST})
 

@@ -137,7 +137,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   params.Add("particle_force_tot", particle_force_tot, Params::Mutability::Restart);
 
   // Create vector for Rebound restart
-  std::vector<char> reb_sim_restart;
+  std::vector<BYTE> reb_sim_restart;
   params.Add("reb_sim_buffer", reb_sim_restart, Params::Mutability::Restart);
 
   // Output parameters
@@ -341,15 +341,12 @@ void UserWorkBeforeRestartOutputMesh(Mesh *pmesh, ParameterInput *, SimTime &,
 #endif
 
   // Read Rebound restart back into string
-  std::ifstream file(NBody::rebound_filename, std::ios::binary);
-  PARTHENON_REQUIRE(file.is_open(), "Error opening temporary rebound output file!");
-  std::vector<char> reb_sim_buffer((std::istreambuf_iterator<char>(file)),
-                                   std::istreambuf_iterator<char>());
-  file.close();
+
+  auto reb_sim_buffer = read_bytes_from_file(NBody::rebound_filename);
 
   // Store current rebound output as restartable parameter.  Every rank must store a
   // matching buffer parameter or else I/O will hang
-  nbody_pkg->UpdateParam<std::vector<char>>("reb_sim_buffer", reb_sim_buffer);
+  nbody_pkg->UpdateParam<std::vector<BYTE>>("reb_sim_buffer", reb_sim_buffer);
 }
 
 //----------------------------------------------------------------------------------------
@@ -368,10 +365,9 @@ void InitializeFromRestart(Mesh *pm) {
   // Initialize rebound state on rank 0
   if (Globals::my_rank == 0) {
     // Create rebound save file from stored buffer
-    auto reb_sim_buffer = nbody_pkg->Param<std::vector<char>>("reb_sim_buffer");
-    std::ofstream outfile(NBody::rebound_filename.c_str(), std::ios::binary);
-    outfile.write(reb_sim_buffer.data(), reb_sim_buffer.size());
-    outfile.close();
+    auto reb_sim_buffer = nbody_pkg->Param<std::vector<BYTE>>("reb_sim_buffer");
+
+    write_bytes_to_file(NBody::rebound_filename, reb_sim_buffer);
 
     // Create rebound simulation from new save file
     RebSim new_reb_sim(NBody::rebound_filename);

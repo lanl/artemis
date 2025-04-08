@@ -69,21 +69,10 @@ TaskStatus ZeroFluxImpl(MeshData<Real> *md, SparsePackFlux vf) {
           vf.flux(b, X1DIR, n, k, j, i) = 0.0;
           vf.flux(b, X1DIR, n, k, j, i) = 0.0;
           vf.flux(b, X3DIR, n, k, j, i) = 0.0;
-        }
-        if (i == ib.e) {
-          for (int n = vf.GetLowerBound(b); n <= vf.GetUpperBound(b); ++n) {
-            vf.flux(b, X1DIR, n, k, j, ib.e + 1) = 0.0;
-          }
-        }
-        if ((j == jb.e) && (multi_d)) {
-          for (int n = vf.GetLowerBound(b); n <= vf.GetUpperBound(b); ++n) {
-            vf.flux(b, X2DIR, n, k, jb.e + 1, i) = 0.0;
-          }
-        }
-        if ((k == kb.e) && (three_d)) {
-          for (int n = vf.GetLowerBound(b); n <= vf.GetUpperBound(b); ++n) {
-            vf.flux(b, X3DIR, n, kb.e + 1, j, i) = 0.0;
-          }
+
+          vf.flux(b, X1DIR, n, k, j, i + (i == ib.e)) = 0.0;
+          vf.flux(b, X2DIR, n, k, j + ((j == jb.e) && (multi_d)), i) = 0.0;
+          vf.flux(b, X3DIR, n, k + ((k == kb.e) && (three_d)), j, i) = 0.0;
         }
       });
 

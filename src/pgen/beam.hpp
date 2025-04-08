@@ -144,9 +144,10 @@ inline void BeamInnerX2(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) 
         const Real xf = coords.bnds.x1[0];
 
         if (do_gas) {
-          for (int d = 0; d < 3; d++)
+          for (int d = 0; d < 3; d++) {
             v(0, gas::prim::velocity(d), k, j, i) =
                 v(0, gas::prim::velocity(d), k, js, i);
+          }
           v(0, gas::prim::density(0), k, j, i) = v(0, gas::prim::density(0), k, js, i);
           v(0, gas::prim::sie(0), k, j, i) = v(0, gas::prim::sie(0), k, js, i);
         }
@@ -202,9 +203,10 @@ inline void BeamInnerX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) 
         const Real yf = coords.bnds.x2[0];
 
         if (do_gas) {
-          for (int d = 0; d < 3; d++)
+          for (int d = 0; d < 3; d++) {
             v(0, gas::prim::velocity(d), k, j, i) =
                 v(0, gas::prim::velocity(d), k, j, is);
+          }
           v(0, gas::prim::density(0), k, j, i) = v(0, gas::prim::density(0), k, j, is);
           v(0, gas::prim::sie(0), k, j, i) = v(0, gas::prim::sie(0), k, j, is);
         }

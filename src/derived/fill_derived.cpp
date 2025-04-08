@@ -174,18 +174,18 @@ void ConsToPrim(MeshData<Real> *md) {
         if (do_rad) {
           for (int n = 0; n < vmesh.GetSize(b, rad::prim::energy()); ++n) {
             // Set primitive density
-            const Real u_d = vmesh(b, rad::cons::energy(n), k, j, i);
-            Real &w_d = vmesh(b, rad::prim::energy(n), k, j, i);
-            w_d = (u_d > eflr_rad) ? u_d : eflr_rad;
+            const Real u_er = vmesh(b, rad::cons::energy(n), k, j, i);
+            Real &w_er = vmesh(b, rad::prim::energy(n), k, j, i);
+            w_er = (u_er > eflr_rad) ? u_er : eflr_rad;
 
             // set primitive velocity
-            const Real hfx1 = vmesh(b, rad::cons::flux(VI(n, 0)), k, j, i) / (c * w_d);
-            const Real hfx2 = vmesh(b, rad::cons::flux(VI(n, 1)), k, j, i) / (c * w_d);
-            const Real hfx3 = vmesh(b, rad::cons::flux(VI(n, 2)), k, j, i) / (c * w_d);
+            const Real hfx1 = vmesh(b, rad::cons::flux(VI(n, 0)), k, j, i) / (c * w_er);
+            const Real hfx2 = vmesh(b, rad::cons::flux(VI(n, 1)), k, j, i) / (c * w_er);
+            const Real hfx3 = vmesh(b, rad::cons::flux(VI(n, 2)), k, j, i) / (c * w_er);
             const auto &fx =
                 Radiation::NormalizeFlux(hfx1 / hx[0], hfx2 / hx[1], hfx3 / hx[2]);
             for (int d = 0; d < 3; d++) {
-              vmesh(b, rad::cons::flux(VI(n, d)), k, j, i) = (fx[d] * c * w_d) * hx[d];
+              vmesh(b, rad::cons::flux(VI(n, d)), k, j, i) = (fx[d] * c * w_er) * hx[d];
               vmesh(b, rad::prim::flux(VI(n, d)), k, j, i) = fx[d];
             }
           }
@@ -313,17 +313,17 @@ void PrimToCons(T *md) {
         if (do_rad) {
           for (int n = 0; n < vmesh.GetSize(b, rad::prim::energy()); ++n) {
             // Sync conserved and primitive density
-            Real &w_d = vmesh(b, rad::prim::energy(n), k, j, i);
-            Real &u_d = vmesh(b, rad::cons::energy(n), k, j, i);
-            w_d = (w_d > eflr_rad) ? w_d : eflr_rad;
-            u_d = w_d;
-            vmesh(b, rad::prim::pressure(n), k, j, i) = w_d / 3.0;
+            Real &w_er = vmesh(b, rad::prim::energy(n), k, j, i);
+            Real &u_er = vmesh(b, rad::cons::energy(n), k, j, i);
+            w_er = (w_er > eflr_rad) ? w_er : eflr_rad;
+            u_er = w_er;
+            vmesh(b, rad::prim::pressure(n), k, j, i) = w_er / 3.0;
 
             // Sync conserved momenta and primitive velocity
             const Real fx1 = vmesh(b, rad::prim::flux(VI(n, 0)), k, j, i);
             const Real fx2 = vmesh(b, rad::prim::flux(VI(n, 1)), k, j, i);
             const Real fx3 = vmesh(b, rad::prim::flux(VI(n, 2)), k, j, i);
-            const Real conv[3] = {c * w_d * hx[0], c * w_d * hx[1], c * w_d * hx[2]};
+            const Real conv[3] = {c * w_er * hx[0], c * w_er * hx[1], c * w_er * hx[2]};
             const auto &fx = Radiation::NormalizeFlux(fx1, fx2, fx3);
             for (int d = 0; d < 3; d++) {
               vmesh(b, rad::cons::flux(VI(n, d)), k, j, i) = fx[d] * conv[d];

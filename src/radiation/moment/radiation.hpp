@@ -21,9 +21,6 @@ namespace Radiation {
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
                                             ArtemisUtils::Constants &Constants);
 
-template <Coordinates GEOM>
-Real EstimateTimestepMesh(MeshData<Real> *md);
-
 TaskStatus CalculateFluxes(MeshData<Real> *md);
 TaskStatus FluxSource(MeshData<Real> *md, const Real dt);
 
@@ -93,8 +90,6 @@ std::array<Real, 3> NormalizeFlux(const Real fx1, const Real fx2, const Real fx3
 
 template <Coordinates GEOM>
 Real EstimateTimeStep(parthenon::Mesh *pmesh) {
-  // TODO:
-  // This is missing the scale factors
   auto &radiation_pkg = pmesh->packages.Get("radiation");
   auto &params = radiation_pkg->AllParams();
   Real dxmin = Big<Real>();

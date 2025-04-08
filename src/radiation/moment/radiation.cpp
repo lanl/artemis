@@ -269,46 +269,6 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
 }
 
 //----------------------------------------------------------------------------------------
-//! \fn  Real Radiation::EstimateTimestepMesh
-//! \brief Compute radiation timestep
-template <Coordinates GEOM>
-Real EstimateTimestepMesh(MeshData<Real> *md) {
-  using parthenon::MakePackDescriptor;
-  auto pm = md->GetParentPointer();
-  auto &resolved_pkgs = pm->resolved_packages;
-
-  auto &radiation_pkg = pm->packages.Get("radiation");
-  auto &params = radiation_pkg->AllParams();
-  const auto chat = params.template Get<Real>("chat");
-
-  static auto desc = MakePackDescriptor<rad::prim::energy>(resolved_pkgs.get());
-  auto vmesh = desc.GetPack(md);
-  IndexRange ib = md->GetBoundsI(IndexDomain::interior);
-  IndexRange jb = md->GetBoundsJ(IndexDomain::interior);
-  IndexRange kb = md->GetBoundsK(IndexDomain::interior);
-  const int ndim = pm->ndim;
-
-  Real min_dt = Big<Real>();
-  parthenon::par_reduce(
-      parthenon::loop_pattern_mdrange_tag, "Radiation::EstimateTimestepMesh",
-      DevExecSpace(), 0, md->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
-      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, Real &ldt) {
-        // Extract coordinates
-        geometry::Coords<GEOM> coords(vmesh.GetCoordinates(b), k, j, i);
-        const auto &dx = coords.GetCellWidths();
-        Real denom = 0.0;
-        for (int d = 0; d < ndim; d++) {
-          denom += chat / dx[d];
-        }
-        ldt = std::min(ldt, 1.0 / denom);
-      },
-      Kokkos::Min<Real>(min_dt));
-
-  const auto cfl_number = params.template Get<Real>("cfl");
-  return cfl_number * min_dt;
-}
-
-//----------------------------------------------------------------------------------------
 //! \fn  TaskStatus Radiation::CalculateFluxes
 //! \brief Evaluates advective fluxes for radiation evolution
 TaskStatus CalculateFluxes(MeshData<Real> *md) {

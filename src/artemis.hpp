@@ -83,6 +83,12 @@ ARTEMIS_VARIABLE(rad.prim, flux);
 
 #undef ARTEMIS_VARIABLE
 
+#ifdef PORTABLE_RESTART
+using BYTE = uint8_t;
+#else
+using BYTE = char;
+#endif
+
 // TaskCollection function pointer for operator split tasks
 using TaskCollectionFnPtr = TaskCollection (*)(Mesh *pm, const Real time, const Real dt);
 

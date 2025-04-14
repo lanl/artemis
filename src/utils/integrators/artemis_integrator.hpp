@@ -67,7 +67,7 @@ TaskStatus ZeroFluxImpl(MeshData<Real> *md, SparsePackFlux vf) {
       KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
         for (int n = vf.GetLowerBound(b); n <= vf.GetUpperBound(b); ++n) {
           vf.flux(b, X1DIR, n, k, j, i) = 0.0;
-          vf.flux(b, X1DIR, n, k, j, i) = 0.0;
+          vf.flux(b, X2DIR, n, k, j, i) = 0.0;
           vf.flux(b, X3DIR, n, k, j, i) = 0.0;
 
           vf.flux(b, X1DIR, n, k, j, i + (i == ib.e)) = 0.0;

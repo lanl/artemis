@@ -51,7 +51,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   lw_params.rho1 = pin->GetOrAddReal("problem", "rho1", 1.0);
   lw_params.pres1 = pin->GetOrAddReal("problem", "pres1", 1.0);
 
-  const auto gm1 = gas_pkg->Param<Real>("adiabatic_index");
+  const auto gm1 = gas_pkg->Param<Real>("adiabatic_index") - 1.0;
 
   lw_params.sie0 = lw_params.pres0 / (lw_params.rho0 * gm1);
   lw_params.sie1 = lw_params.pres1 / (lw_params.rho1 * gm1);

@@ -53,8 +53,8 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   const auto gm1 = gas_pkg->Param<Real>("adiabatic_index");
 
-  lw_params.sie0 = lw_params.pres0/(lw_params.rho0 * gm1);
-  lw_params.sie1 = lw_params.pres1/(lw_params.rho1 * gm1);
+  lw_params.sie0 = lw_params.pres0 / (lw_params.rho0 * gm1);
+  lw_params.sie1 = lw_params.pres1 / (lw_params.rho1 * gm1);
 
   // packing and capture variables for kernel
   auto &md = pmb->meshblock_data.Get();
@@ -75,27 +75,27 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   const int ndim = ProblemDimension(pin);
 
-
   // setup uniform ambient medium
   pmb->par_for(
       "lw", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        const auto bbox = geometry::BBox(pco,k,j,i);
-        const std::array<Real,4> px{ bbox.x1[0],bbox.x1[1], bbox.x1[1],bbox.x1[0]};
-        const std::array<Real,4> py{ bbox.x2[0],bbox.x2[0], bbox.x2[1],bbox.x2[1]};
-        const Real isqrt2 = std::sqrt(1./2.);
-        const Real vf1 = ArtemisUtils::CutCell2D(px, py, {0.5*pars.y0, 0.5*pars.y0}, {isqrt2, isqrt2});
+        const auto bbox = geometry::BBox(pco, k, j, i);
+        const std::array<Real, 4> px{bbox.x1[0], bbox.x1[1], bbox.x1[1], bbox.x1[0]};
+        const std::array<Real, 4> py{bbox.x2[0], bbox.x2[0], bbox.x2[1], bbox.x2[1]};
+        const Real isqrt2 = std::sqrt(1. / 2.);
+        const Real vf1 = ArtemisUtils::CutCell2D(px, py, {0.5 * pars.y0, 0.5 * pars.y0},
+                                                 {isqrt2, isqrt2});
         const Real vf2 = 1.0 - vf1;
-        
+
         const Real dens = vf1 * pars.rho1 + vf2 * pars.rho0;
         const Real pres = vf1 * pars.pres1 + vf2 * pars.pres0;
-        
-        v(0,gas::prim::density(0),k,j,i) = dens;
-        v(0,gas::prim::sie(0),k,j,i) = pres/(dens * gm1); 
-        v(0,gas::prim::velocity(0),k,j,i) = 0.0;
-        v(0,gas::prim::velocity(1),k,j,i) = 0.0;
-        v(0,gas::prim::velocity(2),k,j,i) = 0.0;
-  });
+
+        v(0, gas::prim::density(0), k, j, i) = dens;
+        v(0, gas::prim::sie(0), k, j, i) = pres / (dens * gm1);
+        v(0, gas::prim::velocity(0), k, j, i) = 0.0;
+        v(0, gas::prim::velocity(1), k, j, i) = 0.0;
+        v(0, gas::prim::velocity(2), k, j, i) = 0.0;
+      });
 }
 
 } // namespace lw

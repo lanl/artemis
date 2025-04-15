@@ -80,11 +80,18 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   pmb->par_for(
       "lw", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        geometry::Coords<GEOM> coords(pco, k, j, i);
-        const auto &xv = coords.GetCellCenter();
-        const bool upper = (xv[1] > (pars.y0 - xv[0]));
-        v(0,gas::prim::density(0),k,j,i) = (upper) ? pars.rho1 : pars.rho0;
-        v(0,gas::prim::sie(0),k,j,i) = (upper) ? pars.sie1 : pars.sie0;
+        const auto bbox = geometry::BBox(pco,k,j,i);
+        const std::array<Real,4> px{ bbox.x1[0],bbox.x1[1], bbox.x1[1],bbox.x1[0]};
+        const std::array<Real,4> py{ bbox.x2[0],bbox.x2[0], bbox.x2[1],bbox.x2[1]};
+        const Real isqrt2 = std::sqrt(1./2.);
+        const Real vf1 = ArtemisUtils::CutCell2D(px, py, {0.5*pars.y0, 0.5*pars.y0}, {isqrt2, isqrt2});
+        const Real vf2 = 1.0 - vf1;
+        
+        const Real dens = vf1 * pars.rho1 + vf2 * pars.rho0;
+        const Real pres = vf1 * pars.pres1 + vf2 * pars.pres0;
+        
+        v(0,gas::prim::density(0),k,j,i) = dens;
+        v(0,gas::prim::sie(0),k,j,i) = pres/(dens * gm1); 
         v(0,gas::prim::velocity(0),k,j,i) = 0.0;
         v(0,gas::prim::velocity(1),k,j,i) = 0.0;
         v(0,gas::prim::velocity(2),k,j,i) = 0.0;

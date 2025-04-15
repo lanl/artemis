@@ -25,6 +25,7 @@
 #include "disk.hpp"
 #include "gaussian_bump.hpp"
 #include "linear_wave.hpp"
+#include "lw.hpp"
 #include "shock.hpp"
 #include "strat.hpp"
 #include "thermalization.hpp"
@@ -52,6 +53,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
     gaussian_bump::ProblemGenerator<T>(pmb, pin);
   } else if (name == "linear_wave") {
     linear_wave::ProblemGenerator<T>(pmb, pin);
+  } else if (name == "lw") {
+    lw::ProblemGenerator<T>(pmb, pin);
   } else if (name == "shock") {
     shock::ProblemGenerator<T>(pmb, pin);
   } else if (name == "strat") {

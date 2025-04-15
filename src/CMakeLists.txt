@@ -66,6 +66,7 @@ set (SRC_LIST
   pgen/disk.hpp
   pgen/gaussian_bump.hpp
   pgen/linear_wave.hpp
+  pgen/lw.hpp
   pgen/pgen.hpp
   pgen/problem_modifier.hpp
   pgen/shock.hpp

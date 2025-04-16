@@ -106,7 +106,6 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         // P = P0 + \int rho g dz
         //   = P0 + g*(z - zmin)*rho0                 z < zc
         //   = P0 + g*(zc-zmin) rho0 + g*(z-zc)*rho1  z>=zc
-        // <P> = P0 + g*d \int (z-z0) dV
         const Real p0 = pars.pres0 + (upper)*gx * (pars.y0 - zmin) * pars.rho0;
         const Real pres = p0 + gx * (zc - z0) * dens;
 

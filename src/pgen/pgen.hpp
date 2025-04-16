@@ -24,6 +24,7 @@
 #include "constant.hpp"
 #include "disk.hpp"
 #include "gaussian_bump.hpp"
+#include "kh.hpp"
 #include "linear_wave.hpp"
 #include "lw.hpp"
 #include "rt.hpp"
@@ -56,6 +57,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
     linear_wave::ProblemGenerator<T>(pmb, pin);
   } else if (name == "lw") {
     lw::ProblemGenerator<T>(pmb, pin);
+  } else if (name == "kh") {
+    kh::ProblemGenerator<T>(pmb, pin);
   } else if (name == "rt") {
     rt::ProblemGenerator<T>(pmb, pin);
   } else if (name == "shock") {

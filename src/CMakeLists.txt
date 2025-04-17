@@ -107,6 +107,10 @@ set (SRC_LIST
   utils/refinement/restriction.hpp
 )
 
+if (ARTEMIS_PORTABLE_RESTART)
+  add_compile_definitions(PORTABLE_RESTART)
+endif()
+
 # Generate library
 add_library(artemislib ${SRC_LIST})
 
@@ -145,8 +149,15 @@ if (CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
    message(STATUS "Standalone mode. Adding artemis executable")
    add_executable(artemis main.cpp)
    target_link_libraries(artemis PRIVATE artemislib)
-   add_custom_command(TARGET artemis POST_BUILD
-                      COMMAND ${CMAKE_COMMAND} -E copy
-                              ${CMAKE_BINARY_DIR}/rebound/librebound.so
-                              $<TARGET_FILE_DIR:artemis>)
+
+   # Bake in rpath to rebound on mac
+   if(${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
+    set_target_properties(artemis PROPERTIES
+      BUILD_RPATH "${CMAKE_BINARY_DIR}/rebound"
+    )
+    add_custom_command(TARGET artemis POST_BUILD
+      COMMAND install_name_tool -add_rpath @executable_path/../rebound $<TARGET_FILE:artemis>
+      COMMAND install_name_tool -change librebound.so @rpath/librebound.so $<TARGET_FILE:artemis>
+    )
+   endif()
 endif()

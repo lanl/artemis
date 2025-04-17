@@ -37,11 +37,11 @@ _file_id = "collisions"
 
 # Run Artemis
 def run(**kwargs):
-    input_path = "../../" + artemis.artemis_rel_path + "inputs/"
     logger.debug("Runnning test " + __name__)
     arguments = [
         "parthenon/job/problem_id={}_{:d}".format(_file_id, _nranks),
-        "nbody/planets/input_file=" + input_path + "planet_inputs/n20_sys.txt",
+        "nbody/planets/input_file="
+        + os.path.join(artemis.get_inputs_dir(), "planet_inputs/n20_sys.txt"),
     ]
     artemis.run(
         _nranks,

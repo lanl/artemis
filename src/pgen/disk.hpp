@@ -39,6 +39,7 @@
 #include "nbody/nbody.hpp"
 #include "utils/artemis_utils.hpp"
 #include "utils/eos/eos.hpp"
+#include "utils/units.hpp"
 
 using ArtemisUtils::EOS;
 using ArtemisUtils::VI;
@@ -61,6 +62,7 @@ struct DiskParams {
   Real mdot;
   Real temp_soft2;
   bool const_nu;
+  Real kbmu;
   bool do_dust;
   bool nbody_temp;
   bool quiet_start;
@@ -87,7 +89,8 @@ Real TempProfile(struct DiskParams pgen, const Real R, const Real z) {
   const Real H = R * pgen.h0 * std::pow(R / pgen.r0, pgen.flare);
   const Real ir1 = 1.0 / std::sqrt(R * R + pgen.temp_soft2);
   const Real omk2 = SQR(pgen.Omega0) * ir1 * ir1 * ir1;
-  const Real T0 = omk2 * H * H / pgen.Gamma;
+  // c_iso^2 = P/rho = kb/mu T = Omk^2 H^2
+  const Real T0 = omk2 * H * H / (pgen.kbmu * pgen.Gamma);
   return T0 * std::pow(rho / rho0, pgen.Gamma - 1.0);
 }
 
@@ -203,13 +206,16 @@ inline void InitDiskParams(MeshBlock *pmb, ParameterInput *pin) {
 
     PARTHENON_REQUIRE(disk_params.Gamma >= 1, "problem/gamma needs to be >= 1");
 
-    disk_params.dens_min = pin->GetOrAddReal("problem", "dens_min", 1.0e-5);
-    disk_params.pres_min = pin->GetOrAddReal("problem", "pres_min", 1.0e-8);
+    disk_params.dens_min = pin->GetOrAddReal("problem", "dens_min", 1.0e-20);
+    disk_params.pres_min = pin->GetOrAddReal("problem", "pres_min", 1.0e-24);
     disk_params.rexp = pin->GetOrAddReal("problem", "rexp", 0.0);
     disk_params.rcav = pin->GetOrAddReal("problem", "rcav", 0.0);
     disk_params.l0 = pin->GetOrAddReal("problem", "l0", 0.0);
     disk_params.dust_to_gas = pin->GetOrAddReal("problem", "dust_to_gas", 0.01);
     disk_params.temp_soft2 = pin->GetOrAddReal("problem", "temp_soft", 0.0);
+    const auto mu = gas_pkg->Param<Real>("mu");
+    auto &constants = artemis_pkg->Param<ArtemisUtils::Constants>("constants");
+    disk_params.kbmu = constants.GetKBCode() / (mu * constants.GetAMUCode());
 
     disk_params.do_dust = params.Get<bool>("do_dust");
 
@@ -248,7 +254,7 @@ inline void InitDiskParams(MeshBlock *pmb, ParameterInput *pin) {
         disk_params.nu0 = disk_params.alpha * disk_params.gamma_gas *
                           SQR(disk_params.h0 * disk_params.r0 * disk_params.Omega0);
         disk_params.nu_indx = 1.5 + disk_params.q;
-      } else if (vtype == "powerlaw") {
+      } else if ((vtype == "powerlaw") || (vtype == "constant")) {
         disk_params.const_nu = true;
         disk_params.nu0 = pin->GetReal("gas/viscosity", "nu");
         disk_params.nu_indx = pin->GetOrAddReal("gas/viscosity", "r_exp", 0.0);
@@ -512,7 +518,7 @@ void DiskBoundaryVisc(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) {
             const Real dvp1p = ArtemisUtils::VDot(dvp1, epp1) + dp.omf * xcylp1[0];
             const Real dvm1p = ArtemisUtils::VDot(dvm1, epm1) + dp.omf * xcylm1[0];
             const Real ddvp = std::log(dvp1p / dvm1p);
-            const Real dvcyl[3] = {dvR, dvp * std::exp(dgvp * xmadx) - dp.omf * xcyl[0],
+            const Real dvcyl[3] = {dvR, dvp * std::exp(ddvp * xmadx) - dp.omf * xcyl[0],
                                    dvz};
             const Real dvel[3] = {ArtemisUtils::VDot(dvcyl, ex1),
                                   ArtemisUtils::VDot(dvcyl, ex2),
@@ -735,7 +741,7 @@ void DiskBoundaryExtrap(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) 
             const Real dvp1p = ArtemisUtils::VDot(dvp1, epp1) + dp.omf * xcylp1[0];
             const Real dvm1p = ArtemisUtils::VDot(dvm1, epm1) + dp.omf * xcylm1[0];
             const Real ddvp = std::log(dvp1p / dvm1p);
-            const Real dvcyl[3] = {dvR, dvp * std::exp(dgvp * xmadx) - dp.omf * xcyl[0],
+            const Real dvcyl[3] = {dvR, dvp * std::exp(ddvp * xmadx) - dp.omf * xcyl[0],
                                    dvz};
             const Real dvel[3] = {ArtemisUtils::VDot(dvcyl, ex1),
                                   ArtemisUtils::VDot(dvcyl, ex2),

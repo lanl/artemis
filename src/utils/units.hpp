@@ -1,5 +1,5 @@
 //========================================================================================
-// (C) (or copyright) 2024. Triad National Security, LLC. All rights reserved.
+// (C) (or copyright) 2024-2025. Triad National Security, LLC. All rights reserved.
 //
 // This program was produced under U.S. Government contract 89233218CNA000001 for Los
 // Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -29,7 +29,6 @@ class Units {
   Units(ParameterInput *pin, std::shared_ptr<StateDescriptor> pkg);
 
   // Copy constructor must be marked with KOKKOS_FUNCTION
-  KOKKOS_FUNCTION
   Units(const Units &other) = default;
 
   // Return physical unit system
@@ -51,6 +50,11 @@ class Units {
   Real GetMassCodeToPhysical() const { return mass_; }
   KOKKOS_INLINE_FUNCTION
   Real GetMassPhysicalToCode() const { return 1. / mass_; }
+
+  KOKKOS_INLINE_FUNCTION
+  Real GetTemperatureCodeToPhysical() const { return temp_; }
+  KOKKOS_INLINE_FUNCTION
+  Real GetTemperaturePhysicalToCode() const { return 1. / temp_; }
 
   KOKKOS_INLINE_FUNCTION
   Real GetSpeedCodeToPhysical() const { return length_ / time_; }
@@ -83,9 +87,9 @@ class Units {
   Real GetOpacityPhysicalToCode() const { return mass_ / (length_ * length_); }
 
   KOKKOS_INLINE_FUNCTION
-  Real GetSpecificHeatCodeToPhysical() const { return energy_ / mass_; }
+  Real GetSpecificHeatCodeToPhysical() const { return energy_ / (mass_ * temp_); }
   KOKKOS_INLINE_FUNCTION
-  Real GetSpecificHeatPhysicalToCode() const { return mass_ / energy_; }
+  Real GetSpecificHeatPhysicalToCode() const { return mass_ * temp_ / energy_; }
 
   inline std::string GetSystemName() const {
     return (physical_units_ == PhysicalUnits::scalefree) ? "Scale free" : "CGS";
@@ -98,6 +102,7 @@ class Units {
   Real length_;
   Real time_;
   Real mass_;
+  Real temp_;
 
   Real energy_;
   Real number_density_;
@@ -112,7 +117,6 @@ class Constants {
   KOKKOS_FUNCTION
   Constants(Units &units);
 
-  KOKKOS_FUNCTION
   Constants(const Constants &other) = default;
 
   KOKKOS_INLINE_FUNCTION

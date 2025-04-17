@@ -1,5 +1,5 @@
 //========================================================================================
-// (C) (or copyright) 2023-2024. Triad National Security, LLC. All rights reserved.
+// (C) (or copyright) 2023-2025. Triad National Security, LLC. All rights reserved.
 //
 // This program was produced under U.S. Government contract 89233218CNA000001 for Los
 // Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -101,14 +101,14 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   if (do_nbody) packages.Add(NBody::Initialize(pin.get(), constants));
   if (do_gravity) packages.Add(Gravity::Initialize(pin.get(), constants, packages));
   if (do_gas) packages.Add(Gas::Initialize(pin.get(), units, constants, packages));
-  if (do_dust) packages.Add(Dust::Initialize(pin.get()));
+  if (do_dust) packages.Add(Dust::Initialize(pin.get(), units));
   if (do_rotating_frame) packages.Add(RotatingFrame::Initialize(pin.get()));
   if (do_cooling) packages.Add(Gas::Cooling::Initialize(pin.get()));
   if (do_drag) packages.Add(Drag::Initialize(pin.get()));
   if (do_radiation) {
     auto eos_h = packages.Get("gas")->Param<EOS>("eos_h");
-    auto opacity_h = packages.Get("gas")->Param<Opacity>("opacity_h");
-    auto scattering_h = packages.Get("gas")->Param<Scattering>("scattering_h");
+    auto opacity_h = packages.Get("gas")->Param<MeanOpacity>("opacity_h");
+    auto scattering_h = packages.Get("gas")->Param<MeanScattering>("scattering_h");
     packages.Add(jaybenne::Initialize(pin.get(), opacity_h, scattering_h, eos_h));
     PARTHENON_REQUIRE(coords == Coordinates::cartesian,
                       "Jaybenne currently supports only Cartesian coordinates!");

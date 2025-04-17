@@ -39,7 +39,7 @@ artemis:
     _description: "How to provide unit conversions between code and physical units"
     base:
       _type: opt
-      _description: "Provide base unit conversions (length, time, mass)"
+      _description: "Provide base unit conversions (length, time, mass, temperature)"
     ppd:
       _type: opt
       _description: "AU, Year/(2 pi), solar mass units for protoplanetary disks"
@@ -55,6 +55,10 @@ artemis:
     _type: "Real"
     _default: "1.0"
     _description: "Physical units value of mass equal to 1 code unit"
+  temperature:
+    _type: "Real"
+    _default: "1.0"
+    _description: "Physical units value of temperature equal to 1 code unit"
 
 
 physics:

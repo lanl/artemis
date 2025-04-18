@@ -94,14 +94,12 @@ elif [[ $PARTITION == "frontier-gpu" ]]; then
     module load cray-hdf5-parallel
     module load cray-python/3.11.5
     module load rocm/6.3.1
-    #source /lustre/orion/ast222/proj-shared/dependencies/python/frontier-gpu/bin/activate
-    source /lustre/orion/ast222/proj-shared/artemis/dependencies/python/frontier-gpu/bin/activate
+    source /lustre/orion/ast222/proj-shared/jovian/dependencies/python/frontier-gpu/bin/activate
     module load cmake
     export NVCC_WRAPPER_DEFAULT_COMPILER=CC
     export ARTEMIS_SUITE=frontier-gpu
     export HDF5_USE_FILE_LOCKING='FALSE'
     echo "...setup SUCCEEDED"
-
 elif [[ $PARTITION == "darwin-fe" ]]; then
     module load clang/12.0.1
     module load miniconda3/py311_23.11.0

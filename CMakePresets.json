@@ -131,7 +131,17 @@
         "CMAKE_MAKE_PROGRAM": "$env{MAKE_PROGRAM}",
         "CMAKE_BUILD_TYPE": "Release",
         "NUM_GPU_DEVICES_PER_NODE": "4",
-        "CMAKE_INSTALL_PREFIX": "/lustre/orion/ast222/proj-shared/artemis/dependencies/"
+        "CMAKE_INSTALL_PREFIX": "/lustre/orion/ast222/proj-shared/jovian/dependencies/"
+      }
+    },
+    {
+      "name": "frontier-gpu-debug",
+      "cacheVariables": {
+        "CMAKE_MAKE_PROGRAM": "$env{MAKE_PROGRAM}",
+        "CMAKE_BUILD_TYPE": "Debug",
+        "NUM_GPU_DEVICES_PER_NODE": "4",
+        "CMAKE_INSTALL_PREFIX": "/lustre/orion/ast222/proj-shared/jovian/dependencies/",
+	"Kokkos_ENABLE_DEBUG_BOUNDS_CHECK": "ON"
       }
     }
   ]

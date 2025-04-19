@@ -190,6 +190,7 @@ inline void ExtrapInnerX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
   const auto &bounds = coarse ? pmb->c_cellbounds : pmb->cellbounds;
   const auto &range = bounds.GetBoundsI(IndexDomain::interior, TE::CC);
   const int is = range.s;
+  auto &pars = artemis_pkg->Param<StratParams>("strat_params");
 
   pmb->par_for_bndry(
       "StratInnerX1", nb, IndexDomain::inner_x1, parthenon::TopologicalElement::CC,
@@ -209,7 +210,7 @@ inline void ExtrapInnerX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
         const Real gv3 = v(0, gas::prim::velocity(2), k, j, is);
         const Real gv2p1 = v(0, gas::prim::velocity(1), k, j, is + 1);
         const Real vx1g = (gv1 > 0.0) ? 0.0 : gv1;
-        const Real vx2g = gv2 + (gv2p1 - gv2) * (x - x0) / dx;
+        const Real vx2g = gv2 - pars.q*pars.Om0*(x-x0); 
         const Real vx3g = gv3;
         const Real densg = v(0, gas::prim::density(0), k, j, is);
         const Real sieg = v(0, gas::prim::sie(0), k, j, is);
@@ -265,6 +266,7 @@ inline void ExtrapOuterX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
   const auto &bounds = coarse ? pmb->c_cellbounds : pmb->cellbounds;
   const auto &range = bounds.GetBoundsI(IndexDomain::interior, TE::CC);
   const int ie = range.e;
+  auto &pars = artemis_pkg->Param<StratParams>("strat_params");
 
   pmb->par_for_bndry(
       "StratOuterX1", nb, IndexDomain::outer_x1, parthenon::TopologicalElement::CC,
@@ -284,7 +286,7 @@ inline void ExtrapOuterX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
         const Real gv3 = v(0, gas::prim::velocity(2), k, j, ie);
         const Real gv2m1 = v(0, gas::prim::velocity(1), k, j, ie - 1);
         const Real vx1g = (gv1 < 0.0) ? 0.0 : gv1;
-        const Real vx2g = gv2 + (gv2 - gv2m1) * (x - x0) / dx;
+        const Real vx2g = gv2 - pars.q*pars.Om0*(x-x0);
         const Real vx3g = gv3;
         const Real densg = v(0, gas::prim::density(0), k, j, ie);
         const Real sieg = v(0, gas::prim::sie(0), k, j, ie);
@@ -500,6 +502,8 @@ inline void ExtrapInnerX3(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
 
   auto artemis_pkg = pmb->packages.Get("artemis");
   const bool do_dust = artemis_pkg->Param<bool>("do_dust");
+  auto &gas_pkg = pmb->packages.Get("gas");
+  auto eos_d = gas_pkg->template Param<EOS>("eos_d");
 
   static auto descriptors =
       ArtemisUtils::GetBoundaryPackDescriptorMap<gas::prim::density, gas::prim::velocity,
@@ -515,6 +519,7 @@ inline void ExtrapInnerX3(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
   const auto &bounds = coarse ? pmb->c_cellbounds : pmb->cellbounds;
   const auto &range = bounds.GetBoundsK(IndexDomain::interior, TE::CC);
   const int ks = range.s;
+  auto &pars = artemis_pkg->Param<StratParams>("strat_params");
 
   pmb->par_for_bndry(
       "StratInnerX3", nb, IndexDomain::inner_x3, parthenon::TopologicalElement::CC,
@@ -523,46 +528,43 @@ inline void ExtrapInnerX3(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
         // Extract coordinates
         geometry::Coords<GEOM> coords(pco, k, j, i);
         geometry::Coords<GEOM> coords_s(pco, ks, j, i);
-        geometry::Coords<GEOM> coords_s1(pco, ks + 1, j, i);
 
         const Real z = coords.x3v();
         const Real z0 = coords_s.x3v();
-        const Real z1 = coords_s1.x3v();
-        const Real dz = z1 - z0;
 
-        const Real gv1 = v(0, gas::prim::velocity(0), ks, j, i);
-        const Real gv2 = v(0, gas::prim::velocity(1), ks, j, i);
-        const Real gv3 = v(0, gas::prim::velocity(2), ks, j, i);
-        const Real vx1g = gv1;
-        const Real vx2g = gv2;
+        const Real vx1g = v(0, gas::prim::velocity(0), ks, j, i);
+        const Real vx2g = v(0, gas::prim::velocity(1), ks, j, i);
+        const Real &gv3 = v(0, gas::prim::velocity(2), ks, j, i);
         const Real vx3g = (gv3 > 0.0) ? 0.0 : gv3;
-        const Real gd = v(0, gas::prim::density(0), ks, j, i);
-        const Real gdp1 = v(0, gas::prim::density(0), ks + 1, j, i);
-        const Real drhog = gdp1 / gd;
-        const Real densg = gd * std::pow(drhog, (z - z0) / dz);
-        const Real sieg = v(0, gas::prim::sie(0), ks, j, i);
+
+        const Real &gd = v(0, gas::prim::density(0), ks, j, i);
+        const Real &gsie = v(0, gas::prim::sie(0), ks, j, i);
+        // isothermal through boundary
+        const Real Tg =  eos_d.TemperatureFromDensityInternalEnergy(gd,gsie);
+        // asume P/rho is constant as well
+        // probably could just use Bulk modulus here
+        const Real Rg =  eos_d.PressureFromDensityInternalEnergy(gd,gsie) / (gd * Tg);
+        const Real efac = std::exp(- (SQR(z) - SQR(z0))*SQR(pars.Om0)/(2.0 * Rg*Tg));
+        const Real rhog = gd * efac;
+
         v(0, gas::prim::velocity(0), k, j, i) = vx1g;
         v(0, gas::prim::velocity(1), k, j, i) = vx2g;
         v(0, gas::prim::velocity(2), k, j, i) = vx3g;
-        v(0, gas::prim::density(0), k, j, i) = densg;
-        v(0, gas::prim::sie(0), k, j, i) = sieg;
+        v(0, gas::prim::density(0), k, j, i) = rhog;
+        v(0, gas::prim::sie(0), k, j, i) = eos_d.InternalEnergyFromDensityTemperature(rhog,Tg);
 
         if (do_dust) {
           for (int n = 0; n < v.GetSize(0, dust::prim::density()); ++n) {
-            const Real dv1 = v(0, dust::prim::velocity(VI(n, 0)), ks, j, i);
-            const Real dv2 = v(0, dust::prim::velocity(VI(n, 1)), ks, j, i);
-            const Real dv3 = v(0, dust::prim::velocity(VI(n, 2)), ks, j, i);
-            const Real vx1d = dv1;
-            const Real vx2d = dv2;
+            const Real vx1d = v(0, dust::prim::velocity(VI(n, 0)), ks, j, i);
+            const Real vx2d = v(0, dust::prim::velocity(VI(n, 1)), ks, j, i);
+            const Real &dv3 = v(0, dust::prim::velocity(VI(n, 2)), ks, j, i);
             const Real vx3d = (dv3 > 0.0) ? 0.0 : dv3;
-            const Real dd = v(0, dust::prim::density(n), ks, j, i);
-            const Real ddp1 = v(0, dust::prim::density(n), ks + 1, j, i);
-            const Real drhod = ddp1 / dd;
-            const Real densd = dd * std::pow(drhod, (z - z0) / dz);
+
+            const Real &dd = v(0, dust::prim::density(n), ks, j, i);
             v(0, dust::prim::velocity(VI(n, 0)), k, j, i) = vx1d;
             v(0, dust::prim::velocity(VI(n, 1)), k, j, i) = vx2d;
             v(0, dust::prim::velocity(VI(n, 2)), k, j, i) = vx3d;
-            v(0, dust::prim::density(n), k, j, i) = densd;
+            v(0, dust::prim::density(n), k, j, i) = dd * efac;
           }
         }
       });
@@ -582,6 +584,8 @@ inline void ExtrapOuterX3(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
 
   auto artemis_pkg = pmb->packages.Get("artemis");
   const bool do_dust = artemis_pkg->Param<bool>("do_dust");
+  auto &gas_pkg = pmb->packages.Get("gas");
+  auto eos_d = gas_pkg->template Param<EOS>("eos_d");
 
   static auto descriptors =
       ArtemisUtils::GetBoundaryPackDescriptorMap<gas::prim::density, gas::prim::velocity,
@@ -597,6 +601,7 @@ inline void ExtrapOuterX3(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
   const auto &bounds = coarse ? pmb->c_cellbounds : pmb->cellbounds;
   const auto &range = bounds.GetBoundsK(IndexDomain::interior, TE::CC);
   const int ke = range.e;
+  auto &pars = artemis_pkg->Param<StratParams>("strat_params");
 
   pmb->par_for_bndry(
       "StratOuterX3", nb, IndexDomain::outer_x3, parthenon::TopologicalElement::CC,
@@ -605,46 +610,45 @@ inline void ExtrapOuterX3(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
         // Extract coordinates
         geometry::Coords<GEOM> coords(pco, k, j, i);
         geometry::Coords<GEOM> coords_e(pco, ke, j, i);
-        geometry::Coords<GEOM> coords_e1(pco, ke - 1, j, i);
 
         const Real z = coords.x3v();
         const Real z0 = coords_e.x3v();
-        const Real z1 = coords_e1.x3v();
-        const Real dz = z0 - z1;
 
-        const Real gv1 = v(0, gas::prim::velocity(0), ke, j, i);
-        const Real gv2 = v(0, gas::prim::velocity(1), ke, j, i);
-        const Real gv3 = v(0, gas::prim::velocity(2), ke, j, i);
-        const Real vx1g = gv1;
-        const Real vx2g = gv2;
+        const Real vx1g = v(0, gas::prim::velocity(0), ke, j, i);
+        const Real vx2g = v(0, gas::prim::velocity(1), ke, j, i);
+        const Real &gv3 = v(0, gas::prim::velocity(2), ke, j, i);
         const Real vx3g = (gv3 < 0.0) ? 0.0 : gv3;
-        const Real gd = v(0, gas::prim::density(0), ke, j, i);
-        const Real gdm1 = v(0, gas::prim::density(0), ke - 1, j, i);
-        const Real drhog = gd / gdm1;
-        const Real densg = gd * std::pow(drhog, (z - z0) / dz);
-        const Real sieg = v(0, gas::prim::sie(0), ke, j, i);
+
+        const Real &gd = v(0, gas::prim::density(0), ke, j, i);
+        const Real &gsie = v(0, gas::prim::sie(0), ke, j, i);
+        // isothermal through boundary
+        const Real Tg =  eos_d.TemperatureFromDensityInternalEnergy(gd,gsie);
+        // asume P/rho is constant as well
+        // probably could just use Bulk modulus here
+        const Real Rg =  eos_d.PressureFromDensityInternalEnergy(gd,gsie) / (gd * Tg);
+        const Real efac = std::exp(- (SQR(z) - SQR(z0)) * SQR(pars.Om0)/(2.0 * Rg*Tg));
+        const Real rhog = gd * efac;
+
+
+
         v(0, gas::prim::velocity(0), k, j, i) = vx1g;
         v(0, gas::prim::velocity(1), k, j, i) = vx2g;
         v(0, gas::prim::velocity(2), k, j, i) = vx3g;
-        v(0, gas::prim::density(0), k, j, i) = densg;
-        v(0, gas::prim::sie(0), k, j, i) = sieg;
+        v(0, gas::prim::density(0), k, j, i) = rhog;
+        v(0, gas::prim::sie(0), k, j, i) = eos_d.InternalEnergyFromDensityTemperature(rhog,Tg);
 
         if (do_dust) {
           for (int n = 0; n < v.GetSize(0, dust::prim::density()); ++n) {
-            const Real dv1 = v(0, dust::prim::velocity(VI(n, 0)), ke, j, i);
-            const Real dv2 = v(0, dust::prim::velocity(VI(n, 1)), ke, j, i);
-            const Real dv3 = v(0, dust::prim::velocity(VI(n, 2)), ke, j, i);
-            const Real vx1d = dv1;
-            const Real vx2d = dv2;
+            const Real vx1d = v(0, dust::prim::velocity(VI(n, 0)), ke, j, i);
+            const Real vx2d = v(0, dust::prim::velocity(VI(n, 1)), ke, j, i);
+            const Real &dv3 = v(0, dust::prim::velocity(VI(n, 2)), ke, j, i);
             const Real vx3d = (dv3 < 0.0) ? 0.0 : dv3;
+
             const Real dd = v(0, dust::prim::density(n), ke, j, i);
-            const Real ddm1 = v(0, dust::prim::density(n), ke - 1, j, i);
-            const Real drhod = dd / ddm1;
-            const Real densd = dd * std::pow(drhod, (z - z0) / dz);
             v(0, dust::prim::velocity(VI(n, 0)), k, j, i) = vx1d;
             v(0, dust::prim::velocity(VI(n, 1)), k, j, i) = vx2d;
             v(0, dust::prim::velocity(VI(n, 2)), k, j, i) = vx3d;
-            v(0, dust::prim::density(n), k, j, i) = densd;
+            v(0, dust::prim::density(n), k, j, i) = dd * efac;
           }
         }
       });

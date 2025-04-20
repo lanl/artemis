@@ -69,8 +69,6 @@ inline void InitStratParams(MeshBlock *pmb, ParameterInput *pin) {
     strat_params.h = pin->GetOrAddReal("problem", "h", 1.0);
     strat_params.rho0 = pin->GetOrAddReal("problem", "rho0", 1.0);
     strat_params.r0 = pin->GetOrAddReal("problem", "r0", 1.0);
-    // strat_params.dens_min = pin->GetOrAddReal("problem", "dens_min", 1.0e-5);
-    // strat_params.pres_min = pin->GetOrAddReal("problem", "pres_min", 1.0e-8);
     strat_params.d2g = pin->GetOrAddReal("problem", "dust_to_gas", 0.01);
 
     auto &gas_pkg = pmb->packages.Get("gas");
@@ -200,33 +198,31 @@ inline void ExtrapInnerX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
 
   const auto &bounds = coarse ? pmb->c_cellbounds : pmb->cellbounds;
   const auto &range = bounds.GetBoundsI(IndexDomain::interior, TE::CC);
-  volatile const int is = range.s;
+  const int is = range.s;
   const auto &pars = artemis_pkg->Param<StratParams>("strat_params");
 
   pmb->par_for_bndry(
       "StratInnerX1", nb, IndexDomain::inner_x1, parthenon::TopologicalElement::CC,
       coarse, fine,
       KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
-        volatile int ip = i;
-        volatile int jp = j;
         // Extract coordinates
         geometry::Coords<GEOM> coords(pco, k, j, i);
         geometry::Coords<GEOM> coords_s(pco, k, j, is);
         geometry::Coords<GEOM> coords_s1(pco, k, j, is + 1);
-        volatile const Real x1 = coords_s1.x1v();
-        volatile const Real x0 = coords_s.x1v();
-        volatile const Real dx = x1 - x0;
-        volatile const Real x = coords.x1v();
+        const Real x1 = coords_s1.x1v();
+        const Real x0 = coords_s.x1v();
+        const Real dx = x1 - x0;
+        const Real x = coords.x1v();
 
-        volatile const Real gv2 = v(0, gas::prim::velocity(1), k, j, is);
-        volatile const Real gv1 = v(0, gas::prim::velocity(0), k, j, is);
-        volatile const Real gv3 = v(0, gas::prim::velocity(2), k, j, is);
-        volatile const Real gv2p1 = v(0, gas::prim::velocity(1), k, j, is + 1);
-        volatile const Real vx1g = (gv1 > 0.0) ? 0.0 : gv1;
-        volatile const Real vx2g = gv2 + (gv2p1 - gv2) * (i - is);
-        volatile const Real vx3g = gv3;
-        volatile const Real densg = v(0, gas::prim::density(0), k, j, is);
-        volatile const Real sieg = v(0, gas::prim::sie(0), k, j, is);
+        const Real gv2 = v(0, gas::prim::velocity(1), k, j, is);
+        const Real gv1 = v(0, gas::prim::velocity(0), k, j, is);
+        const Real gv3 = v(0, gas::prim::velocity(2), k, j, is);
+        const Real gv2p1 = v(0, gas::prim::velocity(1), k, j, is + 1);
+        const Real vx1g = (gv1 > 0.0) ? 0.0 : gv1;
+        const Real vx2g = gv2 + (gv2p1 - gv2) * (i - is);
+        const Real vx3g = gv3;
+        const Real densg = v(0, gas::prim::density(0), k, j, is);
+        const Real sieg = v(0, gas::prim::sie(0), k, j, is);
         v(0, gas::prim::velocity(0), k, j, i) = vx1g;
         v(0, gas::prim::velocity(1), k, j, i) = vx2g;
         v(0, gas::prim::velocity(2), k, j, i) = vx3g;
@@ -278,33 +274,31 @@ inline void ExtrapOuterX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
 
   const auto &bounds = coarse ? pmb->c_cellbounds : pmb->cellbounds;
   const auto &range = bounds.GetBoundsI(IndexDomain::interior, TE::CC);
-  volatile const int ie = range.e;
+  const int ie = range.e;
   const auto &pars = artemis_pkg->Param<StratParams>("strat_params");
 
   pmb->par_for_bndry(
       "StratOuterX1", nb, IndexDomain::outer_x1, parthenon::TopologicalElement::CC,
       coarse, fine,
       KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
-        volatile int ip = i;
-        volatile int jp = j;
         // Extract coordinates
         geometry::Coords<GEOM> coords(pco, k, j, i);
         geometry::Coords<GEOM> coords_e(pco, k, j, ie);
         geometry::Coords<GEOM> coords_e1(pco, k, j, ie - 1);
-        volatile const Real x0 = coords_e.x1v();
-        volatile const Real x1 = coords_e1.x1v();
-        volatile const Real dx = x0 - x1;
-        volatile const Real x = coords.x1v();
+        const Real x0 = coords_e.x1v();
+        const Real x1 = coords_e1.x1v();
+        const Real dx = x0 - x1;
+        const Real x = coords.x1v();
 
-        volatile const Real gv1 = v(0, gas::prim::velocity(0), k, j, ie);
-        volatile const Real gv2 = v(0, gas::prim::velocity(1), k, j, ie);
-        volatile const Real gv3 = v(0, gas::prim::velocity(2), k, j, ie);
-        volatile const Real gv2m1 = v(0, gas::prim::velocity(1), k, j, ie - 1);
-        volatile const Real vx1g = (gv1 < 0.0) ? 0.0 : gv1;
-        volatile const Real vx2g = gv2 + (gv2 - gv2m1) * (i - ie);
-        volatile const Real vx3g = gv3;
-        volatile const Real densg = v(0, gas::prim::density(0), k, j, ie);
-        volatile const Real sieg = v(0, gas::prim::sie(0), k, j, ie);
+        const Real gv1 = v(0, gas::prim::velocity(0), k, j, ie);
+        const Real gv2 = v(0, gas::prim::velocity(1), k, j, ie);
+        const Real gv3 = v(0, gas::prim::velocity(2), k, j, ie);
+        const Real gv2m1 = v(0, gas::prim::velocity(1), k, j, ie - 1);
+        const Real vx1g = (gv1 < 0.0) ? 0.0 : gv1;
+        const Real vx2g = gv2 + (gv2 - gv2m1) * (i - ie);
+        const Real vx3g = gv3;
+        const Real densg = v(0, gas::prim::density(0), k, j, ie);
+        const Real sieg = v(0, gas::prim::sie(0), k, j, ie);
         v(0, gas::prim::velocity(0), k, j, i) = vx1g;
         v(0, gas::prim::velocity(1), k, j, i) = vx2g;
         v(0, gas::prim::velocity(2), k, j, i) = vx3g;
@@ -541,9 +535,6 @@ inline void ExtrapInnerX3(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
   auto &gas_pkg = pmb->packages.Get("gas");
   auto eos_d = gas_pkg->template Param<EOS>("eos_d");
 
-  const Real dfloor = gas_pkg->Param<Real>("dfloor");
-  const Real siefloor = gas_pkg->Param<Real>("siefloor");
-
   static auto descriptors =
       ArtemisUtils::GetBoundaryPackDescriptorMap<gas::prim::density, gas::prim::velocity,
                                                  gas::prim::sie, dust::prim::density,
@@ -584,14 +575,14 @@ inline void ExtrapInnerX3(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
         // probably could just use Bulk modulus here
         const Real efac =
             std::exp(-(SQR(z) - SQR(z0)) * SQR(pars.Om0) / (2.0 * pars.kbmu * Tg));
-        const Real rhog = std::max(gd * efac, dfloor);
+        const Real rhog = std::max(gd * efac, pars.dfloor);
 
         v(0, gas::prim::velocity(0), k, j, i) = vx1g;
         v(0, gas::prim::velocity(1), k, j, i) = vx2g;
         v(0, gas::prim::velocity(2), k, j, i) = vx3g;
         v(0, gas::prim::density(0), k, j, i) = rhog;
         v(0, gas::prim::sie(0), k, j, i) =
-            std::max(siefloor, eos_d.InternalEnergyFromDensityTemperature(rhog, Tg));
+            std::max(pars.siefloor, eos_d.InternalEnergyFromDensityTemperature(rhog, Tg));
 
         if (do_dust) {
           for (int n = 0; n < v.GetSize(0, dust::prim::density()); ++n) {
@@ -626,9 +617,6 @@ inline void ExtrapOuterX3(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
   const bool do_dust = artemis_pkg->Param<bool>("do_dust");
   auto &gas_pkg = pmb->packages.Get("gas");
   auto eos_d = gas_pkg->template Param<EOS>("eos_d");
-
-  const Real dfloor = gas_pkg->Param<Real>("dfloor");
-  const Real siefloor = gas_pkg->Param<Real>("siefloor");
 
   static auto descriptors =
       ArtemisUtils::GetBoundaryPackDescriptorMap<gas::prim::density, gas::prim::velocity,
@@ -670,14 +658,14 @@ inline void ExtrapOuterX3(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
         // probably could just use Bulk modulus here
         const Real efac =
             std::exp(-(SQR(z) - SQR(z0)) * SQR(pars.Om0) / (2.0 * pars.kbmu * Tg));
-        const Real rhog = std::max(dfloor, gd * efac);
+        const Real rhog = std::max(pars.dfloor, gd * efac);
 
         v(0, gas::prim::velocity(0), k, j, i) = vx1g;
         v(0, gas::prim::velocity(1), k, j, i) = vx2g;
         v(0, gas::prim::velocity(2), k, j, i) = vx3g;
         v(0, gas::prim::density(0), k, j, i) = rhog;
         v(0, gas::prim::sie(0), k, j, i) =
-            std::max(siefloor, eos_d.InternalEnergyFromDensityTemperature(rhog, Tg));
+            std::max(pars.siefloor, eos_d.InternalEnergyFromDensityTemperature(rhog, Tg));
 
         if (do_dust) {
           for (int n = 0; n < v.GetSize(0, dust::prim::density()); ++n) {

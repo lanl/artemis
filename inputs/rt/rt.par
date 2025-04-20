@@ -1,5 +1,5 @@
 # ========================================================================================
-#  (C) (or copyright) 2023-2024. Triad National Security, LLC. All rights reserved.
+#  (C) (or copyright) 2025. Triad National Security, LLC. All rights reserved.
 #
 #  This program was produced under U.S. Government contract 89233218CNA000001 for Los
 #  Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -12,7 +12,7 @@
 # ========================================================================================
 
 <artemis>
-problem = rt          # name of the pgen
+problem = rt             # name of the pgen
 coordinates = cartesian  # coordinate system
 
 <parthenon/job>
@@ -35,25 +35,25 @@ data_format = %12.14e
 nlim       = -1   # cycle limit
 tlim       = 8.5  # time limit
 integrator = rk2  # time integration algorithm
-ncycle_out = 1  # interval for stdout summary info
+ncycle_out = 1    # interval for stdout summary info
 
 <parthenon/mesh>
 nghost = 3
-nx1    = 32      # Number of zones in X1-direction
-x1min  = -0.5     # minimum value of X1
-x1max  = 0.5      # maximum value of X1
+nx1    = 32          # Number of zones in X1-direction
+x1min  = -0.5        # minimum value of X1
+x1max  = 0.5         # maximum value of X1
 ix1_bc = reflecting  # inner-X1 boundary flag
 ox1_bc = reflecting  # outer-X1 boundary flag
 
-nx2    = 96      # Number of zones in X2-direction
-x2min  = -1.5     # minimum value of X2
-x2max  = 1.5      # maximum value of X2
+nx2    = 96          # Number of zones in X2-direction
+x2min  = -1.5        # minimum value of X2
+x2max  = 1.5         # maximum value of X2
 ix2_bc = reflecting  # inner-X2 boundary flag
 ox2_bc = reflecting  # outer-X2 boundary flag
 
-nx3    = 1        # Number of zones in X3-direction
-x3min  = -0.5     # minimum value of X3
-x3max  = 0.5      # maximum value of X3
+nx3    = 1           # Number of zones in X3-direction
+x3min  = -0.5        # minimum value of X3
+x3max  = 0.5         # maximum value of X3
 ix3_bc = reflecting  # inner-X3 boundary flag
 ox3_bc = reflecting  # outer-X3 boundary flag
 
@@ -79,4 +79,3 @@ gx1 = 0.0
 gx2 = -0.1
 gx3 = 0.0
 
-#<problem>

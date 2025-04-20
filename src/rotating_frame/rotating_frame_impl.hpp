@@ -53,60 +53,51 @@ TaskStatus ShearingBoxImpl(MeshData<Real> *md, const Real om0, const Real qshear
         // Extract coordinates
         geometry::Coords<Coordinates::cartesian> coords(vmesh.GetCoordinates(b), k, j, i);
 
-         const Real dx = coords.bnds.x1[1] - coords.bnds.x1[0];
-         const Real dz = coords.bnds.x3[1] - coords.bnds.x3[0];
+        const Real dx = coords.bnds.x1[1] - coords.bnds.x1[0];
+        const Real dz = coords.bnds.x3[1] - coords.bnds.x3[0];
 
-         const Real xc = 0.5 * (coords.bnds.x1[1] + coords.bnds.x1[0]);
-         const Real zc = 0.5 * (coords.bnds.x3[1] + coords.bnds.x3[0]);
+        const Real xc = 0.5 * (coords.bnds.x1[1] + coords.bnds.x1[0]);
+        const Real zc = 0.5 * (coords.bnds.x3[1] + coords.bnds.x3[0]);
 
-         const Real phi_xm1 = -qshear * omsq * SQR(coords.bnds.x1[0]);
-         const Real phi_xc = -qshear * omsq * SQR(xc);
-         const Real phi_xp1 = -qshear * omsq * SQR(coords.bnds.x1[1]);
+        const Real phi_xm1 = -qshear * omsq * SQR(coords.bnds.x1[0]);
+        const Real phi_xc = -qshear * omsq * SQR(xc);
+        const Real phi_xp1 = -qshear * omsq * SQR(coords.bnds.x1[1]);
 
-         const Real phi_zm1 = 0.5 * omsq * SQR(coords.bnds.x3[0]);
-         const Real phi_zc = 0.5 * omsq * SQR(zc);
-         const Real phi_zp1 = 0.5 * omsq * SQR(coords.bnds.x3[1]);
+        const Real phi_zm1 = 0.5 * omsq * SQR(coords.bnds.x3[0]);
+        const Real phi_zc = 0.5 * omsq * SQR(zc);
+        const Real phi_zp1 = 0.5 * omsq * SQR(coords.bnds.x3[1]);
 
-         const Real dpxc = (phi_xp1 - phi_xm1) / dx;
-         const Real dpxm = (phi_xc - phi_xm1) / dx;
-         const Real dpxp = (phi_xp1 - phi_xc) / dx;
+        const Real dpxc = (phi_xp1 - phi_xm1) / dx;
+        const Real dpxm = (phi_xc - phi_xm1) / dx;
+        const Real dpxp = (phi_xp1 - phi_xc) / dx;
 
-         const Real dpzc = three_d * (phi_zp1 - phi_zm1) / dz;
-         const Real dpzm = three_d * (phi_zc - phi_zm1) / dz;
-         const Real dpzp = three_d * (phi_zp1 - phi_zc) / dz;
+        const Real dpzc = three_d * (phi_zp1 - phi_zm1) / dz;
+        const Real dpzm = three_d * (phi_zc - phi_zm1) / dz;
+        const Real dpzp = three_d * (phi_zp1 - phi_zc) / dz;
 
         if (do_gas) {
           for (int n = 0; n < vmesh.GetSize(b, gas::prim::density()); ++n) {
-             const Real dens = vmesh(b, gas::prim::density(n), k, j, i);
-             const Real v1 = vmesh(b, gas::prim::velocity(VI(n, 0)), k, j, i);
-             const Real v2 = vmesh(b, gas::prim::velocity(VI(n, 1)), k, j, i);
-             const Real v3 = vmesh(b, gas::prim::velocity(VI(n, 2)), k, j, i);
-             const Real rdt = dens * dt;
+            const Real dens = vmesh(b, gas::prim::density(n), k, j, i);
+            const Real v1 = vmesh(b, gas::prim::velocity(VI(n, 0)), k, j, i);
+            const Real v2 = vmesh(b, gas::prim::velocity(VI(n, 1)), k, j, i);
+            const Real v3 = vmesh(b, gas::prim::velocity(VI(n, 2)), k, j, i);
+            const Real rdt = dens * dt;
             vmesh(b, gas::cons::momentum(VI(n, 0)), k, j, i) -=
                 rdt * (dpxc - 2.0 * om0 * v2);
             vmesh(b, gas::cons::momentum(VI(n, 1)), k, j, i) -= rdt * 2.0 * om0 * v1;
             vmesh(b, gas::cons::momentum(VI(n, 2)), k, j, i) -= rdt * dpzc;
 
-             const Real fxm = vf.flux(b, X1DIR, gas::cons::density(n), k, j, i);
-             const Real fxp =
-                vf.flux(b, X1DIR, gas::cons::density(n), k, j, i + 1);
-
-             const Real fzm = vf.flux(b, X3DIR, gas::cons::density(n), k, j, i);
-             const Real fzp =
-                vf.flux(b, X3DIR, gas::cons::density(n), k + three_d, j, i);
-
-             Real fac1 = rdt * (v1 * dpxc + v3 * dpzc);
-             Real fac2 = dt * (fxm * dpxm + fxp * dpxp + fzm * dpzm + fzp * dpzp);
-             int ip = i;
-             int jp = j;
-            // if (i == 2)
-            //   printf("%d %d: %lg %lg, %lg %lg, %lg %lg\n", j, i, fxm, fxp, dens, v1,
-            //   fac1,
-            //          fac2);
-
             vmesh(b, gas::cons::total_energy(n), k, j, i) -=
                 rdt * (v1 * dpxc + v3 * dpzc);
 
+            // TODO: Why does this not work
+            // const Real fxm = vf.flux(b, X1DIR, gas::cons::density(n), k, j, i);
+            // const Real fxp =
+            //   vf.flux(b, X1DIR, gas::cons::density(n), k, j, i + 1);
+
+            // const Real fzm = vf.flux(b, X3DIR, gas::cons::density(n), k, j, i);
+            // const Real fzp =
+            //   vf.flux(b, X3DIR, gas::cons::density(n), k + three_d, j, i);
             // vmesh(b, gas::cons::total_energy(n), k, j, i) -=
             //     dt * (fxm * dpxm + fxp * dpxp + fzm * dpzm + fzp * dpzp);
           }

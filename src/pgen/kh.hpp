@@ -76,7 +76,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const int ndim = ProblemDimension(pin);
 
   PARTHENON_REQUIRE(ndim > 1, "KH problem requires ndim >= 2");
-  const bool threed = ndim == 3;
+  const bool threed = (ndim == 3);
 
   // setup uniform ambient medium
   pmb->par_for(

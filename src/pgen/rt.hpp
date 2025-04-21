@@ -77,9 +77,9 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const int ndim = ProblemDimension(pin);
 
   PARTHENON_REQUIRE(ndim > 1, "RT problem requires ndim >= 2");
-  const bool threed = ndim == 3;
+  const bool threed = (ndim == 3);
   Real gx = 0.0;
-  Real zmin, zmax;
+  Real zmin = Null<Real>(), zmax = Null<Real>();
   if (threed) {
     zmin = pin->GetReal("parthenon/mesh", "x3min");
     zmax = pin->GetReal("parthenon/mesh", "x3max");

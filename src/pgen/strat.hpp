@@ -209,13 +209,13 @@ inline void ExtrapInnerX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
         geometry::Coords<GEOM> coords(pco, k, j, i);
         geometry::Coords<GEOM> coords_s(pco, k, j, is);
         geometry::Coords<GEOM> coords_s1(pco, k, j, is + 1);
-        const Real x1 = coords_s1.x1v();
-        const Real x0 = coords_s.x1v();
-        const Real dx = x1 - x0;
         const Real x = coords.x1v();
+        const Real x0 = coords_s.x1v();
+        const Real x1 = coords_s1.x1v();
+        const Real dx = x1 - x0;
 
-        const Real gv2 = v(0, gas::prim::velocity(1), k, j, is);
         const Real gv1 = v(0, gas::prim::velocity(0), k, j, is);
+        const Real gv2 = v(0, gas::prim::velocity(1), k, j, is);
         const Real gv3 = v(0, gas::prim::velocity(2), k, j, is);
         const Real gv2p1 = v(0, gas::prim::velocity(1), k, j, is + 1);
         const Real vx1g = (gv1 > 0.0) ? 0.0 : gv1;

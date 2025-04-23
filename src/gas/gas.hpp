@@ -14,10 +14,14 @@
 #define GAS_GAS_HPP_
 
 #include "artemis.hpp"
+#include "utils/units.hpp"
 
 namespace Gas {
 
-std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
+std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
+                                            ArtemisUtils::Units &units,
+                                            ArtemisUtils::Constants &constants,
+                                            Packages_t &packages);
 
 template <Coordinates GEOM>
 Real EstimateTimestepMesh(MeshData<Real> *md);

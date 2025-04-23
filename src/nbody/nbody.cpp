@@ -28,6 +28,7 @@ extern "C" {
 #include "geometry/geometry.hpp"
 #include "nbody/nbody.hpp"
 #include "nbody/nbody_utils.hpp"
+#include "utils/units.hpp"
 
 using parthenon::MetadataFlag;
 
@@ -47,7 +48,8 @@ void UserWorkBeforeRestartOutputMesh(Mesh *pmesh, ParameterInput *, SimTime &,
 //----------------------------------------------------------------------------------------
 //! \fn  StateDescriptor NBody::Initialize
 //! \brief Adds intialization function for NBody package
-std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
+std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
+                                            const ArtemisUtils::Constants &constants) {
   auto nbody = std::make_shared<StateDescriptor>("nbody");
   Params &params = nbody->AllParams();
   PARTHENON_REQUIRE(
@@ -73,10 +75,24 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   if (integrator == "none") dt_reb = Big<Real>();
   params.Add("dt_reb", dt_reb);
 
-  // Unit system for gravity
-  const Real GM = pin->GetReal("gravity", "gm");
-  params.Add("GM", GM);
+  // Total mass of gravitating particles
   params.Add("mscale", pin->GetOrAddReal("nbody", "mscale", 1.0));
+  Real mtot = pin->GetOrAddReal("nbody", "mtot", -Big<Real>());
+
+  const Real G = constants.GetGCode();
+
+  // Extra forces
+  RebAttrs::PN = pin->GetOrAddReal("nbody", "pn", 0);
+  RebAttrs::include_pn2 = pin->GetOrAddInteger("nbody", "pn2_corr", 1);
+  RebAttrs::extras = (RebAttrs::PN > 0);
+  RebAttrs::c = constants.GetCCode();
+  RebAttrs::merge_on_collision =
+      pin->GetOrAddBoolean("nbody", "merge_on_collision", true);
+
+  // Read the parameter file for the particles
+  std::vector<int> particle_id;
+  std::vector<Particle> particles_v;
+  auto parts = NBodySetup(pin, G, mtot);
 
   // Frame specification
   // NOTE(ADM): Shearing box has Rf = {R0, 0,0}, shearing box has Vf = {0, Om0*R0,0},
@@ -86,27 +102,22 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   const Real qshear = pin->GetOrAddReal("rotating_frame", "qshear", 0.0);
   Real Rf[3] = {0.0};
   Real Vf[3] = {0.0};
+
   if (global_frame && (Omf != 0.0) && (qshear != 0.0)) {
-    const Real R0 = std::pow(SQR(Omf) / GM, 1.0 / 3.0);
+    const Real R0 = std::pow(SQR(Omf) / (G * mtot), 1.0 / 3.0);
     Rf[0] = R0;
     Vf[1] = R0 * Omf;
   }
   params.Add("frame_correction", global_frame);
+  params.Add("gm", G * mtot);
+  // Copy into our final particle array and check that every particle was initialized
+  int count = 0;
+  for (auto const &[id, p] : parts) {
+    particle_id.push_back(count);
+    particles_v.push_back(Particle(p, G, Rf, Vf));
+    count++;
+  }
 
-  // Extra forces
-  RebAttrs::PN = pin->GetOrAddReal("nbody", "pn", 0);
-  RebAttrs::include_pn2 = pin->GetOrAddInteger("nbody", "pn2_corr", 1);
-  RebAttrs::extras = (RebAttrs::PN > 0);
-  RebAttrs::c = (RebAttrs::extras)
-                    ? pin->GetReal("nbody", "light_speed")
-                    : pin->GetOrAddReal("nbody", "light_speed", Big<Real>());
-  RebAttrs::merge_on_collision =
-      pin->GetOrAddBoolean("nbody", "merge_on_collision", true);
-
-  // Read the parameter file for the particles
-  std::vector<int> particle_id;
-  std::vector<Particle> particles_v;
-  NBodySetup(pin, GM, Rf, Vf, particle_id, particles_v);
   const int npart = static_cast<int>(particles_v.size());
   params.Add("npart", npart);
   params.Add("particle_id", particle_id);
@@ -126,10 +137,10 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   ParArray2D<Real> particle_force_tot("particle_force_tot", npart, 7);
   params.Add("particle_force", particle_force);
   params.Add("particle_force_step", particle_force_step);
-  params.Add("particle_force_tot", particle_force_tot);
+  params.Add("particle_force_tot", particle_force_tot, Params::Mutability::Restart);
 
   // Create vector for Rebound restart
-  std::vector<char> reb_sim_restart;
+  std::vector<BYTE> reb_sim_restart;
   params.Add("reb_sim_buffer", reb_sim_restart, Params::Mutability::Restart);
 
   // Output parameters
@@ -151,8 +162,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
   // Build the rebound sim
   const Real box_size = pin->GetOrAddReal("nbody", "box_size", Big<Real>());
-  struct reb_simulation *reb_sim = nullptr;
-  reb_sim = reb_simulation_create();
+  RebSim reb_sim;
   if (parthenon::Globals::my_rank == 0) {
     for (int i = 0; i < npart; i++) {
       struct reb_particle pl = {0};
@@ -166,12 +176,32 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
       pl.vy = particles_v[i].vel[1];
       pl.vz = particles_v[i].vel[2];
       reb_simulation_add(reb_sim, pl);
+
+      // Verify that what we added still lives
+      struct reb_particle *pl2 = reb_simulation_particle_by_hash(reb_sim, i + 1);
+      PARTHENON_REQUIRE(pl2->r == particles_v[i].radius,
+                        "Particle radius is inconsistent at setup!");
+      PARTHENON_REQUIRE(pl2->m == particles_v[i].GM,
+                        "Particle mass is inconsistent at setup!");
+      PARTHENON_REQUIRE(pl2->x == particles_v[i].pos[0],
+                        "Particle x is inconsistent at setup!");
+      PARTHENON_REQUIRE(pl2->y == particles_v[i].pos[1],
+                        "Particle y is inconsistent at setup!");
+      PARTHENON_REQUIRE(pl2->z == particles_v[i].pos[2],
+                        "Particle z is inconsistent at setup!");
+      PARTHENON_REQUIRE(pl2->vx == particles_v[i].vel[0],
+                        "Particle vx is inconsistent at setup!");
+      PARTHENON_REQUIRE(pl2->vy == particles_v[i].vel[1],
+                        "Particle vy is inconsistent at setup!");
+      PARTHENON_REQUIRE(pl2->vz == particles_v[i].vel[2],
+                        "Particle vz is inconsistent at setup!");
     }
 
     reb_simulation_configure_box(reb_sim, box_size, 1, 1, 1);
     reb_sim->boundary = reb_simulation::REB_BOUNDARY_OPEN;
     reb_sim->collision = reb_simulation::REB_COLLISION_LINE;
     reb_sim->dt = dt_reb;
+    reb_sim->G = G;
     if (RebAttrs::extras) reb_sim->force_is_velocity_dependent = 1;
     if (integrator == "whfast") {
       reb_sim->integrator = reb_simulation::REB_INTEGRATOR_WHFAST;
@@ -294,7 +324,7 @@ void UserWorkBeforeRestartOutputMesh(Mesh *pmesh, ParameterInput *, SimTime &,
 
   // Extract Rebound simulation
   auto &nbody_pkg = pmesh->packages.Get("nbody");
-  auto reb_sim = nbody_pkg->Param<struct reb_simulation *>("reb_sim");
+  auto reb_sim = nbody_pkg->Param<RebSim>("reb_sim");
 
   // Write native Rebound restart
   if (Globals::my_rank == 0) {
@@ -314,15 +344,12 @@ void UserWorkBeforeRestartOutputMesh(Mesh *pmesh, ParameterInput *, SimTime &,
 #endif
 
   // Read Rebound restart back into string
-  std::ifstream file(NBody::rebound_filename, std::ios::binary);
-  PARTHENON_REQUIRE(file.is_open(), "Error opening temporary rebound output file!");
-  std::vector<char> reb_sim_buffer((std::istreambuf_iterator<char>(file)),
-                                   std::istreambuf_iterator<char>());
-  file.close();
+
+  auto reb_sim_buffer = read_bytes_from_file(NBody::rebound_filename);
 
   // Store current rebound output as restartable parameter.  Every rank must store a
   // matching buffer parameter or else I/O will hang
-  nbody_pkg->UpdateParam<std::vector<char>>("reb_sim_buffer", reb_sim_buffer);
+  nbody_pkg->UpdateParam<std::vector<BYTE>>("reb_sim_buffer", reb_sim_buffer);
 }
 
 //----------------------------------------------------------------------------------------
@@ -334,29 +361,26 @@ void InitializeFromRestart(Mesh *pm) {
 
   // Extract Rebound parameters
   auto &nbody_pkg = pm->packages.Get("nbody");
-  auto reb_sim = nbody_pkg->Param<struct reb_simulation *>("reb_sim");
+  auto reb_sim = nbody_pkg->Param<RebSim>("reb_sim");
   auto particle_id = nbody_pkg->Param<std::vector<int>>("particle_id");
   auto particles = nbody_pkg->Param<ParArray1D<NBody::Particle>>("particles");
 
   // Initialize rebound state on rank 0
   if (Globals::my_rank == 0) {
     // Create rebound save file from stored buffer
-    auto reb_sim_buffer = nbody_pkg->Param<std::vector<char>>("reb_sim_buffer");
-    std::ofstream outfile(NBody::rebound_filename.c_str(), std::ios::binary);
-    outfile.write(reb_sim_buffer.data(), reb_sim_buffer.size());
-    outfile.close();
+    auto reb_sim_buffer = nbody_pkg->Param<std::vector<BYTE>>("reb_sim_buffer");
+
+    write_bytes_to_file(NBody::rebound_filename, reb_sim_buffer);
 
     // Create rebound simulation from new save file
-    char *reb_filename = new char[NBody::rebound_filename.size() + 1];
-    std::strcpy(reb_filename, NBody::rebound_filename.c_str());
-    auto new_reb_sim = reb_simulation_create_from_file(reb_filename, -1);
-    reb_simulation_free(reb_sim);
+    RebSim new_reb_sim(NBody::rebound_filename);
     SetReboundPtrs(new_reb_sim);
-    nbody_pkg->UpdateParam<struct reb_simulation *>("reb_sim", new_reb_sim);
+    nbody_pkg->UpdateParam<RebSim>("reb_sim", new_reb_sim);
   }
 
   // Send restarted rebound particles to all nodes
-  SyncWithRebound(reb_sim, particle_id, particles);
+  auto reb_sim_rst = nbody_pkg->Param<RebSim>("reb_sim");
+  SyncWithRebound(reb_sim_rst, particle_id, particles);
 }
 
 //----------------------------------------------------------------------------------------

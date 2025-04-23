@@ -23,8 +23,7 @@ extern "C" {
 // Artemis includes
 #include "artemis.hpp"
 #include "nbody.hpp"
-
-using namespace parthenon::package::prelude;
+#include "nbody_utils.hpp"
 
 namespace NBody {
 //----------------------------------------------------------------------------------------
@@ -44,7 +43,7 @@ void Outputs(parthenon::Mesh *pm, const Real time) {
   auto npart = nbody->Param<int>("npart");
   auto particle_id = nbody->Param<std::vector<int>>("particle_id");
   auto *output_count = nbody->MutableParam<int>("output_count");
-  auto r_sim = nbody->Param<struct reb_simulation *>("reb_sim");
+  auto r_sim = nbody->Param<RebSim>("reb_sim");
   auto base = nbody->Param<std::string>("output_base");
   auto particles = nbody->Param<ParArray1D<Particle>>("particles");
   auto pforce_tot = nbody->Param<ParArray2D<Real>>("particle_force_tot");

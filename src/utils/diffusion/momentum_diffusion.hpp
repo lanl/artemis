@@ -125,11 +125,11 @@ StrainTensorFace(parthenon::team_mbr_t const &member, const int b, const int n,
       const auto &hx_xmzm = coords_xmzm.GetScaleFactors();
       const auto &hx_xmzp = coords_xmzp.GetScaleFactors();
 
-      const Real dx1 = coords.Distance(xv, xv_xm);
-      const Real dx2 = multid ? coords.Distance(xv_ym, xv_yp) : Fuzz<Real>();
-      const Real dx2_xm = multid ? coords.Distance(xv_xmym, xv_xmyp) : Fuzz<Real>();
-      const Real dx3 = threed ? coords.Distance(xv_zm, xv_zp) : Fuzz<Real>();
-      const Real dx3_xm = threed ? coords.Distance(xv_xmzm, xv_xmzp) : Fuzz<Real>();
+      const Real dx1 = xv[0] - xv_xm[0];
+      const Real dx2 = multid ? (xv_yp[1] - xv_ym[1]) : Fuzz<Real>();
+      const Real dx2_xm = multid ? (xv_xmyp[1] - xv_xmym[1]) : Fuzz<Real>();
+      const Real dx3 = threed ? (xv_zp[2] - xv_zm[2]) : Fuzz<Real>();
+      const Real dx3_xm = threed ? (xv_xmzp[2] - xv_xmzm[2]) : Fuzz<Real>();
 
       // T_1^1  = 2 dv^1/dx1 +  v^k dh1/xk / h1
       const Real dv1 =
@@ -222,11 +222,11 @@ StrainTensorFace(parthenon::team_mbr_t const &member, const int b, const int n,
       const auto &hx_ymzm = coords_ymzm.GetScaleFactors();
       const auto &hx_ymzp = coords_ymzp.GetScaleFactors();
 
-      const Real dx1 = coords.Distance(xv_xm, xv_xp);
-      const Real dx1_ym = coords.Distance(xv_xmym, xv_xpym);
-      const Real dx2 = coords.Distance(xv, xv_ym);
-      const Real dx3 = threed ? coords.Distance(xv_zm, xv_zp) : Fuzz<Real>();
-      const Real dx3_ym = threed ? coords.Distance(xv_ymzm, xv_ymzp) : Fuzz<Real>();
+      const Real dx1 = xv_xp[0] - xv_xm[0];
+      const Real dx1_ym = xv_xpym[0] - xv_xmym[0];
+      const Real dx2 = xv[1] - xv_ym[1];
+      const Real dx3 = threed ? (xv_zp[2] - xv_zm[2]) : Fuzz<Real>();
+      const Real dx3_ym = threed ? (xv_ymzp[2] - xv_ymzm[2]) : Fuzz<Real>();
 
       // T_1^2 = dv^2/dx1 + h1^2/h2^2 dv^1/dx2
 
@@ -317,11 +317,11 @@ StrainTensorFace(parthenon::team_mbr_t const &member, const int b, const int n,
 
       const auto &hx_zm = coords_zm.GetScaleFactors();
 
-      const Real dx1 = coords.Distance(xv_xm, xv_xp);
-      const Real dx1_zm = coords.Distance(xv_xmzm, xv_xpzm);
-      const Real dx2 = coords.Distance(xv_ym, xv_yp);
-      const Real dx2_zm = coords.Distance(xv_ymzm, xv_ypzm);
-      const Real dx3 = coords.Distance(xv, xv_zm);
+      const Real dx1 = xv_xp[0] - xv_xm[0];
+      const Real dx1_zm = xv_xpzm[0] - xv_xmzm[0];
+      const Real dx2 = xv_yp[1] - xv_ym[1];
+      const Real dx2_zm = xv_ypzm[1] - xv_ymzm[1];
+      const Real dx3 = xv[2] - xv_zm[2];
 
       // T_1^3 = dv^3/dx1 + h1^2/h3^2 dv^1/dx3
 

@@ -15,6 +15,8 @@
 #include <fstream>
 
 #include "artemis_utils.hpp"
+#include "nbody/nbody_utils.hpp"
+#include "units.hpp"
 
 namespace ArtemisUtils {
 
@@ -28,6 +30,7 @@ void PrintArtemisConfiguration(Packages_t &packages) {
     const auto nx = params.Get<std::array<int, 3>>("prob_dim");
     const int nd = (nx[0] > 1) + (nx[1] > 1) + (nx[2] > 1);
     const auto nb = params.Get<std::array<int, 3>>("mb_dim");
+    const auto units = params.Get<Units>("units");
     std::string msg = "";
     if (params.Get<bool>("do_gas")) msg += "Gas\n";
     if (params.Get<bool>("do_dust")) msg += hfill + "Dust\n";
@@ -39,7 +42,7 @@ void PrintArtemisConfiguration(Packages_t &packages) {
     if (params.Get<bool>("do_drag")) msg += hfill + "Drag\n";
     if (params.Get<bool>("do_nbody")) msg += hfill + "N-body\n";
     if (params.Get<bool>("do_radiation")) msg += hfill + "IMC radiation\n";
-    printf("\n=====================================================\n");
+    printf("\n=======================================================\n");
     printf("  ARTEMIS\n");
     printf("    name:            %s\n", params.Get<std::string>("job_name").c_str());
     printf("    problem:         %s\n", params.Get<std::string>("pgen_name").c_str());
@@ -48,8 +51,41 @@ void PrintArtemisConfiguration(Packages_t &packages) {
     printf("    MPI ranks:       %d\n", parthenon::Globals::nranks);
     printf("    dimensions:      %dx%dx%d\n", nx[0], nx[1], nx[2]);
     printf("    meshblock:       %dx%dx%d\n", nb[0], nb[1], nb[2]);
+    printf("    Unit System:  %s\n", units.GetSystemName().c_str());
+    printf("                  [L] = %.2e\n", units.GetLengthCodeToPhysical());
+    printf("                  [M] = %.2e\n", units.GetMassCodeToPhysical());
+    printf("                  [T] = %.2e\n", units.GetTimeCodeToPhysical());
+    printf("                  [K] = %.2e\n", units.GetTemperatureCodeToPhysical());
     printf("    Active physics:  %s", msg.c_str());
-    printf("=====================================================\n\n");
+
+    if (params.Get<bool>("do_nbody")) {
+
+      auto nbody_pkg = packages.Get("nbody");
+      auto particles = nbody_pkg->Param<ParArray1D<NBody::Particle>>("particles");
+      auto particles_h = particles.GetHostMirrorAndCopy();
+      auto npart = particles_h.size();
+      printf("      %d NBody particle(s)\n", static_cast<int>(npart));
+      printf("      |_\n");
+      for (int n = 0; n < npart; n++) {
+        auto &part = particles_h(n);
+        printf("        Particle      %2d:\n", part.id);
+        printf("        |            mass: %.2e\n", part.GM);
+        printf("        |         coupled: %s\n", part.couple == 1 ? "yes" : "no");
+        printf("        |            live: %s\n", part.live == 1 ? "yes" : "no");
+        printf("        |       softening: %s\n",
+               part.spline == 1 ? "spline" : "plummer");
+        printf("        |          radius: %.2e\n", part.rs);
+        printf("        | accretion rates: gamma=%.2e\n", part.gamma);
+        printf("        |                   beta=%.2e\n", part.beta);
+        printf("        |          radius: %.2e\n", part.racc);
+        printf("        |        position: (%.2e,%.2e,%.2e)\n", part.pos[0], part.pos[1],
+               part.pos[2]);
+        printf("        |        velocity: (%.2e,%.2e,%.2e)\n", part.vel[0], part.vel[1],
+               part.vel[2]);
+        printf("        -----------------------------------------------\n");
+      }
+    }
+    printf("=======================================================\n\n");
   }
 }
 
@@ -113,6 +149,52 @@ std::vector<std::vector<Real>> loadtxt(std::string fname) {
   }
   ifs.close();
   return table;
+}
+
+KOKKOS_FUNCTION
+Real CutCell2D(const std::array<Real, 4> &x, const std::array<Real, 4> &y,
+               const std::array<Real, 2> &xc, const std::array<Real, 2> &nx) {
+  // Cuts a 2D rectangle with the given plane
+  // The volume is computed using the divergence theorem, V = \int div(x) dV
+
+  auto plane_distance = [&xc, &nx](const Real px, const Real py) {
+    return nx[0] * (px - xc[0]) + nx[1] * (py - xc[1]);
+  };
+  const Real x0 = x[0];
+  const Real y0 = y[0];
+  auto contrib = [&x0, &y0](const Real xi, const Real yi, const Real xj, const Real yj) {
+    return 0.5 * ((xi - x0) * (yj - y0) - (xj - x0) * (yi - y0));
+  };
+  Real vol_inside = 0.0;
+  Real vol = 0.0;
+
+  // Loop through the edges of the quad
+  for (int i = 0; i < 4; i++) {
+    const int j = (i + 1) % 4;
+    vol += contrib(x[i], y[i], x[j], y[j]);
+
+    // distance to the plane
+    const Real di = plane_distance(x[i], y[i]);
+    const Real dj = plane_distance(x[j], y[j]);
+
+    // are we removing the point
+    const int clipi = (di < 0.0);
+    const int clipj = (dj < 0.0);
+
+    // intersection point
+    const Real xp =
+        (std::abs(di) * x[j] + std::abs(dj) * x[i]) / (std::abs(di) + std::abs(dj));
+    const Real yp =
+        (std::abs(di) * y[j] + std::abs(dj) * y[i]) / (std::abs(di) + std::abs(dj));
+
+    const Real x1 = (clipi) ? xp : x[i];
+    const Real y1 = (clipi) ? yp : y[i];
+    const Real x2 = (clipj) ? xp : x[j];
+    const Real y2 = (clipj) ? yp : y[j];
+
+    vol_inside += ((clipi + clipj) <= 1) * contrib(x1, y1, x2, y2);
+  }
+  return vol_inside / vol;
 }
 
 } // namespace ArtemisUtils

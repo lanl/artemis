@@ -117,12 +117,12 @@ class Particle {
     const Real rs2 = SQR(rs);
 
     // plummer
-    const Real idr1_p = 1.0 / std::sqrt(dr2 + rs2);
+    const Real idr1_p = 1.0 / std::sqrt(dr2 + rs2 + Fuzz<Real>());
 
     // spline
     const Real dr1 = std::sqrt(dr2);
-    const Real hinv = 1. / rs;
-    const Real u2 = dr2 / rs2;
+    const Real hinv = 1. / (rs + Fuzz<Real>());
+    const Real u2 = dr2 / (rs2 + Fuzz<Real>());
     const Real u = std::sqrt(u2);
     const Real u3 = u * u2;
     const Real u4 = u2 * u2;
@@ -145,14 +145,14 @@ class Particle {
     const Real rs2 = SQR(rs);
 
     // plummer
-    const Real idr3_p = 1.0 / (std::sqrt(dr2 + rs2) * (dr2 + rs2));
+    const Real idr3_p = 1.0 / (Fuzz<Real>() + std::sqrt(dr2 + rs2) * (dr2 + rs2));
 
     // spline
     const Real dr3 = dr2 * std::sqrt(dr2);
-    const Real u2 = dr2 / rs2;
+    const Real u2 = dr2 / (rs2 + Fuzz<Real>());
     const Real u = std::sqrt(u2);
     const Real u3 = u * u2;
-    const Real h3inv = 1. / (rs2 * rs);
+    const Real h3inv = 1. / (rs2 * rs + Fuzz<Real>());
     const Real idr3_s =
         (dr2 >= rs2) ? 1.0 / dr3
                      : ((u < 0.5) ? h3inv * (32.0 / 3.0 - 192.0 / 5.0 * u2 + 32.0 * u3)
@@ -198,7 +198,9 @@ class Particle {
     const Real dv2 = SQR(dv[0]) + SQR(dv[1]) + SQR(dv[2]);
 
     // Convert the gas coordinates to a spherical system centered on the particle
-    const auto &[dr, er, et, ep] = CartToSph(dx);
+    const auto &[dr, ex1, ex2, ex3] = CartToSph(dx);
+    std::array<Real, 3> et{ex1[1], ex2[1], ex3[1]};
+    std::array<Real, 3> ep{ex1[2], ex2[2], ex3[2]};
 
     // Pull out the tangential relative velociteis
     const Real dvt = dv[0] * et[0] + dv[1] * et[1] + dv[2] * et[2];

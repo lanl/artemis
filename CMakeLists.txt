@@ -1,5 +1,5 @@
 # ========================================================================================
-#  (C) (or copyright) 2023-2024. Triad National Security, LLC. All rights reserved.
+#  (C) (or copyright) 2023-2025. Triad National Security, LLC. All rights reserved.
 #
 #  This program was produced under U.S. Government contract 89233218CNA000001 for Los
 #  Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -24,6 +24,11 @@ option(ARTEMIS_ENABLE_MPI "Enable MPI for artemis and all dependencies" ON)
 option(ARTEMIS_ENABLE_OPENMP "Enable OpenMP for artemis and parthenon" OFF)
 option(ARTEMIS_ENABLE_COMPILE_TIMING "Enable timing of compilation of artemis" ON)
 option(ARTEMIS_ENABLE_ASAN "Enable AddressSanitizer to detect memory errors" OFF)
+option(ARTEMIS_PORTABLE_RESTART "Enable portable data types for REBOUND restarts" ON)
+
+# Force -03 optimization for RelWithDebInfo
+set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O3 -g -DNDEBUG" CACHE STRING "Force -O3 in RelWithDebInfo mode" FORCE)
+set(CMAKE_C_FLAGS_RELWITHDEBINFO "-O3 -g -DNDEBUG" CACHE STRING "Force -O3 in RelWithDebInfo mode" FORCE)
 
 # Timing of compilation
 if (ARTEMIS_ENABLE_COMPILE_TIMING)
@@ -119,6 +124,11 @@ if(ARTEMIS_ENABLE_ASAN)
   add_link_options(-fsanitize=address -fsanitize=undefined)
 endif()
 
+if(${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
+  # silence sprintf warnings on mac
+  add_compile_options(-Wno-deprecated-declarations)
+endif()
+
 # NOTE(@jonahm): For some reason, order still matters for including
 # parthenon and singularity. Likely has to do with project
 # includes other than Kokkos. MPI and OpenMP likely culprits.
@@ -186,7 +196,8 @@ set(ARTEMIS_SINGULARITY_INCLUDE_PATHS
     ${CMAKE_CURRENT_SOURCE_DIR}/external/singularity-eos/utils/variant/include
     ${CMAKE_CURRENT_SOURCE_DIR}/external/singularity-opac/utils
     ${CMAKE_CURRENT_SOURCE_DIR}/src
-    ${CMAKE_CURRENT_SOURCE_DIR})
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/generated>)
 
 # Set Jaybenne config options and paths
 # NOTE(@pdmullen): For the life of us, we are still not sure why we can't treat
@@ -199,6 +210,8 @@ set(JAYBENNE_EOS_TYPE "ArtemisUtils::EOS")
 set(JAYBENNE_OPACITY_HEADER "${CMAKE_CURRENT_SOURCE_DIR}/src/utils/opacity/opacity.hpp")
 set(JAYBENNE_ABSORPTION_OPACITY_TYPE "ArtemisUtils::Opacity")
 set(JAYBENNE_SCATTERING_OPACITY_TYPE "ArtemisUtils::Scattering")
+set(JAYBENNE_ABSORPTION_MEAN_OPACITY_TYPE "ArtemisUtils::MeanOpacity")
+set(JAYBENNE_SCATTERING_MEAN_OPACITY_TYPE "ArtemisUtils::MeanScattering")
 set(JAYBENNE_SINGULARITY_INCLUDE_PATHS ${ARTEMIS_SINGULARITY_INCLUDE_PATHS})
 
 # Point Jaybenne at the correct Artemis variables

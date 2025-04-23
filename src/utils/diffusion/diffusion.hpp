@@ -94,9 +94,9 @@ Real EstimateTimestep(MeshData<Real> *md, DiffCoeffParams &dp, PKG &pkg, const E
           // Get the maximum diffusion coefficient (if there's more than one)
           DiffusionCoeff<DIFF, GEOM, FLUID_TYPE> diffcoeff;
           Real mu = diffcoeff.Get(dp, coords, dens, sie, eos);
-          if constexpr (DIFF == DiffType::conductivity_const) {
+          if constexpr (DIFF == DiffType::conductivity_plaw) {
             mu /= (dens * eos.SpecificHeatFromDensityInternalEnergy(dens, sie));
-          } else if constexpr ((DIFF == DiffType::viscosity_const) ||
+          } else if constexpr ((DIFF == DiffType::viscosity_plaw) ||
                                (DIFF == DiffType::viscosity_alpha)) {
             mu *= (1.0 + (dp.eta > 1.0) * (dp.eta - 1.0)) / dens;
           }

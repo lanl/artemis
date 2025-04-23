@@ -92,7 +92,7 @@ TaskStatus Advance(Mesh *pm, const Real time, const int stage,
   auto pforce = nbody_pkg->Param<ParArray2D<Real>>("particle_force");
   auto pforce_tot = nbody_pkg->Param<ParArray2D<Real>>("particle_force_tot");
   auto pforce_step = nbody_pkg->Param<ParArray2D<Real>>("particle_force_step");
-  auto reb_sim = nbody_pkg->Param<struct reb_simulation *>("reb_sim");
+  auto reb_sim = nbody_pkg->Param<RebSim>("reb_sim");
 
   // Extract integrators/weights
   // NOTE(PDM): reb_integ is the rebound integrator pushing particles.  nbody_integ is the
@@ -130,12 +130,16 @@ TaskStatus Advance(Mesh *pm, const Real time, const int stage,
   }
 #endif
 
-  struct reb_simulation *r_sim = nullptr;
+  RebSim r_sim;
   if (parthenon::Globals::my_rank == 0) {
     // Advance the simulation.  If this is the final stage, advance the master simulation.
     // If not, advance a copy of the master.
     int sid = disable_stderr();
-    r_sim = (stage < nstages) ? reb_simulation_copy(reb_sim) : reb_sim;
+    if (stage < nstages) {
+      r_sim.copy(reb_sim);
+    } else {
+      r_sim = reb_sim;
+    }
     SetReboundPtrs(r_sim);
     enable_stderr(sid);
 
@@ -143,7 +147,7 @@ TaskStatus Advance(Mesh *pm, const Real time, const int stage,
     for (int n = 0; n < npart; n++) {
       // Update the current estimate for this steps force
       for (int i = 0; i < 7; i++) {
-        pforce_step_h(n, i) = gam0 * pforce_step_h(n, i) + gam1 * dt * pforce_h(n, i);
+        pforce_step_h(n, i) = gam0 * pforce_step_h(n, i) + gam1 * pforce_h(n, i);
       }
 
       const int id = particle_id[n];
@@ -154,9 +158,9 @@ TaskStatus Advance(Mesh *pm, const Real time, const int stage,
         struct reb_particle *pl = reb_simulation_particle_by_hash(r_sim, n + 1);
         if (pl != nullptr) {
           const Real mp = pl->m;
-          pl->vx += mscale * pforce_step_h(n, 1) / mp;
-          pl->vy += mscale * pforce_step_h(n, 2) / mp;
-          pl->vz += mscale * pforce_step_h(n, 3) / mp;
+          pl->vx += mscale * dt_stage * pforce_step_h(n, 1) / mp;
+          pl->vy += mscale * dt_stage * pforce_step_h(n, 2) / mp;
+          pl->vz += mscale * dt_stage * pforce_step_h(n, 3) / mp;
         }
       }
     }
@@ -177,11 +181,6 @@ TaskStatus Advance(Mesh *pm, const Real time, const int stage,
   // Update our copies of the particle positions and velocities
   SyncWithRebound(r_sim, particle_id, particles);
 
-  // Free the rebound copy if we are not on the last stage
-  if ((parthenon::Globals::my_rank == 0) && (stage < nstages)) {
-    reb_simulation_free(r_sim);
-  }
-
   // Reset pforce for next step
   for (int n = 0; n < npart; n++) {
     for (int i = 0; i < 7; i++) {
@@ -192,14 +191,16 @@ TaskStatus Advance(Mesh *pm, const Real time, const int stage,
 
   // On the final stage, add the final force (i.e., the one that actually updated the
   // particles) for this step to the running total and reset the force for the next step
-  if ((parthenon::Globals::my_rank == 0) && (stage == nstages)) {
-    for (int n = 0; n < npart; n++) {
-      for (int i = 0; i < 7; i++) {
-        pforce_tot_h(n, i) += pforce_step_h(n, i);
-        pforce_step_h(n, i) = 0.0;
+  if (parthenon::Globals::my_rank == 0) {
+    if (stage == nstages) {
+      for (int n = 0; n < npart; n++) {
+        for (int i = 0; i < 7; i++) {
+          pforce_tot_h(n, i) += dt_stage * pforce_step_h(n, i);
+          pforce_step_h(n, i) = 0.0;
+        }
       }
+      pforce_tot.DeepCopy(pforce_tot_h);
     }
-    pforce_tot.DeepCopy(pforce_tot_h);
     pforce_step.DeepCopy(pforce_step_h);
   }
 

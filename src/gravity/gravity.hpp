@@ -18,8 +18,7 @@
 
 // Artemis includes
 #include "artemis.hpp"
-
-using namespace parthenon::package::prelude;
+#include "utils/units.hpp"
 
 namespace Gravity {
 
@@ -94,7 +93,9 @@ struct Orbit {
   }
 };
 
-std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
+std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
+                                            const ArtemisUtils::Constants &constants,
+                                            const Packages_t &packages);
 
 template <Coordinates GEOM>
 TaskStatus UniformGravity(MeshData<Real> *md, const Real time, const Real dt);

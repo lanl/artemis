@@ -52,17 +52,20 @@ KOKKOS_INLINE_FUNCTION void UpwindAdvance(const V1 &v0, const V1 &v1, const Real
     Real &u0_m2 = v0(b, gas::cons::momentum(VI(n, 1)), k, j, i);
     Real &u0_m3 = v0(b, gas::cons::momentum(VI(n, 2)), k, j, i);
     Real &u0_et = v0(b, gas::cons::total_energy(n), k, j, i);
+    Real &u0_ei = v0(b, gas::cons::internal_energy(n), k, j, i);
     const Real &u1_dn = v1(b, gas::cons::density(n), k, j, i);
     const Real &u1_m1 = v1(b, gas::cons::momentum(VI(n, 0)), k, j, i);
     const Real &u1_m2 = v1(b, gas::cons::momentum(VI(n, 1)), k, j, i);
     const Real &u1_m3 = v1(b, gas::cons::momentum(VI(n, 2)), k, j, i);
     const Real &u1_et = v1(b, gas::cons::total_energy(n), k, j, i);
+    const Real &u1_ei = v1(b, gas::cons::internal_energy(n), k, j, i);
 
     u0_dn = g0 * u0_dn + g1 * u1_dn + fac * (qp[0] - q[0]);
     u0_m1 = g0 * u0_m1 + g1 * u1_m1 + fac * (qp[1] - q[1]);
     u0_m2 = g0 * u0_m2 + g1 * u1_m2 + fac * (qp[2] - q[2]);
     u0_m3 = g0 * u0_m3 + g1 * u1_m3 + fac * (qp[3] - q[3]);
     u0_et = g0 * u0_et + g1 * u1_et + fac * (qp[4] - q[4]);
+    u0_ei = g0 * u0_ei + g1 * u1_ei + fac * (qp[5] - q[5]);
   } else {
     Real &u0_dn = v0(b, dust::cons::density(n), k, j, i);
     Real &u0_m1 = v0(b, dust::cons::momentum(VI(n, 0)), k, j, i);
@@ -109,6 +112,7 @@ KOKKOS_INLINE_FUNCTION void UpwindReconstruct(const V1 &vmesh, V2 &arr, const in
     ReconSingle<UDIR, gas::cons::momentum>(vmesh, arr, 2, b, VI(n, 1), k, j, i);
     ReconSingle<UDIR, gas::cons::momentum>(vmesh, arr, 3, b, VI(n, 2), k, j, i);
     ReconSingle<UDIR, gas::cons::total_energy>(vmesh, arr, 4, b, n, k, j, i);
+    ReconSingle<UDIR, gas::cons::internal_energy>(vmesh, arr, 5, b, n, k, j, i);
   } else {
     ReconSingle<UDIR, dust::cons::density>(vmesh, arr, 0, b, n, k, j, i);
     ReconSingle<UDIR, dust::cons::momentum>(vmesh, arr, 1, b, VI(n, 0), k, j, i);
@@ -139,14 +143,14 @@ KOKKOS_INLINE_FUNCTION void Upwind(const V1 &v0, const V1 &v1, const Real g0,
 
   // reconstruct and advance
   for (int n = 0; n < nu; ++n) {
-    auto uup = NewArray<Real, 5>();
+    auto uup = NewArray<Real, 6>();
     UpwindReconstruct<FLUID_TYPE, UDIR>(v0, uup, b, n, k, jstart + joff, i);
-    auto uu = NewArray<Real, 5>();
+    auto uu = NewArray<Real, 6>();
     UpwindReconstruct<FLUID_TYPE, UDIR>(v0, uu, b, n, k, jstart, i);
-    auto uum = NewArray<Real, 5>();
+    auto uum = NewArray<Real, 6>();
     for (int j = jb.s; j < jb.e; ++j) {
       const int jswp = l_stencil * j + r_stencil * (jb.e - (j - jb.s));
-      auto uum = NewArray<Real, 5>();
+      auto uum = NewArray<Real, 6>();
       UpwindReconstruct<FLUID_TYPE, UDIR>(v0, uum, b, n, k, jswp - joff, i);
       UpwindAdvance<FLUID_TYPE, UDIR>(v0, v1, g0, g1, uup, uu, wdt, b, n, k, jswp, i);
       uup = uu;
@@ -184,7 +188,8 @@ static TaskStatus UpwindAdvection(MeshData<Real> *u0, MeshData<Real> *u1, const 
   // Packing and indexing
   static auto desc =
       MakePackDescriptor<gas::cons::density, gas::cons::momentum, gas::cons::total_energy,
-                         dust::cons::density, dust::cons::momentum>(resolved_pkgs.get());
+                         gas::cons::internal_energy, dust::cons::density,
+                         dust::cons::momentum>(resolved_pkgs.get());
   auto v0 = desc.GetPack(u0);
   auto v1 = desc.GetPack(u1);
   const int nblocks = u0->NumBlocks();
@@ -219,20 +224,7 @@ static TaskStatus UpwindAdvection(MeshData<Real> *u0, MeshData<Real> *u1, const 
 static TaskCollection LinearAdvectionStep(Mesh *pmesh, const Real time, const Real dt,
                                           parthenon::LowStorageIntegrator *integrator) {
   TaskCollection tc;
-
-  // Compatibility checks
-  // ... multi_d
   if (!(pmesh->ndim >= 2)) return tc;
-  // ...de_switch disabled (TODO(@pdmullen)....)
-  auto &artemis_pkg = pmesh->packages.Get("artemis");
-  const bool do_gas = artemis_pkg->template Param<bool>("do_gas");
-  const bool do_dust = artemis_pkg->template Param<bool>("do_dust");
-  if (do_gas) {
-    const Real de_switch =
-        pmesh->packages.Get("gas").get()->template Param<Real>("de_switch");
-    PARTHENON_REQUIRE(de_switch == 0.0, "Internal energy equation evolution currently "
-                                        "incompatible with linear advection");
-  }
 
   // Construct TaskCollection
   using namespace ::parthenon::Update;

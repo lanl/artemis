@@ -25,34 +25,24 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   auto pkg = std::make_shared<StateDescriptor>("rotating_frame");
   Params &params = pkg->AllParams();
 
+  const std::string sys = pin->GetString("artemis", "coordinates");
   const Real omega = pin->GetReal("rotating_frame", "omega");
   const Real qshear = pin->GetOrAddReal("rotating_frame", "qshear", 0.0);
-
   PARTHENON_REQUIRE(omega != 0.0, "rotating_frame/omega cannot be zero! To disable, set "
                                   "physics/rotating_frame = false");
-
-  if (pin->GetString("artemis", "coordinates") != "cartesian") {
-    PARTHENON_REQUIRE(
-        qshear == 0.0,
-        "rotating_frame/qshear must be zero for non-Cartesian coordinate systems!");
-  }
+  PARTHENON_REQUIRE(
+      qshear == 0.0 || sys == "cartesian",
+      "rotating_frame/qshear must be zero for non-Cartesian coordinate systems!");
 
   params.Add("omega", omega);
   params.Add("qshear", qshear);
-
-  // turn off vertical gravity in shearingbox
 
   return pkg;
 }
 
 //----------------------------------------------------------------------------------------
 //! \fn  TaskStatus RotatingFrame::RotatingFrameForce
-//! \brief Calculate the rotating frame body forces
-//!           For cartesian this function adds:
-//!            dv/dt = -2 Omega x v - Omega x Omega x r
-//!            dE/dt = - v. Omega x Omega x r
-//!           For cyl/axi/sph this function only adds
-//!             dE/dt = - v. Omega x Omega x r
+//! \brief
 TaskStatus RotatingFrameForce(MeshData<Real> *md, const Real time, const Real dt) {
   using parthenon::MakePackDescriptor;
   using TE = parthenon::TopologicalElement;

@@ -92,6 +92,8 @@ enum class Coordinates {
 };
 // ...Riemann solvers
 enum class RSolver { hllc, hlle, llf, null };
+// ... Upwinding
+enum class Upwind { l, r };
 // ...Reconstrution algorithms
 enum class ReconstructionMethod { pcm, plm, ppm, null };
 // ...Fluid types

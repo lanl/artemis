@@ -244,6 +244,18 @@ Real EstimateTimestepMesh(MeshData<Real> *md) {
   auto &dust_pkg = pm->packages.Get("dust");
   auto &params = dust_pkg->AllParams();
 
+  // NOTE(@pdmullen): Without FARGO, integration of the residual eqs must have a dt
+  // limited by vy = dvy + vy0 = dvy - q Omega x
+  bool do_shear = false;
+  Real qomega = 0.0;
+  if (pm->packages.Get("artemis")->Param<bool>("do_rotating_frame")) {
+    auto &rframe_pkg = pm->packages.Get("rotating_frame");
+    const Real omega = rframe_pkg->Param<Real>("omega");
+    const Real qshear = rframe_pkg->Param<Real>("qshear");
+    qomega = qshear * omega;
+    do_shear = (qomega >= 0.0);
+  }
+
   static auto desc =
       MakePackDescriptor<dust::prim::density, dust::prim::velocity>(resolved_pkgs.get());
   auto vmesh = desc.GetPack(md);
@@ -264,7 +276,9 @@ Real EstimateTimestepMesh(MeshData<Real> *md) {
         for (int n = 0; n < vmesh.GetSize(b, dust::prim::density()); ++n) {
           Real denom = 0.0;
           for (int d = 0; d < ndim; d++) {
-            denom += std::abs(vmesh(b, dust::prim::velocity(VI(n, d)), k, j, i)) / dx[d];
+            Real vd = vmesh(b, dust::prim::velocity(VI(n, d)), k, j, i);
+            vd -= (do_shear) * (qomega * coords.x1v());
+            denom += std::abs(vd) / dx[d];
           }
           ldt = std::min(ldt, 1.0 / denom);
         }

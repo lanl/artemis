@@ -31,6 +31,9 @@ void PrimToCons(T *md);
 template <Coordinates GEOM>
 void PostInitialization(MeshBlock *pmb, ParameterInput *pin);
 
+template <Coordinates GEOM>
+TaskCollection SyncFields(Mesh *pmesh, const Real time, const Real dt);
+
 } // namespace ArtemisDerived
 
 #endif // DERIVED_FILL_DERIVED_HPP_

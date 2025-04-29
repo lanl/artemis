@@ -21,7 +21,7 @@
 #include "artemis.hpp"
 
 // NOTE(PDMM): The following is taken directly from the open-source AthenaK software, and
-// adapted for Parthenon/Artemis by PDMM
+// adapted for Parthenon/Artemis by PDM
 
 namespace ArtemisUtils {
 //----------------------------------------------------------------------------------------

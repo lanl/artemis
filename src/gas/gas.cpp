@@ -428,6 +428,18 @@ Real EstimateTimestepMesh(MeshData<Real> *md) {
   auto &params = gas_pkg->AllParams();
   auto eos_d = params.template Get<EOS>("eos_d");
 
+  // NOTE(@pdmullen): Without FARGO, integration of the residual eqs must have a dt
+  // limited by vy = dvy + vy0 = dvy - q Omega x
+  bool do_shear = false;
+  Real qomega = 0.0;
+  if (pm->packages.Get("artemis")->Param<bool>("do_rotating_frame")) {
+    auto &rframe_pkg = pm->packages.Get("rotating_frame");
+    const Real omega = rframe_pkg->Param<Real>("omega");
+    const Real qshear = rframe_pkg->Param<Real>("qshear");
+    qomega = qshear * omega;
+    do_shear = (qomega >= 0.0);
+  }
+
   static auto desc =
       MakePackDescriptor<gas::prim::density, gas::prim::velocity, gas::prim::sie>(
           resolved_pkgs.get());
@@ -453,8 +465,9 @@ Real EstimateTimestepMesh(MeshData<Real> *md) {
           const Real cs = std::sqrt(bulk / dens);
           Real denom = 0.0;
           for (int d = 0; d < ndim; d++) {
-            const Real ss =
-                std::abs(vmesh(b, gas::prim::velocity(VI(n, d)), k, j, i)) + cs;
+            Real vd = vmesh(b, gas::prim::velocity(VI(n, d)), k, j, i);
+            vd -= (do_shear) * (qomega * coords.x1v());
+            const Real ss = std::abs(vd) + cs;
             denom += ss / dx[d];
           }
           ldt = std::min(ldt, 1.0 / denom);
@@ -726,38 +739,33 @@ void AddHistory(Coordinates coords, Params &params) {
 
 //----------------------------------------------------------------------------------------
 //! template instantiations
-template Real EstimateTimestepMesh<Coordinates::cartesian>(MeshData<Real> *md);
-template Real EstimateTimestepMesh<Coordinates::cylindrical>(MeshData<Real> *md);
-template Real EstimateTimestepMesh<Coordinates::spherical1D>(MeshData<Real> *md);
-template Real EstimateTimestepMesh<Coordinates::spherical2D>(MeshData<Real> *md);
-template Real EstimateTimestepMesh<Coordinates::spherical3D>(MeshData<Real> *md);
-template Real EstimateTimestepMesh<Coordinates::axisymmetric>(MeshData<Real> *md);
+typedef MeshData<Real> MD;
+template Real EstimateTimestepMesh<Coordinates::cartesian>(MD *md);
+template Real EstimateTimestepMesh<Coordinates::cylindrical>(MD *md);
+template Real EstimateTimestepMesh<Coordinates::spherical1D>(MD *md);
+template Real EstimateTimestepMesh<Coordinates::spherical2D>(MD *md);
+template Real EstimateTimestepMesh<Coordinates::spherical3D>(MD *md);
+template Real EstimateTimestepMesh<Coordinates::axisymmetric>(MD *md);
 
-template TaskStatus ViscousFlux<Coordinates::cartesian>(MeshData<Real> *md);
-template TaskStatus ViscousFlux<Coordinates::spherical1D>(MeshData<Real> *md);
-template TaskStatus ViscousFlux<Coordinates::spherical2D>(MeshData<Real> *md);
-template TaskStatus ViscousFlux<Coordinates::spherical3D>(MeshData<Real> *md);
-template TaskStatus ViscousFlux<Coordinates::cylindrical>(MeshData<Real> *md);
-template TaskStatus ViscousFlux<Coordinates::axisymmetric>(MeshData<Real> *md);
+template TaskStatus ViscousFlux<Coordinates::cartesian>(MD *md);
+template TaskStatus ViscousFlux<Coordinates::spherical1D>(MD *md);
+template TaskStatus ViscousFlux<Coordinates::spherical2D>(MD *md);
+template TaskStatus ViscousFlux<Coordinates::spherical3D>(MD *md);
+template TaskStatus ViscousFlux<Coordinates::cylindrical>(MD *md);
+template TaskStatus ViscousFlux<Coordinates::axisymmetric>(MD *md);
 
-template TaskStatus ThermalFlux<Coordinates::cartesian>(MeshData<Real> *md);
-template TaskStatus ThermalFlux<Coordinates::spherical1D>(MeshData<Real> *md);
-template TaskStatus ThermalFlux<Coordinates::spherical2D>(MeshData<Real> *md);
-template TaskStatus ThermalFlux<Coordinates::spherical3D>(MeshData<Real> *md);
-template TaskStatus ThermalFlux<Coordinates::cylindrical>(MeshData<Real> *md);
-template TaskStatus ThermalFlux<Coordinates::axisymmetric>(MeshData<Real> *md);
+template TaskStatus ThermalFlux<Coordinates::cartesian>(MD *md);
+template TaskStatus ThermalFlux<Coordinates::spherical1D>(MD *md);
+template TaskStatus ThermalFlux<Coordinates::spherical2D>(MD *md);
+template TaskStatus ThermalFlux<Coordinates::spherical3D>(MD *md);
+template TaskStatus ThermalFlux<Coordinates::cylindrical>(MD *md);
+template TaskStatus ThermalFlux<Coordinates::axisymmetric>(MD *md);
 
-template TaskStatus DiffusionUpdate<Coordinates::cartesian>(MeshData<Real> *md,
-                                                            const Real dt);
-template TaskStatus DiffusionUpdate<Coordinates::spherical1D>(MeshData<Real> *md,
-                                                              const Real dt);
-template TaskStatus DiffusionUpdate<Coordinates::spherical2D>(MeshData<Real> *md,
-                                                              const Real dt);
-template TaskStatus DiffusionUpdate<Coordinates::spherical3D>(MeshData<Real> *md,
-                                                              const Real dt);
-template TaskStatus DiffusionUpdate<Coordinates::cylindrical>(MeshData<Real> *md,
-                                                              const Real dt);
-template TaskStatus DiffusionUpdate<Coordinates::axisymmetric>(MeshData<Real> *md,
-                                                               const Real dt);
+template TaskStatus DiffusionUpdate<Coordinates::cartesian>(MD *md, const Real dt);
+template TaskStatus DiffusionUpdate<Coordinates::spherical1D>(MD *md, const Real dt);
+template TaskStatus DiffusionUpdate<Coordinates::spherical2D>(MD *md, const Real dt);
+template TaskStatus DiffusionUpdate<Coordinates::spherical3D>(MD *md, const Real dt);
+template TaskStatus DiffusionUpdate<Coordinates::cylindrical>(MD *md, const Real dt);
+template TaskStatus DiffusionUpdate<Coordinates::axisymmetric>(MD *md, const Real dt);
 
 } // namespace Gas

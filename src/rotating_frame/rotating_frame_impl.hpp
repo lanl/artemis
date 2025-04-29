@@ -71,7 +71,7 @@ TaskStatus ShearingBoxImpl(MeshData<Real> *md, const Real om0, const Real qshear
             const Real rdt = dd * dt;
             vmesh(b, gas::cons::momentum(VI(n, 0)), k, j, i) += rdt * two_om * v2;
             vmesh(b, gas::cons::momentum(VI(n, 1)), k, j, i) += rdt * qm2_om * v1;
-            vmesh(b, gas::cons::momentum(VI(n, 1)), k, j, i) += rdt * g3;
+            vmesh(b, gas::cons::momentum(VI(n, 2)), k, j, i) += rdt * g3;
             vmesh(b, gas::cons::total_energy(n), k, j, i) += rdt * v3 * g3;
           }
         }
@@ -84,7 +84,7 @@ TaskStatus ShearingBoxImpl(MeshData<Real> *md, const Real om0, const Real qshear
             const Real rdt = dd * dt;
             vmesh(b, dust::cons::momentum(VI(n, 0)), k, j, i) += rdt * two_om * v2;
             vmesh(b, dust::cons::momentum(VI(n, 1)), k, j, i) += rdt * qm2_om * v1;
-            vmesh(b, dust::cons::momentum(VI(n, 1)), k, j, i) += rdt * g3;
+            vmesh(b, dust::cons::momentum(VI(n, 2)), k, j, i) += rdt * g3;
           }
         }
       });

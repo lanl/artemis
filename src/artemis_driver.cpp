@@ -29,6 +29,7 @@
 #include "nbody/nbody.hpp"
 #include "radiation/imc/imc.hpp"
 #include "rotating_frame/rotating_frame.hpp"
+#include "sts/sts.hpp"
 #include "utils/integrators/artemis_integrator.hpp"
 
 using namespace parthenon::driver::prelude;
@@ -65,6 +66,7 @@ ArtemisDriver<GEOM>::ArtemisDriver(ParameterInput *pin, ApplicationInput *app_in
   do_conduction = artemis_pkg->template Param<bool>("do_conduction");
   do_nbody = artemis_pkg->template Param<bool>("do_nbody");
   do_diffusion = do_viscosity || do_conduction;
+  do_sts = artemis_pkg->template Param<bool>("do_sts");
   do_radiation = artemis_pkg->template Param<bool>("do_radiation");
 
   // NBody initialization tasks
@@ -103,10 +105,14 @@ TaskListStatus ArtemisDriver<GEOM>::Step() {
   // Prepare registers
   PreStepTasks();
 
+  // Execute STS first stage
+  if (do_sts) STSFirstStage();
+
   // Execute explicit, unsplit physics
   auto status = StepTasks().Execute();
   if (status != TaskListStatus::complete) return status;
 
+  // STS_second_stage();
   // Execute operator split physics
   if (do_radiation) status = IMC::JaybenneIMC<GEOM>(pmesh, tm.time, tm.dt);
   if (status != TaskListStatus::complete) return status;
@@ -136,6 +142,31 @@ void ArtemisDriver<GEOM>::PreStepTasks() {
   auto &base = pmesh->mesh_data.Get();
   auto &u0 = pmesh->mesh_data.AddShallow("u0", base, names);
   auto &u1 = pmesh->mesh_data.Add("u1", u0);
+}
+
+//----------------------------------------------------------------------------------------
+//! \fn TaskCollection ArtemisDriver::STS_first_stage
+//! \brief Define the tasks for the first stage of the STS integrator
+template <Coordinates GEOM>
+void ArtemisDriver<GEOM>::STSFirstStage() {
+
+  // Assign sts registers and First stage of STS integration
+  auto &gas_pkg = pmesh->packages.Get("gas");
+  auto min_diff_dt = gas_pkg->template Param<Real>("diff_dt");
+  auto &sts_pkg = pmesh->packages.Get("STS");
+  auto info_output = sts_pkg->template Param<bool>("info_output");
+  // compute the number of stages needed for the STS integrator (for rkl1 only)
+  int s_sts = static_cast<int>(0.5 * (-1. + std::sqrt(1. + 8. * tm.dt / min_diff_dt)));
+  if (s_sts % 2 == 0) s_sts += 1;
+
+  if (parthenon::Globals::my_rank == 0 && info_output) {
+    Real ratio = tm.dt / min_diff_dt;
+    std::cout << "STS ratio: " << ratio << ", Taking " << s_sts << " steps." << std::endl;
+    if (ratio > 200.0) {
+      std::cout << "WARNING: ratio is > 200. Proceed at own risk." << std::endl;
+    }
+  }
+  STS::PreStepSTSTasks<GEOM>(pmesh, tm.time, tm.dt, s_sts);
 }
 
 //----------------------------------------------------------------------------------------
@@ -186,7 +217,7 @@ TaskCollection ArtemisDriver<GEOM>::StepTasks() {
 
       // Compute (gas) diffusive fluxes
       TaskID diff_flx = none;
-      if (do_diffusion && do_gas) {
+      if (do_diffusion && do_gas && !(do_sts)) {
         auto zf = tl.AddTask(none, Gas::ZeroDiffusionFlux, u0.get());
         TaskID vflx = zf, tflx = zf;
         if (do_viscosity) vflx = tl.AddTask(zf, Gas::ViscousFlux<GEOM>, u0.get());
@@ -215,7 +246,8 @@ TaskCollection ArtemisDriver<GEOM>::StepTasks() {
       // NOTE(@pdmullen): I believe set_flx dependency implicitly inside gas_coord_src,
       // but included below explicitly for posterity
       TaskID gas_diff_src = gas_coord_src | diff_flx | set_flx;
-      if (do_diffusion && do_gas) {
+
+      if (do_diffusion && do_gas && !(do_sts)) {
         gas_diff_src = tl.AddTask(gas_coord_src | diff_flx | set_flx,
                                   Gas::DiffusionUpdate<GEOM>, u0.get(), bdt);
       }
@@ -252,18 +284,18 @@ TaskCollection ArtemisDriver<GEOM>::StepTasks() {
           tl.AddTask(cooling_src, ArtemisDerived::SetAuxillaryFields<GEOM>, u0.get());
 
       // Set (remaining) fields to be communicated
-      auto c2p = tl.AddTask(set_aux, PreCommFillDerived<MeshData<Real>>, u0.get());
+      auto pre_comm = tl.AddTask(set_aux, PreCommFillDerived<MeshData<Real>>, u0.get());
 
       // Set boundary conditions (both physical and logical)
-      auto bcs = parthenon::AddBoundaryExchangeTasks(c2p, tl, u0, pmesh->multilevel);
+      auto bcs = parthenon::AddBoundaryExchangeTasks(pre_comm, tl, u0, pmesh->multilevel);
 
-      // Sync fields
-      auto p2c = tl.AddTask(TQ::local_sync, bcs, FillDerived<MeshData<Real>>, u0.get());
+      // Update primitive variables
+      auto c2p = tl.AddTask(TQ::local_sync, bcs, FillDerived<MeshData<Real>>, u0.get());
 
       // Advance nbody integrator
-      TaskID nbadv = p2c;
+      TaskID nbadv = c2p;
       if (do_nbody) {
-        nbadv = tl.AddTask(TQ::once_per_region, p2c, NBody::Advance, pmesh, time, stage,
+        nbadv = tl.AddTask(TQ::once_per_region, c2p, NBody::Advance, pmesh, time, stage,
                            nbody_integrator.get());
       }
     }
@@ -280,6 +312,8 @@ TaskCollection ArtemisDriver<GEOM>::PostStepTasks() {
   using namespace ::parthenon::Update;
   TaskCollection tc;
   TaskID none(0);
+
+  // TODO: Implement RKL2 STS integration
 
   const int num_partitions = pmesh->DefaultNumPartitions();
   auto &post_region = tc.AddRegion(num_partitions);
@@ -305,31 +339,37 @@ typedef ApplicationInput AI;
 template ArtemisDriver<C::cartesian>::ArtemisDriver(PI *p, AI *a, M *m, const bool r);
 template TaskListStatus ArtemisDriver<C::cartesian>::Step();
 template void ArtemisDriver<C::cartesian>::PreStepTasks();
+template void ArtemisDriver<C::cartesian>::STSFirstStage();
 template TaskCollection ArtemisDriver<C::cartesian>::StepTasks();
 template TaskCollection ArtemisDriver<C::cartesian>::PostStepTasks();
 template ArtemisDriver<C::cylindrical>::ArtemisDriver(PI *p, AI *a, M *m, const bool r);
 template TaskListStatus ArtemisDriver<C::cylindrical>::Step();
 template void ArtemisDriver<C::cylindrical>::PreStepTasks();
+template void ArtemisDriver<C::cylindrical>::STSFirstStage();
 template TaskCollection ArtemisDriver<C::cylindrical>::StepTasks();
 template TaskCollection ArtemisDriver<C::cylindrical>::PostStepTasks();
 template ArtemisDriver<C::spherical1D>::ArtemisDriver(PI *p, AI *a, M *m, const bool r);
 template TaskListStatus ArtemisDriver<C::spherical1D>::Step();
 template void ArtemisDriver<C::spherical1D>::PreStepTasks();
+template void ArtemisDriver<C::spherical1D>::STSFirstStage();
 template TaskCollection ArtemisDriver<C::spherical1D>::StepTasks();
 template TaskCollection ArtemisDriver<C::spherical1D>::PostStepTasks();
 template ArtemisDriver<C::spherical2D>::ArtemisDriver(PI *p, AI *a, M *m, const bool r);
 template TaskListStatus ArtemisDriver<C::spherical2D>::Step();
 template void ArtemisDriver<C::spherical2D>::PreStepTasks();
+template void ArtemisDriver<C::spherical2D>::STSFirstStage();
 template TaskCollection ArtemisDriver<C::spherical2D>::StepTasks();
 template TaskCollection ArtemisDriver<C::spherical2D>::PostStepTasks();
 template ArtemisDriver<C::spherical3D>::ArtemisDriver(PI *p, AI *a, M *m, const bool r);
 template TaskListStatus ArtemisDriver<C::spherical3D>::Step();
 template void ArtemisDriver<C::spherical3D>::PreStepTasks();
+template void ArtemisDriver<C::spherical3D>::STSFirstStage();
 template TaskCollection ArtemisDriver<C::spherical3D>::StepTasks();
 template TaskCollection ArtemisDriver<C::spherical3D>::PostStepTasks();
 template ArtemisDriver<C::axisymmetric>::ArtemisDriver(PI *p, AI *a, M *m, const bool r);
 template TaskListStatus ArtemisDriver<C::axisymmetric>::Step();
 template void ArtemisDriver<C::axisymmetric>::PreStepTasks();
+template void ArtemisDriver<C::axisymmetric>::STSFirstStage();
 template TaskCollection ArtemisDriver<C::axisymmetric>::StepTasks();
 template TaskCollection ArtemisDriver<C::axisymmetric>::PostStepTasks();
 

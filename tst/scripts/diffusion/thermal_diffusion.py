@@ -51,6 +51,7 @@ def run(**kwargs):
             "parthenon/job/problem_id=" + name,
             "artemis/coordinates=" + g,
             "parthenon/time/tlim=50.0",
+            "physics/sts=true",
             "gas/conductivity/cond={:.8f}".format(_kcond),
             "gravity/uniform/gx1={:.8f}".format(_gx1),
             "problem/flux={:.8f}".format(_flux),

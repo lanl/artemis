@@ -77,6 +77,9 @@ set (SRC_LIST
 
   radiation/imc/imc.hpp
 
+  sts/sts.cpp
+  sts/sts.hpp
+
   utils/artemis_utils.cpp
   utils/artemis_utils.hpp
   utils/history.hpp

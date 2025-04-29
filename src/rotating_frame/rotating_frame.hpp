@@ -27,8 +27,6 @@
 
 using namespace parthenon::driver::prelude;
 using namespace parthenon::package::prelude;
-using Integrator_t = parthenon::LowStorageIntegrator;
-using IntegratorPtr_t = std::unique_ptr<Integrator_t>;
 using ArtemisUtils::PLM;
 using ArtemisUtils::VI;
 

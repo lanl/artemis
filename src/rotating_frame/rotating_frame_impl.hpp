@@ -46,8 +46,9 @@ TaskStatus ShearingBoxImpl(MeshData<Real> *md, const Real om0, const Real qshear
   const int three_d = (pm->ndim == 3);
 
   // Source term prefactors
+  const Real qom = qshear * om0;
   const Real two_om = 2.0 * om0;
-  const Real qm2_om = (qshear - 2.0) * om0;
+  const Real qm2_om = qom - two_om;
   const Real homsq = (three_d) * (0.5 * SQR(om0));
 
   parthenon::par_for(
@@ -72,7 +73,8 @@ TaskStatus ShearingBoxImpl(MeshData<Real> *md, const Real om0, const Real qshear
             vmesh(b, gas::cons::momentum(VI(n, 0)), k, j, i) += rdt * two_om * v2;
             vmesh(b, gas::cons::momentum(VI(n, 1)), k, j, i) += rdt * qm2_om * v1;
             vmesh(b, gas::cons::momentum(VI(n, 2)), k, j, i) += rdt * g3;
-            vmesh(b, gas::cons::total_energy(n), k, j, i) += rdt * v3 * g3;
+            vmesh(b, gas::cons::total_energy(n), k, j, i) +=
+                rdt * (qom * v1 * v2 + v3 * g3);
           }
         }
 

@@ -136,35 +136,61 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   const Real temp = units.GetTemperatureCodeToPhysical();
 
   // Absorption opacity model
-  ArtemisUtils::Opacity model;
   std::string opacity_model_name =
       pin->GetOrAddString("gas/opacity/absorption", "opacity_model", "constant");
-  if (opacity_model_name == "none") {
-    model = Gray(0.0);
-  } else if (opacity_model_name == "constant") {
-    const Real kappa_a = pin->GetOrAddReal("gas/opacity/absorption", "kappa_a", 0.0);
-    model = Gray(kappa_a);
-  } else if (opacity_model_name == "powerlaw") {
-    const Real coef_kappa_a =
-        pin->GetOrAddReal("gas/opacity/absorption", "coef_kappa_a", 0.0);
-    const Real rho_exp = pin->GetOrAddReal("gas/opacity/absorption", "rho_exp", 0.0);
-    const Real temp_exp = pin->GetOrAddReal("gas/opacity/absorption", "temp_exp", 0.0);
-    model = PowerLaw(coef_kappa_a, rho_exp, temp_exp);
+
+  // Mean absorption opacity (either read from table or uses model
+  ArtemisUtils::MeanOpacity opacity;
+  if (opacity_model_name == "table") {
+    std::string table_filename =
+        pin->GetString("gas/opacity/absorption", "opacity_table");
+    opacity =
+        singularity::photons::MeanNonCGSUnits<singularity::photons::MeanOpacityBase>(
+            singularity::photons::MeanOpacityBase(table_filename), time, mass, length,
+            temp);
   } else {
-    PARTHENON_FAIL("Opacity model not recognized!");
+
+    // Instantiate mean absorption opacity object (i.e., table)
+    const Real lRhoMin_a = pin->GetOrAddReal("gas/opacity/absorption", "lRhoMin", -1.0);
+    const Real lRhoMax_a = pin->GetOrAddReal("gas/opacity/absorption", "lRhoMax", 1.0);
+    const int NRho_a = pin->GetOrAddInteger("gas/opacity/absorption", "NRho", 2);
+    const Real lTMin_a = pin->GetOrAddReal("gas/opacity/absorption", "lTMin", -1.0);
+    const Real lTMax_a = pin->GetOrAddReal("gas/opacity/absorption", "lTMax", 1.0);
+    const int NT_a = pin->GetOrAddInteger("gas/opacity/absorption", "NT", 2);
+
+    if (opacity_model_name == "none") {
+      auto model =
+          singularity::photons::NonCGSUnits<Gray>(Gray(0.0), time, mass, length, temp);
+      opacity =
+          singularity::photons::MeanNonCGSUnits<singularity::photons::MeanOpacityBase>(
+              singularity::photons::MeanOpacityBase(model, lRhoMin_a, lRhoMax_a, NRho_a,
+                                                    lTMin_a, lTMax_a, NT_a),
+              time, mass, length, temp);
+    } else if (opacity_model_name == "constant") {
+      const Real kappa_a = pin->GetOrAddReal("gas/opacity/absorption", "kappa_a", 0.0);
+      auto model = singularity::photons::NonCGSUnits<Gray>(Gray(kappa_a), time, mass,
+                                                           length, temp);
+      opacity =
+          singularity::photons::MeanNonCGSUnits<singularity::photons::MeanOpacityBase>(
+              singularity::photons::MeanOpacityBase(model, lRhoMin_a, lRhoMax_a, NRho_a,
+                                                    lTMin_a, lTMax_a, NT_a),
+              time, mass, length, temp);
+    } else if (opacity_model_name == "powerlaw") {
+      const Real coef_kappa_a =
+          pin->GetOrAddReal("gas/opacity/absorption", "coef_kappa_a", 0.0);
+      const Real rho_exp = pin->GetOrAddReal("gas/opacity/absorption", "rho_exp", 0.0);
+      const Real temp_exp = pin->GetOrAddReal("gas/opacity/absorption", "temp_exp", 0.0);
+      auto model = singularity::photons::NonCGSUnits<PowerLaw>(
+          PowerLaw(coef_kappa_a, rho_exp, temp_exp), time, mass, length, temp);
+      opacity =
+          singularity::photons::MeanNonCGSUnits<singularity::photons::MeanOpacityBase>(
+              singularity::photons::MeanOpacityBase(model, lRhoMin_a, lRhoMax_a, NRho_a,
+                                                    lTMin_a, lTMax_a, NT_a),
+              time, mass, length, temp);
+    } else {
+      PARTHENON_FAIL("Opacity model not recognized!");
+    }
   }
-  // Instantiate mean absorption opacity object (i.e., table)
-  const Real lRhoMin_a = pin->GetOrAddReal("gas/opacity/absorption", "lRhoMin", -1.0);
-  const Real lRhoMax_a = pin->GetOrAddReal("gas/opacity/absorption", "lRhoMax", 1.0);
-  const int NRho_a = pin->GetOrAddInteger("gas/opacity/absorption", "NRho", 2);
-  const Real lTMin_a = pin->GetOrAddReal("gas/opacity/absorption", "lTMin", -1.0);
-  const Real lTMax_a = pin->GetOrAddReal("gas/opacity/absorption", "lTMax", 1.0);
-  const int NT_a = pin->GetOrAddInteger("gas/opacity/absorption", "NT", 2);
-  ArtemisUtils::MeanOpacity opacity =
-      singularity::photons::MeanNonCGSUnits<singularity::photons::MeanOpacityBase>(
-          singularity::photons::MeanOpacityBase(model, lRhoMin_a, lRhoMax_a, NRho_a,
-                                                lTMin_a, lTMax_a, NT_a),
-          time, mass, length, temp);
   params.Add("opacity_h", opacity);
   params.Add("opacity_d", opacity.GetOnDevice());
 

@@ -159,8 +159,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
     const int NT_a = pin->GetOrAddInteger("gas/opacity/absorption", "NT", 2);
 
     if (opacity_model_name == "none") {
-      auto model =
-          singularity::photons::NonCGSUnits<Gray>(Gray(0.0), time, mass, length, temp);
+      auto model = Gray(0.0);
       opacity =
           singularity::photons::MeanNonCGSUnits<singularity::photons::MeanOpacityBase>(
               singularity::photons::MeanOpacityBase(model, lRhoMin_a, lRhoMax_a, NRho_a,
@@ -168,8 +167,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
               time, mass, length, temp);
     } else if (opacity_model_name == "constant") {
       const Real kappa_a = pin->GetOrAddReal("gas/opacity/absorption", "kappa_a", 0.0);
-      auto model = singularity::photons::NonCGSUnits<Gray>(Gray(kappa_a), time, mass,
-                                                           length, temp);
+      auto model = Gray(kappa_a);
       opacity =
           singularity::photons::MeanNonCGSUnits<singularity::photons::MeanOpacityBase>(
               singularity::photons::MeanOpacityBase(model, lRhoMin_a, lRhoMax_a, NRho_a,
@@ -180,8 +178,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
           pin->GetOrAddReal("gas/opacity/absorption", "coef_kappa_a", 0.0);
       const Real rho_exp = pin->GetOrAddReal("gas/opacity/absorption", "rho_exp", 0.0);
       const Real temp_exp = pin->GetOrAddReal("gas/opacity/absorption", "temp_exp", 0.0);
-      auto model = singularity::photons::NonCGSUnits<PowerLaw>(
-          PowerLaw(coef_kappa_a, rho_exp, temp_exp), time, mass, length, temp);
+      auto model = PowerLaw(coef_kappa_a, rho_exp, temp_exp);
       opacity =
           singularity::photons::MeanNonCGSUnits<singularity::photons::MeanOpacityBase>(
               singularity::photons::MeanOpacityBase(model, lRhoMin_a, lRhoMax_a, NRho_a,

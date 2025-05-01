@@ -36,6 +36,9 @@
 #include "utils/artemis_utils.hpp"
 #include "utils/eos/eos.hpp"
 
+// jaybenne includes
+#include "jaybenne.hpp"
+
 using ArtemisUtils::EOS;
 using ArtemisUtils::VI;
 
@@ -108,6 +111,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
                     "problem = strat only works for Cartesian Coordinates!");
 
   const bool do_dust = artemis_pkg->Param<bool>("do_dust");
+  const bool do_radiation = artemis_pkg->Param<bool>("do_radiation");
   int nspec = Null<int>();
   if (do_dust) {
     auto dust_pkg = pmb->packages.Get("dust");
@@ -170,6 +174,8 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           }
         }
       });
+
+  if (do_radiation) jaybenne::InitializeRadiation(md.get(), true);
 }
 
 //----------------------------------------------------------------------------------------

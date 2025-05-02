@@ -246,8 +246,8 @@ Real EstimateTimestepMesh(MeshData<Real> *md) {
   auto &dust_pkg = pm->packages.Get("dust");
   auto &params = dust_pkg->AllParams();
 
-  // NOTE(@pdmullen): Without FARGO, integration of the residual eqs must have a dt
-  // limited by vy = dvy + vy0 = dvy - q Omega x
+  // NOTE(@pdmullen): Without FARGO, dt must be additionally limited by the linear
+  // advection of the shear background flow (vy0 = -q Omega x)
   bool do_shear = false;
   Real qshear = 0.0, om0 = 0.0;
   if (pm->packages.Get("artemis")->Param<bool>("do_rotating_frame")) {

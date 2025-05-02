@@ -254,7 +254,7 @@ Real EstimateTimestepMesh(MeshData<Real> *md) {
     auto &rframe_pkg = pm->packages.Get("rotating_frame");
     qshear = rframe_pkg->Param<Real>("qshear");
     om0 = rframe_pkg->Param<Real>("omega");
-    do_shear = (qshear != 0.0);
+    do_shear = (qshear * om0 != 0.0);
   }
 
   static auto desc =
@@ -277,12 +277,14 @@ Real EstimateTimestepMesh(MeshData<Real> *md) {
         for (int n = 0; n < vmesh.GetSize(b, dust::prim::density()); ++n) {
           Real denom = 0.0;
           for (int d = 0; d < ndim; d++) {
-            Real vd = vmesh(b, dust::prim::velocity(VI(n, d)), k, j, i);
-            vd += (do_shear && (d == 1)) ? ShearVelocity<GEOM>(qshear, om0, coords.x1v())
-                                         : 0.0;
-            denom += std::abs(vd) / dx[d];
+            denom += std::abs(vmesh(b, dust::prim::velocity(VI(n, d)), k, j, i)) / dx[d];
           }
           ldt = std::min(ldt, 1.0 / denom);
+        }
+
+        if (do_shear) {
+          ldt = std::min(
+              ldt, dx[1] / std::abs(ShearVelocity<GEOM>(qshear, om0, coords.x1v())));
         }
       },
       Kokkos::Min<Real>(min_dt));

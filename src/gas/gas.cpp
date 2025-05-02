@@ -438,7 +438,7 @@ Real EstimateTimestepMesh(MeshData<Real> *md) {
     auto &rframe_pkg = pm->packages.Get("rotating_frame");
     qshear = rframe_pkg->Param<Real>("qshear");
     om0 = rframe_pkg->Param<Real>("omega");
-    do_shear = (qshear * om0 >= 0.0);
+    do_shear = (qshear != 0.0);
   }
 
   static auto desc =

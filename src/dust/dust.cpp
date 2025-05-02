@@ -1,5 +1,5 @@
 //========================================================================================
-// (C) (or copyright) 2023-2024. Triad National Security, LLC. All rights reserved.
+// (C) (or copyright) 2023-2025. Triad National Security, LLC. All rights reserved.
 //
 // This program was produced under U.S. Government contract 89233218CNA000001 for Los
 // Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -22,6 +22,7 @@
 #include "artemis.hpp"
 #include "dust/dust.hpp"
 #include "geometry/geometry.hpp"
+#include "rotating_frame/rotating_frame.hpp"
 #include "utils/artemis_utils.hpp"
 #include "utils/fluxes/fluid_fluxes.hpp"
 #include "utils/history.hpp"
@@ -238,6 +239,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
 template <Coordinates GEOM>
 Real EstimateTimestepMesh(MeshData<Real> *md) {
   using parthenon::MakePackDescriptor;
+  using RotatingFrame::ShearVelocity;
   auto pm = md->GetParentPointer();
   auto &resolved_pkgs = pm->resolved_packages;
 
@@ -247,13 +249,12 @@ Real EstimateTimestepMesh(MeshData<Real> *md) {
   // NOTE(@pdmullen): Without FARGO, integration of the residual eqs must have a dt
   // limited by vy = dvy + vy0 = dvy - q Omega x
   bool do_shear = false;
-  Real qomega = 0.0;
+  Real qshear = 0.0, om0 = 0.0;
   if (pm->packages.Get("artemis")->Param<bool>("do_rotating_frame")) {
     auto &rframe_pkg = pm->packages.Get("rotating_frame");
-    const Real omega = rframe_pkg->Param<Real>("omega");
-    const Real qshear = rframe_pkg->Param<Real>("qshear");
-    qomega = qshear * omega;
-    do_shear = (qomega >= 0.0);
+    qshear = rframe_pkg->Param<Real>("qshear");
+    om0 = rframe_pkg->Param<Real>("omega");
+    do_shear = (qshear * om0 >= 0.0);
   }
 
   static auto desc =
@@ -277,7 +278,7 @@ Real EstimateTimestepMesh(MeshData<Real> *md) {
           Real denom = 0.0;
           for (int d = 0; d < ndim; d++) {
             Real vd = vmesh(b, dust::prim::velocity(VI(n, d)), k, j, i);
-            vd -= (do_shear) * (qomega * coords.x1v());
+            vd += (do_shear * (d == 1)) * ShearVelocity<GEOM>(qshear, om0, coords.x1v());
             denom += std::abs(vd) / dx[d];
           }
           ldt = std::min(ldt, 1.0 / denom);

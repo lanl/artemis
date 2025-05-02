@@ -1,5 +1,5 @@
 //========================================================================================
-// (C) (or copyright) 2023-2024. Triad National Security, LLC. All rights reserved.
+// (C) (or copyright) 2023-2025. Triad National Security, LLC. All rights reserved.
 //
 // This program was produced under U.S. Government contract 89233218CNA000001 for Los
 // Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -49,19 +49,15 @@ TaskStatus ShearingBoxImpl(MeshData<Real> *md, const Real om0, const Real qshear
   const Real qom = qshear * om0;
   const Real two_om = 2.0 * om0;
   const Real qm2_om = qom - two_om;
-  const Real homsq = (three_d) * (0.5 * SQR(om0));
+  const Real g3_over_x3 = (three_d) * (-SQR(om0));
 
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "ShearingBox", parthenon::DevExecSpace(), 0,
       md->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
-        // Extract coordinates
+        // Evaluate vertical gravity
         geometry::Coords<Coordinates::cartesian> coords(vmesh.GetCoordinates(b), k, j, i);
-        const Real &zp = coords.bnds.x3[1];
-        const Real &zm = coords.bnds.x3[0];
-
-        // Evaluate vertical gravity (at cell center)
-        const Real g3 = homsq * (SQR(zm) - SQR(zp)) / (zp - zm);
+        const Real g3 = g3_over_x3 * coords.x3v();
 
         if (do_gas) {
           for (int n = 0; n < vmesh.GetSize(b, gas::prim::density()); ++n) {

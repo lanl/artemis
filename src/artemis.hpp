@@ -1,5 +1,5 @@
 //========================================================================================
-// (C) (or copyright) 2023-2024. Triad National Security, LLC. All rights reserved.
+// (C) (or copyright) 2023-2025. Triad National Security, LLC. All rights reserved.
 //
 // This program was produced under U.S. Government contract 89233218CNA000001 for Los
 // Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -92,8 +92,8 @@ enum class Coordinates {
 };
 // ...Riemann solvers
 enum class RSolver { hllc, hlle, llf, null };
-// ... Upwinding
-enum class Upwind { l, r };
+// ... Upwinding (left vs right state)
+enum class Upwind { l, r, null };
 // ...Reconstrution algorithms
 enum class ReconstructionMethod { pcm, plm, ppm, null };
 // ...Fluid types

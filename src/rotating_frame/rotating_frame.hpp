@@ -1,5 +1,5 @@
 //========================================================================================
-// (C) (or copyright) 2023-2024. Triad National Security, LLC. All rights reserved.
+// (C) (or copyright) 2023-2025. Triad National Security, LLC. All rights reserved.
 //
 // This program was produced under U.S. Government contract 89233218CNA000001 for Los
 // Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -33,6 +33,40 @@ using ArtemisUtils::VI;
 namespace RotatingFrame {
 
 //----------------------------------------------------------------------------------------
+//! Declarations
+std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
+
+TaskStatus RotatingFrameForce(MeshData<Real> *md, const Real time, const Real dt);
+
+//----------------------------------------------------------------------------------------
+//! \fn std::array<Real, 3> RotatingFrame::ShearVelocity
+//! \brief Returns signed shear velocity
+template <Coordinates GEOM>
+KOKKOS_INLINE_FUNCTION Real ShearVelocity(const Real qshear, const Real omega,
+                                          const Real x1v) {
+  if constexpr (GEOM == Coordinates::cartesian) {
+    return -qshear * omega * x1v;
+  } else {
+    PARTHENON_FAIL("Shearing box currently only supports Cartesian geometries");
+  }
+}
+
+//----------------------------------------------------------------------------------------
+//! \fn std::array<Real, 3> RotatingFrame::RotationVelocity
+//! \brief Returns std::array of components of rotation velocity
+template <Coordinates GEOM>
+KOKKOS_INLINE_FUNCTION std::array<Real, 3> RotationVelocity(const std::array<Real, 3> &xv,
+                                                            const Real omf) {
+  // Empty constructor to get access to conversion routine
+  if constexpr (GEOM == Coordinates::cartesian) return {0.0, omf, 0.0};
+
+  geometry::Coords<GEOM> coords;
+  const auto &[xcyl, ex1, ex2, ex3] = coords.ConvertToCylWithVec(xv);
+  const Real vp = omf * xcyl[0];
+  return {ex1[1] * vp, ex2[1] * vp, ex3[1] * vp};
+}
+
+//----------------------------------------------------------------------------------------
 //! \fn  UpwindAdvance
 //! \brief
 template <Fluid FLUID_TYPE, Upwind UDIR, typename V1, typename V2>
@@ -64,7 +98,7 @@ KOKKOS_INLINE_FUNCTION void UpwindAdvance(const V1 &v0, const V1 &v1, const Real
     u0_m3 = g0 * u0_m3 + g1 * u1_m3 + fac * (qp[3] - q[3]);
     u0_et = g0 * u0_et + g1 * u1_et + fac * (qp[4] - q[4]);
     u0_ei = g0 * u0_ei + g1 * u1_ei + fac * (qp[5] - q[5]);
-  } else {
+  } else if constexpr (FLUID_TYPE == Fluid::dust) {
     Real &u0_dn = v0(b, dust::cons::density(n), k, j, i);
     Real &u0_m1 = v0(b, dust::cons::momentum(VI(n, 0)), k, j, i);
     Real &u0_m2 = v0(b, dust::cons::momentum(VI(n, 1)), k, j, i);
@@ -111,7 +145,7 @@ KOKKOS_INLINE_FUNCTION void UpwindReconstruct(const V1 &vmesh, V2 &arr, const in
     ReconSingle<UDIR, gas::cons::momentum>(vmesh, arr, 3, b, VI(n, 2), k, j, i);
     ReconSingle<UDIR, gas::cons::total_energy>(vmesh, arr, 4, b, n, k, j, i);
     ReconSingle<UDIR, gas::cons::internal_energy>(vmesh, arr, 5, b, n, k, j, i);
-  } else {
+  } else if constexpr (FLUID_TYPE == Fluid::dust) {
     ReconSingle<UDIR, dust::cons::density>(vmesh, arr, 0, b, n, k, j, i);
     ReconSingle<UDIR, dust::cons::momentum>(vmesh, arr, 1, b, VI(n, 0), k, j, i);
     ReconSingle<UDIR, dust::cons::momentum>(vmesh, arr, 2, b, VI(n, 1), k, j, i);
@@ -174,9 +208,8 @@ static TaskStatus UpwindAdvection(MeshData<Real> *u0, MeshData<Real> *u1, const 
 
   // Rotating frame package and params
   auto &rframe_pkg = pm->packages.Get("rotating_frame");
-  const Real om0 = rframe_pkg->Param<Real>("omega");
-  const Real qshear = rframe_pkg->Param<Real>("qshear");
-  const Real w_over_x = -qshear * om0;
+  const Real qshear = rframe_pkg->template Param<Real>("qshear");
+  const Real om0 = rframe_pkg->template Param<Real>("omega");
 
   // Extract integrator weights
   const Real g0 = integrator->gam0[stage - 1];
@@ -202,7 +235,7 @@ static TaskStatus UpwindAdvection(MeshData<Real> *u0, MeshData<Real> *u1, const 
         geometry::Coords<Coordinates::cartesian> coords(v0.GetCoordinates(b), 0, 0, i);
         const Real idx2 = 1.0 / (coords.bnds.x2[1] - coords.bnds.x2[0]);
         const Real x1v = 0.5 * (coords.bnds.x1[1] + coords.bnds.x1[0]);
-        const Real ww = w_over_x * x1v;
+        const Real ww = ShearVelocity<Coordinates::cartesian>(qshear, om0, x1v);
         const Real wbdt = ww * idx2 * bdt;
 
         if (ww >= 0.0) {
@@ -268,27 +301,6 @@ static TaskListStatus Advect(Mesh *pmesh, const Real time, const Real dt,
                              parthenon::LowStorageIntegrator *integrator) {
   return LinearAdvectionStep(pmesh, time, dt, integrator).Execute();
 }
-
-//----------------------------------------------------------------------------------------
-//! \fn std::array<Real, 3> RotatingFrame::RotationVelocity
-//! \brief Returns std::array of components of rotation velocity
-template <Coordinates GEOM>
-KOKKOS_INLINE_FUNCTION std::array<Real, 3> RotationVelocity(const std::array<Real, 3> &xv,
-                                                            const Real omf) {
-  // Empty constructor to get access to conversion routine
-  if constexpr (GEOM == Coordinates::cartesian) return {0.0, omf, 0.0};
-
-  geometry::Coords<GEOM> coords;
-  const auto &[xcyl, ex1, ex2, ex3] = coords.ConvertToCylWithVec(xv);
-  const Real vp = omf * xcyl[0];
-  return {ex1[1] * vp, ex2[1] * vp, ex3[1] * vp};
-}
-
-//----------------------------------------------------------------------------------------
-//! Remaining declarations
-std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
-
-TaskStatus RotatingFrameForce(MeshData<Real> *md, const Real time, const Real dt);
 
 } // namespace RotatingFrame
 

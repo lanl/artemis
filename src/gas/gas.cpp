@@ -467,7 +467,8 @@ Real EstimateTimestepMesh(MeshData<Real> *md) {
           Real denom = 0.0;
           for (int d = 0; d < ndim; d++) {
             Real vd = vmesh(b, gas::prim::velocity(VI(n, d)), k, j, i);
-            vd += (do_shear * (d == 1)) * ShearVelocity<GEOM>(qshear, om0, coords.x1v());
+            vd += (do_shear && (d == 1)) ? ShearVelocity<GEOM>(qshear, om0, coords.x1v())
+                                         : 0.0;
             const Real ss = std::abs(vd) + cs;
             denom += ss / dx[d];
           }

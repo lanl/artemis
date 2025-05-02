@@ -39,13 +39,13 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
 TaskStatus RotatingFrameForce(MeshData<Real> *md, const Real time, const Real dt);
 
 //----------------------------------------------------------------------------------------
-//! \fn std::array<Real, 3> RotatingFrame::ShearVelocity
+//! \fn std::array<Real, 3> RotatingFrame::BackgroundVelocity
 //! \brief Returns signed shear velocity
 template <Coordinates GEOM>
-KOKKOS_INLINE_FUNCTION Real ShearVelocity(const Real qshear, const Real omega,
-                                          const Real x1v) {
+KOKKOS_INLINE_FUNCTION std::array<Real, 3>
+BackgroundVelocity(const Real qshear, const Real omega, const Real x1v) {
   if constexpr (GEOM == Coordinates::cartesian) {
-    return -qshear * omega * x1v;
+    return {0.0, -qshear * omega * x1v, 0.0};
   } else {
     PARTHENON_FAIL("Shearing box currently only supports Cartesian geometries");
   }
@@ -235,10 +235,10 @@ static TaskStatus UpwindAdvection(MeshData<Real> *u0, MeshData<Real> *u1, const 
         geometry::Coords<Coordinates::cartesian> coords(v0.GetCoordinates(b), 0, 0, i);
         const Real idx2 = 1.0 / (coords.bnds.x2[1] - coords.bnds.x2[0]);
         const Real x1v = 0.5 * (coords.bnds.x1[1] + coords.bnds.x1[0]);
-        const Real ww = ShearVelocity<Coordinates::cartesian>(qshear, om0, x1v);
-        const Real wbdt = ww * idx2 * bdt;
+        const auto ww = BackgroundVelocity<Coordinates::cartesian>(qshear, om0, x1v);
+        const Real wbdt = ww[1] * idx2 * bdt;
 
-        if (ww >= 0.0) {
+        if (ww[1] >= 0.0) {
           if (do_gas) Upwind<Fluid::gas, Upwind::l>(v0, v1, g0, g1, wbdt, b, k, jb, i);
           if (do_dust) Upwind<Fluid::dust, Upwind::l>(v0, v1, g0, g1, wbdt, b, k, jb, i);
         } else {

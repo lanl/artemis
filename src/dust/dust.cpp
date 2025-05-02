@@ -239,7 +239,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
 template <Coordinates GEOM>
 Real EstimateTimestepMesh(MeshData<Real> *md) {
   using parthenon::MakePackDescriptor;
-  using RotatingFrame::ShearVelocity;
+  using RotatingFrame::BackgroundVelocity;
   auto pm = md->GetParentPointer();
   auto &resolved_pkgs = pm->resolved_packages;
 
@@ -283,8 +283,8 @@ Real EstimateTimestepMesh(MeshData<Real> *md) {
         }
 
         if (do_shear) {
-          ldt = std::min(
-              ldt, dx[1] / std::abs(ShearVelocity<GEOM>(qshear, om0, coords.x1v())));
+          const auto ww = BackgroundVelocity<GEOM>(qshear, om0, coords.x1v());
+          ldt = std::min(ldt, dx[1] / std::abs(ww[1]));
         }
       },
       Kokkos::Min<Real>(min_dt));

@@ -25,14 +25,18 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   auto pkg = std::make_shared<StateDescriptor>("rotating_frame");
   Params &params = pkg->AllParams();
 
-  const std::string sys = pin->GetString("artemis", "coordinates");
   const Real omega = pin->GetReal("rotating_frame", "omega");
   const Real qshear = pin->GetOrAddReal("rotating_frame", "qshear", 0.0);
   PARTHENON_REQUIRE(omega != 0.0, "rotating_frame/omega cannot be zero! To disable, set "
                                   "physics/rotating_frame = false");
-  PARTHENON_REQUIRE(
-      qshear == 0.0 || sys == "cartesian",
-      "rotating_frame/qshear must be zero for non-Cartesian coordinate systems!");
+  if (qshear != 0) {
+    const std::string sys = pin->GetString("artemis", "coordinates");
+    PARTHENON_REQUIRE(
+        sys == "cartesian",
+        "rotating_frame/qshear must be zero for non-Cartesian coordinate systems!");
+    PARTHENON_REQUIRE(parthenon::Globals::nghost >= 2,
+                      "Rotating frame advection step requires at least 2 ghost cells.");
+  }
 
   params.Add("omega", omega);
   params.Add("qshear", qshear);

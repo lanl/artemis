@@ -124,6 +124,14 @@
         "Kokkos_ARCH_HOPPER90": "ON",
         "NUM_GPU_DEVICES_PER_NODE": "4"
       }
+    },
+    {
+      "name": "frontier-gpu-release",
+      "cacheVariables": {
+        "CMAKE_MAKE_PROGRAM": "$env{MAKE_PROGRAM}",
+        "CMAKE_BUILD_TYPE": "Release",
+        "NUM_GPU_DEVICES_PER_NODE": "4"
+      }
     }
   ]
 }

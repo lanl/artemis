@@ -57,9 +57,11 @@ BackgroundVelocity(const Real qshear, const Real omega, const Real x1v) {
 template <Coordinates GEOM>
 KOKKOS_INLINE_FUNCTION std::array<Real, 3> RotationVelocity(const std::array<Real, 3> &xv,
                                                             const Real omf) {
-  // Empty constructor to get access to conversion routine
+  // TODO(AMD): implicitly multiplied by a length of 1. But that's a unit system
+  // depedendent constant. Should pass an R0.
   if constexpr (GEOM == Coordinates::cartesian) return {0.0, omf, 0.0};
 
+  // Empty constructor to get access to conversion routine
   geometry::Coords<GEOM> coords;
   const auto &[xcyl, ex1, ex2, ex3] = coords.ConvertToCylWithVec(xv);
   const Real vp = omf * xcyl[0];

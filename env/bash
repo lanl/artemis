@@ -21,7 +21,7 @@ export MAKE_PROGRAM=${MAKE_PROGRAM:-make}
 
 #  Identify partitions based on  SLURM_JOB_PARTITION and HOSTNAME variables
 PARTITION="unknown"
-if [[ $HOSTNAME == ch-fe*  ||  $SLURM_CLUSTER_NAME == "chicoma" ]]; then
+if [[ $HOSTNAME == ch-fe*  ||  $CLUSTER == "chicoma" ]]; then
     if [[ $SLURM_JOB_PARTITION == *gpu* ]]; then
         PARTITION="chicoma-gpu"
     else
@@ -80,6 +80,8 @@ elif [[ $PARTITION == "chicoma-cpu" ]]; then
     module swap PrgEnv-cray PrgEnv-gnu
     module load cray-hdf5-parallel
     module load cray-python/3.11.5
+    module load gcc-native/12.3
+    module load cray-mpich/8.1.28.1
     source /usr/projects/jovian/dependencies/python/chicoma-cpu/bin/activate
     module load cmake
     export ARTEMIS_SUITE=chicoma-cpu

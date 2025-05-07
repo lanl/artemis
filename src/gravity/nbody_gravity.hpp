@@ -51,7 +51,7 @@ NBodyGravityImpl(V1 vmesh, const NBody::Particle &pl,
 
   // Get the rotational velocity
   auto vf = NewArray<Real, 3>(0.0);
-  if (omf != 0.0) {
+  if ((omf != 0.0) || (omb != 0)) {
     // TODO(AMD): The Background velocity should have the frame velocity in it. Only
     // important for non-shearing box
     const auto &vrot = RotatingFrame::RotationVelocity<GEOM>(x, omf);

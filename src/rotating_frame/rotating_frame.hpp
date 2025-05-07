@@ -46,7 +46,7 @@ KOKKOS_INLINE_FUNCTION std::array<Real, 3>
 BackgroundVelocity(const Real qshear, const Real omega, const Real x1v) {
   if constexpr (GEOM == Coordinates::cartesian) {
     return {0.0, -qshear * omega * x1v, 0.0};
-  } 
+  }
   return {0.0, 0.0, 0.0};
 }
 

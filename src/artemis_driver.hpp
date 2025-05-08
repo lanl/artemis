@@ -1,5 +1,5 @@
 //========================================================================================
-// (C) (or copyright) 2023-2024. Triad National Security, LLC. All rights reserved.
+// (C) (or copyright) 2023-2025. Triad National Security, LLC. All rights reserved.
 //
 // This program was produced under U.S. Government contract 89233218CNA000001 for Los
 // Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -52,8 +52,8 @@ class ArtemisDriver : public EvolutionDriver {
  protected:
   IntegratorPtr_t integrator, nbody_integrator;
   StateDescriptor *artemis_pkg;
-  bool do_gas, do_dust, do_gravity, do_rotating_frame, do_cooling, do_drag, do_viscosity,
-      do_nbody, do_conduction, do_diffusion, do_radiation;
+  bool do_gas, do_dust, do_gravity, do_rotating_frame, do_shear, do_cooling, do_drag,
+      do_viscosity, do_nbody, do_conduction, do_diffusion, do_radiation;
   const bool is_restart;
 };
 

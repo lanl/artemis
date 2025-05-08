@@ -152,7 +152,8 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         const Real z = coords.x3v();
 
         const Real vx1 = 0.0;
-        const Real vx2 = -pars.q * pars.Om0 * x;
+        // const Real vx2 = -pars.q * pars.Om0 * x;
+        const Real dvx2 = 0.0; // residual eq evolution
         const Real vx3 = 0.0;
         const Real temp = pars.temp0;
         const Real dens = InitialDensity(pars, z);
@@ -161,7 +162,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
         v(0, gas::prim::density(0), k, j, i) = dens;
         v(0, gas::prim::velocity(0), k, j, i) = vx1;
-        v(0, gas::prim::velocity(1), k, j, i) = vx2;
+        v(0, gas::prim::velocity(1), k, j, i) = dvx2;
         v(0, gas::prim::velocity(2), k, j, i) = vx3;
         v(0, gas::prim::sie(0), k, j, i) = sie;
         if (do_dust) {
@@ -169,7 +170,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           for (int n = 0; n < nspec; ++n) {
             v(0, dust::prim::density(n), k, j, i) = ddens;
             v(0, dust::prim::velocity(VI(n, 0)), k, j, i) = vx1;
-            v(0, dust::prim::velocity(VI(n, 1)), k, j, i) = vx2;
+            v(0, dust::prim::velocity(VI(n, 1)), k, j, i) = dvx2;
             v(0, dust::prim::velocity(VI(n, 2)), k, j, i) = vx3;
           }
         }
@@ -393,7 +394,8 @@ inline void ShearInnerX2(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse)
         const Real x = coords.x1v();
         const Real xf = coords.bnds.x1[0];
 
-        const Real vy0 = -pars.q * pars.Om0 * x;
+        // const Real vy0 = -pars.q * pars.Om0 * x;
+        const Real dvy0 = 0.0; // residual eq evolution
 
         const bool outflow = (xf >= 0.0);
 
@@ -401,7 +403,7 @@ inline void ShearInnerX2(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse)
         const Real gv2 = v(0, gas::prim::velocity(1), k, js, i);
         const Real gv3 = v(0, gas::prim::velocity(2), k, js, i);
         const Real vx1g = outflow ? gv1 : 0.0;
-        const Real vx2g = outflow ? ((gv2 > 0.) ? 0.0 : gv2) : vy0;
+        const Real vx2g = outflow ? ((gv2 > 0.) ? 0.0 : gv2) : dvy0;
         const Real vx3g = outflow ? gv3 : 0.0;
         const Real densg =
             outflow ? v(0, gas::prim::density(0), k, js, i) : InitialDensity(pars, z);
@@ -422,7 +424,7 @@ inline void ShearInnerX2(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse)
             const Real dv2 = v(0, dust::prim::velocity(VI(n, 1)), k, js, i);
             const Real dv3 = v(0, dust::prim::velocity(VI(n, 2)), k, js, i);
             const Real vx1d = dv1;
-            const Real vx2d = outflow ? ((dv2 > 0.) ? 0.0 : dv2) : vy0;
+            const Real vx2d = outflow ? ((dv2 > 0.) ? 0.0 : dv2) : dvy0;
             const Real vx3d = dv3;
             const Real densd =
                 outflow ? v(0, dust::prim::density(n), k, js, i) : densg * pars.d2g;
@@ -494,7 +496,8 @@ inline void ShearOuterX2(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse)
         const Real x = coords.x1v();
         const Real xf = coords.bnds.x1[0];
 
-        const Real vy0 = -pars.q * pars.Om0 * x;
+        // const Real vy0 = -pars.q * pars.Om0 * x;
+        const Real dvy0 = 0.0; // residual eq evolution
 
         const bool outflow = (xf < 0.0);
 
@@ -502,7 +505,7 @@ inline void ShearOuterX2(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse)
         const Real gv2 = v(0, gas::prim::velocity(1), k, je, i);
         const Real gv3 = v(0, gas::prim::velocity(2), k, je, i);
         const Real vx1g = outflow ? gv1 : 0.0;
-        const Real vx2g = outflow ? ((gv2 < 0.0) ? 0.0 : gv2) : vy0;
+        const Real vx2g = outflow ? ((gv2 < 0.0) ? 0.0 : gv2) : dvy0;
         const Real vx3g = outflow ? gv3 : 0.0;
         const Real densg =
             outflow ? v(0, gas::prim::density(0), k, je, i) : InitialDensity(pars, z);
@@ -524,7 +527,7 @@ inline void ShearOuterX2(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse)
             const Real dv2 = v(0, dust::prim::velocity(VI(n, 1)), k, je, i);
             const Real dv3 = v(0, dust::prim::velocity(VI(n, 2)), k, je, i);
             const Real vx1d = dv1;
-            const Real vx2d = outflow ? ((dv2 < 0.0) ? 0.0 : dv2) : vy0;
+            const Real vx2d = outflow ? ((dv2 < 0.0) ? 0.0 : dv2) : dvy0;
             const Real vx3d = dv3;
             const Real densd =
                 outflow ? v(0, dust::prim::density(n), k, je, i) : densg * pars.d2g;

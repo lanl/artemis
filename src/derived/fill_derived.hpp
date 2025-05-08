@@ -1,5 +1,5 @@
 //========================================================================================
-// (C) (or copyright) 2023-2024. Triad National Security, LLC. All rights reserved.
+// (C) (or copyright) 2023-2025. Triad National Security, LLC. All rights reserved.
 //
 // This program was produced under U.S. Government contract 89233218CNA000001 for Los
 // Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -30,6 +30,9 @@ void PrimToCons(T *md);
 
 template <Coordinates GEOM>
 void PostInitialization(MeshBlock *pmb, ParameterInput *pin);
+
+template <Coordinates GEOM>
+TaskCollection SyncFields(Mesh *pmesh, const Real time, const Real dt);
 
 } // namespace ArtemisDerived
 

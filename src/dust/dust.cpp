@@ -1,5 +1,5 @@
 //========================================================================================
-// (C) (or copyright) 2023-2024. Triad National Security, LLC. All rights reserved.
+// (C) (or copyright) 2023-2025. Triad National Security, LLC. All rights reserved.
 //
 // This program was produced under U.S. Government contract 89233218CNA000001 for Los
 // Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -22,6 +22,7 @@
 #include "artemis.hpp"
 #include "dust/dust.hpp"
 #include "geometry/geometry.hpp"
+#include "rotating_frame/rotating_frame.hpp"
 #include "utils/artemis_utils.hpp"
 #include "utils/fluxes/fluid_fluxes.hpp"
 #include "utils/history.hpp"
@@ -238,11 +239,23 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
 template <Coordinates GEOM>
 Real EstimateTimestepMesh(MeshData<Real> *md) {
   using parthenon::MakePackDescriptor;
+  using RotatingFrame::BackgroundVelocity;
   auto pm = md->GetParentPointer();
   auto &resolved_pkgs = pm->resolved_packages;
 
   auto &dust_pkg = pm->packages.Get("dust");
   auto &params = dust_pkg->AllParams();
+
+  // NOTE(@pdmullen): Without FARGO, dt must be additionally limited by the linear
+  // advection of the shear background flow (vy0 = -q Omega x)
+  bool do_shear = false;
+  Real qshear = 0.0, om0 = 0.0;
+  if (pm->packages.Get("artemis")->Param<bool>("do_rotating_frame")) {
+    auto &rframe_pkg = pm->packages.Get("rotating_frame");
+    qshear = rframe_pkg->Param<Real>("qshear");
+    om0 = rframe_pkg->Param<Real>("omega");
+    do_shear = (qshear * om0 != 0.0);
+  }
 
   static auto desc =
       MakePackDescriptor<dust::prim::density, dust::prim::velocity>(resolved_pkgs.get());
@@ -267,6 +280,11 @@ Real EstimateTimestepMesh(MeshData<Real> *md) {
             denom += std::abs(vmesh(b, dust::prim::velocity(VI(n, d)), k, j, i)) / dx[d];
           }
           ldt = std::min(ldt, 1.0 / denom);
+        }
+
+        if (do_shear) {
+          const auto ww = BackgroundVelocity<GEOM>(qshear, om0, coords.x1v());
+          ldt = std::min(ldt, dx[1] / std::abs(ww[1]));
         }
       },
       Kokkos::Min<Real>(min_dt));

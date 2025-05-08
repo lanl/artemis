@@ -1,5 +1,5 @@
 //========================================================================================
-// (C) (or copyright) 2023-2024. Triad National Security, LLC. All rights reserved.
+// (C) (or copyright) 2023-2025. Triad National Security, LLC. All rights reserved.
 //
 // This program was produced under U.S. Government contract 89233218CNA000001 for Los
 // Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -287,40 +287,71 @@ void PostInitialization(MeshBlock *pmb, ParameterInput *pin) {
 }
 
 //----------------------------------------------------------------------------------------
+//! \fn TaskCollection ArtemisDerived::SyncFields
+//! \brief Syncs fields following an operator split update
+template <Coordinates GEOM>
+TaskCollection SyncFields(Mesh *pmesh, const Real time, const Real dt) {
+  using namespace ::parthenon::Update;
+  TaskCollection tc;
+  TaskID none(0);
+  const auto any = parthenon::BoundaryType::any;
+
+  const int num_partitions = pmesh->DefaultNumPartitions();
+  auto &post_region = tc.AddRegion(num_partitions);
+  for (int i = 0; i < num_partitions; i++) {
+    auto &tl = post_region[i];
+    auto &u0 = pmesh->mesh_data.GetOrAdd("base", i);
+    auto start_recv = tl.AddTask(none, parthenon::StartReceiveBoundBufs<any>, u0);
+    auto c2p = tl.AddTask(start_recv, PreCommFillDerived<MeshData<Real>>, u0.get());
+    auto bcs = parthenon::AddBoundaryExchangeTasks(c2p, tl, u0, pmesh->multilevel);
+    auto p2c = tl.AddTask(bcs, FillDerived<MeshData<Real>>, u0.get());
+  }
+
+  return tc;
+}
+
+//----------------------------------------------------------------------------------------
 //! template instantiations
+typedef Coordinates C;
 typedef MeshBlock MB;
 typedef MeshData<Real> MD;
 typedef MeshBlockData<Real> MBD;
 typedef ParameterInput PI;
-template void ConsToPrim<Coordinates::cartesian>(MD *md);
-template void ConsToPrim<Coordinates::cylindrical>(MD *md);
-template void ConsToPrim<Coordinates::spherical1D>(MD *md);
-template void ConsToPrim<Coordinates::spherical2D>(MD *md);
-template void ConsToPrim<Coordinates::spherical3D>(MD *md);
-template void ConsToPrim<Coordinates::axisymmetric>(MD *md);
-template void PrimToCons<MBD, Coordinates::cartesian>(MBD *mbd);
-template void PrimToCons<MBD, Coordinates::cylindrical>(MBD *mbd);
-template void PrimToCons<MBD, Coordinates::spherical1D>(MBD *mbd);
-template void PrimToCons<MBD, Coordinates::spherical2D>(MBD *mbd);
-template void PrimToCons<MBD, Coordinates::spherical3D>(MBD *mbd);
-template void PrimToCons<MBD, Coordinates::axisymmetric>(MBD *mbd);
-template void PrimToCons<MD, Coordinates::cartesian>(MD *md);
-template void PrimToCons<MD, Coordinates::cylindrical>(MD *md);
-template void PrimToCons<MD, Coordinates::spherical1D>(MD *md);
-template void PrimToCons<MD, Coordinates::spherical2D>(MD *md);
-template void PrimToCons<MD, Coordinates::spherical3D>(MD *md);
-template void PrimToCons<MD, Coordinates::axisymmetric>(MD *md);
-template void PostInitialization<Coordinates::cartesian>(MB *pmb, PI *pin);
-template void PostInitialization<Coordinates::cylindrical>(MB *pmb, PI *pin);
-template void PostInitialization<Coordinates::spherical1D>(MB *pmb, PI *pin);
-template void PostInitialization<Coordinates::spherical2D>(MB *pmb, PI *pin);
-template void PostInitialization<Coordinates::spherical3D>(MB *pmb, PI *pin);
-template void PostInitialization<Coordinates::axisymmetric>(MB *pmb, PI *pin);
-template TaskStatus SetAuxillaryFields<Coordinates::cartesian>(MD *md);
-template TaskStatus SetAuxillaryFields<Coordinates::cylindrical>(MD *md);
-template TaskStatus SetAuxillaryFields<Coordinates::spherical1D>(MD *md);
-template TaskStatus SetAuxillaryFields<Coordinates::spherical2D>(MD *md);
-template TaskStatus SetAuxillaryFields<Coordinates::spherical3D>(MD *md);
-template TaskStatus SetAuxillaryFields<Coordinates::axisymmetric>(MD *md);
+template void ConsToPrim<C::cartesian>(MD *md);
+template void ConsToPrim<C::cylindrical>(MD *md);
+template void ConsToPrim<C::spherical1D>(MD *md);
+template void ConsToPrim<C::spherical2D>(MD *md);
+template void ConsToPrim<C::spherical3D>(MD *md);
+template void ConsToPrim<C::axisymmetric>(MD *md);
+template void PrimToCons<MBD, C::cartesian>(MBD *mbd);
+template void PrimToCons<MBD, C::cylindrical>(MBD *mbd);
+template void PrimToCons<MBD, C::spherical1D>(MBD *mbd);
+template void PrimToCons<MBD, C::spherical2D>(MBD *mbd);
+template void PrimToCons<MBD, C::spherical3D>(MBD *mbd);
+template void PrimToCons<MBD, C::axisymmetric>(MBD *mbd);
+template void PrimToCons<MD, C::cartesian>(MD *md);
+template void PrimToCons<MD, C::cylindrical>(MD *md);
+template void PrimToCons<MD, C::spherical1D>(MD *md);
+template void PrimToCons<MD, C::spherical2D>(MD *md);
+template void PrimToCons<MD, C::spherical3D>(MD *md);
+template void PrimToCons<MD, C::axisymmetric>(MD *md);
+template void PostInitialization<C::cartesian>(MB *pmb, PI *pin);
+template void PostInitialization<C::cylindrical>(MB *pmb, PI *pin);
+template void PostInitialization<C::spherical1D>(MB *pmb, PI *pin);
+template void PostInitialization<C::spherical2D>(MB *pmb, PI *pin);
+template void PostInitialization<C::spherical3D>(MB *pmb, PI *pin);
+template void PostInitialization<C::axisymmetric>(MB *pmb, PI *pin);
+template TaskStatus SetAuxillaryFields<C::cartesian>(MD *md);
+template TaskStatus SetAuxillaryFields<C::cylindrical>(MD *md);
+template TaskStatus SetAuxillaryFields<C::spherical1D>(MD *md);
+template TaskStatus SetAuxillaryFields<C::spherical2D>(MD *md);
+template TaskStatus SetAuxillaryFields<C::spherical3D>(MD *md);
+template TaskStatus SetAuxillaryFields<C::axisymmetric>(MD *md);
+template TaskCollection SyncFields<C::cartesian>(Mesh *m, const Real t, const Real dt);
+template TaskCollection SyncFields<C::cylindrical>(Mesh *m, const Real t, const Real dt);
+template TaskCollection SyncFields<C::spherical1D>(Mesh *m, const Real t, const Real dt);
+template TaskCollection SyncFields<C::spherical2D>(Mesh *m, const Real t, const Real dt);
+template TaskCollection SyncFields<C::spherical3D>(Mesh *m, const Real t, const Real dt);
+template TaskCollection SyncFields<C::axisymmetric>(Mesh *m, const Real t, const Real dt);
 
 } // namespace ArtemisDerived

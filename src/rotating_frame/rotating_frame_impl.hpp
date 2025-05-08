@@ -1,5 +1,5 @@
 //========================================================================================
-// (C) (or copyright) 2023-2024. Triad National Security, LLC. All rights reserved.
+// (C) (or copyright) 2023-2025. Triad National Security, LLC. All rights reserved.
 //
 // This program was produced under U.S. Government contract 89233218CNA000001 for Los
 // Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -24,97 +24,65 @@
 using ArtemisUtils::VI;
 
 namespace RotatingFrame {
-
+//----------------------------------------------------------------------------------------
+//! \fn  TaskStatus ShearingBoxImpl
+//! \brief Calculate the shearing box frame body forces
 TaskStatus ShearingBoxImpl(MeshData<Real> *md, const Real om0, const Real qshear,
                            const bool do_gas, const bool do_dust, const Real dt) {
   auto pm = md->GetParentPointer();
   auto &resolved_pkgs = pm->resolved_packages;
+
+  // Packing
   static auto desc = parthenon::MakePackDescriptor<
       gas::cons::momentum, gas::cons::total_energy, dust::cons::momentum,
       gas::prim::density, gas::prim::velocity, dust::prim::density, dust::prim::velocity>(
       resolved_pkgs.get());
-
-  static auto desc_flux = parthenon::MakePackDescriptor<gas::cons::density>(
-      resolved_pkgs.get(), {}, {parthenon::PDOpt::WithFluxes});
-
   auto vmesh = desc.GetPack(md);
-  auto vf = desc_flux.GetPack(md);
 
-  const int three_d = (pm->ndim == 3);
+  // Indexing and dimensionality
   const auto ib = md->GetBoundsI(IndexDomain::interior);
   const auto jb = md->GetBoundsJ(IndexDomain::interior);
   const auto kb = md->GetBoundsK(IndexDomain::interior);
+  const int three_d = (pm->ndim == 3);
 
-  const Real omsq = SQR(om0);
+  // Source term prefactors
+  const Real qom = qshear * om0;
+  const Real two_om = 2.0 * om0;
+  const Real qm2_om = qom - two_om;
+  const Real g3_over_x3 = (three_d) * (-SQR(om0));
+
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "ShearingBox", parthenon::DevExecSpace(), 0,
       md->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
-        // Extract coordinates
+        // Evaluate vertical gravity
         geometry::Coords<Coordinates::cartesian> coords(vmesh.GetCoordinates(b), k, j, i);
-
-        const Real dx = coords.bnds.x1[1] - coords.bnds.x1[0];
-        const Real dz = coords.bnds.x3[1] - coords.bnds.x3[0];
-
-        const Real xc = 0.5 * (coords.bnds.x1[1] + coords.bnds.x1[0]);
-        const Real zc = 0.5 * (coords.bnds.x3[1] + coords.bnds.x3[0]);
-
-        const Real phi_xm1 = -qshear * omsq * SQR(coords.bnds.x1[0]);
-        const Real phi_xc = -qshear * omsq * SQR(xc);
-        const Real phi_xp1 = -qshear * omsq * SQR(coords.bnds.x1[1]);
-
-        const Real phi_zm1 = 0.5 * omsq * SQR(coords.bnds.x3[0]);
-        const Real phi_zc = 0.5 * omsq * SQR(zc);
-        const Real phi_zp1 = 0.5 * omsq * SQR(coords.bnds.x3[1]);
-
-        const Real dpxc = (phi_xp1 - phi_xm1) / dx;
-        const Real dpxm = (phi_xc - phi_xm1) / dx;
-        const Real dpxp = (phi_xp1 - phi_xc) / dx;
-
-        const Real dpzc = three_d * (phi_zp1 - phi_zm1) / dz;
-        const Real dpzm = three_d * (phi_zc - phi_zm1) / dz;
-        const Real dpzp = three_d * (phi_zp1 - phi_zc) / dz;
+        const Real g3 = g3_over_x3 * coords.x3v();
 
         if (do_gas) {
           for (int n = 0; n < vmesh.GetSize(b, gas::prim::density()); ++n) {
-            const Real dens = vmesh(b, gas::prim::density(n), k, j, i);
-            const Real v1 = vmesh(b, gas::prim::velocity(VI(n, 0)), k, j, i);
-            const Real v2 = vmesh(b, gas::prim::velocity(VI(n, 1)), k, j, i);
-            const Real v3 = vmesh(b, gas::prim::velocity(VI(n, 2)), k, j, i);
-            const Real rdt = dens * dt;
-            vmesh(b, gas::cons::momentum(VI(n, 0)), k, j, i) -=
-                rdt * (dpxc - 2.0 * om0 * v2);
-            vmesh(b, gas::cons::momentum(VI(n, 1)), k, j, i) -= rdt * 2.0 * om0 * v1;
-            vmesh(b, gas::cons::momentum(VI(n, 2)), k, j, i) -= rdt * dpzc;
-
-            vmesh(b, gas::cons::total_energy(n), k, j, i) -=
-                rdt * (v1 * dpxc + v3 * dpzc);
-
-            // TODO: Why does this not work
-            // const Real fxm = vf.flux(b, X1DIR, gas::cons::density(n), k, j, i);
-            // const Real fxp =
-            //   vf.flux(b, X1DIR, gas::cons::density(n), k, j, i + 1);
-
-            // const Real fzm = vf.flux(b, X3DIR, gas::cons::density(n), k, j, i);
-            // const Real fzp =
-            //   vf.flux(b, X3DIR, gas::cons::density(n), k + three_d, j, i);
-            // vmesh(b, gas::cons::total_energy(n), k, j, i) -=
-            //     dt * (fxm * dpxm + fxp * dpxp + fzm * dpzm + fzp * dpzp);
+            const Real &dd = vmesh(b, gas::prim::density(n), k, j, i);
+            const Real &v1 = vmesh(b, gas::prim::velocity(VI(n, 0)), k, j, i);
+            const Real &v2 = vmesh(b, gas::prim::velocity(VI(n, 1)), k, j, i);
+            const Real &v3 = vmesh(b, gas::prim::velocity(VI(n, 2)), k, j, i);
+            const Real rdt = dd * dt;
+            vmesh(b, gas::cons::momentum(VI(n, 0)), k, j, i) += rdt * two_om * v2;
+            vmesh(b, gas::cons::momentum(VI(n, 1)), k, j, i) += rdt * qm2_om * v1;
+            vmesh(b, gas::cons::momentum(VI(n, 2)), k, j, i) += rdt * g3;
+            vmesh(b, gas::cons::total_energy(n), k, j, i) +=
+                rdt * (qom * v1 * v2 + v3 * g3);
           }
         }
 
         if (do_dust) {
           for (int n = 0; n < vmesh.GetSize(b, dust::prim::density()); ++n) {
-            const Real &dens = vmesh(b, dust::prim::density(n), k, j, i);
+            const Real &dd = vmesh(b, dust::prim::density(n), k, j, i);
             const Real &v1 = vmesh(b, dust::prim::velocity(VI(n, 0)), k, j, i);
             const Real &v2 = vmesh(b, dust::prim::velocity(VI(n, 1)), k, j, i);
-            const Real &v3 = vmesh(b, dust::prim::velocity(VI(n, 2)), k, j, i);
-
-            const Real rdt = dens * dt;
-            vmesh(b, dust::cons::momentum(VI(n, 0)), k, j, i) -=
-                rdt * (dpxc - 2.0 * om0 * v2);
-            vmesh(b, dust::cons::momentum(VI(n, 1)), k, j, i) -= rdt * 2.0 * om0 * v1;
-            vmesh(b, dust::cons::momentum(VI(n, 2)), k, j, i) -= rdt * dpzc;
+            const Real rdt = dd * dt;
+            vmesh(b, dust::cons::momentum(VI(n, 0)), k, j, i) += rdt * two_om * v2;
+            vmesh(b, dust::cons::momentum(VI(n, 1)), k, j, i) += rdt * qm2_om * v1;
+            vmesh(b, dust::cons::momentum(VI(n, 2)), k, j, i) += rdt * g3;
           }
         }
       });
@@ -122,6 +90,9 @@ TaskStatus ShearingBoxImpl(MeshData<Real> *md, const Real om0, const Real qshear
   return TaskStatus::complete;
 }
 
+//----------------------------------------------------------------------------------------
+//! \fn  TaskStatus RotatingFrameImpl
+//! \brief Calculate the rotating frame body forces
 template <Coordinates GEOM>
 TaskStatus RotatingFrameImpl(MeshData<Real> *md, const Real om0, const bool do_gas,
                              const bool do_dust, const Real dt) {

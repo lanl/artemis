@@ -1,5 +1,5 @@
 //========================================================================================
-// (C) (or copyright) 2023-2024. Triad National Security, LLC. All rights reserved.
+// (C) (or copyright) 2023-2025. Triad National Security, LLC. All rights reserved.
 //
 // This program was produced under U.S. Government contract 89233218CNA000001 for Los
 // Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -60,6 +60,7 @@ ArtemisDriver<GEOM>::ArtemisDriver(ParameterInput *pin, ApplicationInput *app_in
   do_dust = artemis_pkg->template Param<bool>("do_dust");
   do_gravity = artemis_pkg->template Param<bool>("do_gravity");
   do_rotating_frame = artemis_pkg->template Param<bool>("do_rotating_frame");
+  do_shear = (do_rotating_frame) ? (pin->GetReal("rotating_frame", "qshear") > 0) : false;
   do_cooling = artemis_pkg->template Param<bool>("do_cooling");
   do_drag = artemis_pkg->template Param<bool>("do_drag");
   do_viscosity = artemis_pkg->template Param<bool>("do_viscosity");
@@ -117,6 +118,11 @@ TaskListStatus ArtemisDriver<GEOM>::Step() {
   if (status != TaskListStatus::complete) return status;
 
   // Execute operator split physics
+
+  // Operator split, background linear advection (for shearing box)
+  if (do_shear) status = RotatingFrame::Advect(pmesh, tm.time, tm.dt, integrator.get());
+  if (status != TaskListStatus::complete) return status;
+
   if (do_imc) status = IMC::JaybenneIMC<GEOM>(pmesh, tm.time, tm.dt);
   if (status != TaskListStatus::complete) return status;
 

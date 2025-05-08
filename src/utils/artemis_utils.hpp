@@ -183,6 +183,10 @@ void PrintArtemisConfiguration(Packages_t &packages);
 void EnrollArtemisRefinementOps(parthenon::Metadata &m, Coordinates coords);
 std::vector<std::vector<Real>> loadtxt(std::string fname);
 
+KOKKOS_FUNCTION
+Real CutCell2D(const std::array<Real, 4> &x, const std::array<Real, 4> &y,
+               const std::array<Real, 2> &xc, const std::array<Real, 2> &nx);
+
 } // namespace ArtemisUtils
 
 #endif // UTILS_ARTEMIS_UTILS_HPP_

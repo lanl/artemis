@@ -18,6 +18,7 @@
 #include "artemis.hpp"
 #include "gas.hpp"
 #include "geometry/geometry.hpp"
+#include "rotating_frame/rotating_frame.hpp"
 #include "utils/artemis_utils.hpp"
 #include "utils/diffusion/diffusion.hpp"
 #include "utils/diffusion/diffusion_coeff.hpp"
@@ -137,50 +138,65 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   const Real temp = units.GetTemperatureCodeToPhysical();
 
   // Absorption opacity model
-  ArtemisUtils::Opacity model;
   std::string opacity_model_name =
       pin->GetOrAddString("gas/opacity/absorption", "opacity_model", "constant");
-  if (opacity_model_name == "none") {
-    model = Gray(0.0);
-  } else if (opacity_model_name == "constant") {
-    const Real kappa_a = pin->GetOrAddReal("gas/opacity/absorption", "kappa_a", 0.0);
-    model = Gray(kappa_a);
-  } else if (opacity_model_name == "powerlaw") {
-    const Real coef_kappa_a =
-        pin->GetOrAddReal("gas/opacity/absorption", "coef_kappa_a", 0.0);
-    const Real rho_exp = pin->GetOrAddReal("gas/opacity/absorption", "rho_exp", 0.0);
-    const Real temp_exp = pin->GetOrAddReal("gas/opacity/absorption", "temp_exp", 0.0);
-    model = PowerLaw(coef_kappa_a, rho_exp, temp_exp);
+
+  // Mean absorption opacity (either read from table or uses model
+  ArtemisUtils::MeanOpacity opacity;
+  if (opacity_model_name == "table") {
+    std::string table_filename =
+        pin->GetString("gas/opacity/absorption", "opacity_table");
+    opacity =
+        singularity::photons::MeanNonCGSUnits<singularity::photons::MeanOpacityBase>(
+            singularity::photons::MeanOpacityBase(table_filename), time, mass, length,
+            temp);
   } else {
-    PARTHENON_FAIL("Opacity model not recognized!");
+
+    // Instantiate mean absorption opacity object (i.e., table)
+    const Real lRhoMin_a = pin->GetOrAddReal("gas/opacity/absorption", "lRhoMin", -1.0);
+    const Real lRhoMax_a = pin->GetOrAddReal("gas/opacity/absorption", "lRhoMax", 1.0);
+    const int NRho_a = pin->GetOrAddInteger("gas/opacity/absorption", "NRho", 2);
+    const Real lTMin_a = pin->GetOrAddReal("gas/opacity/absorption", "lTMin", -1.0);
+    const Real lTMax_a = pin->GetOrAddReal("gas/opacity/absorption", "lTMax", 1.0);
+    const int NT_a = pin->GetOrAddInteger("gas/opacity/absorption", "NT", 2);
+
+    if (opacity_model_name == "none") {
+      auto model = Gray(0.0);
+      opacity =
+          singularity::photons::MeanNonCGSUnits<singularity::photons::MeanOpacityBase>(
+              singularity::photons::MeanOpacityBase(model, lRhoMin_a, lRhoMax_a, NRho_a,
+                                                    lTMin_a, lTMax_a, NT_a),
+              time, mass, length, temp);
+    } else if (opacity_model_name == "constant") {
+      const Real kappa_a = pin->GetOrAddReal("gas/opacity/absorption", "kappa_a", 0.0);
+      auto model = Gray(kappa_a);
+      opacity =
+          singularity::photons::MeanNonCGSUnits<singularity::photons::MeanOpacityBase>(
+              singularity::photons::MeanOpacityBase(model, lRhoMin_a, lRhoMax_a, NRho_a,
+                                                    lTMin_a, lTMax_a, NT_a),
+              time, mass, length, temp);
+    } else if (opacity_model_name == "powerlaw") {
+      const Real coef_kappa_a =
+          pin->GetOrAddReal("gas/opacity/absorption", "coef_kappa_a", 0.0);
+      const Real rho_exp = pin->GetOrAddReal("gas/opacity/absorption", "rho_exp", 0.0);
+      const Real temp_exp = pin->GetOrAddReal("gas/opacity/absorption", "temp_exp", 0.0);
+      auto model = PowerLaw(coef_kappa_a, rho_exp, temp_exp);
+      opacity =
+          singularity::photons::MeanNonCGSUnits<singularity::photons::MeanOpacityBase>(
+              singularity::photons::MeanOpacityBase(model, lRhoMin_a, lRhoMax_a, NRho_a,
+                                                    lTMin_a, lTMax_a, NT_a),
+              time, mass, length, temp);
+    } else {
+      PARTHENON_FAIL("Opacity model not recognized!");
+    }
   }
-  // Instantiate mean absorption opacity object (i.e., table)
-  const Real lRhoMin_a = pin->GetOrAddReal("gas/opacity/absorption", "lRhoMin", -1.0);
-  const Real lRhoMax_a = pin->GetOrAddReal("gas/opacity/absorption", "lRhoMax", 1.0);
-  const int NRho_a = pin->GetOrAddInteger("gas/opacity/absorption", "NRho", 2);
-  const Real lTMin_a = pin->GetOrAddReal("gas/opacity/absorption", "lTMin", -1.0);
-  const Real lTMax_a = pin->GetOrAddReal("gas/opacity/absorption", "lTMax", 1.0);
-  const int NT_a = pin->GetOrAddInteger("gas/opacity/absorption", "NT", 2);
-  ArtemisUtils::MeanOpacity opacity =
-      singularity::photons::MeanNonCGSUnits<singularity::photons::MeanOpacityBase>(
-          singularity::photons::MeanOpacityBase(model, lRhoMin_a, lRhoMax_a, NRho_a,
-                                                lTMin_a, lTMax_a, NT_a),
-          time, mass, length, temp);
   params.Add("opacity_h", opacity);
   params.Add("opacity_d", opacity.GetOnDevice());
 
   // Scattering opacity model
-  ArtemisUtils::Scattering smodel;
   std::string scattering_model_name =
       pin->GetOrAddString("gas/opacity/scattering", "scattering_model", "none");
-  if (scattering_model_name == "none") {
-    smodel = GrayS(0.0, 1.0);
-  } else if (scattering_model_name == "constant") {
-    const Real kappa_s = pin->GetOrAddReal("gas/opacity/scattering", "kappa_s", 0.0);
-    smodel = GrayS(kappa_s, 1.0);
-  } else {
-    PARTHENON_FAIL("Scattering model not recognized!");
-  }
+
   // Instantiate mean scattering opacity object (i.e., table)
   const Real lRhoMin_s = pin->GetOrAddReal("gas/opacity/scattering", "lRhoMin", -1.0);
   const Real lRhoMax_s = pin->GetOrAddReal("gas/opacity/scattering", "lRhoMax", 1.0);
@@ -188,11 +204,27 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   const Real lTMin_s = pin->GetOrAddReal("gas/opacity/scattering", "lTMin", -1.0);
   const Real lTMax_s = pin->GetOrAddReal("gas/opacity/scattering", "lTMax", 1.0);
   const int NT_s = pin->GetOrAddInteger("gas/opacity/scattering", "NT", 2);
-  ArtemisUtils::MeanScattering scattering =
-      singularity::photons::MeanNonCGSUnitsS<singularity::photons::MeanSOpacityCGS>(
-          singularity::photons::MeanSOpacityCGS(smodel, lRhoMin_s, lRhoMax_s, NRho_s,
-                                                lTMin_s, lTMax_s, NT_s),
-          time, mass, length, temp);
+
+  ArtemisUtils::MeanScattering scattering;
+  if (scattering_model_name == "none") {
+    auto smodel = GrayS(0.0, 1.0);
+    scattering =
+        singularity::photons::MeanNonCGSUnitsS<singularity::photons::MeanSOpacityCGS>(
+            singularity::photons::MeanSOpacityCGS(smodel, lRhoMin_s, lRhoMax_s, NRho_s,
+                                                  lTMin_s, lTMax_s, NT_s),
+            time, mass, length, temp);
+  } else if (scattering_model_name == "constant") {
+    const Real kappa_s = pin->GetOrAddReal("gas/opacity/scattering", "kappa_s", 0.0);
+    auto smodel = GrayS(kappa_s, 1.0);
+    scattering =
+        singularity::photons::MeanNonCGSUnitsS<singularity::photons::MeanSOpacityCGS>(
+            singularity::photons::MeanSOpacityCGS(smodel, lRhoMin_s, lRhoMax_s, NRho_s,
+                                                  lTMin_s, lTMax_s, NT_s),
+            time, mass, length, temp);
+  } else {
+    PARTHENON_FAIL("Scattering model not recognized!");
+  }
+
   params.Add("scattering_h", scattering);
   params.Add("scattering_d", scattering.GetOnDevice());
 
@@ -422,12 +454,24 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
 template <Coordinates GEOM>
 Real EstimateTimestepMesh(MeshData<Real> *md) {
   using parthenon::MakePackDescriptor;
+  using RotatingFrame::BackgroundVelocity;
   auto pm = md->GetParentPointer();
   auto &resolved_pkgs = pm->resolved_packages;
 
   auto &gas_pkg = pm->packages.Get("gas");
   auto &params = gas_pkg->AllParams();
   auto eos_d = params.template Get<EOS>("eos_d");
+
+  // NOTE(@pdmullen): Without FARGO, dt must be additionally limited by the linear
+  // advection of the shear background flow (vy0 = -q Omega x)
+  bool do_shear = false;
+  Real qshear = 0.0, om0 = 0.0;
+  if (pm->packages.Get("artemis")->Param<bool>("do_rotating_frame")) {
+    auto &rframe_pkg = pm->packages.Get("rotating_frame");
+    qshear = rframe_pkg->Param<Real>("qshear");
+    om0 = rframe_pkg->Param<Real>("omega");
+    do_shear = (qshear * om0 != 0.0);
+  }
 
   static auto desc =
       MakePackDescriptor<gas::prim::density, gas::prim::velocity, gas::prim::sie>(
@@ -454,11 +498,15 @@ Real EstimateTimestepMesh(MeshData<Real> *md) {
           const Real cs = std::sqrt(bulk / dens);
           Real denom = 0.0;
           for (int d = 0; d < ndim; d++) {
-            const Real ss =
-                std::abs(vmesh(b, gas::prim::velocity(VI(n, d)), k, j, i)) + cs;
-            denom += ss / dx[d];
+            denom +=
+                (std::abs(vmesh(b, gas::prim::velocity(VI(n, d)), k, j, i)) + cs) / dx[d];
           }
           ldt = std::min(ldt, 1.0 / denom);
+        }
+
+        if (do_shear) {
+          const auto ww = BackgroundVelocity<GEOM>(qshear, om0, coords.x1v());
+          ldt = std::min(ldt, dx[1] / std::abs(ww[1]));
         }
       },
       Kokkos::Min<Real>(min_dt));
@@ -744,38 +792,33 @@ void AddHistory(Coordinates coords, Params &params) {
 
 //----------------------------------------------------------------------------------------
 //! template instantiations
-template Real EstimateTimestepMesh<Coordinates::cartesian>(MeshData<Real> *md);
-template Real EstimateTimestepMesh<Coordinates::cylindrical>(MeshData<Real> *md);
-template Real EstimateTimestepMesh<Coordinates::spherical1D>(MeshData<Real> *md);
-template Real EstimateTimestepMesh<Coordinates::spherical2D>(MeshData<Real> *md);
-template Real EstimateTimestepMesh<Coordinates::spherical3D>(MeshData<Real> *md);
-template Real EstimateTimestepMesh<Coordinates::axisymmetric>(MeshData<Real> *md);
+typedef MeshData<Real> MD;
+template Real EstimateTimestepMesh<Coordinates::cartesian>(MD *md);
+template Real EstimateTimestepMesh<Coordinates::cylindrical>(MD *md);
+template Real EstimateTimestepMesh<Coordinates::spherical1D>(MD *md);
+template Real EstimateTimestepMesh<Coordinates::spherical2D>(MD *md);
+template Real EstimateTimestepMesh<Coordinates::spherical3D>(MD *md);
+template Real EstimateTimestepMesh<Coordinates::axisymmetric>(MD *md);
 
-template TaskStatus ViscousFlux<Coordinates::cartesian>(MeshData<Real> *md);
-template TaskStatus ViscousFlux<Coordinates::spherical1D>(MeshData<Real> *md);
-template TaskStatus ViscousFlux<Coordinates::spherical2D>(MeshData<Real> *md);
-template TaskStatus ViscousFlux<Coordinates::spherical3D>(MeshData<Real> *md);
-template TaskStatus ViscousFlux<Coordinates::cylindrical>(MeshData<Real> *md);
-template TaskStatus ViscousFlux<Coordinates::axisymmetric>(MeshData<Real> *md);
+template TaskStatus ViscousFlux<Coordinates::cartesian>(MD *md);
+template TaskStatus ViscousFlux<Coordinates::spherical1D>(MD *md);
+template TaskStatus ViscousFlux<Coordinates::spherical2D>(MD *md);
+template TaskStatus ViscousFlux<Coordinates::spherical3D>(MD *md);
+template TaskStatus ViscousFlux<Coordinates::cylindrical>(MD *md);
+template TaskStatus ViscousFlux<Coordinates::axisymmetric>(MD *md);
 
-template TaskStatus ThermalFlux<Coordinates::cartesian>(MeshData<Real> *md);
-template TaskStatus ThermalFlux<Coordinates::spherical1D>(MeshData<Real> *md);
-template TaskStatus ThermalFlux<Coordinates::spherical2D>(MeshData<Real> *md);
-template TaskStatus ThermalFlux<Coordinates::spherical3D>(MeshData<Real> *md);
-template TaskStatus ThermalFlux<Coordinates::cylindrical>(MeshData<Real> *md);
-template TaskStatus ThermalFlux<Coordinates::axisymmetric>(MeshData<Real> *md);
+template TaskStatus ThermalFlux<Coordinates::cartesian>(MD *md);
+template TaskStatus ThermalFlux<Coordinates::spherical1D>(MD *md);
+template TaskStatus ThermalFlux<Coordinates::spherical2D>(MD *md);
+template TaskStatus ThermalFlux<Coordinates::spherical3D>(MD *md);
+template TaskStatus ThermalFlux<Coordinates::cylindrical>(MD *md);
+template TaskStatus ThermalFlux<Coordinates::axisymmetric>(MD *md);
 
-template TaskStatus DiffusionUpdate<Coordinates::cartesian>(MeshData<Real> *md,
-                                                            const Real dt);
-template TaskStatus DiffusionUpdate<Coordinates::spherical1D>(MeshData<Real> *md,
-                                                              const Real dt);
-template TaskStatus DiffusionUpdate<Coordinates::spherical2D>(MeshData<Real> *md,
-                                                              const Real dt);
-template TaskStatus DiffusionUpdate<Coordinates::spherical3D>(MeshData<Real> *md,
-                                                              const Real dt);
-template TaskStatus DiffusionUpdate<Coordinates::cylindrical>(MeshData<Real> *md,
-                                                              const Real dt);
-template TaskStatus DiffusionUpdate<Coordinates::axisymmetric>(MeshData<Real> *md,
-                                                               const Real dt);
+template TaskStatus DiffusionUpdate<Coordinates::cartesian>(MD *md, const Real dt);
+template TaskStatus DiffusionUpdate<Coordinates::spherical1D>(MD *md, const Real dt);
+template TaskStatus DiffusionUpdate<Coordinates::spherical2D>(MD *md, const Real dt);
+template TaskStatus DiffusionUpdate<Coordinates::spherical3D>(MD *md, const Real dt);
+template TaskStatus DiffusionUpdate<Coordinates::cylindrical>(MD *md, const Real dt);
+template TaskStatus DiffusionUpdate<Coordinates::axisymmetric>(MD *md, const Real dt);
 
 } // namespace Gas

@@ -151,4 +151,50 @@ std::vector<std::vector<Real>> loadtxt(std::string fname) {
   return table;
 }
 
+KOKKOS_FUNCTION
+Real CutCell2D(const std::array<Real, 4> &x, const std::array<Real, 4> &y,
+               const std::array<Real, 2> &xc, const std::array<Real, 2> &nx) {
+  // Cuts a 2D rectangle with the given plane
+  // The volume is computed using the divergence theorem, V = \int div(x) dV
+
+  auto plane_distance = [&xc, &nx](const Real px, const Real py) {
+    return nx[0] * (px - xc[0]) + nx[1] * (py - xc[1]);
+  };
+  const Real x0 = x[0];
+  const Real y0 = y[0];
+  auto contrib = [&x0, &y0](const Real xi, const Real yi, const Real xj, const Real yj) {
+    return 0.5 * ((xi - x0) * (yj - y0) - (xj - x0) * (yi - y0));
+  };
+  Real vol_inside = 0.0;
+  Real vol = 0.0;
+
+  // Loop through the edges of the quad
+  for (int i = 0; i < 4; i++) {
+    const int j = (i + 1) % 4;
+    vol += contrib(x[i], y[i], x[j], y[j]);
+
+    // distance to the plane
+    const Real di = plane_distance(x[i], y[i]);
+    const Real dj = plane_distance(x[j], y[j]);
+
+    // are we removing the point
+    const int clipi = (di < 0.0);
+    const int clipj = (dj < 0.0);
+
+    // intersection point
+    const Real xp =
+        (std::abs(di) * x[j] + std::abs(dj) * x[i]) / (std::abs(di) + std::abs(dj));
+    const Real yp =
+        (std::abs(di) * y[j] + std::abs(dj) * y[i]) / (std::abs(di) + std::abs(dj));
+
+    const Real x1 = (clipi) ? xp : x[i];
+    const Real y1 = (clipi) ? yp : y[i];
+    const Real x2 = (clipj) ? xp : x[j];
+    const Real y2 = (clipj) ? yp : y[j];
+
+    vol_inside += ((clipi + clipj) <= 1) * contrib(x1, y1, x2, y2);
+  }
+  return vol_inside / vol;
+}
+
 } // namespace ArtemisUtils

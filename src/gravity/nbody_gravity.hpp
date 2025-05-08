@@ -28,7 +28,8 @@ KOKKOS_INLINE_FUNCTION void
 NBodyGravityImpl(V1 vmesh, const NBody::Particle &pl,
                  ArtemisUtils::array_type<Real, 7> &lforce, const int b, const int k,
                  const int j, const int i, const bool do_gas, const bool do_dust,
-                 const Real omf, const Real time, const Real dt) {
+                 const Real qshear, const Real omb, const Real omf, const Real time,
+                 const Real dt) {
   // Extract coordinates
   geometry::Coords<GEOM> coords(vmesh.GetCoordinates(b), k, j, i);
   const auto &x = coords.GetCellCenter();
@@ -50,11 +51,17 @@ NBodyGravityImpl(V1 vmesh, const NBody::Particle &pl,
 
   // Get the rotational velocity
   auto vf = NewArray<Real, 3>(0.0);
-  if (omf != 0.0) {
+  if ((omf != 0.0) || (omb != 0)) {
+    // TODO(AMD): The Background velocity should have the frame velocity in it. Only
+    // important for non-shearing box
     const auto &vrot = RotatingFrame::RotationVelocity<GEOM>(x, omf);
-    vf[0] = ex1[0] * vrot[0] + ex2[0] * vrot[1] + ex3[0] * vrot[2];
-    vf[1] = ex1[1] * vrot[0] + ex2[1] * vrot[1] + ex3[1] * vrot[2];
-    vf[2] = ex1[2] * vrot[0] + ex2[2] * vrot[1] + ex3[2] * vrot[2];
+    const auto &vback = RotatingFrame::BackgroundVelocity<GEOM>(qshear, omb, x[0]);
+    vf[0] = ex1[0] * (vback[0] + vrot[0]) + ex2[0] * (vback[1] + vrot[1]) +
+            ex3[0] * (vback[2] + vrot[2]);
+    vf[1] = ex1[1] * (vback[0] + vrot[0]) + ex2[1] * (vback[1] + vrot[1]) +
+            ex3[1] * (vback[2] + vrot[2]);
+    vf[2] = ex1[2] * (vback[0] + vrot[0]) + ex2[2] * (vback[1] + vrot[1]) +
+            ex3[2] * (vback[2] + vrot[2]);
   }
 
   // Process the fluids
@@ -171,11 +178,19 @@ TaskStatus NBodyGravity(MeshData<Real> *md, const Real time, const Real dt) {
   bool do_rf = artemis_pkg->template Param<bool>("do_rotating_frame");
 
   Real omf = 0.0;
+  Real omb = 0.0;
+  Real qshear = 0.0;
   if (do_rf) {
     auto &rf_pkg = pm->packages.Get("rotating_frame");
     const bool global_frame = nbody_pkg->template Param<bool>("frame_correction");
     if (global_frame) {
       omf = rf_pkg->template Param<Real>("omega");
+      omb = omf;
+      qshear = rf_pkg->template Param<Real>("qshear");
+    } else {
+      // still need the background flow if shearing box local
+      omb = rf_pkg->template Param<Real>("omega");
+      qshear = rf_pkg->template Param<Real>("qshear");
     }
   }
 
@@ -205,7 +220,7 @@ TaskStatus NBodyGravity(MeshData<Real> *md, const Real time, const Real dt) {
                       ArtemisUtils::array_type<Real, 7> &lsum) {
           if (particles(n).couple) {
             NBodyGravityImpl<GEOM>(vmesh, particles(n), lsum, b, k, j, i, do_gas, do_dust,
-                                   omf, time, dt);
+                                   qshear, omb, omf, time, dt);
           }
         },
         ArtemisUtils::SumMyArray<Real, Kokkos::HostSpace, 7>(lforce));

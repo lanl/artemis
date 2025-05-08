@@ -22,13 +22,15 @@
 namespace ArtemisUtils {
 
 // Reduced absorption variant for this codebase
-using Opacity = singularity::photons::impl::Variant<singularity::photons::Gray,
-                                                    singularity::photons::PowerLaw,
-                                                    singularity::photons::EPBremss>;
+using Opacity = singularity::photons::impl::Variant<
+    singularity::photons::NonCGSUnits<singularity::photons::Gray>,
+    singularity::photons::NonCGSUnits<singularity::photons::PowerLaw>,
+    singularity::photons::NonCGSUnits<singularity::photons::EPBremss>>;
 
 // Reduced scattering variant for this codebase
-using Scattering = singularity::photons::impl::S_Variant<singularity::photons::GrayS,
-                                                         singularity::photons::ThomsonS>;
+using Scattering = singularity::photons::impl::S_Variant<
+    singularity::photons::NonCGSUnitsS<singularity::photons::GrayS>,
+    singularity::photons::NonCGSUnitsS<singularity::photons::ThomsonS>>;
 
 // Reduced variant for mean absorption opacities
 using MeanOpacity =

@@ -66,9 +66,12 @@ set (SRC_LIST
   pgen/constant.hpp
   pgen/disk.hpp
   pgen/gaussian_bump.hpp
+  pgen/kh.hpp
   pgen/linear_wave.hpp
+  pgen/lw.hpp
   pgen/pgen.hpp
   pgen/problem_modifier.hpp
+  pgen/rt.hpp
   pgen/shock.hpp
   pgen/strat.hpp
   pgen/thermalization.hpp

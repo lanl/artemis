@@ -28,8 +28,9 @@ using Opacity = singularity::photons::impl::Variant<
     singularity::photons::NonCGSUnits<singularity::photons::EPBremss>>;
 
 // Reduced scattering variant for this codebase
-using Scattering = singularity::photons::impl::S_Variant<singularity::photons::GrayS,
-                                                         singularity::photons::ThomsonS>;
+using Scattering = singularity::photons::impl::S_Variant<
+    singularity::photons::NonCGSUnitsS<singularity::photons::GrayS>,
+    singularity::photons::NonCGSUnitsS<singularity::photons::ThomsonS>>;
 
 // Reduced variant for mean absorption opacities
 using MeanOpacity =

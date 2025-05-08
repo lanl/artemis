@@ -192,17 +192,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   params.Add("opacity_d", opacity.GetOnDevice());
 
   // Scattering opacity model
-  ArtemisUtils::Scattering smodel;
   std::string scattering_model_name =
       pin->GetOrAddString("gas/opacity/scattering", "scattering_model", "none");
-  if (scattering_model_name == "none") {
-    smodel = GrayS(0.0, 1.0);
-  } else if (scattering_model_name == "constant") {
-    const Real kappa_s = pin->GetOrAddReal("gas/opacity/scattering", "kappa_s", 0.0);
-    smodel = GrayS(kappa_s, 1.0);
-  } else {
-    PARTHENON_FAIL("Scattering model not recognized!");
-  }
+
   // Instantiate mean scattering opacity object (i.e., table)
   const Real lRhoMin_s = pin->GetOrAddReal("gas/opacity/scattering", "lRhoMin", -1.0);
   const Real lRhoMax_s = pin->GetOrAddReal("gas/opacity/scattering", "lRhoMax", 1.0);
@@ -210,11 +202,27 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   const Real lTMin_s = pin->GetOrAddReal("gas/opacity/scattering", "lTMin", -1.0);
   const Real lTMax_s = pin->GetOrAddReal("gas/opacity/scattering", "lTMax", 1.0);
   const int NT_s = pin->GetOrAddInteger("gas/opacity/scattering", "NT", 2);
-  ArtemisUtils::MeanScattering scattering =
-      singularity::photons::MeanNonCGSUnitsS<singularity::photons::MeanSOpacityCGS>(
-          singularity::photons::MeanSOpacityCGS(smodel, lRhoMin_s, lRhoMax_s, NRho_s,
-                                                lTMin_s, lTMax_s, NT_s),
-          time, mass, length, temp);
+
+  ArtemisUtils::MeanScattering scattering;
+  if (scattering_model_name == "none") {
+    auto smodel = GrayS(0.0, 1.0);
+    scattering =
+        singularity::photons::MeanNonCGSUnitsS<singularity::photons::MeanSOpacityCGS>(
+            singularity::photons::MeanSOpacityCGS(smodel, lRhoMin_s, lRhoMax_s, NRho_s,
+                                                  lTMin_s, lTMax_s, NT_s),
+            time, mass, length, temp);
+  } else if (scattering_model_name == "constant") {
+    const Real kappa_s = pin->GetOrAddReal("gas/opacity/scattering", "kappa_s", 0.0);
+    auto smodel = GrayS(kappa_s, 1.0);
+    scattering =
+        singularity::photons::MeanNonCGSUnitsS<singularity::photons::MeanSOpacityCGS>(
+            singularity::photons::MeanSOpacityCGS(smodel, lRhoMin_s, lRhoMax_s, NRho_s,
+                                                  lTMin_s, lTMax_s, NT_s),
+            time, mass, length, temp);
+  } else {
+    PARTHENON_FAIL("Scattering model not recognized!");
+  }
+
   params.Add("scattering_h", scattering);
   params.Add("scattering_d", scattering.GetOnDevice());
 

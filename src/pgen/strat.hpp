@@ -36,6 +36,9 @@
 #include "utils/artemis_utils.hpp"
 #include "utils/eos/eos.hpp"
 
+// jaybenne includes
+#include "jaybenne.hpp"
+
 using ArtemisUtils::EOS;
 using ArtemisUtils::VI;
 
@@ -108,6 +111,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
                     "problem = strat only works for Cartesian Coordinates!");
 
   const bool do_dust = artemis_pkg->Param<bool>("do_dust");
+  const bool do_radiation = artemis_pkg->Param<bool>("do_radiation");
   int nspec = Null<int>();
   if (do_dust) {
     auto dust_pkg = pmb->packages.Get("dust");
@@ -171,6 +175,8 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           }
         }
       });
+
+  if (do_radiation) jaybenne::InitializeRadiation(md.get(), true);
 }
 
 //----------------------------------------------------------------------------------------
@@ -193,6 +199,8 @@ inline void ExtrapInnerX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
 
   auto v = descriptors[coarse].GetPack(mbd.get());
 
+  if (v.GetMaxNumberOfVars() == 0) return;
+
   const auto &pco = (coarse) ? pmb->pmr->GetCoarseCoords() : pmb->coords;
   const auto nb = IndexRange{0, 0};
   const bool fine = false;
@@ -200,7 +208,6 @@ inline void ExtrapInnerX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
   const auto &bounds = coarse ? pmb->c_cellbounds : pmb->cellbounds;
   const auto &range = bounds.GetBoundsI(IndexDomain::interior, TE::CC);
   const int is = range.s;
-  const auto &pars = artemis_pkg->Param<StratParams>("strat_params");
 
   pmb->par_for_bndry(
       "StratInnerX1", nb, IndexDomain::inner_x1, parthenon::TopologicalElement::CC,
@@ -247,6 +254,8 @@ inline void ExtrapInnerX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
           }
         }
       });
+
+  return;
 }
 
 //----------------------------------------------------------------------------------------
@@ -269,6 +278,8 @@ inline void ExtrapOuterX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
 
   auto v = descriptors[coarse].GetPack(mbd.get());
 
+  if (v.GetMaxNumberOfVars() == 0) return;
+
   const auto &pco = (coarse) ? pmb->pmr->GetCoarseCoords() : pmb->coords;
   const auto nb = IndexRange{0, 0};
   const bool fine = false;
@@ -276,7 +287,6 @@ inline void ExtrapOuterX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
   const auto &bounds = coarse ? pmb->c_cellbounds : pmb->cellbounds;
   const auto &range = bounds.GetBoundsI(IndexDomain::interior, TE::CC);
   const int ie = range.e;
-  const auto &pars = artemis_pkg->Param<StratParams>("strat_params");
 
   pmb->par_for_bndry(
       "StratOuterX1", nb, IndexDomain::outer_x1, parthenon::TopologicalElement::CC,
@@ -323,6 +333,8 @@ inline void ExtrapOuterX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
           }
         }
       });
+
+  return;
 }
 
 //----------------------------------------------------------------------------------------
@@ -360,6 +372,8 @@ inline void ShearInnerX2(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse)
                                                  dust::prim::velocity>(mbd);
 
   auto v = descriptors[coarse].GetPack(mbd.get());
+
+  if (v.GetMaxNumberOfVars() == 0) return;
 
   const auto &pco = (coarse) ? pmb->pmr->GetCoarseCoords() : pmb->coords;
   const auto &pars = artemis_pkg->Param<StratParams>("strat_params");
@@ -421,6 +435,8 @@ inline void ShearInnerX2(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse)
           }
         }
       });
+
+  return;
 }
 
 //----------------------------------------------------------------------------------------
@@ -458,6 +474,8 @@ inline void ShearOuterX2(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse)
                                                  dust::prim::velocity>(mbd);
 
   auto v = descriptors[coarse].GetPack(mbd.get());
+
+  if (v.GetMaxNumberOfVars() == 0) return;
 
   const auto &pco = (coarse) ? pmb->pmr->GetCoarseCoords() : pmb->coords;
   const auto &pars = artemis_pkg->Param<StratParams>("strat_params");
@@ -520,6 +538,8 @@ inline void ShearOuterX2(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse)
           }
         }
       });
+
+  return;
 }
 
 //----------------------------------------------------------------------------------------
@@ -544,6 +564,8 @@ inline void ExtrapInnerX3(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
                                                  dust::prim::velocity>(mbd);
 
   auto v = descriptors[coarse].GetPack(mbd.get());
+
+  if (v.GetMaxNumberOfVars() == 0) return;
 
   const auto &pco = (coarse) ? pmb->pmr->GetCoarseCoords() : pmb->coords;
   const auto nb = IndexRange{0, 0};
@@ -628,6 +650,8 @@ inline void ExtrapOuterX3(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
 
   auto v = descriptors[coarse].GetPack(mbd.get());
 
+  if (v.GetMaxNumberOfVars() == 0) return;
+
   const auto &pco = (coarse) ? pmb->pmr->GetCoarseCoords() : pmb->coords;
   const auto nb = IndexRange{0, 0};
   const bool fine = false;
@@ -685,6 +709,7 @@ inline void ExtrapOuterX3(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
           }
         }
       });
+
   return;
 }
 

@@ -21,8 +21,8 @@
 #include "utils/opacity/opacity.hpp"
 
 using ArtemisUtils::EOS;
-using ArtemisUtils::Opacity;
-using ArtemisUtils::Scattering;
+using ArtemisUtils::MeanOpacity;
+using ArtemisUtils::MeanScattering;
 using ArtemisUtils::VI;
 
 namespace Radiation {
@@ -38,8 +38,8 @@ TaskStatus MatterCouplingSimpleImpl(MeshData<Real> *u0, const Real dt) {
 
   auto &gas_pkg = pm->packages.Get("gas");
   auto eos_d = gas_pkg->template Param<EOS>("eos_d");
-  auto opac_d = gas_pkg->template Param<Opacity>("opacity_d");
-  auto scat_d = gas_pkg->template Param<Scattering>("scattering_d");
+  auto opac_d = gas_pkg->template Param<MeanOpacity>("opacity_d");
+  auto scat_d = gas_pkg->template Param<MeanScattering>("scattering_d");
   auto sieflr = gas_pkg->template Param<Real>("siefloor");
   auto dflr = gas_pkg->template Param<Real>("dfloor");
   auto de_switch = gas_pkg->template Param<Real>("de_switch");
@@ -115,7 +115,7 @@ TaskStatus MatterCouplingSimpleImpl(MeshData<Real> *u0, const Real dt) {
           T = std::pow(B / arad, 0.25);
           e = eos_d.InternalEnergyFromDensityTemperature(dens, T) * dens;
           const Real Cv = dens * eos_d.SpecificHeatFromDensityTemperature(dens, T);
-          const Real a = chat * dt * opac_d.AbsorptionCoefficient(dens, T, 1.0);
+          const Real a = chat * dt * opac_d.PlanckMeanAbsorptionCoefficient(dens, T);
           const Real fleck = FleckFactor(arad, T, Cv);
 
           const Real Ri = a * (E - B);
@@ -141,8 +141,8 @@ TaskStatus MatterCouplingSimpleImpl(MeshData<Real> *u0, const Real dt) {
         e = eos_d.InternalEnergyFromDensityTemperature(dens, T) * dens;
         const Real dEg = e - e0;
         Real a = chat * dt *
-                 (opac_d.AbsorptionCoefficient(dens, T, 1.0) +
-                  scat_d.TotalScatteringCoefficient(dens, T, 1.0));
+                 (opac_d.RosselandMeanAbsorptionCoefficient(dens, T) +
+                  scat_d.RosselandMeanTotalScatteringCoefficient(dens, T));
         std::array<Real, 3> dF{-a / (1. + a) * Fr0[0], -a / (1. + a) * Fr0[1],
                                -a / (1. + a) * Fr0[2]};
         const Real icc = -1. / (c * chat * dens);
@@ -176,8 +176,8 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
 
   auto &gas_pkg = pm->packages.Get("gas");
   auto eos_d = gas_pkg->template Param<EOS>("eos_d");
-  auto opac_d = gas_pkg->template Param<Opacity>("opacity_d");
-  auto scat_d = gas_pkg->template Param<Scattering>("scattering_d");
+  auto opac_d = gas_pkg->template Param<MeanOpacity>("opacity_d");
+  auto scat_d = gas_pkg->template Param<MeanScattering>("scattering_d");
   auto sieflr = gas_pkg->template Param<Real>("siefloor");
   auto dflr = gas_pkg->template Param<Real>("dfloor");
   auto de_switch = gas_pkg->template Param<Real>("de_switch");
@@ -294,8 +294,9 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
             const Real Cv = dens * eos_d.SpecificHeatFromDensityTemperature(dens, T);
             const Real fleck = FleckFactor(arad, T, Cv);
 
-            const Real sigp = chat * dt * opac_d.AbsorptionCoefficient(dens, T, 1.0);
-            const Real sigs = chat * dt * scat_d.TotalScatteringCoefficient(dens, T, 1.0);
+            const Real sigp = chat * dt * opac_d.PlanckMeanAbsorptionCoefficient(dens, T);
+            const Real sigs =
+                chat * dt * scat_d.RosselandMeanTotalScatteringCoefficient(dens, T);
             const Real sigf = sigp + sigs;
 
             const Real a = g * (sigf - g2 * sigs * (1. + bdbdp));
@@ -332,8 +333,10 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
           Real eg = dens * eos_d.InternalEnergyFromDensityTemperature(dens, T);
           dEg = eg - eg0;
 
-          const Real sigp = chat * dt * opac_d.AbsorptionCoefficient(dens, T, 1.0);
-          const Real sigs = chat * dt * scat_d.TotalScatteringCoefficient(dens, T, 1.0);
+          const Real sigp =
+              chat * dt * opac_d.RosselandMeanAbsorptionCoefficient(dens, T);
+          const Real sigs =
+              chat * dt * scat_d.RosselandMeanTotalScatteringCoefficient(dens, T);
           const Real sigf = sigp + sigs;
 
           const Real a = g * sigf;

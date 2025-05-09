@@ -27,8 +27,8 @@
 #include "utils/units.hpp"
 
 using ArtemisUtils::EOS;
-using ArtemisUtils::Opacity;
-using ArtemisUtils::Scattering;
+using ArtemisUtils::MeanOpacity;
+using ArtemisUtils::MeanScattering;
 using ArtemisUtils::VI;
 
 namespace Radiation {

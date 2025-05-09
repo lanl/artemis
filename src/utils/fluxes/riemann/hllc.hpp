@@ -43,15 +43,16 @@ namespace ArtemisUtils {
 //! \class ArtemisUtils::RiemannSolver<RSolver::hllc, ...>
 //! \brief The HLLC Riemann solver for ideal gas hydrodynamics
 template <Fluid FLUID_TYPE>
-class RiemannSolver<RSolver::hllc, FLUID_TYPE> {
- public:
+struct RiemannSolver<RSolver::hllc, FLUID_TYPE,
+                     std::enable_if_t<!is_grey<FLUID_TYPE>()>> {
   template <typename V1, typename V2, typename V3>
-  KOKKOS_INLINE_FUNCTION void
-  solve(const EOS &eos, const Real c, const Real chat,
-        parthenon::team_mbr_t const &member, const int b, const int k, const int j,
-        const int il, const int iu, const int dir,
-        const parthenon::ScratchPad2D<Real> &wl, const parthenon::ScratchPad2D<Real> &wr,
-        const V1 &p, const V2 &q, const V3 &vf) const {
+  KOKKOS_INLINE_FUNCTION void operator()(const EOS &eos, const Real c, const Real chat,
+                                         parthenon::team_mbr_t const &member, const int b,
+                                         const int k, const int j, const int il,
+                                         const int iu, const int dir,
+                                         const parthenon::ScratchPad2D<Real> &wl,
+                                         const parthenon::ScratchPad2D<Real> &wr,
+                                         const V1 &p, const V2 &q, const V3 &vf) const {
     using TE = parthenon::TopologicalElement;
     // Check sensibility of flux direction
     PARTHENON_REQUIRE(dir > 0 && dir <= 3, "Invalid flux direction!");

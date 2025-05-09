@@ -50,15 +50,16 @@ namespace ArtemisUtils {
 //! \class ArtemisUtils::RiemannSolver<RSolver::hlle, ...>
 //! \brief The HLLE Riemann solver for ideal gas hydrodynamics
 template <Fluid FLUID_TYPE>
-class RiemannSolver<RSolver::hlle, FLUID_TYPE> {
- public:
+struct RiemannSolver<RSolver::hlle, FLUID_TYPE,
+                     std::enable_if_t<!is_grey<FLUID_TYPE>()>> {
   template <typename V1, typename V2, typename V3>
-  KOKKOS_INLINE_FUNCTION void
-  solve(const EOS &eos, const Real c, const Real chat,
-        parthenon::team_mbr_t const &member, const int b, const int k, const int j,
-        const int il, const int iu, const int dir,
-        const parthenon::ScratchPad2D<Real> &wl, const parthenon::ScratchPad2D<Real> &wr,
-        const V1 &p, const V2 &q, const V3 &vf) const {
+  KOKKOS_INLINE_FUNCTION void operator()(const EOS &eos, const Real c, const Real chat,
+                                         parthenon::team_mbr_t const &member, const int b,
+                                         const int k, const int j, const int il,
+                                         const int iu, const int dir,
+                                         const parthenon::ScratchPad2D<Real> &wl,
+                                         const parthenon::ScratchPad2D<Real> &wr,
+                                         const V1 &p, const V2 &q, const V3 &vf) const {
     using TE = parthenon::TopologicalElement;
     // Check sensibility of flux direction
     PARTHENON_REQUIRE(dir > 0 && dir <= 3, "Invalid flux direction!");
@@ -66,14 +67,13 @@ class RiemannSolver<RSolver::hlle, FLUID_TYPE> {
 
     // TODO(BRR) temporary
     const Real gm1 = eos.GruneisenParamFromDensityTemperature(Null<Real>(), Null<Real>());
+
     // Obtain number of species
     int nvar = Null<int>();
     if constexpr (FLUID_TYPE == Fluid::gas) {
       nvar = 6;
     } else if constexpr (FLUID_TYPE == Fluid::dust) {
       nvar = 4;
-    } else if constexpr (is_grey<FLUID_TYPE>()) {
-      nvar = 5;
     }
     const int nspecies = p.GetMaxNumberOfVars() / nvar;
 
@@ -118,6 +118,7 @@ class RiemannSolver<RSolver::hlle, FLUID_TYPE> {
               wr_ipr = wr(IPR, i);
               wr_ise = wr(ISE, i);
             }
+
             // Compute Roe-averaged state
             Real sqrtdl = sqrt(wl_idn);
             Real sqrtdr = sqrt(wr_idn);
@@ -152,14 +153,6 @@ class RiemannSolver<RSolver::hlle, FLUID_TYPE> {
             [[maybe_unused]] Real sr = Null<Real>();
             [[maybe_unused]] Real al = Null<Real>();
             [[maybe_unused]] Real ar = Null<Real>();
-            Real scalel = 1.0;
-            Real scaler = 1.0;
-            Real qscale = 1.0;
-            Real norml = 1.0;
-            Real normr = 1.0;
-            [[maybe_unused]] Real pscalel = Null<Real>();
-            [[maybe_unused]] Real pscaler = Null<Real>();
-
             if constexpr (FLUID_TYPE == Fluid::gas) {
               Real a = hroe - 0.5 * (SQR(wroe_ivx) + SQR(wroe_ivy) + SQR(wroe_ivz));
               a = (a < 0.0) ? 0.0 : sqrt(gm1 * a);
@@ -174,32 +167,6 @@ class RiemannSolver<RSolver::hlle, FLUID_TYPE> {
             } else if constexpr (FLUID_TYPE == Fluid::dust) {
               sl = std::min(wroe_ivx, wl_ivx);
               sr = std::max(wroe_ivx, wr_ivx);
-            } else if constexpr (is_grey<FLUID_TYPE>()) {
-              wl_ivx = (std::abs(wl_ivx) <= 1e-20) ? 0.0 : wl_ivx;
-              wl_ivy = (std::abs(wl_ivy) <= 1e-20) ? 0.0 : wl_ivy;
-              wl_ivz = (std::abs(wl_ivz) <= 1e-20) ? 0.0 : wl_ivz;
-              wr_ivx = (std::abs(wr_ivx) <= 1e-20) ? 0.0 : wr_ivx;
-              wr_ivy = (std::abs(wr_ivy) <= 1e-20) ? 0.0 : wr_ivy;
-              wr_ivz = (std::abs(wr_ivz) <= 1e-20) ? 0.0 : wr_ivz;
-              Real fl = std::sqrt(SQR(wl_ivx) + SQR(wl_ivy) + SQR(wl_ivz));
-              Real fr = std::sqrt(SQR(wr_ivx) + SQR(wr_ivy) + SQR(wr_ivz));
-              const Real nlx = wl_ivx / (fl + Fuzz<Real>());
-              const Real nrx = wr_ivx / (fr + Fuzz<Real>());
-              fl = std::min(1.0, fl);
-              fr = std::min(1.0, fr);
-              const Real chil = Radiation::EddingtonFactor<FLUID_TYPE>(fl);
-              const Real chir = Radiation::EddingtonFactor<FLUID_TYPE>(fr);
-              const auto [sla, slb] = Radiation::WaveSpeed<FLUID_TYPE>(nlx, fl);
-              const auto [sra, srb] = Radiation::WaveSpeed<FLUID_TYPE>(nrx, fr);
-              qscale = chat;
-              sl = std::min(sla, slb);
-              sr = std::max(sra, srb);
-              pscalel = chat * c * 0.5 * (1.0 - chil);
-              pscaler = chat * c * 0.5 * (1.0 - chir);
-              norml = fl * fl;
-              normr = fr * fr;
-              scalel = c * 0.5 * (3. * chil - 1.);
-              scaler = c * 0.5 * (3. * chir - 1.);
             }
 
             // following min/max set to TINY_NUMBER to fix bug found in converging
@@ -208,20 +175,20 @@ class RiemannSolver<RSolver::hlle, FLUID_TYPE> {
             Real bm = (sl < 0.0) ? sl : -1.0e-20;
 
             // Compute L/R fluxes along lines bm/bp: F_L - (S_L)U_L; F_R - (S_R)U_R
-            qa = qscale * (wl_ivx - bm);
-            qb = qscale * (wr_ivx - bp);
+            qa = wl_ivx - bm;
+            qb = wr_ivx - bp;
 
             Real fl_d = wl_idn * qa;
             Real fr_d = wr_idn * qb;
 
-            Real fl_mx = scalel * wl_idn * qa * (wl_ivx / (norml + Fuzz<Real>()));
-            Real fr_mx = scaler * wr_idn * qb * (wr_ivx / (normr + Fuzz<Real>()));
+            Real fl_mx = wl_idn * wl_ivx * qa;
+            Real fr_mx = wr_idn * wr_ivx * qb;
 
-            Real fl_my = scalel * wl_idn * qa * (wl_ivy / (norml + Fuzz<Real>()));
-            Real fr_my = scaler * wr_idn * qb * (wr_ivy / (normr + Fuzz<Real>()));
+            Real fl_my = wl_idn * wl_ivy * qa;
+            Real fr_my = wr_idn * wr_ivy * qb;
 
-            Real fl_mz = scalel * wl_idn * qa * (wl_ivz / (norml + Fuzz<Real>()));
-            Real fr_mz = scaler * wr_idn * qb * (wr_ivz / (normr + Fuzz<Real>()));
+            Real fl_mz = wl_idn * wl_ivz * qa;
+            Real fr_mz = wr_idn * wr_ivz * qb;
 
             [[maybe_unused]] Real fl_e = Null<Real>();
             [[maybe_unused]] Real fr_e = Null<Real>();
@@ -237,11 +204,6 @@ class RiemannSolver<RSolver::hlle, FLUID_TYPE> {
             if constexpr (FLUID_TYPE == Fluid::gas) {
               p.flux(b, dir, IPR, k, j, i) =
                   0.5 * (wl_ipr + wr_ipr) + qa * (wl_ipr - wr_ipr);
-            } else if constexpr (is_grey<FLUID_TYPE>()) {
-              wl_ipr = pscalel * wl_idn; // - sign?
-              wr_ipr = pscaler * wr_idn;
-              p.flux(b, dir, IPR, k, j, i) =
-                  0.5 * (wl_ipr + wr_ipr) + qa * (wl_ipr - wr_ipr);
             }
 
             // Compute the HLLE flux at interface. Formulae below equivalent to
@@ -251,7 +213,6 @@ class RiemannSolver<RSolver::hlle, FLUID_TYPE> {
             q.flux(b, dir, ivx, k, j, i) = 0.5 * (fl_mx + fr_mx) + qa * (fl_mx - fr_mx);
             q.flux(b, dir, ivy, k, j, i) = 0.5 * (fl_my + fr_my) + qa * (fl_my - fr_my);
             q.flux(b, dir, ivz, k, j, i) = 0.5 * (fl_mz + fr_mz) + qa * (fl_mz - fr_mz);
-
             if constexpr (FLUID_TYPE == Fluid::gas) {
               q.flux(b, dir, IEN, k, j, i) = 0.5 * (fl_e + fr_e) + qa * (fl_e - fr_e);
 
@@ -259,6 +220,117 @@ class RiemannSolver<RSolver::hlle, FLUID_TYPE> {
               q.flux(b, dir, IEG, k, j, i) = frho * ((frho >= 0.0) ? wl_ise : wr_ise);
               vf(b, fdir, n, k, j, i) = frho / ((frho >= 0.0) ? wl_idn : wr_idn);
             }
+          });
+    }
+  }
+};
+
+template <Fluid FLUID_TYPE>
+struct RiemannSolver<RSolver::hlle, FLUID_TYPE, std::enable_if_t<is_grey<FLUID_TYPE>()>> {
+  template <typename V1, typename V2, typename V3>
+  KOKKOS_INLINE_FUNCTION void operator()(const EOS &eos, const Real c, const Real chat,
+                                         parthenon::team_mbr_t const &member, const int b,
+                                         const int k, const int j, const int il,
+                                         const int iu, const int dir,
+                                         const parthenon::ScratchPad2D<Real> &wl,
+                                         const parthenon::ScratchPad2D<Real> &wr,
+                                         const V1 &p, const V2 &q, const V3 &vf) const {
+    using TE = parthenon::TopologicalElement;
+    // Check sensibility of flux direction
+    PARTHENON_REQUIRE(dir > 0 && dir <= 3, "Invalid flux direction!");
+    // Obtain number of species
+    constexpr int nvar = 5;
+    const int nspecies = p.GetMaxNumberOfVars() / nvar;
+
+    for (int n = 0; n < nspecies; ++n) {
+      const int IDN = n;
+      const int ivx = nspecies + (n * 3) + ((dir - 1));
+      const int ivy = nspecies + (n * 3) + ((dir - 1) + 1) % 3;
+      const int ivz = nspecies + (n * 3) + ((dir - 1) + 2) % 3;
+      const int IPR = nspecies * 4 + n;
+
+      parthenon::par_for_inner(
+          DEFAULT_INNER_LOOP_PATTERN, member, il, iu, [&](const int i) {
+            // Create local references for L/R states (helps compiler vectorize)
+            Real &wl_idn = wl(IDN, i);
+            Real &wl_ivx = wl(ivx, i);
+            Real &wl_ivy = wl(ivy, i);
+            Real &wl_ivz = wl(ivz, i);
+
+            Real &wr_idn = wr(IDN, i);
+            Real &wr_ivx = wr(ivx, i);
+            Real &wr_ivy = wr(ivy, i);
+            Real &wr_ivz = wr(ivz, i);
+
+            wl_ivx = (std::abs(wl_ivx) <= 1e-20) ? 0.0 : wl_ivx;
+            wl_ivy = (std::abs(wl_ivy) <= 1e-20) ? 0.0 : wl_ivy;
+            wl_ivz = (std::abs(wl_ivz) <= 1e-20) ? 0.0 : wl_ivz;
+            wr_ivx = (std::abs(wr_ivx) <= 1e-20) ? 0.0 : wr_ivx;
+            wr_ivy = (std::abs(wr_ivy) <= 1e-20) ? 0.0 : wr_ivy;
+            wr_ivz = (std::abs(wr_ivz) <= 1e-20) ? 0.0 : wr_ivz;
+
+            // Compute reduced flux magnitude
+            Real fl = std::sqrt(SQR(wl_ivx) + SQR(wl_ivy) + SQR(wl_ivz));
+            Real fr = std::sqrt(SQR(wr_ivx) + SQR(wr_ivy) + SQR(wr_ivz));
+            const Real nlx = wl_ivx / (fl + Fuzz<Real>());
+            const Real nrx = wr_ivx / (fr + Fuzz<Real>());
+            // limit to allowable state
+            fl = std::min(1.0, fl);
+            fr = std::min(1.0, fr);
+
+            // Wave speeds
+            const Real chil = Radiation::EddingtonFactor<FLUID_TYPE>(fl);
+            const Real chir = Radiation::EddingtonFactor<FLUID_TYPE>(fr);
+            const auto [sla, slb] = Radiation::WaveSpeed<FLUID_TYPE>(nlx, fl);
+            const auto [sra, srb] = Radiation::WaveSpeed<FLUID_TYPE>(nrx, fr);
+            Real sl = std::min(sla, slb);
+            Real sr = std::max(sra, srb);
+
+            Real pscalel = chat * c * 0.5 * (1.0 - chil);
+            Real pscaler = chat * c * 0.5 * (1.0 - chir);
+            Real norml = fl * fl;
+            Real normr = fr * fr;
+            Real scalel = c * 0.5 * (3. * chil - 1.);
+            Real scaler = c * 0.5 * (3. * chir - 1.);
+
+            // following min/max set to TINY_NUMBER to fix bug found in converging
+            // supersonic flow
+            Real bp = (sr > 0.0) ? sr : 1.0e-20;
+            Real bm = (sl < 0.0) ? sl : -1.0e-20;
+
+            // Compute L/R fluxes along lines bm/bp: F_L - (S_L)U_L; F_R - (S_R)U_R
+            Real qa = chat * (wl_ivx - bm);
+            Real qb = chat * (wr_ivx - bp);
+
+            Real fl_d = wl_idn * qa;
+            Real fr_d = wr_idn * qb;
+
+            Real fl_mx = scalel * wl_idn * qa * (wl_ivx / (norml + Fuzz<Real>()));
+            Real fr_mx = scaler * wr_idn * qb * (wr_ivx / (normr + Fuzz<Real>()));
+
+            Real fl_my = scalel * wl_idn * qa * (wl_ivy / (norml + Fuzz<Real>()));
+            Real fr_my = scaler * wr_idn * qb * (wr_ivy / (normr + Fuzz<Real>()));
+
+            Real fl_mz = scalel * wl_idn * qa * (wl_ivz / (norml + Fuzz<Real>()));
+            Real fr_mz = scaler * wr_idn * qb * (wr_ivz / (normr + Fuzz<Real>()));
+
+            // Set an approximate interface pressure for coordinate source terms and
+            // pressure contribution to flux.
+            qa = 0.0;
+            if (bp != bm) qa = 0.5 * (bp + bm) / (bp - bm);
+
+            Real wl_ipr = pscalel * wl_idn;
+            Real wr_ipr = pscaler * wr_idn;
+            p.flux(b, dir, IPR, k, j, i) =
+                0.5 * (wl_ipr + wr_ipr) + qa * (wl_ipr - wr_ipr);
+
+            // Compute the HLLE flux at interface. Formulae below equivalent to
+            // Toro eq. 10.20, or Einfeldt et al. (1991) eq. 4.4b
+            const Real frho = 0.5 * (fl_d + fr_d) + qa * (fl_d - fr_d);
+            q.flux(b, dir, IDN, k, j, i) = frho;
+            q.flux(b, dir, ivx, k, j, i) = 0.5 * (fl_mx + fr_mx) + qa * (fl_mx - fr_mx);
+            q.flux(b, dir, ivy, k, j, i) = 0.5 * (fl_my + fr_my) + qa * (fl_my - fr_my);
+            q.flux(b, dir, ivz, k, j, i) = 0.5 * (fl_mz + fr_mz) + qa * (fl_mz - fr_mz);
           });
     }
   }

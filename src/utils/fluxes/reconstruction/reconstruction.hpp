@@ -22,12 +22,11 @@ namespace ArtemisUtils {
 //!        template specialization.
 template <ReconstructionMethod R, CoordinateDirection DIR, Coordinates GEOM>
 class Reconstruction {
- public:
   template <typename V>
-  KOKKOS_INLINE_FUNCTION void apply(parthenon::team_mbr_t const &member, const int b,
-                                    const int k, const int j, const int il, const int iu,
-                                    const V &q, parthenon::ScratchPad2D<Real> &ql,
-                                    parthenon::ScratchPad2D<Real> &qr) const {
+  KOKKOS_INLINE_FUNCTION void
+  operator()(parthenon::team_mbr_t const &member, const int b, const int k, const int j,
+             const int il, const int iu, const V &q, parthenon::ScratchPad2D<Real> &ql,
+             parthenon::ScratchPad2D<Real> &qr) const {
     PARTHENON_FAIL("No default implementation!");
   }
 };

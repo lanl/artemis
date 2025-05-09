@@ -121,13 +121,12 @@ TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PackPrim vprim,
 
         // Reconstruct qR[i] and qL[i+1]
         Reconstruction<RECON, X1DIR, GEOM> recon;
-        recon.apply(mbr, b, k, j, il - 1, iu, vprim, wl, wr);
+        recon(mbr, b, k, j, il - 1, iu, vprim, wl, wr);
         mbr.team_barrier();
 
         // Compute fluxes over[is, ie + 1]
         RiemannSolver<RIEMANN, FLUID_TYPE> riemann;
-        riemann.solve(eos, c, chat, mbr, b, k, j, il, iu, X1DIR, wl, wr, vprim, vflux,
-                      vface);
+        riemann(eos, c, chat, mbr, b, k, j, il, iu, X1DIR, wl, wr, vprim, vflux, vface);
         mbr.team_barrier();
 
         // Scale X1-momentum flux by appropriate scale factor for coord system
@@ -159,14 +158,14 @@ TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PackPrim vprim,
 
             // Reconstruct qR[j] and qL[j+1]
             Reconstruction<RECON, X2DIR, GEOM> recon;
-            recon.apply(mbr, b, k, j, il, iu, vprim, wl_jp1, wr);
+            recon(mbr, b, k, j, il, iu, vprim, wl_jp1, wr);
             mbr.team_barrier();
 
             if (j > jl) {
               // compute fluxes over [js,je+1]
               RiemannSolver<RIEMANN, FLUID_TYPE> riemann;
-              riemann.solve(eos, c, chat, mbr, b, k, j, il, iu, X2DIR, wl, wr, vprim,
-                            vflux, vface);
+              riemann(eos, c, chat, mbr, b, k, j, il, iu, X2DIR, wl, wr, vprim, vflux,
+                      vface);
               mbr.team_barrier();
 
               // Scale X2-momentum flux by appropriate scale factor for coord system
@@ -201,14 +200,14 @@ TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PackPrim vprim,
 
             // Reconstruct qR[k] and qL[k+1]
             Reconstruction<RECON, X3DIR, GEOM> recon;
-            recon.apply(mbr, b, k, j, il, iu, vprim, wl_kp1, wr);
+            recon(mbr, b, k, j, il, iu, vprim, wl_kp1, wr);
             mbr.team_barrier();
 
             // compute fluxes over [ks,ke+1]
             if (k > kl) {
               RiemannSolver<RIEMANN, FLUID_TYPE> riemann;
-              riemann.solve(eos, c, chat, mbr, b, k, j, il, iu, X3DIR, wl, wr, vprim,
-                            vflux, vface);
+              riemann(eos, c, chat, mbr, b, k, j, il, iu, X3DIR, wl, wr, vprim, vflux,
+                      vface);
               mbr.team_barrier();
 
               // Scale X3-momentum flux by appropriate scale factor for coord system
@@ -255,8 +254,13 @@ TaskStatus CalculateFluxesRiemannSelect(MeshData<Real> *md, PKG &pkg, PackPrim v
   const RSolver riemann_method = pkg->template Param<RSolver>("rsolver");
 
   if (riemann_method == RSolver::hllc) {
-    return CalculateFluxesReconSelect<GEOM, FLUID_TYPE, RSolver::hllc>(md, pkg, vprim,
-                                                                       vflux, vface, pcm);
+    if constexpr (is_grey<FLUID_TYPE>()) {
+      PARTHENON_FAIL("Radiationf fluid does not support an HLLC solver");
+      return TaskStatus::complete;
+    } else {
+      return CalculateFluxesReconSelect<GEOM, FLUID_TYPE, RSolver::hllc>(
+          md, pkg, vprim, vflux, vface, pcm);
+    }
   } else if (riemann_method == RSolver::hlle) {
     return CalculateFluxesReconSelect<GEOM, FLUID_TYPE, RSolver::hlle>(md, pkg, vprim,
                                                                        vflux, vface, pcm);

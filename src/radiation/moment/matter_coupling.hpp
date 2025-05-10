@@ -212,7 +212,6 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
     qshear = rframe_pkg->Param<Real>("qshear");
     om0 = rframe_pkg->Param<Real>("omega");
   }
-  printf("MATTER FULL?\n");
 
   // Packing and indexing
   static auto desc =

@@ -124,6 +124,10 @@ TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PackPrim vprim,
         recon(mbr, b, k, j, il - 1, iu, vprim, wl, wr);
         mbr.team_barrier();
 
+        // Fall back to PCM if needed
+        // the barrier is inside
+        correct_recon<FLUID_TYPE>(mbr, X1DIR, b, k, j, il - 1, iu, vprim, wl, wr);
+
         // Compute fluxes over[is, ie + 1]
         RiemannSolver<RIEMANN, FLUID_TYPE> riemann;
         riemann(eos, c, chat, mbr, b, k, j, il, iu, X1DIR, wl, wr, vprim, vflux, vface);
@@ -160,6 +164,10 @@ TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PackPrim vprim,
             Reconstruction<RECON, X2DIR, GEOM> recon;
             recon(mbr, b, k, j, il, iu, vprim, wl_jp1, wr);
             mbr.team_barrier();
+
+            // Fall back to PCM if needed
+            // the barrier is inside
+            correct_recon<FLUID_TYPE>(mbr, X2DIR, b, k, j, il, iu, vprim, wl_jp1, wr);
 
             if (j > jl) {
               // compute fluxes over [js,je+1]
@@ -202,6 +210,9 @@ TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PackPrim vprim,
             Reconstruction<RECON, X3DIR, GEOM> recon;
             recon(mbr, b, k, j, il, iu, vprim, wl_kp1, wr);
             mbr.team_barrier();
+            // Fall back to PCM if needed
+            // the barrier is inside
+            correct_recon<FLUID_TYPE>(mbr, X3DIR, b, k, j, il, iu, vprim, wl_kp1, wr);
 
             // compute fluxes over [ks,ke+1]
             if (k > kl) {

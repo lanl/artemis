@@ -262,13 +262,6 @@ struct RiemannSolver<RSolver::hlle, FLUID_TYPE, std::enable_if_t<is_grey<FLUID_T
             Real &wr_ivy = wr(ivy, i);
             Real &wr_ivz = wr(ivz, i);
 
-            wl_ivx = (std::abs(wl_ivx) <= 1e-20) ? 0.0 : wl_ivx;
-            wl_ivy = (std::abs(wl_ivy) <= 1e-20) ? 0.0 : wl_ivy;
-            wl_ivz = (std::abs(wl_ivz) <= 1e-20) ? 0.0 : wl_ivz;
-            wr_ivx = (std::abs(wr_ivx) <= 1e-20) ? 0.0 : wr_ivx;
-            wr_ivy = (std::abs(wr_ivy) <= 1e-20) ? 0.0 : wr_ivy;
-            wr_ivz = (std::abs(wr_ivz) <= 1e-20) ? 0.0 : wr_ivz;
-
             // Compute reduced flux magnitude
             Real fl = std::sqrt(SQR(wl_ivx) + SQR(wl_ivy) + SQR(wl_ivz));
             Real fr = std::sqrt(SQR(wr_ivx) + SQR(wr_ivy) + SQR(wr_ivz));

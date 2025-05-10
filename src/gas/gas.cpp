@@ -111,15 +111,22 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
       cv = pin->GetReal("gas", "cv");
       PARTHENON_REQUIRE(cv > 0, "Only positive cv allowed!");
       mu = constants.GetKBCode() / ((gamma - 1.) * constants.GetAMUCode() * cv);
+      if (pin->DoesParameterExist("gas", "mu")) {
+        PARTHENON_FAIL("Cannot set both mu and cv in the input file. One is calculated "
+                       "from the other!");
+      }
     } else {
       mu = pin->GetOrAddReal("gas", "mu", 1.);
       PARTHENON_REQUIRE(mu > 0, "Only positive mean molecular weight allowed!");
       cv = constants.GetKBCode() / ((gamma - 1.) * constants.GetAMUCode() * mu);
     }
-    params.Add("mu", mu);
+    // Store these so they are available in outputs
     params.Add("cv", cv);
+    params.Add("mu", mu);
+    auto zbar = pin->GetOrAddReal("gas", "zbar", 1.0);
     EOS eos_host = singularity::UnitSystem<singularity::IdealGas>(
-        singularity::IdealGas(gamma - 1., cv * units.GetSpecificHeatCodeToPhysical()),
+        singularity::IdealGas(gamma - 1., cv * units.GetSpecificHeatCodeToPhysical(),
+                              {mu, zbar}),
         singularity::eos_units_init::LengthTimeUnitsInit(), units.GetTimeCodeToPhysical(),
         units.GetMassCodeToPhysical(), units.GetLengthCodeToPhysical(),
         units.GetTemperatureCodeToPhysical());

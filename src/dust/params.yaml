@@ -120,5 +120,8 @@ dust:
       stokes:
         _type: opt
         _description: "Stopping times between the gas and dust fluid are in the Stokes regime"
+      dp15:
+        _type: opt
+        _description: "Stopping times between the gas and dust fluid use the model described in Appendix A of D'Angelo & Podolok (2015)."
       
      

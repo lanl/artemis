@@ -16,13 +16,16 @@
 #include "artemis.hpp"
 #include "geometry/geometry.hpp"
 #include "utils/eos/eos.hpp"
+#include "utils/units.hpp"
 
 using ArtemisUtils::EOS;
 namespace Drag {
 //----------------------------------------------------------------------------------------
 //! \fn  StateDescriptor Drag::Initialize
 //! \brief Adds intialization function for damping package
-std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
+std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
+                                            ArtemisUtils::Constants &constants,
+                                            ArtemisUtils::Units &units) {
   auto drag = std::make_shared<StateDescriptor>("drag");
   Params &params = drag->AllParams();
 
@@ -82,7 +85,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
     // Enforce 1 gas species
 
-    params.Add("stopping_time_params", StoppingTimeParams("dust/stopping_time", pin));
+    params.Add("stopping_time_params",
+               StoppingTimeParams("dust/stopping_time", pin, constants, units));
   }
 
   return drag;
@@ -139,6 +143,10 @@ TaskStatus DragSource(MeshData<Real> *md, const Real time, const Real dt) {
           return SimpleDragSourceImpl<Diffusion::DiffType::viscosity_plaw,
                                       DragModel::constant, GEOM>(
               md, time, dt, dp, eos_d, gas_self_par, dust_self_par, stop_par);
+        } else if (stop_par.model == DragModel::powerlaw) {
+          return SimpleDragSourceImpl<Diffusion::DiffType::viscosity_plaw,
+                                      DragModel::powerlaw, GEOM>(
+              md, time, dt, dp, eos_d, gas_self_par, dust_self_par, stop_par);
         } else if (stop_par.model == DragModel::stokes) {
           return SimpleDragSourceImpl<Diffusion::DiffType::viscosity_plaw,
                                       DragModel::stokes, GEOM>(
@@ -148,6 +156,10 @@ TaskStatus DragSource(MeshData<Real> *md, const Real time, const Real dt) {
         if (stop_par.model == DragModel::constant) {
           return SimpleDragSourceImpl<Diffusion::DiffType::viscosity_alpha,
                                       DragModel::constant, GEOM>(
+              md, time, dt, dp, eos_d, gas_self_par, dust_self_par, stop_par);
+        } else if (stop_par.model == DragModel::powerlaw) {
+          return SimpleDragSourceImpl<Diffusion::DiffType::viscosity_alpha,
+                                      DragModel::powerlaw, GEOM>(
               md, time, dt, dp, eos_d, gas_self_par, dust_self_par, stop_par);
         } else if (stop_par.model == DragModel::stokes) {
           return SimpleDragSourceImpl<Diffusion::DiffType::viscosity_alpha,
@@ -161,6 +173,9 @@ TaskStatus DragSource(MeshData<Real> *md, const Real time, const Real dt) {
       Diffusion::DiffCoeffParams dp;
       if (stop_par.model == DragModel::constant) {
         return SimpleDragSourceImpl<Diffusion::DiffType::null, DragModel::constant, GEOM>(
+            md, time, dt, dp, eos_d, gas_self_par, dust_self_par, stop_par);
+      } else if (stop_par.model == DragModel::powerlaw) {
+        return SimpleDragSourceImpl<Diffusion::DiffType::null, DragModel::powerlaw, GEOM>(
             md, time, dt, dp, eos_d, gas_self_par, dust_self_par, stop_par);
       } else if (stop_par.model == DragModel::stokes) {
         return SimpleDragSourceImpl<Diffusion::DiffType::null, DragModel::stokes, GEOM>(

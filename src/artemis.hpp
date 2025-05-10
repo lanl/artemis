@@ -21,9 +21,6 @@
 #include <parthenon/driver.hpp>
 #include <parthenon/package.hpp>
 
-// Singularity-eos includes
-#include <singularity-eos/eos/eos.hpp>
-
 using namespace parthenon;
 using namespace parthenon::driver::prelude;
 using namespace parthenon::package::prelude;

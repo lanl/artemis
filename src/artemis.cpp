@@ -23,7 +23,9 @@
 #include "nbody/nbody.hpp"
 #include "rotating_frame/rotating_frame.hpp"
 #include "utils/artemis_utils.hpp"
+#include "utils/eos/eos.hpp"
 #include "utils/history.hpp"
+#include "utils/opacity/opacity.hpp"
 #include "utils/units.hpp"
 
 // Jaybenne includes
@@ -104,7 +106,7 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   if (do_dust) packages.Add(Dust::Initialize(pin.get(), units));
   if (do_rotating_frame) packages.Add(RotatingFrame::Initialize(pin.get()));
   if (do_cooling) packages.Add(Gas::Cooling::Initialize(pin.get()));
-  if (do_drag) packages.Add(Drag::Initialize(pin.get()));
+  if (do_drag) packages.Add(Drag::Initialize(pin.get(), constants, units));
   if (do_radiation) {
     auto eos_h = packages.Get("gas")->Param<EOS>("eos_h");
     auto opacity_h = packages.Get("gas")->Param<MeanOpacity>("opacity_h");

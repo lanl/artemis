@@ -614,12 +614,12 @@ void DiskBoundaryVisc(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) {
           for (int n = 0; n < v.GetSize(0, rad::prim::energy()); ++n) {
             v(0, rad::prim::energy(n), k, j, i) =
                 v(0, rad::prim::energy(n), ia[0], ia[1], ia[2]);
-            v(0, rad::prim::flux(VI(n, 0)), k, j, i) =
-                v(0, rad::prim::flux(VI(n, i)), ia[0], ia[1], ia[2]);
-            v(0, rad::prim::flux(VI(n, 1)), k, j, i) =
-                v(0, rad::prim::flux(VI(n, i)), ia[0], ia[1], ia[2]);
-            v(0, rad::prim::flux(VI(n, 2)), k, j, i) =
-                v(0, rad::prim::flux(VI(n, i)), ia[0], ia[1], ia[2]);
+            v(0, rad::prim::flux(VI(n, ix1)), k, j, i) =
+                v(0, rad::prim::flux(VI(n, ix1)), ia[0], ia[1], ia[2]);
+            v(0, rad::prim::flux(VI(n, ix2)), k, j, i) =
+                v(0, rad::prim::flux(VI(n, ix2)), ia[0], ia[1], ia[2]);
+            v(0, rad::prim::flux(VI(n, ix3)), k, j, i) =
+                v(0, rad::prim::flux(VI(n, ix3)), ia[0], ia[1], ia[2]);
           }
         }
       });
@@ -848,12 +848,12 @@ void DiskBoundaryExtrap(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) 
           for (int n = 0; n < v.GetSize(0, rad::prim::energy()); ++n) {
             v(0, rad::prim::energy(n), k, j, i) =
                 v(0, rad::prim::energy(n), ia[0], ia[1], ia[2]);
-            v(0, rad::prim::flux(VI(n, 0)), k, j, i) =
-                v(0, rad::prim::flux(VI(n, i)), ia[0], ia[1], ia[2]);
-            v(0, rad::prim::flux(VI(n, 1)), k, j, i) =
-                v(0, rad::prim::flux(VI(n, i)), ia[0], ia[1], ia[2]);
-            v(0, rad::prim::flux(VI(n, 2)), k, j, i) =
-                v(0, rad::prim::flux(VI(n, i)), ia[0], ia[1], ia[2]);
+            v(0, rad::prim::flux(VI(n, ix1)), k, j, i) =
+                v(0, rad::prim::flux(VI(n, ix1)), ia[0], ia[1], ia[2]);
+            v(0, rad::prim::flux(VI(n, ix2)), k, j, i) =
+                v(0, rad::prim::flux(VI(n, ix2)), ia[0], ia[1], ia[2]);
+            v(0, rad::prim::flux(VI(n, ix3)), k, j, i) =
+                v(0, rad::prim::flux(VI(n, ix3)), ia[0], ia[1], ia[2]);
           }
         }
       });

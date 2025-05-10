@@ -16,6 +16,7 @@
 #include "artemis.hpp"
 #include "geometry/geometry.hpp"
 #include "radiation.hpp"
+#include "rotating_frame/rotating_frame.hpp"
 #include "utils/artemis_utils.hpp"
 #include "utils/eos/eos.hpp"
 #include "utils/opacity/opacity.hpp"
@@ -54,6 +55,14 @@ TaskStatus MatterCouplingSimpleImpl(MeshData<Real> *u0, const Real dt) {
   const auto outer_tol = params.template Get<Real>("outer_iteration_tol");
   const auto inner_tol = params.template Get<Real>("inner_iteration_tol");
 
+  Real om0 = 0.0;
+  Real qshear = 0.0;
+  if (artemis_pkg->Param<bool>("do_rotating_frame")) {
+    auto &rframe_pkg = pm->packages.Get("rotating_frame");
+    qshear = rframe_pkg->Param<Real>("qshear");
+    om0 = rframe_pkg->Param<Real>("omega");
+  }
+
   // Packing and indexing
   static auto desc =
       parthenon::MakePackDescriptor<rad::cons::energy, rad::cons::flux,
@@ -81,9 +90,12 @@ TaskStatus MatterCouplingSimpleImpl(MeshData<Real> *u0, const Real dt) {
         // U^(0) values
         const Real dens = v0(b, gas::cons::density(), k, j, i);
         Real e0 = v0(b, gas::cons::internal_energy(), k, j, i);
-        std::array<Real, 3> v{v0(b, gas::cons::momentum(0), k, j, i) / (hx[0] * dens),
-                              v0(b, gas::cons::momentum(1), k, j, i) / (hx[1] * dens),
-                              v0(b, gas::cons::momentum(2), k, j, i) / (hx[2] * dens)};
+        const auto vb =
+            RotatingFrame::BackgroundVelocity<GEOM>(qshear, om0, coords.x1v());
+        std::array<Real, 3> v{
+            vb[0] + v0(b, gas::cons::momentum(0), k, j, i) / (hx[0] * dens),
+            vb[1] + v0(b, gas::cons::momentum(1), k, j, i) / (hx[1] * dens),
+            vb[2] + v0(b, gas::cons::momentum(2), k, j, i) / (hx[2] * dens)};
         const Real Er0 = v0(b, rad::cons::energy(), k, j, i);
         std::array<Real, 3> Fr0{v0(b, rad::cons::flux(0), k, j, i) / hx[0],
                                 v0(b, rad::cons::flux(1), k, j, i) / hx[1],
@@ -131,7 +143,9 @@ TaskStatus MatterCouplingSimpleImpl(MeshData<Real> *u0, const Real dt) {
           if (inner_err <= inner_tol) {
             break;
           }
+          //  printf("Continuing %d %d, %d %lg\n", j, i, inner_iter, inner_err);
         }
+        //        printf("Inner done\n");
         if (inner_iter == inner_max) {
           printf("(%d,%d,%d,%d)  %lg > %lg after %d iterations\n", b, k, j, i, inner_err,
                  inner_tol, inner_max);
@@ -161,7 +175,6 @@ TaskStatus MatterCouplingSimpleImpl(MeshData<Real> *u0, const Real dt) {
           v0(b, gas::cons::momentum(d), k, j, i) += dv[d] * dens * hx[d];
         }
       });
-
   return TaskStatus::complete;
 }
 
@@ -191,6 +204,15 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
   const auto inner_max = params.template Get<int>("inner_iteration_max");
   const auto outer_tol = params.template Get<Real>("outer_iteration_tol");
   const auto inner_tol = params.template Get<Real>("inner_iteration_tol");
+
+  Real om0 = 0.0;
+  Real qshear = 0.0;
+  if (artemis_pkg->Param<bool>("do_rotating_frame")) {
+    auto &rframe_pkg = pm->packages.Get("rotating_frame");
+    qshear = rframe_pkg->Param<Real>("qshear");
+    om0 = rframe_pkg->Param<Real>("omega");
+  }
+  printf("MATTER FULL?\n");
 
   // Packing and indexing
   static auto desc =
@@ -232,9 +254,12 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
             dens, v0(b, gas::cons::internal_energy(), k, j, i) / dens);
         const Real eg0 = dens * eos_d.InternalEnergyFromDensityTemperature(dens, T);
 
-        const std::array<Real, 3> p0{v0(b, gas::cons::momentum(0), k, j, i) / hx[0],
-                                     v0(b, gas::cons::momentum(1), k, j, i) / hx[1],
-                                     v0(b, gas::cons::momentum(2), k, j, i) / hx[2]};
+        const auto vb =
+            RotatingFrame::BackgroundVelocity<GEOM>(qshear, om0, coords.x1v());
+        const std::array<Real, 3> p0{
+            vb[0] * dens + v0(b, gas::cons::momentum(0), k, j, i) / hx[0],
+            vb[1] * dens + v0(b, gas::cons::momentum(1), k, j, i) / hx[1],
+            vb[2] * dens + v0(b, gas::cons::momentum(2), k, j, i) / hx[2]};
 
         const Real &E0 = v0(b, rad::cons::energy(), k, j, i);
         const std::array<Real, 3> Fr0{v0(b, rad::cons::flux(0), k, j, i) / hx[0],

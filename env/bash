@@ -98,7 +98,6 @@ elif [[ $PARTITION == "frontier-gpu" ]]; then
     module load rocm/6.3.1
     source $JOVIAN_DIR/dependencies/python/frontier-gpu/bin/activate
     module load cmake
-    export NVCC_WRAPPER_DEFAULT_COMPILER=CC
     export ARTEMIS_SUITE=frontier-gpu
     export HDF5_USE_FILE_LOCKING='FALSE'
     echo "...setup SUCCEEDED"

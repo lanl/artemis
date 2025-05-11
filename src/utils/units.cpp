@@ -67,6 +67,7 @@ Units::Units(ParameterInput *pin, std::shared_ptr<StateDescriptor> pkg) {
   pkg->AddParam("mass", mass_);
 }
 
+KOKKOS_FUNCTION
 Constants::Constants(Units &units) {
   if (units.GetPhysicalUnits() == PhysicalUnits::scalefree) {
     G_ = 1.;

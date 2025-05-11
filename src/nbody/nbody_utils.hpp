@@ -19,6 +19,7 @@
 #include <cstdio>
 #include <fcntl.h>
 #include <iostream>
+#include <fstream>
 #include <unistd.h> // for dup and dup2 on Unix-like systems
 
 // REBOUND includes

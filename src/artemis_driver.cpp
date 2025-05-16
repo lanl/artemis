@@ -71,7 +71,7 @@ ArtemisDriver<GEOM>::ArtemisDriver(ParameterInput *pin, ApplicationInput *app_in
   do_moment = artemis_pkg->template Param<bool>("do_moment");
 
   if (do_moment) {
-    auto rad_int = pin->GetOrAddString("radiation", "integrator", "rk2");
+    auto rad_int = pin->GetOrAddString("radiation/moment", "integrator", "rk2");
     PARTHENON_REQUIRE(((rad_int == "rk1") || (rad_int == "rk2") || (rad_int == "rk3")),
                       "radiation/integrator must be rk1,rk2, or rk3.")
     rad_integrator = std::make_unique<Integrator_t>(rad_int);

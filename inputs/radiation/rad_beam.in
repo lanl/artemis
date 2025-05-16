@@ -67,7 +67,7 @@ nx3 = 1   # Number of cells in each MeshBlock, X3-dir
 gas = true
 radiation = true
 
-<radiation>
+<radiation/moment>
 creduc = 1
 cfl = 0.1
 reconstruct = plm

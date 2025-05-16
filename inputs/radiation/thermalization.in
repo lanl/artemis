@@ -80,12 +80,12 @@ kappa_a = 2.0
 # scattering_model = constant
 # kappa_s = 10.0
 
-<jaybenne>
+<radiation/imc>
 dt = 1.0e-10
 num_particles = 1000
 use_ddmc = true
 
-# <radiation>
+# <radiation/moment>
 # cfl = 0.3
 # riemann = hlle
 # reconstruct = plm

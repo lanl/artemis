@@ -41,7 +41,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   Params &params = radiation->AllParams();
 
   // Fluid behavior for this package
-  auto closure = pin->GetOrAddString("radiation", "closure", "m1");
+  auto closure = pin->GetOrAddString("radiation/moment", "closure", "m1");
   if (closure == "m1") {
     params.Add("fluid_type", Fluid::greyM1);
   } else if (closure == "p1") {
@@ -58,7 +58,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
 
   // Reconstruction algorithm
   ReconstructionMethod recon_method = ReconstructionMethod::null;
-  const std::string recon = pin->GetOrAddString("radiation", "reconstruct", "plm");
+  const std::string recon = pin->GetOrAddString("radiation/moment", "reconstruct", "plm");
   if (recon.compare("pcm") == 0) {
     PARTHENON_REQUIRE(parthenon::Globals::nghost >= 1,
                       "PCM requires at least 1 ghost cell.");
@@ -82,7 +82,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
 
   // Riemann solver
   RSolver riemann_solver = RSolver::null;
-  const std::string riemann = pin->GetOrAddString("radiation", "riemann", "hlle");
+  const std::string riemann = pin->GetOrAddString("radiation/moment", "riemann", "hlle");
   if (riemann.compare("hlle") == 0) {
     riemann_solver = RSolver::hlle;
   } else if (riemann.compare("llf") == 0) {
@@ -93,44 +93,45 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   params.Add("rsolver", riemann_solver);
 
   // Courant, Friedrichs, & Lewy (CFL) Number
-  const Real cfl_number = pin->GetOrAddReal("radiation", "cfl", 0.8);
+  const Real cfl_number = pin->GetOrAddReal("radiation/moment", "cfl", 0.8);
   params.Add("cfl", cfl_number);
 
-  params.Add("full_coupling", pin->GetOrAddBoolean("radiation", "full_coupling", true));
+  params.Add("full_coupling",
+             pin->GetOrAddBoolean("radiation/moment", "full_coupling", true));
 
   const Real light = constants.GetCCode();
   params.Add("c", light);
-  const Real creduc = pin->GetOrAddReal("radiation", "creduc", 1.0);
+  const Real creduc = pin->GetOrAddReal("radiation/moment", "creduc", 1.0);
   params.Add("chat", light / creduc);
 
   const Real arad = constants.GetARCode();
   params.Add("arad", arad);
 
   // Floors
-  const Real efloor = pin->GetOrAddReal("radiation", "efloor", 1.0e-20);
+  const Real efloor = pin->GetOrAddReal("radiation/moment", "efloor", 1.0e-20);
   params.Add("efloor", efloor);
 
   // Number of radiation species
-  const int nspecies = pin->GetOrAddInteger("radiation", "nspecies", 1);
+  const int nspecies = pin->GetOrAddInteger("radiation/moment", "nspecies", 1);
   params.Add("nspecies", nspecies);
   PARTHENON_REQUIRE(nspecies == 1, "Radiation only works with nspecies=1!");
 
   // Iteration params
   params.Add("outer_iteration_max",
-             pin->GetOrAddInteger("radiation", "outer_iteration_max", 100));
+             pin->GetOrAddInteger("radiation/moment", "outer_iteration_max", 100));
   params.Add("inner_iteration_max",
-             pin->GetOrAddInteger("radiation", "inner_iteration_max", 400));
+             pin->GetOrAddInteger("radiation/moment", "inner_iteration_max", 400));
   params.Add("outer_iteration_tol",
-             pin->GetOrAddReal("radiation", "outer_iteration_tol", 1e-10));
+             pin->GetOrAddReal("radiation/moment", "outer_iteration_tol", 1e-10));
   params.Add("inner_iteration_tol",
-             pin->GetOrAddReal("radiation", "inner_iteration_tol", 1e-10));
+             pin->GetOrAddReal("radiation/moment", "inner_iteration_tol", 1e-10));
 
   std::vector<int> fluidids;
   for (int n = 0; n < nspecies; ++n)
     fluidids.push_back(n);
 
   // Scratch for radiation flux
-  const int scr_level = pin->GetOrAddInteger("radiation", "scr_level", 0);
+  const int scr_level = pin->GetOrAddInteger("radiation/moment", "scr_level", 0);
   params.Add("scr_level", scr_level);
 
   // Control field for sparse radiation fields
@@ -185,7 +186,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
 
   // Radiation refinement criterion
   const std::string refine_field =
-      pin->GetOrAddString("radiation", "refine_field", "none");
+      pin->GetOrAddString("radiation/moment", "refine_field", "none");
   if (refine_field != "none") {
     // Check which field controls the refinement
     const bool ref_dens = (refine_field == "density");
@@ -194,7 +195,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
                       "Only density or pressure based criterion currently supported!");
 
     // Check the type of refinement (e.g., gradient vs magnitude)
-    const std::string refine_type = pin->GetString("radiation", "refine_type");
+    const std::string refine_type = pin->GetString("radiation/moment", "refine_type");
     const bool ref_grad = (refine_type == "gradient");
     const bool ref_mag = (refine_type == "magnitude");
     PARTHENON_REQUIRE((ref_grad || ref_mag) && !(ref_grad && ref_mag),
@@ -204,7 +205,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
     if (ref_grad) {
       using ArtemisUtils::ScalarFirstDerivative;
       // Refinement threshold
-      const Real thr = pin->GetReal("radiation", "refine_thr");
+      const Real thr = pin->GetReal("radiation/moment", "refine_thr");
       params.Add("refine_thr", thr);
       // Geometry specific refinement criteria
       typedef Coordinates C;
@@ -253,8 +254,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
       }
     } else if (ref_mag) {
       using ArtemisUtils::ScalarMagnitude;
-      const Real rthr = pin->GetReal("radiation", "refine_thr");
-      const Real dthr = pin->GetReal("radiation", "deref_thr");
+      const Real rthr = pin->GetReal("radiation/moment", "refine_thr");
+      const Real dthr = pin->GetReal("radiation/moment", "deref_thr");
       params.Add("refine_thr", rthr);
       params.Add("deref_thr", dthr);
       if (ref_dens) {

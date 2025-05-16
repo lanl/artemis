@@ -84,7 +84,7 @@ coef_kappa_a = 577.0      # kappa_a,0 constant (must be passed in cgs)
 rho_exp = -1.0            # dens exponent for opacity powerlaw
 temp_exp = 0.0            # temp exponent for opacity powerlaw
 
-<radiation>
+<radiation/moment>
 cfl = 0.3
 riemann = hlle
 reconstruct = plm

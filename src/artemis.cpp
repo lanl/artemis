@@ -74,10 +74,11 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   const bool do_radiation = pin->GetOrAddBoolean("physics", "radiation", false);
   // Check if we are using IMC or moment based radiation
   // This maybe is not great if user doesn't comment out unused node...
-  const bool do_imc = do_radiation && pin->DoesBlockExist("jaybenne");
-  const bool do_moment = do_radiation && pin->DoesBlockExist("radiation");
-  PARTHENON_REQUIRE(!(do_imc && do_moment),
-                    "You cannot have both a <jaybenne> block and a <radiation> block");
+  const bool do_imc = do_radiation && pin->DoesBlockExist("radiation/imc");
+  const bool do_moment = do_radiation && pin->DoesBlockExist("radiation/moment");
+  PARTHENON_REQUIRE(
+      !(do_imc && do_moment),
+      "You cannot have both a <radiation/imc> block and a <radiation/moment> block");
 
   artemis->AddParam("do_gas", do_gas);
   artemis->AddParam("do_dust", do_dust);
@@ -122,7 +123,8 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
       auto eos_h = packages.Get("gas")->Param<EOS>("eos_h");
       auto opacity_h = packages.Get("gas")->Param<MeanOpacity>("opacity_h");
       auto scattering_h = packages.Get("gas")->Param<MeanScattering>("scattering_h");
-      packages.Add(jaybenne::Initialize(pin.get(), opacity_h, scattering_h, eos_h));
+      packages.Add(jaybenne::Initialize(pin.get(), opacity_h, scattering_h, eos_h,
+                                        "radiation/imc"));
       PARTHENON_REQUIRE(coords == Coordinates::cartesian,
                         "Jaybenne currently supports only Cartesian coordinates!");
     } else if (do_moment) {

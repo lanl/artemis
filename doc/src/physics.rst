@@ -415,6 +415,7 @@ Mass accretion is handled by a particle's ``<../sink>`` attribute.
    \frac{\partial (\rho v_r)}{\partial t} = - \gamma \rho v_r \\
    \frac{\partial (\rho v_\theta)}{\partial t} = - \gamma \rho v_\theta \\
    \frac{\partial (\rho v_\phi)}{\partial t} = - \beta \rho v_\phi \\
+
 where :math:`(r,\theta,\phi)` refers to a spherical coordinate system coordinate system centered on the particle. 
 
 Two types of removal rates are available.
@@ -844,21 +845,21 @@ Radiation
 ---------
 
 Low Order Moments
-=================
+^^^^^^^^^^^^^^^^^
 
 |code| includes a native capability to include a subcycled, moment-based description of radiation.
 This method forms a hyperbolic fluid system of equations by taking the first two moments of the radiation transport equation. 
 
 .. math::
-   \hat{c}^{-1} \partial_t E_r + \mathbf{\nabla} \cdot \mathbf{F_r}/c = G_0
+   \hat{c}^{-1} \partial_t E_r + \mathbf{\nabla} \cdot \mathbf{F_r}/c = G_0 \\
    \hat{c}^{-1} \partial_t (\mathbf{F_r}/c) + \mathbf{\nabla} \cdot \mathbf{P_r} = \mathbf{G} 
 
 These equations specify how the radiation energy density and radiation flux evolve in time due the radiation pressure and the interaction with matter.
 Note, in particular, that |code| allows for a reduced speed of light to limit the number of subcycles needed to advance the radiation field.
-This is controlled by the `creduc` parameter of the `<radiation/moment>` node.
+This is controlled by the ``creduc`` parameter of the ``<radiation/moment>`` node.
 The value of the reduced speed of light dictates how many subcycles |code| will integrate the radiation equations for in each hydro time step.
-The time integrator for this step is set by an `integrator` parameter under the `<radiation/moment>` node. 
-Currently, |code| supports all of the RK integrators that the hydro integrator supports, e.g., `rk1`, `rk2`, `rk3`, etc. 
+The time integrator for this step is set by an ``integrator`` parameter under the ``<radiation/moment>`` node. 
+Currently, |code| supports all of the RK integrators that the hydro integrator supports, e.g., ``rk1``, ``rk2``, ``rk3``, etc. 
 For each of these integrators, a corresponding IMEX scheme is used for the stiff matter-coupling terms. 
 
 The radiation pressure in the above equation is given by a local closure relation given by:
@@ -871,12 +872,12 @@ where the Eddington tensor is defined one of two ways:
 * P1: Isotropic pressure with :math:`\mathbf{f}= 1/3 \mathbf{I}` 
 * M1: Anisotropic pressure using the Levermore closure. 
 
-The parameter `closure` can be set to `p1` or `m1` to choose an appropriate closure model.
+The parameter ``closure`` can be set to ``p1`` or ``m1`` to choose an appropriate closure model.
 
-In the moments approximation, the radiation is treated like a fluid and so has many of the typical fluid parameter options such as `cfl`, `riemann`, `reconstruct`, and `nspecies`.
+In the moments approximation, the radiation is treated like a fluid and so has many of the typical fluid parameter options such as ``cfl``, `riemann``, ``reconstruct``, and ``nspecies``.
 
-If `nspecies=1`, this tells |code| to use a gray description of the radiation. 
-Currently, `nspecies` cannot be larger than one, but in the future this will enable a multigroup method. 
+If ``nspecies=1``, this tells |code| to use a gray description of the radiation. 
+Currently, ``nspecies`` cannot be larger than one, but in the future this will enable a multigroup method. 
 
 
 A typical input block for moment-based radiation looks like:
@@ -894,7 +895,7 @@ A typical input block for moment-based radiation looks like:
 
 
 Implict Monte Carlo
-===================
+^^^^^^^^^^^^^^^^^^^
 
 |code| supports gray photon transport via coupling to the |jaybenne| package.  The gray
 representation of the radiation transport equation is

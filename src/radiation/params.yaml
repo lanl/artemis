@@ -45,8 +45,8 @@ radiation:
       _default: true
     creduc:
       _type: Real
-      _description: "Speed of light reduction factor, \hat{c} = c / creduc."
-      _default: 1.0
+      _description: "Speed of light reduction factor, c_hat = c / creduc."
+      _default: 1
     efloor:
       _type: Real
       _description: "Radiation energy density floor."

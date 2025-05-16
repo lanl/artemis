@@ -843,6 +843,59 @@ Note that the grain sizes and density must be in code units.
 Radiation
 ---------
 
+Low Order Moments
+=================
+
+|code| includes a native capability to include a subcycled, moment-based description of radiation.
+This method forms a hyperbolic fluid system of equations by taking the first two moments of the radiation transport equation. 
+
+.. math::
+   \hat{c}^{-1} \partial_t E_r + \mathbf{\nabla} \cdot \mathbf{F_r}/c = G_0
+   \hat{c}^{-1} \partial_t (\mathbf{F_r}/c) + \mathbf{\nabla} \cdot \mathbf{P_r} = \mathbf{G} 
+
+These equations specify how the radiation energy density and radiation flux evolve in time due the radiation pressure and the interaction with matter.
+Note, in particular, that |code| allows for a reduced speed of light to limit the number of subcycles needed to advance the radiation field.
+This is controlled by the `creduc` parameter of the `<radiation/moment>` node.
+The value of the reduced speed of light dictates how many subcycles |code| will integrate the radiation equations for in each hydro time step.
+The time integrator for this step is set by an `integrator` parameter under the `<radiation/moment>` node. 
+Currently, |code| supports all of the RK integrators that the hydro integrator supports, e.g., `rk1`, `rk2`, `rk3`, etc. 
+For each of these integrators, a corresponding IMEX scheme is used for the stiff matter-coupling terms. 
+
+The radiation pressure in the above equation is given by a local closure relation given by:
+
+.. math::
+   \mathbf{P_r} = \mathbf{f} E_r
+
+where the Eddington tensor is defined one of two ways:
+
+* P1: Isotropic pressure with :math:`\mathbf{f}= 1/3 \mathbf{I}` 
+* M1: Anisotropic pressure using the Levermore closure. 
+
+The parameter `closure` can be set to `p1` or `m1` to choose an appropriate closure model.
+
+In the moments approximation, the radiation is treated like a fluid and so has many of the typical fluid parameter options such as `cfl`, `riemann`, `reconstruct`, and `nspecies`.
+
+If `nspecies=1`, this tells |code| to use a gray description of the radiation. 
+Currently, `nspecies` cannot be larger than one, but in the future this will enable a multigroup method. 
+
+
+A typical input block for moment-based radiation looks like:
+
+::
+
+   <radiation/moment>
+   cfl = 0.3
+   riemann = hlle
+   reconstruct = plm
+   efloor = 1e-16
+   closure = p1
+   creduc = 100.0
+   full_coupling = false # simpler and faster matter-coupling
+
+
+Implict Monte Carlo
+===================
+
 |code| supports gray photon transport via coupling to the |jaybenne| package.  The gray
 representation of the radiation transport equation is
 
@@ -872,11 +925,11 @@ follows:
   ix3_bc = periodic
   ox3_bc = periodic
 
-An |code| input file interfaces with |jaybenne| via a ``<jaybenne>`` node, e.g.,
+An |code| input file interfaces with |jaybenne| via a ``<radiation/imc>`` node, e.g.,
 
 ::
 
-  <jaybenne>
+  <radiation/imc>
   dt = 1.0
   num_particles = 10000
   do_emission = true
@@ -886,7 +939,7 @@ where ``dt`` defines a constant timestep by which radiation limits the global ti
 desired), ``num_particles`` sets the resolution element for IMC, ``do_emission`` enables
 thermal emission, and ``do_feedback`` triggers coupling between the radiation field and
 the relevant |code| energy field (momentum coupling is not yet implemented).  Remaining
-``<jaybenne>`` runtime parameters will be defined in forthcoming ``jaybenne``
+``<radiation/imc>`` runtime parameters will be defined in forthcoming ``jaybenne``
 documentation.
 
 Finally, |jaybenne| interfaces with |code| gas fields via absorption and scattering
@@ -905,8 +958,6 @@ via additional input nodes, e.g.,
 
 where the above enrolls constant specific absorption and scattering opacities ``kappa_a``
 and ``kappa_s``, respectively.  By default, ``jaybenne`` operates in assumed CGS units.
-Often test problems invoke custom code units; see ``opacity_model = thermalization``
-and/or ``opacity_model == shocktube_a`` implementations for custom units enrollment.
 
 In a ``<parthenon/output...>`` block, a user can pass ``field.jaybenne.energy_tally`` to
 dump the radiation energy density, as computed by |jaybenne|.

@@ -100,13 +100,13 @@ def analyze():
     tgas = []
     trad = []
     for file in files:
-        with h5py.File(file,'r') as phdf:
-            sie = phdf['gas.prim.sie_0'][...].ravel()
+        with h5py.File(file, "r") as phdf:
+            sie = phdf["gas.prim.sie_0"][...].ravel()
             try:
-                erad = phdf['field.jaybenne.energy_tally'][...].ravel()
+                erad = phdf["field.jaybenne.energy_tally"][...].ravel()
             except:
-                erad = phdf['rad.prim.energy_0'][...].ravel()
-            tt.append(phdf['Info'].attrs['Time'])
+                erad = phdf["rad.prim.energy_0"][...].ravel()
+            tt.append(phdf["Info"].attrs["Time"])
         tgas.append(sie / cv)
         trad.append((erad / _ar) ** 0.25)
     tgas = np.array(tgas)

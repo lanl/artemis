@@ -69,22 +69,24 @@ def analyze():
     # test other jaybenne/dt to test how artemis fares for varying dt / (c rho kappa)^-1
     logger.debug("Analyzing test " + __name__)
     analyze_status = True
-    with h5py.File(os.path.join(artemis.get_data_dir(), "shock.out1.final.phdf"), 'r') as f:
-        cv = f['Params'].attrs['gas/cv']
-        ar = f['Params'].attrs['radiation/arad']
-        xm = f['Locations/x'][...].ravel()
-        xc = 0.5*(xm[:-1] + xm[1:])
-        sie = f['gas.prim.sie_0'][...].ravel()
-        er = f['rad.prim.energy_0'][...].ravel()
+    with h5py.File(
+        os.path.join(artemis.get_data_dir(), "shock.out1.final.phdf"), "r"
+    ) as f:
+        cv = f["Params"].attrs["gas/cv"]
+        ar = f["Params"].attrs["radiation/arad"]
+        xm = f["Locations/x"][...].ravel()
+        xc = 0.5 * (xm[:-1] + xm[1:])
+        sie = f["gas.prim.sie_0"][...].ravel()
+        er = f["rad.prim.energy_0"][...].ravel()
         tgas = sie / cv
-        trad = (er / ar)**(0.25)
+        trad = (er / ar) ** (0.25)
 
     # Grab exact solution
     exact = np.loadtxt(
         os.path.join(artemis.get_artemis_dir(), "tst/scripts/radiation/rad_shock.dat")
     )
-    int_tg = interp1d(exact[:,0]-_dx, exact[:,1], kind="linear")
-    int_tr = interp1d(exact[:,0]-_dx, exact[:,2], kind="linear")
+    int_tg = interp1d(exact[:, 0] - _dx, exact[:, 1], kind="linear")
+    int_tr = interp1d(exact[:, 0] - _dx, exact[:, 2], kind="linear")
     tgas_exact = int_tg(xc)
     trad_exact = int_tr(xc)
 
@@ -108,8 +110,12 @@ def analyze():
     fig.savefig(os.path.join(artemis.get_fig_dir(), "rad_shock_cgs.png"))
 
     # Check if solution errors are above threshold.  See notes above regarding thresholds.
-    l2_tgas = np.sqrt( np.trapz( ((tgas - tgas_exact)/tgas_exact)**2, x = xc) / (xm[-1]-xm[0]))
-    l2_trad = np.sqrt( np.trapz( ((trad - trad_exact)/trad_exact)**2, x = xc) / (xm[-1]-xm[0]))
+    l2_tgas = np.sqrt(
+        np.trapz(((tgas - tgas_exact) / tgas_exact) ** 2, x=xc) / (xm[-1] - xm[0])
+    )
+    l2_trad = np.sqrt(
+        np.trapz(((trad - trad_exact) / trad_exact) ** 2, x=xc) / (xm[-1] - xm[0])
+    )
     print("l2_tgas: ", l2_tgas, "l2_trad: ", l2_trad)
     if l2_tgas > _thr_gas:
         logger.warning(

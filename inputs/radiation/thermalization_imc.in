@@ -33,7 +33,7 @@ dt        = 1.0e-9 # time increment between outputs
 nlim       = -1      # cycle limit
 tlim       = 6.0e-8  # time limit
 integrator = rk1     # time integration algorithm
-#dt_force = 1e-10
+dt_force = 1e-10
 
 <parthenon/mesh>
 nx1    = 4         # Number of zones in X1-direction
@@ -81,8 +81,7 @@ kappa_a = 2.0
 # kappa_s = 10.0
 
 <radiation/imc>
-dt = 1.0e-10
-num_particles = 1000
+num_particles = 200000
 use_ddmc = true
 
 # <radiation/moment>

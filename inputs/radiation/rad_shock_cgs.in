@@ -28,7 +28,6 @@ variables = gas.prim.density,  &
             field.jaybenne.energy_tally
 file_type = hdf5  # HDF5 data dump
 dt        = 1e-10   # time increment between outputs
-use_final_label = false
 
 <parthenon/time>
 nlim       = -1   # cycle limit

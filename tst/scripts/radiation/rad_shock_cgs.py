@@ -54,12 +54,12 @@ _dx = 0.000262
 # Run Artemis
 def run(**kwargs):
     logger.debug("Runnning test " + __name__)
-    # arguments = [
-    #     "parthenon/job/problem_id=" + _file_id,
-    #     "parthenon/mesh/nx1=256",
-    #     "parthenon/meshblock/nx1=256"
-    # ]
-    # artemis.run(_nranks, "radiation/rad_shock_cgs.in", arguments)
+    arguments = [
+        "parthenon/job/problem_id=" + _file_id,
+        "parthenon/mesh/nx1=256",
+        "parthenon/meshblock/nx1=256",
+    ]
+    artemis.run(_nranks, "radiation/rad_shock_cgs.in", arguments)
 
 
 # Analyze outputs

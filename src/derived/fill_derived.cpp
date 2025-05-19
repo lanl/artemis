@@ -173,12 +173,12 @@ void ConsToPrim(MeshData<Real> *md) {
         }
         if (do_rad) {
           for (int n = 0; n < vmesh.GetSize(b, rad::prim::energy()); ++n) {
-            // Set primitive density
+            // Set primitive rad energy density
             const Real u_er = vmesh(b, rad::cons::energy(n), k, j, i);
             Real &w_er = vmesh(b, rad::prim::energy(n), k, j, i);
             w_er = (u_er > eflr_rad) ? u_er : eflr_rad;
 
-            // set primitive velocity
+            // set primitive rad flux
             const Real hfx1 = vmesh(b, rad::cons::flux(VI(n, 0)), k, j, i) / (c * w_er);
             const Real hfx2 = vmesh(b, rad::cons::flux(VI(n, 1)), k, j, i) / (c * w_er);
             const Real hfx3 = vmesh(b, rad::cons::flux(VI(n, 2)), k, j, i) / (c * w_er);

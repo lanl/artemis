@@ -397,7 +397,7 @@ TaskCollection ArtemisDriver<GEOM>::RadiationTasks() {
       auto bcs = parthenon::AddBoundaryExchangeTasks(pre_comm, tl, u0, pmesh->multilevel);
 
       // Update primitive variables
-      auto c2p = tl.AddTask(TQ::local_sync, bcs, FillDerived<MeshData<Real>>, u0.get());
+      auto c2p = tl.AddTask(bcs, FillDerived<MeshData<Real>>, u0.get());
     }
   }
 

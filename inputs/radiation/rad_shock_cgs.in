@@ -26,13 +26,13 @@ variables = gas.prim.density,  &
             gas.prim.sie,      &
             rad.prim.energy, &
             field.jaybenne.energy_tally
-file_type = hdf5  # HDF5 data dump
-dt        = 1e-10   # time increment between outputs
+file_type = hdf5   # HDF5 data dump
+dt        = 1e-10  # time increment between outputs
 
 <parthenon/time>
-nlim       = -1   # cycle limit
-tlim       = 6e-10  # time limit
-integrator = rk2  # time integration algorithm
+nlim       = -1    # cycle limit
+tlim       = 6e-10 # time limit
+integrator = rk2   # time integration algorithm
 
 <parthenon/mesh>
 nx1    = 512       # Number of zones in X1-direction
@@ -73,7 +73,7 @@ radiation = true  # enable IMC radiation
 <gas>
 gamma = 1.666666    # adiabatic index
 mu = 1.008          # mean molecular weight
-cfl = 0.3         # CFL number
+cfl = 0.3           # CFL number
 reconstruct = plm   # reconstruction algorithm
 riemann = hllc      # Riemann solver
 
@@ -91,7 +91,7 @@ efloor = 1e-16
 closure = p1
 creduc = 43.3526011561
 
-# <jaybenne>
+# <radiation/imc>
 # num_particles = 100000  # particle resolution
 # use_ddmc = false        # use DDMC?
 

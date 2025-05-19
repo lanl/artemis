@@ -96,14 +96,17 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   const Real cfl_number = pin->GetOrAddReal("radiation/moment", "cfl", 0.8);
   params.Add("cfl", cfl_number);
 
+  // how to handle the matter coupling:
+  // full_coupling = false only does a loop over energy couopling
+  // full_coupling = true also does an outer loop over momentum coupling
   params.Add("full_coupling",
              pin->GetOrAddBoolean("radiation/moment", "full_coupling", true));
 
+  // We stuff some constants into params so that can be used in post-processing
   const Real light = constants.GetCCode();
   params.Add("c", light);
   const Real creduc = pin->GetOrAddReal("radiation/moment", "creduc", 1.0);
   params.Add("chat", light / creduc);
-
   const Real arad = constants.GetARCode();
   params.Add("arad", arad);
 

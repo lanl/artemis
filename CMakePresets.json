@@ -7,6 +7,17 @@
   },
   "configurePresets": [
     {
+      "name": "cpu-asan",
+      "cacheVariables": {
+        "CMAKE_MAKE_PROGRAM": "$env{MAKE_PROGRAM}",
+        "CMAKE_C_COMPILER": "clang",
+        "CMAKE_CXX_COMPILER": "clang++",
+        "CMAKE_BUILD_TYPE": "Debug",
+        "ARTEMIS_ENABLE_ASAN": "ON",
+        "Kokkos_ENABLE_DEBUG_BOUNDS_CHECK": "ON"
+      }
+    },
+    {
       "name": "cpu-debug",
       "cacheVariables": {
         "CMAKE_MAKE_PROGRAM": "$env{MAKE_PROGRAM}",

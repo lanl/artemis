@@ -143,13 +143,11 @@ TaskStatus MatterCouplingSimpleImpl(MeshData<Real> *u0, const Real dt) {
           if (inner_err <= inner_tol) {
             break;
           }
-          //  printf("Continuing %d %d, %d %lg\n", j, i, inner_iter, inner_err);
         }
-        //        printf("Inner done\n");
         if (inner_iter == inner_max) {
           printf("(%d,%d,%d,%d)  %lg > %lg after %d iterations\n", b, k, j, i, inner_err,
                  inner_tol, inner_max);
-          PARTHENON_FAIL("NOT CONVERGED");
+          PARTHENON_FAIL("Radiation matter coupling did not converge!");
         }
         T = std::pow(B / arad, 0.25);
         e = eos_d.InternalEnergyFromDensityTemperature(dens, T) * dens;

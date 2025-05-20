@@ -38,7 +38,7 @@ colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
 
 # Commands
 _nranks = 1
-_file_id = "shock"
+_file_id = "shock_cgs"
 
 
 # Thresholds
@@ -70,7 +70,7 @@ def analyze():
     logger.debug("Analyzing test " + __name__)
     analyze_status = True
     with h5py.File(
-        os.path.join(artemis.get_data_dir(), "shock.out1.final.phdf"), "r"
+        os.path.join(artemis.get_data_dir(), "{}.out1.final.phdf".format(_file_id)), "r"
     ) as f:
         cv = f["Params"].attrs["gas/cv"]
         ar = f["Params"].attrs["radiation/arad"]

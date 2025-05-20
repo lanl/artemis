@@ -134,7 +134,9 @@ def analyze():
     cv = _kb / (_mu * _amu * gm1)
 
     # Grab Artemis datasets
-    data = phdf(os.path.join(artemis.get_data_dir(), "shock.out1.final.phdf"))
+    data = phdf(
+        os.path.join(artemis.get_data_dir(), "{}.out1.final.phdf".format(_file_id))
+    )
     xc = 0.5 * (data.xng[0, 1:] + data.xng[0, :-1])
     sie = data.Get("gas.prim.sie_0", False, False)[0, 0, 0]
     erad = data.Get("field.jaybenne.energy_tally", False, False)[0, 0, 0]

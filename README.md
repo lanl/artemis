@@ -64,13 +64,14 @@ Currently supported computers/partitions are:
     gg (cpu)
     gh (gpu)
 
-# Installation
+# Building
+To build the code, create a build directory and select one of the preset configurations in the `CMakePresets.json` file. An example set of commands to build the cpu version of the code is,
 
     git submodule update --init --recursive
     mkdir build
     cd build
-    cmake ../
-    make -j install
+    cmake --preset=cpu-release ../
+    make -j
 
 ## Submodules
 

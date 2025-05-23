@@ -65,7 +65,11 @@ Currently supported computers/partitions are:
     gh (gpu)
 
 # Building
-To build the code, create a build directory and select one of the preset configurations in the `CMakePresets.json` file. An example set of commands to build the cpu version of the code is,
+To build the code, (1) ensure submodules are up-to-date, (2) create and move into a
+`build` directory, (3) run `cmake` (optionally pointing to a preset configuration in
+the `CMakePresets.json` file via the `--preset` flag), and (4) `make` the program
+(optionally invoking multiple processes with `-j`). An example set of commands to build
+a CPU version of the code is
 
     git submodule update --init --recursive
     mkdir build
@@ -142,8 +146,8 @@ and then, again from Darwin, manually launch the CI runner:
     cd artemis
     ./tst/launch_ci_runner.py [Number of the github PR]
 
-Note that `launch_ci_runner.py` will create a temporary checkout of the current state of the branch associated 
-with this PR according to the `origin` remote, so you don't need to worry about the state of your local checkout 
+Note that `launch_ci_runner.py` will create a temporary checkout of the current state of the branch associated
+with this PR according to the `origin` remote, so you don't need to worry about the state of your local checkout
 of `artemis`.
 
 ## Release

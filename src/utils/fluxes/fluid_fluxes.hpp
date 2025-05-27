@@ -355,7 +355,7 @@ TaskStatus FluxSourceImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, CONS vcons, FAC
             const Real dp2 = (vp_.flux(b, d2, IPR, k, j, i) -
                               vp_.flux(b, d2, IPR, k, j + multi_d_, i));
             const Real dp3 = (vp_.flux(b, d3, IPR, k, j, i) -
-                              vp_.flux(b, d3, IPR, k, j + three_d_, i));
+                              vp_.flux(b, d3, IPR, k + three_d_, j, i));
             // clang-format on
             vc_(b, IMX, k, j, i) += dtdx[0] * dp1;
             vc_(b, IMY, k, j, i) += dtdx[1] * dp2;

@@ -1,5 +1,5 @@
 //========================================================================================
-// (C) (or copyright) 2023-2024. Triad National Security, LLC. All rights reserved.
+// (C) (or copyright) 2023-2025. Triad National Security, LLC. All rights reserved.
 //
 // This program was produced under U.S. Government contract 89233218CNA000001 for Los
 // Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -22,13 +22,20 @@ namespace ArtemisUtils {
 //! \fn void ArtemisUtils::PrintArtemisConfiguration
 //! \brief
 void PrintArtemisConfiguration(Packages_t &packages) {
+  // Generate and print splash screen
   if (parthenon::Globals::my_rank == 0) {
     Params &params = packages.Get("artemis")->AllParams();
-    std::string hfill(21, ' ');
+
+    // Extract select params
     const auto nx = params.Get<std::array<int, 3>>("prob_dim");
-    const int nd = (nx[0] > 1) + (nx[1] > 1) + (nx[2] > 1);
     const auto nb = params.Get<std::array<int, 3>>("mb_dim");
     const auto units = params.Get<Units>("units");
+    const int nd = (nx[0] > 1) + (nx[1] > 1) + (nx[2] > 1);
+
+    // NOTE(@pdmullen:) Below (and only below...), we permit line length violations so
+    // that we can better see the format of the splash screen...
+    // clang-format off
+    std::string hfill(21, ' ');
     std::string msg = "";
     if (params.Get<bool>("do_gas")) msg += "Gas\n";
     if (params.Get<bool>("do_dust")) msg += hfill + "Dust\n";
@@ -45,8 +52,7 @@ void PrintArtemisConfiguration(Packages_t &packages) {
     printf("  ARTEMIS\n");
     printf("    name:            %s\n", params.Get<std::string>("job_name").c_str());
     printf("    problem:         %s\n", params.Get<std::string>("pgen_name").c_str());
-    printf("    coordinates:     %dD %s\n", nd,
-           params.Get<std::string>("coord_sys").c_str());
+    printf("    coordinates:     %dD %s\n", nd, params.Get<std::string>("coord_sys").c_str());
     printf("    integrator:      %s\n", params.Get<std::string>("integrator").c_str());
     printf("    MPI ranks:       %d\n", parthenon::Globals::nranks);
     printf("    dimensions:      %dx%dx%d\n", nx[0], nx[1], nx[2]);
@@ -57,9 +63,7 @@ void PrintArtemisConfiguration(Packages_t &packages) {
     printf("                  [T] = %.2e\n", units.GetTimeCodeToPhysical());
     printf("                  [K] = %.2e\n", units.GetTemperatureCodeToPhysical());
     printf("    Active physics:  %s", msg.c_str());
-
     if (params.Get<bool>("do_nbody")) {
-
       auto nbody_pkg = packages.Get("nbody");
       auto particles = nbody_pkg->Param<ParArray1D<NBody::Particle>>("particles");
       auto particles_h = particles.GetHostMirrorAndCopy();
@@ -72,20 +76,18 @@ void PrintArtemisConfiguration(Packages_t &packages) {
         printf("        |            mass: %.2e\n", part.GM);
         printf("        |         coupled: %s\n", part.couple == 1 ? "yes" : "no");
         printf("        |            live: %s\n", part.live == 1 ? "yes" : "no");
-        printf("        |       softening: %s\n",
-               part.spline == 1 ? "spline" : "plummer");
+        printf("        |       softening: %s\n", part.spline == 1 ? "spline" : "plummer");
         printf("        |          radius: %.2e\n", part.rs);
         printf("        | accretion rates: gamma=%.2e\n", part.gamma);
         printf("        |                   beta=%.2e\n", part.beta);
         printf("        |          radius: %.2e\n", part.racc);
-        printf("        |        position: (%.2e,%.2e,%.2e)\n", part.pos[0], part.pos[1],
-               part.pos[2]);
-        printf("        |        velocity: (%.2e,%.2e,%.2e)\n", part.vel[0], part.vel[1],
-               part.vel[2]);
+        printf("        |        position: (%.2e,%.2e,%.2e)\n", part.pos[0], part.pos[1], part.pos[2]);
+        printf("        |        velocity: (%.2e,%.2e,%.2e)\n", part.vel[0], part.vel[1], part.vel[2]);
         printf("        -----------------------------------------------\n");
       }
     }
     printf("=======================================================\n\n");
+    // clang-format on
   }
 }
 
@@ -93,25 +95,25 @@ void PrintArtemisConfiguration(Packages_t &packages) {
 //! \fn void ArtemisUtils::EnrollArtemisRefinementOps
 //! \brief Registers custom prolongation and restriction operators on provided Metadata
 void EnrollArtemisRefinementOps(parthenon::Metadata &m, Coordinates coords) {
-  typedef Coordinates C;
-  if (coords == C::cartesian) {
-    m.RegisterRefinementOps<ArtemisUtils::ProlongateSharedMinMod<C::cartesian>,
-                            ArtemisUtils::RestrictAverage<C::cartesian>>();
-  } else if (coords == C::spherical1D) {
-    m.RegisterRefinementOps<ArtemisUtils::ProlongateSharedMinMod<C::spherical1D>,
-                            ArtemisUtils::RestrictAverage<C::spherical1D>>();
-  } else if (coords == C::spherical2D) {
-    m.RegisterRefinementOps<ArtemisUtils::ProlongateSharedMinMod<C::spherical2D>,
-                            ArtemisUtils::RestrictAverage<C::spherical2D>>();
-  } else if (coords == C::spherical3D) {
-    m.RegisterRefinementOps<ArtemisUtils::ProlongateSharedMinMod<C::spherical3D>,
-                            ArtemisUtils::RestrictAverage<C::spherical3D>>();
-  } else if (coords == C::cylindrical) {
-    m.RegisterRefinementOps<ArtemisUtils::ProlongateSharedMinMod<C::cylindrical>,
-                            ArtemisUtils::RestrictAverage<C::cylindrical>>();
-  } else if (coords == C::axisymmetric) {
-    m.RegisterRefinementOps<ArtemisUtils::ProlongateSharedMinMod<C::axisymmetric>,
-                            ArtemisUtils::RestrictAverage<C::axisymmetric>>();
+  typedef Coordinates G;
+  if (coords == G::cartesian) {
+    m.RegisterRefinementOps<ArtemisUtils::ProlongateSharedMinMod<G::cartesian>,
+                            ArtemisUtils::RestrictAverage<G::cartesian>>();
+  } else if (coords == G::spherical1D) {
+    m.RegisterRefinementOps<ArtemisUtils::ProlongateSharedMinMod<G::spherical1D>,
+                            ArtemisUtils::RestrictAverage<G::spherical1D>>();
+  } else if (coords == G::spherical2D) {
+    m.RegisterRefinementOps<ArtemisUtils::ProlongateSharedMinMod<G::spherical2D>,
+                            ArtemisUtils::RestrictAverage<G::spherical2D>>();
+  } else if (coords == G::spherical3D) {
+    m.RegisterRefinementOps<ArtemisUtils::ProlongateSharedMinMod<G::spherical3D>,
+                            ArtemisUtils::RestrictAverage<G::spherical3D>>();
+  } else if (coords == G::cylindrical) {
+    m.RegisterRefinementOps<ArtemisUtils::ProlongateSharedMinMod<G::cylindrical>,
+                            ArtemisUtils::RestrictAverage<G::cylindrical>>();
+  } else if (coords == G::axisymmetric) {
+    m.RegisterRefinementOps<ArtemisUtils::ProlongateSharedMinMod<G::axisymmetric>,
+                            ArtemisUtils::RestrictAverage<G::axisymmetric>>();
   } else {
     PARTHENON_FAIL("Invalid artemis/coordinate system!");
   }
@@ -151,24 +153,26 @@ std::vector<std::vector<Real>> loadtxt(std::string fname) {
   return table;
 }
 
+//----------------------------------------------------------------------------------------
+//! \fn  std::vector<std::vector<Real>> NBody::loadtxt
+//! \brief Cuts a 2D rectangle with the given plane
+//!        The volume is computed using the divergence theorem, V = \int div(x) dV
 KOKKOS_FUNCTION
 Real CutCell2D(const std::array<Real, 4> &x, const std::array<Real, 4> &y,
                const std::array<Real, 2> &xc, const std::array<Real, 2> &nx) {
-  // Cuts a 2D rectangle with the given plane
-  // The volume is computed using the divergence theorem, V = \int div(x) dV
-
   auto plane_distance = [&xc, &nx](const Real px, const Real py) {
     return nx[0] * (px - xc[0]) + nx[1] * (py - xc[1]);
   };
+
   const Real x0 = x[0];
   const Real y0 = y[0];
   auto contrib = [&x0, &y0](const Real xi, const Real yi, const Real xj, const Real yj) {
     return 0.5 * ((xi - x0) * (yj - y0) - (xj - x0) * (yi - y0));
   };
-  Real vol_inside = 0.0;
-  Real vol = 0.0;
 
   // Loop through the edges of the quad
+  Real vol_inside = 0.0;
+  Real vol = 0.0;
   for (int i = 0; i < 4; i++) {
     const int j = (i + 1) % 4;
     vol += contrib(x[i], y[i], x[j], y[j]);
@@ -182,11 +186,11 @@ Real CutCell2D(const std::array<Real, 4> &x, const std::array<Real, 4> &y,
     const int clipj = (dj < 0.0);
 
     // intersection point
-    const Real xp =
-        (std::abs(di) * x[j] + std::abs(dj) * x[i]) / (std::abs(di) + std::abs(dj));
-    const Real yp =
-        (std::abs(di) * y[j] + std::abs(dj) * y[i]) / (std::abs(di) + std::abs(dj));
-
+    const Real adi = std::abs(di);
+    const Real adj = std::abs(dj);
+    const Real denom = (adi + adj);
+    const Real xp = (adi * x[j] + adj * x[i]) / denom;
+    const Real yp = (adi * y[j] + adj * y[i]) / denom;
     const Real x1 = (clipi) ? xp : x[i];
     const Real y1 = (clipi) ? yp : y[i];
     const Real x2 = (clipj) ? xp : x[j];

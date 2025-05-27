@@ -1,5 +1,5 @@
 # ========================================================================================
-#  (C) (or copyright) 2023-2024. Triad National Security, LLC. All rights reserved.
+#  (C) (or copyright) 2023-2025. Triad National Security, LLC. All rights reserved.
 #
 #  This program was produced under U.S. Government contract 89233218CNA000001 for Los
 #  Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -12,7 +12,7 @@
 # ========================================================================================
 
 <artemis>
-problem = beam          # name of the pgen
+problem = beam  # name of the pgen
 physical_units  = cgs
 unit_conversion = base
 coordinates = cartesian  # coordinate system
@@ -24,7 +24,7 @@ problem_id = beam  # problem ID: basename of output filenames
 variables = gas.prim.density,  &
             gas.prim.velocity, &
             gas.prim.pressure, &
-            rad.prim.energy, &
+            rad.prim.energy,   &
             rad.prim.flux
 file_type = hdf5  # HDF5 data dump
 dt        = 5e-12 # time increment between outputs
@@ -84,12 +84,11 @@ siefloor = 1.0e-10
 opacity_model = constant
 kappa_a = 1.0
 
-
 <problem>
-width = 0.35 
+width = 0.35
 mu = 0.5
 sigma = 0.05
 rho = 1e-3
 bump = 1e6
-tgas = 3e2 
+tgas = 3e2
 trad = 1e3

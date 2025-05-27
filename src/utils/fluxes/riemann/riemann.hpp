@@ -1,5 +1,5 @@
 //========================================================================================
-// (C) (or copyright) 2023. Triad National Security, LLC. All rights reserved.
+// (C) (or copyright) 2023-2025. Triad National Security, LLC. All rights reserved.
 //
 // This program was produced under U.S. Government contract 89233218CNA000001 for Los
 // Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -22,7 +22,7 @@ namespace ArtemisUtils {
 //! \class  TaskStatus ArtemisUtils::RiemannSolver
 //! \brief Functor that wraps templated Riemann solver call to allow for partial
 //!        template specialization.
-template <RSolver R, Fluid FLUID_TYPE, typename Enable = void>
+template <RSolver R, Fluid FLUID_TYPE, Closure CTYPE, typename Enable = void>
 struct RiemannSolver {
   template <typename V1, typename V2>
   KOKKOS_INLINE_FUNCTION void

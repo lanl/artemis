@@ -33,11 +33,8 @@ NBodyGravityImpl(V1 vmesh, const NBody::Particle &pl,
   // Extract coordinates
   geometry::Coords<GEOM> coords(vmesh.GetCoordinates(b), k, j, i);
   const auto &x = coords.GetCellCenter();
-
   const auto &[xcart, ex1, ex2, ex3] = coords.ConvertToCartWithVec(x);
-
   const auto &hx = coords.GetScaleFactors();
-
   const Real vol = coords.Volume();
 
   // Compute gravitational acceleration
@@ -52,7 +49,7 @@ NBodyGravityImpl(V1 vmesh, const NBody::Particle &pl,
   // Get the rotational velocity
   auto vf = NewArray<Real, 3>(0.0);
   if ((omf != 0.0) || (omb != 0)) {
-    // TODO(AMD): The Background velocity should have the frame velocity in it. Only
+    // TODO(AMD): The background velocity should have the frame velocity in it. Only
     // important for non-shearing box
     const auto &vrot = RotatingFrame::RotationVelocity<GEOM>(x, omf);
     const auto &vback = RotatingFrame::BackgroundVelocity<GEOM>(qshear, omb, x[0]);
@@ -235,6 +232,9 @@ TaskStatus NBodyGravity(MeshData<Real> *md, const Real time, const Real dt) {
   return TaskStatus::complete;
 }
 
+//----------------------------------------------------------------------------------------
+//! \fn  Real Gravity::NBodyPotential
+//! \brief
 template <Coordinates GEOM>
 KOKKOS_INLINE_FUNCTION Real NBodyPotential(geometry::Coords<GEOM> &coords,
                                            const std::array<Real, 3> &xv,

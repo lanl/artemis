@@ -1,5 +1,5 @@
 //========================================================================================
-// (C) (or copyright) 2023-2024. Triad National Security, LLC. All rights reserved.
+// (C) (or copyright) 2023-2025. Triad National Security, LLC. All rights reserved.
 //
 // This program was produced under U.S. Government contract 89233218CNA000001 for Los
 // Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -33,15 +33,16 @@
 
 // Artemis headers
 #include "artemis.hpp"
-#include "radiation/moment/radiation.hpp"
+#include "radiation/moments/moments.hpp"
 #include "utils/eos/eos.hpp"
 
 namespace ArtemisUtils {
 //----------------------------------------------------------------------------------------
 //! \class ArtemisUtils::RiemannSolver<RSolver::llf, ...>
 //! \brief The LLF Riemann solver for ideal gas hydrodynamics
-template <Fluid FLUID_TYPE>
-struct RiemannSolver<RSolver::llf, FLUID_TYPE, std::enable_if_t<!is_grey<FLUID_TYPE>()>> {
+template <Fluid FLUID_TYPE, Closure CTYPE>
+struct RiemannSolver<RSolver::llf, FLUID_TYPE, CTYPE,
+                     std::enable_if_t<FLUID_TYPE != Fluid::radiation>> {
   template <typename V1, typename V2, typename V3>
   KOKKOS_INLINE_FUNCTION void operator()(const EOS &eos, const Real c, const Real chat,
                                          parthenon::team_mbr_t const &member, const int b,
@@ -173,8 +174,9 @@ struct RiemannSolver<RSolver::llf, FLUID_TYPE, std::enable_if_t<!is_grey<FLUID_T
   }
 };
 
-template <Fluid FLUID_TYPE>
-struct RiemannSolver<RSolver::llf, FLUID_TYPE, std::enable_if_t<is_grey<FLUID_TYPE>()>> {
+template <Fluid FLUID_TYPE, Closure CTYPE>
+struct RiemannSolver<RSolver::llf, FLUID_TYPE, CTYPE,
+                     std::enable_if_t<FLUID_TYPE == Fluid::radiation>> {
   template <typename V1, typename V2, typename V3>
   KOKKOS_INLINE_FUNCTION void operator()(const EOS &eos, const Real c, const Real chat,
                                          parthenon::team_mbr_t const &member, const int b,
@@ -195,7 +197,6 @@ struct RiemannSolver<RSolver::llf, FLUID_TYPE, std::enable_if_t<is_grey<FLUID_TY
       const int ivx = nspecies + (n * 3) + ((dir - 1));
       const int ivy = nspecies + (n * 3) + ((dir - 1) + 1) % 3;
       const int ivz = nspecies + (n * 3) + ((dir - 1) + 2) % 3;
-      // Unused indices for dust hydrodynamics
       const int IPR = nspecies * 4 + n;
 
       parthenon::par_for_inner(
@@ -211,18 +212,23 @@ struct RiemannSolver<RSolver::llf, FLUID_TYPE, std::enable_if_t<is_grey<FLUID_TY
             Real &wr_ivy = wr(ivy, i);
             Real &wr_ivz = wr(ivz, i);
 
+            // Compute reduced flux magnitude and limit
             Real fl = std::sqrt(SQR(wl_ivx) + SQR(wl_ivy) + SQR(wl_ivz));
             Real fr = std::sqrt(SQR(wr_ivx) + SQR(wr_ivy) + SQR(wr_ivz));
             const Real nlx = wl_ivx / (fl + Fuzz<Real>());
             const Real nrx = wr_ivx / (fr + Fuzz<Real>());
             fl = std::min(1.0, fl);
             fr = std::min(1.0, fr);
-            const Real chil = Radiation::EddingtonFactor<FLUID_TYPE>(fl);
-            const Real chir = Radiation::EddingtonFactor<FLUID_TYPE>(fr);
-            const auto [sla, slb] = Radiation::WaveSpeed<FLUID_TYPE>(nlx, fl);
-            const auto [sra, srb] = Radiation::WaveSpeed<FLUID_TYPE>(nrx, fr);
+
+            // Wave speeds
+            const Real chil = Radiation::EddingtonFactor<CTYPE>(fl);
+            const Real chir = Radiation::EddingtonFactor<CTYPE>(fr);
+            const auto [sla, slb] = Radiation::WaveSpeed<CTYPE>(nlx, fl);
+            const auto [sra, srb] = Radiation::WaveSpeed<CTYPE>(nrx, fr);
             const Real sl = std::min(sla, slb);
             const Real sr = std::max(sra, srb);
+
+            // Scales
             const Real pscalel = chat * c * 0.5 * (1.0 - chil);
             const Real pscaler = chat * c * 0.5 * (1.0 - chir);
             const Real scalel = c * 0.5 * (3. * chil - 1.) / (fl * fl + Fuzz<Real>());

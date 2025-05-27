@@ -1,5 +1,5 @@
 //========================================================================================
-// (C) (or copyright) 2023-2024. Triad National Security, LLC. All rights reserved.
+// (C) (or copyright) 2023-2025. Triad National Security, LLC. All rights reserved.
 //
 // This program was produced under U.S. Government contract 89233218CNA000001 for Los
 // Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -43,7 +43,7 @@ TaskStatus ZeroFluxes(MeshData<Real> *md);
 void AddHistory(Coordinates coords, Params &params);
 
 //----------------------------------------------------------------------------------------
-//! External template instantiations
+//! template instantiations
 extern template Real EstimateTimestepMesh<Coordinates::cartesian>(MeshData<Real> *md);
 extern template Real EstimateTimestepMesh<Coordinates::cylindrical>(MeshData<Real> *md);
 extern template Real EstimateTimestepMesh<Coordinates::spherical1D>(MeshData<Real> *md);

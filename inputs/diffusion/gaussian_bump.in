@@ -1,5 +1,5 @@
 # ========================================================================================
-#  (C) (or copyright) 2023-2024. Triad National Security, LLC. All rights reserved.
+#  (C) (or copyright) 2023-2025. Triad National Security, LLC. All rights reserved.
 #
 #  This program was produced under U.S. Government contract 89233218CNA000001 for Los
 #  Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -19,8 +19,8 @@ coordinates = cartesian
 problem_id = bump3  # problem ID: basename of output filenames
 
 <parthenon/output1>
-variables = gas.prim.density,   &
-            gas.prim.velocity,  &
+variables = gas.prim.density,  &
+            gas.prim.velocity, &
             gas.prim.pressure
 file_type = hdf5  # HDF5 data dump
 dt        = 0.05  # time increment between outputs
@@ -80,11 +80,10 @@ type = constant
 nu = 5.0e-3
 
 <gas/conductivity>
-type = conductivity 
+type = conductivity
 cond = 5.0e-3
 
 <problem>
 temperature_bump = 5.0
 sigma = 0.1
 system = cartesian
-

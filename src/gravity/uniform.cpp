@@ -1,5 +1,5 @@
 //========================================================================================
-// (C) (or copyright) 2023-2024. Triad National Security, LLC. All rights reserved.
+// (C) (or copyright) 2023-2025. Triad National Security, LLC. All rights reserved.
 //
 // This program was produced under U.S. Government contract 89233218CNA000001 for Los
 // Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -92,13 +92,13 @@ TaskStatus UniformGravity(MeshData<Real> *md, const Real time, const Real dt) {
 
 //----------------------------------------------------------------------------------------
 //! template instantiations
-typedef Coordinates C;
+typedef Coordinates G;
 typedef MeshData<Real> MD;
-template TaskStatus UniformGravity<C::cartesian>(MD *m, const Real t, const Real d);
-template TaskStatus UniformGravity<C::cylindrical>(MD *m, const Real t, const Real d);
-template TaskStatus UniformGravity<C::spherical1D>(MD *m, const Real t, const Real d);
-template TaskStatus UniformGravity<C::spherical2D>(MD *m, const Real t, const Real d);
-template TaskStatus UniformGravity<C::spherical3D>(MD *m, const Real t, const Real d);
-template TaskStatus UniformGravity<C::axisymmetric>(MD *m, const Real t, const Real d);
+template TaskStatus UniformGravity<G::cartesian>(MD *m, const Real t, const Real d);
+template TaskStatus UniformGravity<G::cylindrical>(MD *m, const Real t, const Real d);
+template TaskStatus UniformGravity<G::spherical1D>(MD *m, const Real t, const Real d);
+template TaskStatus UniformGravity<G::spherical2D>(MD *m, const Real t, const Real d);
+template TaskStatus UniformGravity<G::spherical3D>(MD *m, const Real t, const Real d);
+template TaskStatus UniformGravity<G::axisymmetric>(MD *m, const Real t, const Real d);
 
 } // namespace Gravity

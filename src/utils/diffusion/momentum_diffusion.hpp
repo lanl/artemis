@@ -1,5 +1,5 @@
 //========================================================================================
-// (C) (or copyright) 2023-2024. Triad National Security, LLC. All rights reserved.
+// (C) (or copyright) 2023-2025. Triad National Security, LLC. All rights reserved.
 //
 // This program was produced under U.S. Government contract 89233218CNA000001 for Los
 // Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -25,6 +25,9 @@ using ArtemisUtils::VI;
 
 namespace Diffusion {
 
+//----------------------------------------------------------------------------------------
+//! \fn void StrainTensorFace
+//! \brief Computes strain rate tensor
 template <Coordinates GEOM, Fluid FLUID_TYPE, parthenon::CoordinateDirection XDIR,
           typename SparsePack>
 KOKKOS_INLINE_FUNCTION void
@@ -374,6 +377,9 @@ StrainTensorFace(parthenon::team_mbr_t const &member, const int b, const int n,
   });
 }
 
+//----------------------------------------------------------------------------------------
+//! \fn void StressTensorFaceX1
+//! \brief Stress Ttensor X1-Face
 template <Coordinates GEOM, Fluid FLUID_TYPE, typename SparsePackPrim,
           typename SparsePackFlux>
 KOKKOS_INLINE_FUNCTION void StressTensorFaceX1(
@@ -431,6 +437,9 @@ KOKKOS_INLINE_FUNCTION void StressTensorFaceX1(
   });
 }
 
+//----------------------------------------------------------------------------------------
+//! \fn void StressTensorFaceX2
+//! \brief Stress Ttensor X2-Face
 template <Coordinates GEOM, Fluid FLUID_TYPE, typename SparsePackPrim,
           typename SparsePackFlux>
 KOKKOS_INLINE_FUNCTION void StressTensorFaceX2(
@@ -490,6 +499,9 @@ KOKKOS_INLINE_FUNCTION void StressTensorFaceX2(
   });
 }
 
+//----------------------------------------------------------------------------------------
+//! \fn void StressTensorFaceX3
+//! \brief Stress Ttensor X3-Face
 template <Coordinates GEOM, Fluid FLUID_TYPE, typename SparsePackPrim,
           typename SparsePackFlux>
 KOKKOS_INLINE_FUNCTION void StressTensorFaceX3(
@@ -549,6 +561,9 @@ KOKKOS_INLINE_FUNCTION void StressTensorFaceX3(
   });
 }
 
+//----------------------------------------------------------------------------------------
+//! \fn void VelocityDivergence
+//! \brief Computes velocity divergence
 template <Coordinates GEOM, Fluid FLUID_TYPE, typename SparsePackPrim>
 KOKKOS_INLINE_FUNCTION void
 VelocityDivergence(parthenon::team_mbr_t const &member, const int b, const int n,
@@ -588,6 +603,9 @@ VelocityDivergence(parthenon::team_mbr_t const &member, const int b, const int n
   });
 }
 
+//----------------------------------------------------------------------------------------
+//! \fn TaskStatus MomentumFluxImpl
+//! \brief Implementation for momentum flux calculation
 template <Coordinates GEOM, Fluid FLUID_TYPE, DiffType DIFF, typename PKG,
           typename SparsePackPrim, typename SparsePackFlux>
 TaskStatus MomentumFluxImpl(MeshData<Real> *md, DiffCoeffParams dp, PKG &pkg,

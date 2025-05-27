@@ -1,5 +1,5 @@
 # ========================================================================================
-#  (C) (or copyright) 2023-2024. Triad National Security, LLC. All rights reserved.
+#  (C) (or copyright) 2023-2025. Triad National Security, LLC. All rights reserved.
 #
 #  This program was produced under U.S. Government contract 89233218CNA000001 for Los
 #  Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -18,12 +18,11 @@ set (SRC_LIST
   artemis.cpp
   artemis.hpp
 
-  drag/drag.cpp
-  drag/drag.hpp
-
-
   derived/fill_derived.cpp
   derived/fill_derived.hpp
+
+  drag/drag.cpp
+  drag/drag.hpp
 
   dust/dust.cpp
   dust/dust.hpp
@@ -45,10 +44,6 @@ set (SRC_LIST
   gravity/point_mass.cpp
   gravity/uniform.cpp
   gravity/gravity.hpp
-
-  rotating_frame/rotating_frame.cpp
-  rotating_frame/rotating_frame_impl.hpp
-  rotating_frame/rotating_frame.hpp
 
   nbody/nbody.cpp
   nbody/nbody.hpp
@@ -77,9 +72,13 @@ set (SRC_LIST
   pgen/thermalization.hpp
 
   radiation/imc/imc.hpp
-  radiation/moment/radiation.cpp
-  radiation/moment/radiation.hpp
-  radiation/moment/matter_coupling.hpp
+  radiation/moments/moments.cpp
+  radiation/moments/moments.hpp
+  radiation/moments/matter_coupling.hpp
+
+  rotating_frame/rotating_frame.cpp
+  rotating_frame/rotating_frame_impl.hpp
+  rotating_frame/rotating_frame.hpp
 
   utils/artemis_utils.cpp
   utils/artemis_utils.hpp

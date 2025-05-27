@@ -1,5 +1,5 @@
 //========================================================================================
-// (C) (or copyright) 2023-2024. Triad National Security, LLC. All rights reserved.
+// (C) (or copyright) 2023-2025. Triad National Security, LLC. All rights reserved.
 //
 // This program was produced under U.S. Government contract 89233218CNA000001 for Los
 // Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -42,16 +42,16 @@
 
 // Artemis headers
 #include "artemis.hpp"
-#include "radiation/moment/radiation.hpp"
+#include "radiation/moments/moments.hpp"
 #include "utils/eos/eos.hpp"
 
 namespace ArtemisUtils {
 //----------------------------------------------------------------------------------------
 //! \class ArtemisUtils::RiemannSolver<RSolver::hlle, ...>
 //! \brief The HLLE Riemann solver for ideal gas hydrodynamics
-template <Fluid FLUID_TYPE>
-struct RiemannSolver<RSolver::hlle, FLUID_TYPE,
-                     std::enable_if_t<!is_grey<FLUID_TYPE>()>> {
+template <Fluid FLUID_TYPE, Closure CTYPE>
+struct RiemannSolver<RSolver::hlle, FLUID_TYPE, CTYPE,
+                     std::enable_if_t<FLUID_TYPE != Fluid::radiation>> {
   template <typename V1, typename V2, typename V3>
   KOKKOS_INLINE_FUNCTION void operator()(const EOS &eos, const Real c, const Real chat,
                                          parthenon::team_mbr_t const &member, const int b,
@@ -225,8 +225,9 @@ struct RiemannSolver<RSolver::hlle, FLUID_TYPE,
   }
 };
 
-template <Fluid FLUID_TYPE>
-struct RiemannSolver<RSolver::hlle, FLUID_TYPE, std::enable_if_t<is_grey<FLUID_TYPE>()>> {
+template <Fluid FLUID_TYPE, Closure CTYPE>
+struct RiemannSolver<RSolver::hlle, FLUID_TYPE, CTYPE,
+                     std::enable_if_t<FLUID_TYPE == Fluid::radiation>> {
   template <typename V1, typename V2, typename V3>
   KOKKOS_INLINE_FUNCTION void operator()(const EOS &eos, const Real c, const Real chat,
                                          parthenon::team_mbr_t const &member, const int b,
@@ -262,58 +263,53 @@ struct RiemannSolver<RSolver::hlle, FLUID_TYPE, std::enable_if_t<is_grey<FLUID_T
             Real &wr_ivy = wr(ivy, i);
             Real &wr_ivz = wr(ivz, i);
 
-            // Compute reduced flux magnitude
+            // Compute reduced flux magnitude and limit
             Real fl = std::sqrt(SQR(wl_ivx) + SQR(wl_ivy) + SQR(wl_ivz));
             Real fr = std::sqrt(SQR(wr_ivx) + SQR(wr_ivy) + SQR(wr_ivz));
             const Real nlx = wl_ivx / (fl + Fuzz<Real>());
             const Real nrx = wr_ivx / (fr + Fuzz<Real>());
-            // limit to allowable state
             fl = std::min(1.0, fl);
             fr = std::min(1.0, fr);
 
             // Wave speeds
-            const Real chil = Radiation::EddingtonFactor<FLUID_TYPE>(fl);
-            const Real chir = Radiation::EddingtonFactor<FLUID_TYPE>(fr);
-            const auto [sla, slb] = Radiation::WaveSpeed<FLUID_TYPE>(nlx, fl);
-            const auto [sra, srb] = Radiation::WaveSpeed<FLUID_TYPE>(nrx, fr);
-            Real sl = std::min(sla, slb);
-            Real sr = std::max(sra, srb);
+            const Real chil = Radiation::EddingtonFactor<CTYPE>(fl);
+            const Real chir = Radiation::EddingtonFactor<CTYPE>(fr);
+            const auto [sla, slb] = Radiation::WaveSpeed<CTYPE>(nlx, fl);
+            const auto [sra, srb] = Radiation::WaveSpeed<CTYPE>(nrx, fr);
+            const Real sl = std::min(sla, slb);
+            const Real sr = std::max(sra, srb);
 
-            Real pscalel = chat * c * 0.5 * (1.0 - chil);
-            Real pscaler = chat * c * 0.5 * (1.0 - chir);
-            Real norml = fl * fl;
-            Real normr = fr * fr;
-            Real scalel = c * 0.5 * (3. * chil - 1.);
-            Real scaler = c * 0.5 * (3. * chir - 1.);
+            // Scales
+            const Real pscalel = chat * c * 0.5 * (1.0 - chil);
+            const Real pscaler = chat * c * 0.5 * (1.0 - chir);
+            const Real wl_ipr = pscalel * wl_idn;
+            const Real wr_ipr = pscaler * wr_idn;
+            const Real norml = fl * fl;
+            const Real normr = fr * fr;
+            const Real scalel = c * 0.5 * (3. * chil - 1.);
+            const Real scaler = c * 0.5 * (3. * chir - 1.);
 
             // following min/max set to TINY_NUMBER to fix bug found in converging
             // supersonic flow
-            Real bp = (sr > 0.0) ? sr : 1.0e-20;
-            Real bm = (sl < 0.0) ? sl : -1.0e-20;
+            const Real bp = (sr > 0.0) ? sr : 1.0e-20;
+            const Real bm = (sl < 0.0) ? sl : -1.0e-20;
 
             // Compute L/R fluxes along lines bm/bp: F_L - (S_L)U_L; F_R - (S_R)U_R
             Real qa = chat * (wl_ivx - bm);
             Real qb = chat * (wr_ivx - bp);
-
-            Real fl_d = wl_idn * qa;
-            Real fr_d = wr_idn * qb;
-
-            Real fl_mx = scalel * wl_idn * qa * (wl_ivx / (norml + Fuzz<Real>()));
-            Real fr_mx = scaler * wr_idn * qb * (wr_ivx / (normr + Fuzz<Real>()));
-
-            Real fl_my = scalel * wl_idn * qa * (wl_ivy / (norml + Fuzz<Real>()));
-            Real fr_my = scaler * wr_idn * qb * (wr_ivy / (normr + Fuzz<Real>()));
-
-            Real fl_mz = scalel * wl_idn * qa * (wl_ivz / (norml + Fuzz<Real>()));
-            Real fr_mz = scaler * wr_idn * qb * (wr_ivz / (normr + Fuzz<Real>()));
+            const Real fl_d = wl_idn * qa;
+            const Real fr_d = wr_idn * qb;
+            const Real fl_mx = scalel * wl_idn * qa * (wl_ivx / (norml + Fuzz<Real>()));
+            const Real fr_mx = scaler * wr_idn * qb * (wr_ivx / (normr + Fuzz<Real>()));
+            const Real fl_my = scalel * wl_idn * qa * (wl_ivy / (norml + Fuzz<Real>()));
+            const Real fr_my = scaler * wr_idn * qb * (wr_ivy / (normr + Fuzz<Real>()));
+            const Real fl_mz = scalel * wl_idn * qa * (wl_ivz / (norml + Fuzz<Real>()));
+            const Real fr_mz = scaler * wr_idn * qb * (wr_ivz / (normr + Fuzz<Real>()));
 
             // Set an approximate interface pressure for coordinate source terms and
             // pressure contribution to flux.
             qa = 0.0;
             if (bp != bm) qa = 0.5 * (bp + bm) / (bp - bm);
-
-            Real wl_ipr = pscalel * wl_idn;
-            Real wr_ipr = pscaler * wr_idn;
             p.flux(b, dir, IPR, k, j, i) =
                 0.5 * (wl_ipr + wr_ipr) + qa * (wl_ipr - wr_ipr);
 

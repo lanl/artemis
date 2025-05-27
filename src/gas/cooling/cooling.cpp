@@ -1,5 +1,5 @@
 //========================================================================================
-// (C) (or copyright) 2023-2024. Triad National Security, LLC. All rights reserved.
+// (C) (or copyright) 2023-2025. Triad National Security, LLC. All rights reserved.
 //
 // This program was produced under U.S. Government contract 89233218CNA000001 for Los
 // Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -35,6 +35,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   auto cooling = std::make_shared<StateDescriptor>("cooling");
   Params &params = cooling->AllParams();
 
+  // Cooling type
   std::string cool_type = pin->GetString("cooling", "type");
   CoolingType ctype = CoolingType::null;
   if (cool_type == "beta") {
@@ -50,6 +51,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   }
   params.Add("type", ctype);
 
+  // Temperature type
   std::string temp_type = pin->GetString("cooling", "tref");
   TempRefType ttype = TempRefType::null;
   TempParams tpars;
@@ -104,14 +106,14 @@ TaskStatus CoolingSource(MeshData<Real> *md, const Real time, const Real dt) {
 
 //----------------------------------------------------------------------------------------
 //! template instantiations
-typedef Coordinates C;
+typedef Coordinates G;
 typedef MeshData<Real> MD;
-template TaskStatus CoolingSource<C::cartesian>(MD *md, const Real t, const Real d);
-template TaskStatus CoolingSource<C::cylindrical>(MD *md, const Real t, const Real d);
-template TaskStatus CoolingSource<C::spherical3D>(MD *md, const Real t, const Real d);
-template TaskStatus CoolingSource<C::spherical1D>(MD *md, const Real t, const Real d);
-template TaskStatus CoolingSource<C::spherical2D>(MD *md, const Real t, const Real d);
-template TaskStatus CoolingSource<C::axisymmetric>(MD *md, const Real t, const Real d);
+template TaskStatus CoolingSource<G::cartesian>(MD *md, const Real t, const Real d);
+template TaskStatus CoolingSource<G::cylindrical>(MD *md, const Real t, const Real d);
+template TaskStatus CoolingSource<G::spherical3D>(MD *md, const Real t, const Real d);
+template TaskStatus CoolingSource<G::spherical1D>(MD *md, const Real t, const Real d);
+template TaskStatus CoolingSource<G::spherical2D>(MD *md, const Real t, const Real d);
+template TaskStatus CoolingSource<G::axisymmetric>(MD *md, const Real t, const Real d);
 
 } // namespace Cooling
 } // namespace Gas

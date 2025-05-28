@@ -126,5 +126,7 @@ def analyze():
 
     errors = np.array(errors).ravel()
     fail = np.any(errors > _tol)
-    fail |= np.max(mom_err) > 1e-13
+    # NOTE(@pdmullen): PR#74 reduces the number of divides, but this leads to differing
+    # round-off behavior... increment tolerance
+    fail |= np.max(mom_err) > 2e-13
     return not fail

@@ -55,6 +55,8 @@ struct StratParams {
   Real r0;
   Real kbmu;
   bool three_d;
+  Real ar;
+  bool do_dust, do_moment, do_imc;
 };
 
 //----------------------------------------------------------------------------------------
@@ -63,7 +65,8 @@ struct StratParams {
 //! NOTE(PDM): In order for our user-defined BCs to be compatible with restarts, we must
 //! reset the StratParams struct upon initialization.
 inline void InitStratParams(MeshBlock *pmb, ParameterInput *pin) {
-  Params &params = pmb->packages.Get("artemis")->AllParams();
+  auto &artemis_pkg = pmb->packages.Get("artemis");
+  Params &params = artemis_pkg->AllParams();
   if (!(params.hasKey("strat_params"))) {
     StratParams strat_params;
     strat_params.three_d = pin->GetInteger("parthenon/mesh", "nx3") > 1;
@@ -73,9 +76,9 @@ inline void InitStratParams(MeshBlock *pmb, ParameterInput *pin) {
     strat_params.rho0 = pin->GetOrAddReal("problem", "rho0", 1.0);
     strat_params.r0 = pin->GetOrAddReal("problem", "r0", 1.0);
     strat_params.d2g = pin->GetOrAddReal("problem", "dust_to_gas", 0.01);
+    strat_params.do_dust = params.Get<bool>("do_dust");
 
     auto &gas_pkg = pmb->packages.Get("gas");
-    auto &artemis_pkg = pmb->packages.Get("artemis");
     const auto mu = gas_pkg->Param<Real>("mu");
     const auto eos = gas_pkg->Param<EOS>("eos_h");
     auto &constants = artemis_pkg->Param<ArtemisUtils::Constants>("constants");
@@ -86,6 +89,10 @@ inline void InitStratParams(MeshBlock *pmb, ParameterInput *pin) {
         SQR(strat_params.h * strat_params.r0 * strat_params.Om0) / strat_params.kbmu;
     strat_params.pres0 = eos.PressureFromDensityTemperature(
         strat_params.rho0, strat_params.temp0); // strat_params.rho0 * strat_params.temp0;
+
+    strat_params.do_imc = params.Get<bool>("do_imc");
+    strat_params.do_moment = params.Get<bool>("do_moment");
+    strat_params.ar = constants.GetARCode();
     params.Add("strat_params", strat_params);
   }
 }
@@ -109,18 +116,10 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto artemis_pkg = pmb->packages.Get("artemis");
   PARTHENON_REQUIRE(GEOM == Coordinates::cartesian,
                     "problem = strat only works for Cartesian Coordinates!");
-
-  const bool do_dust = artemis_pkg->Param<bool>("do_dust");
-  const bool do_radiation = artemis_pkg->Param<bool>("do_radiation");
-  int nspec = Null<int>();
-  if (do_dust) {
-    auto dust_pkg = pmb->packages.Get("dust");
-    nspec = dust_pkg->Param<int>("nspecies");
-  }
+  auto strat_params = artemis_pkg->Param<StratParams>("strat_params");
 
   auto &gas_pkg = pmb->packages.Get("gas");
   auto eos_d = gas_pkg->template Param<EOS>("eos_d");
-  auto strat_params = artemis_pkg->Param<StratParams>("strat_params");
 
   // Dimensionality
   const int ndim = pmb->pmy_mesh->ndim;
@@ -133,13 +132,12 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   }
   static auto desc =
       MakePackDescriptor<gas::prim::density, gas::prim::velocity, gas::prim::sie,
-                         dust::prim::density, dust::prim::velocity>(
-          (pmb->resolved_packages).get());
+                         dust::prim::density, dust::prim::velocity, rad::prim::energy,
+                         rad::prim::flux>((pmb->resolved_packages).get());
   auto v = desc.GetPack(md.get());
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
-
   auto &pco = pmb->coords;
   const auto &pars = strat_params;
 
@@ -165,18 +163,26 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         v(0, gas::prim::velocity(1), k, j, i) = dvx2;
         v(0, gas::prim::velocity(2), k, j, i) = vx3;
         v(0, gas::prim::sie(0), k, j, i) = sie;
-        if (do_dust) {
+        if (pars.do_dust) {
           const Real ddens = dens * pars.d2g;
-          for (int n = 0; n < nspec; ++n) {
+          for (int n = 0; n < v.GetSize(0, dust::prim::density()); ++n) {
             v(0, dust::prim::density(n), k, j, i) = ddens;
             v(0, dust::prim::velocity(VI(n, 0)), k, j, i) = vx1;
             v(0, dust::prim::velocity(VI(n, 1)), k, j, i) = dvx2;
             v(0, dust::prim::velocity(VI(n, 2)), k, j, i) = vx3;
           }
         }
+        if (pars.do_moment) {
+          for (int n = 0; n < v.GetSize(0, rad::prim::energy()); ++n) {
+            v(0, rad::prim::energy(n), k, j, i) = pars.ar * SQR(SQR(temp));
+            v(0, rad::prim::flux(VI(n, 0)), k, j, i) = 0.0;
+            v(0, rad::prim::flux(VI(n, 1)), k, j, i) = 0.0;
+            v(0, rad::prim::flux(VI(n, 2)), k, j, i) = 0.0;
+          }
+        }
       });
 
-  if (do_radiation) jaybenne::InitializeRadiation(md.get(), true);
+  if (strat_params.do_imc) jaybenne::InitializeRadiation(md.get(), true);
 }
 
 //----------------------------------------------------------------------------------------
@@ -190,12 +196,10 @@ inline void ExtrapInnerX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
   auto pmb = mbd->GetBlockPointer();
 
   auto artemis_pkg = pmb->packages.Get("artemis");
-  const bool do_dust = artemis_pkg->Param<bool>("do_dust");
 
-  static auto descriptors =
-      ArtemisUtils::GetBoundaryPackDescriptorMap<gas::prim::density, gas::prim::velocity,
-                                                 gas::prim::sie, dust::prim::density,
-                                                 dust::prim::velocity>(mbd);
+  static auto descriptors = ArtemisUtils::GetBoundaryPackDescriptorMap<
+      gas::prim::density, gas::prim::velocity, gas::prim::sie, dust::prim::density,
+      dust::prim::velocity, rad::prim::energy, rad::prim::flux>(mbd);
 
   auto v = descriptors[coarse].GetPack(mbd.get());
 
@@ -208,6 +212,7 @@ inline void ExtrapInnerX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
   const auto &bounds = coarse ? pmb->c_cellbounds : pmb->cellbounds;
   const auto &range = bounds.GetBoundsI(IndexDomain::interior, TE::CC);
   const int is = range.s;
+  auto &pars = artemis_pkg->Param<StratParams>("strat_params");
 
   pmb->par_for_bndry(
       "StratInnerX1", nb, IndexDomain::inner_x1, parthenon::TopologicalElement::CC,
@@ -237,7 +242,7 @@ inline void ExtrapInnerX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
         v(0, gas::prim::density(0), k, j, i) = densg;
         v(0, gas::prim::sie(0), k, j, i) = sieg;
 
-        if (do_dust) {
+        if (pars.do_dust) {
           for (int n = 0; n < v.GetSize(0, dust::prim::density()); ++n) {
             const Real dv1 = v(0, dust::prim::velocity(VI(n, 0)), k, j, is);
             const Real dv2 = v(0, dust::prim::velocity(VI(n, 1)), k, j, is);
@@ -251,6 +256,17 @@ inline void ExtrapInnerX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
             v(0, dust::prim::velocity(VI(n, 1)), k, j, i) = vx2d;
             v(0, dust::prim::velocity(VI(n, 2)), k, j, i) = vx3d;
             v(0, dust::prim::density(n), k, j, i) = densd;
+          }
+        }
+        if (pars.do_moment) {
+          for (int n = 0; n < v.GetSize(0, rad::prim::energy()); ++n) {
+            const Real fx1 = v(0, rad::prim::flux(VI(n, 0)), k, j, is);
+            const Real fx2 = v(0, rad::prim::flux(VI(n, 1)), k, j, is);
+            const Real fx3 = v(0, rad::prim::flux(VI(n, 2)), k, j, is);
+            v(0, rad::prim::flux(VI(n, 0)), k, j, i) = (fx1 > 0.0) ? 0.0 : fx1;
+            v(0, rad::prim::flux(VI(n, 1)), k, j, i) = fx2;
+            v(0, rad::prim::flux(VI(n, 2)), k, j, i) = fx3;
+            v(0, rad::prim::energy(n), k, j, i) = v(0, rad::prim::energy(n), k, j, is);
           }
         }
       });
@@ -269,12 +285,10 @@ inline void ExtrapOuterX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
   auto pmb = mbd->GetBlockPointer();
 
   auto artemis_pkg = pmb->packages.Get("artemis");
-  const bool do_dust = artemis_pkg->Param<bool>("do_dust");
 
-  static auto descriptors =
-      ArtemisUtils::GetBoundaryPackDescriptorMap<gas::prim::density, gas::prim::velocity,
-                                                 gas::prim::sie, dust::prim::density,
-                                                 dust::prim::velocity>(mbd);
+  static auto descriptors = ArtemisUtils::GetBoundaryPackDescriptorMap<
+      gas::prim::density, gas::prim::velocity, gas::prim::sie, dust::prim::density,
+      dust::prim::velocity, rad::prim::energy, rad::prim::flux>(mbd);
 
   auto v = descriptors[coarse].GetPack(mbd.get());
 
@@ -287,6 +301,7 @@ inline void ExtrapOuterX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
   const auto &bounds = coarse ? pmb->c_cellbounds : pmb->cellbounds;
   const auto &range = bounds.GetBoundsI(IndexDomain::interior, TE::CC);
   const int ie = range.e;
+  auto &pars = artemis_pkg->Param<StratParams>("strat_params");
 
   pmb->par_for_bndry(
       "StratOuterX1", nb, IndexDomain::outer_x1, parthenon::TopologicalElement::CC,
@@ -316,7 +331,7 @@ inline void ExtrapOuterX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
         v(0, gas::prim::density(0), k, j, i) = densg;
         v(0, gas::prim::sie(0), k, j, i) = sieg;
 
-        if (do_dust) {
+        if (pars.do_dust) {
           for (int n = 0; n < v.GetSize(0, dust::prim::density()); ++n) {
             const Real dv1 = v(0, dust::prim::velocity(VI(n, 0)), k, j, ie);
             const Real dv2 = v(0, dust::prim::velocity(VI(n, 1)), k, j, ie);
@@ -330,6 +345,17 @@ inline void ExtrapOuterX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
             v(0, dust::prim::velocity(VI(n, 1)), k, j, i) = vx2d;
             v(0, dust::prim::velocity(VI(n, 2)), k, j, i) = vx3d;
             v(0, dust::prim::density(n), k, j, i) = ddens;
+          }
+        }
+        if (pars.do_moment) {
+          for (int n = 0; n < v.GetSize(0, rad::prim::energy()); ++n) {
+            const Real fx1 = v(0, rad::prim::flux(VI(n, 0)), k, j, ie);
+            const Real fx2 = v(0, rad::prim::flux(VI(n, 1)), k, j, ie);
+            const Real fx3 = v(0, rad::prim::flux(VI(n, 2)), k, j, ie);
+            v(0, rad::prim::flux(VI(n, 0)), k, j, i) = (fx1 > 0.0) ? 0.0 : fx1;
+            v(0, rad::prim::flux(VI(n, 1)), k, j, i) = fx2;
+            v(0, rad::prim::flux(VI(n, 2)), k, j, i) = fx3;
+            v(0, rad::prim::energy(n), k, j, i) = v(0, rad::prim::energy(n), k, j, ie);
           }
         }
       });
@@ -362,14 +388,12 @@ inline void ShearInnerX2(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse)
   auto pmb = mbd->GetBlockPointer();
 
   auto artemis_pkg = pmb->packages.Get("artemis");
-  const bool do_dust = artemis_pkg->Param<bool>("do_dust");
   auto &gas_pkg = pmb->packages.Get("gas");
   auto eos_d = gas_pkg->template Param<EOS>("eos_d");
 
-  static auto descriptors =
-      ArtemisUtils::GetBoundaryPackDescriptorMap<gas::prim::density, gas::prim::velocity,
-                                                 gas::prim::sie, dust::prim::density,
-                                                 dust::prim::velocity>(mbd);
+  static auto descriptors = ArtemisUtils::GetBoundaryPackDescriptorMap<
+      gas::prim::density, gas::prim::velocity, gas::prim::sie, dust::prim::density,
+      dust::prim::velocity, rad::prim::energy, rad::prim::flux>(mbd);
 
   auto v = descriptors[coarse].GetPack(mbd.get());
 
@@ -418,7 +442,7 @@ inline void ShearInnerX2(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse)
         v(0, gas::prim::density(0), k, j, i) = densg;
         v(0, gas::prim::sie(0), k, j, i) = sieg;
 
-        if (do_dust) {
+        if (pars.do_dust) {
           for (int n = 0; n < v.GetSize(0, dust::prim::density()); ++n) {
             const Real dv1 = v(0, dust::prim::velocity(VI(n, 0)), k, js, i);
             const Real dv2 = v(0, dust::prim::velocity(VI(n, 1)), k, js, i);
@@ -432,6 +456,21 @@ inline void ShearInnerX2(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse)
             v(0, dust::prim::velocity(VI(n, 1)), k, j, i) = vx2d;
             v(0, dust::prim::velocity(VI(n, 2)), k, j, i) = vx3d;
             v(0, dust::prim::density(n), k, j, i) = densd;
+          }
+        }
+        if (pars.do_moment) {
+          for (int n = 0; n < v.GetSize(0, rad::prim::energy()); ++n) {
+            const Real fx1 = v(0, rad::prim::flux(VI(n, 0)), k, js, i);
+            const Real fx2 = v(0, rad::prim::flux(VI(n, 1)), k, js, i);
+            const Real fx3 = v(0, rad::prim::flux(VI(n, 2)), k, js, i);
+            v(0, rad::prim::flux(VI(n, 0)), k, j, i) = fx1;
+            v(0, rad::prim::flux(VI(n, 1)), k, j, i) =
+                outflow ? ((fx2 > 0.) ? 0.0 : fx2) : 0.0;
+            ;
+            v(0, rad::prim::flux(VI(n, 2)), k, j, i) = fx3;
+            v(0, rad::prim::energy(n), k, j, i) =
+                outflow ? v(0, rad::prim::energy(n), k, js, i)
+                        : pars.ar * SQR(SQR(pars.temp0));
           }
         }
       });
@@ -464,14 +503,12 @@ inline void ShearOuterX2(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse)
   auto pmb = mbd->GetBlockPointer();
 
   auto artemis_pkg = pmb->packages.Get("artemis");
-  const bool do_dust = artemis_pkg->Param<bool>("do_dust");
   auto &gas_pkg = pmb->packages.Get("gas");
   auto eos_d = gas_pkg->template Param<EOS>("eos_d");
 
-  static auto descriptors =
-      ArtemisUtils::GetBoundaryPackDescriptorMap<gas::prim::density, gas::prim::velocity,
-                                                 gas::prim::sie, dust::prim::density,
-                                                 dust::prim::velocity>(mbd);
+  static auto descriptors = ArtemisUtils::GetBoundaryPackDescriptorMap<
+      gas::prim::density, gas::prim::velocity, gas::prim::sie, dust::prim::density,
+      dust::prim::velocity, rad::prim::energy, rad::prim::flux>(mbd);
 
   auto v = descriptors[coarse].GetPack(mbd.get());
 
@@ -521,7 +558,7 @@ inline void ShearOuterX2(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse)
         v(0, gas::prim::density(0), k, j, i) = densg;
         v(0, gas::prim::sie(0), k, j, i) = sieg;
 
-        if (do_dust) {
+        if (pars.do_dust) {
           for (int n = 0; n < v.GetSize(0, dust::prim::density()); ++n) {
             const Real dv1 = v(0, dust::prim::velocity(VI(n, 0)), k, je, i);
             const Real dv2 = v(0, dust::prim::velocity(VI(n, 1)), k, je, i);
@@ -535,6 +572,21 @@ inline void ShearOuterX2(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse)
             v(0, dust::prim::velocity(VI(n, 1)), k, j, i) = vx2d;
             v(0, dust::prim::velocity(VI(n, 2)), k, j, i) = vx3d;
             v(0, dust::prim::density(n), k, j, i) = densd;
+          }
+        }
+        if (pars.do_moment) {
+          for (int n = 0; n < v.GetSize(0, rad::prim::energy()); ++n) {
+            const Real fx1 = v(0, rad::prim::flux(VI(n, 0)), k, je, i);
+            const Real fx2 = v(0, rad::prim::flux(VI(n, 1)), k, je, i);
+            const Real fx3 = v(0, rad::prim::flux(VI(n, 2)), k, je, i);
+            v(0, rad::prim::flux(VI(n, 0)), k, j, i) = fx1;
+            v(0, rad::prim::flux(VI(n, 1)), k, j, i) =
+                outflow ? ((fx2 < 0.) ? 0.0 : fx2) : 0.0;
+            ;
+            v(0, rad::prim::flux(VI(n, 2)), k, j, i) = fx3;
+            v(0, rad::prim::energy(n), k, j, i) =
+                outflow ? v(0, rad::prim::energy(n), k, je, i)
+                        : pars.ar * SQR(SQR(pars.temp0));
           }
         }
       });
@@ -554,14 +606,12 @@ inline void ExtrapInnerX3(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
   auto pmb = mbd->GetBlockPointer();
 
   auto artemis_pkg = pmb->packages.Get("artemis");
-  const bool do_dust = artemis_pkg->Param<bool>("do_dust");
   auto &gas_pkg = pmb->packages.Get("gas");
   auto eos_d = gas_pkg->template Param<EOS>("eos_d");
 
-  static auto descriptors =
-      ArtemisUtils::GetBoundaryPackDescriptorMap<gas::prim::density, gas::prim::velocity,
-                                                 gas::prim::sie, dust::prim::density,
-                                                 dust::prim::velocity>(mbd);
+  static auto descriptors = ArtemisUtils::GetBoundaryPackDescriptorMap<
+      gas::prim::density, gas::prim::velocity, gas::prim::sie, dust::prim::density,
+      dust::prim::velocity, rad::prim::energy, rad::prim::flux>(mbd);
 
   auto v = descriptors[coarse].GetPack(mbd.get());
 
@@ -609,7 +659,7 @@ inline void ExtrapInnerX3(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
         v(0, gas::prim::sie(0), k, j, i) =
             std::max(pars.siefloor, eos_d.InternalEnergyFromDensityTemperature(rhog, Tg));
 
-        if (do_dust) {
+        if (pars.do_dust) {
           for (int n = 0; n < v.GetSize(0, dust::prim::density()); ++n) {
             const Real vx1d = v(0, dust::prim::velocity(VI(n, 0)), ks, j, i);
             const Real vx2d = v(0, dust::prim::velocity(VI(n, 1)), ks, j, i);
@@ -621,6 +671,17 @@ inline void ExtrapInnerX3(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
             v(0, dust::prim::velocity(VI(n, 1)), k, j, i) = vx2d;
             v(0, dust::prim::velocity(VI(n, 2)), k, j, i) = vx3d;
             v(0, dust::prim::density(n), k, j, i) = dd * efac;
+          }
+        }
+        if (pars.do_moment) {
+          for (int n = 0; n < v.GetSize(0, rad::prim::energy()); ++n) {
+            const Real fx1 = v(0, rad::prim::flux(VI(n, 0)), ks, j, i);
+            const Real fx2 = v(0, rad::prim::flux(VI(n, 1)), ks, j, i);
+            const Real fx3 = v(0, rad::prim::flux(VI(n, 2)), ks, j, i);
+            v(0, rad::prim::flux(VI(n, 0)), k, j, i) = fx1;
+            v(0, rad::prim::flux(VI(n, 1)), k, j, i) = fx2;
+            v(0, rad::prim::flux(VI(n, 2)), k, j, i) = (fx3 > 0.0) ? 0.0 : fx3;
+            v(0, rad::prim::energy(n), k, j, i) = pars.ar * SQR(SQR(pars.temp0));
           }
         }
       });
@@ -639,14 +700,12 @@ inline void ExtrapOuterX3(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
   auto pmb = mbd->GetBlockPointer();
 
   auto artemis_pkg = pmb->packages.Get("artemis");
-  const bool do_dust = artemis_pkg->Param<bool>("do_dust");
   auto &gas_pkg = pmb->packages.Get("gas");
   auto eos_d = gas_pkg->template Param<EOS>("eos_d");
 
-  static auto descriptors =
-      ArtemisUtils::GetBoundaryPackDescriptorMap<gas::prim::density, gas::prim::velocity,
-                                                 gas::prim::sie, dust::prim::density,
-                                                 dust::prim::velocity>(mbd);
+  static auto descriptors = ArtemisUtils::GetBoundaryPackDescriptorMap<
+      gas::prim::density, gas::prim::velocity, gas::prim::sie, dust::prim::density,
+      dust::prim::velocity, rad::prim::energy, rad::prim::flux>(mbd);
 
   auto v = descriptors[coarse].GetPack(mbd.get());
 
@@ -694,7 +753,7 @@ inline void ExtrapOuterX3(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
         v(0, gas::prim::sie(0), k, j, i) =
             std::max(pars.siefloor, eos_d.InternalEnergyFromDensityTemperature(rhog, Tg));
 
-        if (do_dust) {
+        if (pars.do_dust) {
           for (int n = 0; n < v.GetSize(0, dust::prim::density()); ++n) {
             const Real vx1d = v(0, dust::prim::velocity(VI(n, 0)), ke, j, i);
             const Real vx2d = v(0, dust::prim::velocity(VI(n, 1)), ke, j, i);
@@ -706,6 +765,17 @@ inline void ExtrapOuterX3(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
             v(0, dust::prim::velocity(VI(n, 1)), k, j, i) = vx2d;
             v(0, dust::prim::velocity(VI(n, 2)), k, j, i) = vx3d;
             v(0, dust::prim::density(n), k, j, i) = dd * efac;
+          }
+        }
+        if (pars.do_moment) {
+          for (int n = 0; n < v.GetSize(0, rad::prim::energy()); ++n) {
+            const Real fx1 = v(0, rad::prim::flux(VI(n, 0)), ke, j, i);
+            const Real fx2 = v(0, rad::prim::flux(VI(n, 1)), ke, j, i);
+            const Real fx3 = v(0, rad::prim::flux(VI(n, 2)), ke, j, i);
+            v(0, rad::prim::flux(VI(n, 0)), k, j, i) = fx1;
+            v(0, rad::prim::flux(VI(n, 1)), k, j, i) = fx2;
+            v(0, rad::prim::flux(VI(n, 2)), k, j, i) = (fx3 < 0.0) ? 0.0 : fx3;
+            v(0, rad::prim::energy(n), k, j, i) = pars.ar * SQR(SQR(pars.temp0));
           }
         }
       });

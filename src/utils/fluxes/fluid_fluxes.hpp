@@ -42,6 +42,8 @@ KOKKOS_INLINE_FUNCTION void ScaleMomentumFlux(parthenon::team_mbr_t const &membe
     nvar = 6;
   } else if constexpr (FLUID_TYPE == Fluid::dust) {
     nvar = 4;
+  } else if constexpr (is_grey<FLUID_TYPE>()) {
+    nvar = 4;
   }
   const int nspecies = q.GetMaxNumberOfVars() / nvar;
 
@@ -92,6 +94,12 @@ TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PackPrim vprim,
   if constexpr (FLUID_TYPE == Fluid::gas) {
     eos = pkg->template Param<EOS>("eos_d");
   }
+  Real chat = Null<Real>();
+  Real c = Null<Real>();
+  if constexpr (is_grey<FLUID_TYPE>()) {
+    chat = pkg->template Param<Real>("chat");
+    c = pkg->template Param<Real>("c");
+  }
 
   // Scratch properties
   // NOTE(PDM): Scratch here must be able to contain up to the total number of species,
@@ -113,12 +121,16 @@ TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PackPrim vprim,
 
         // Reconstruct qR[i] and qL[i+1]
         Reconstruction<RECON, X1DIR, GEOM> recon;
-        recon.apply(mbr, b, k, j, il - 1, iu, vprim, wl, wr);
+        recon(mbr, b, k, j, il - 1, iu, vprim, wl, wr);
         mbr.team_barrier();
+
+        // Fall back to PCM if needed
+        // the barrier is inside
+        correct_recon<FLUID_TYPE>(mbr, X1DIR, b, k, j, il - 1, iu, vprim, wl, wr);
 
         // Compute fluxes over[is, ie + 1]
         RiemannSolver<RIEMANN, FLUID_TYPE> riemann;
-        riemann.solve(eos, mbr, b, k, j, il, iu, X1DIR, wl, wr, vprim, vflux, vface);
+        riemann(eos, c, chat, mbr, b, k, j, il, iu, X1DIR, wl, wr, vprim, vflux, vface);
         mbr.team_barrier();
 
         // Scale X1-momentum flux by appropriate scale factor for coord system
@@ -150,14 +162,18 @@ TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PackPrim vprim,
 
             // Reconstruct qR[j] and qL[j+1]
             Reconstruction<RECON, X2DIR, GEOM> recon;
-            recon.apply(mbr, b, k, j, il, iu, vprim, wl_jp1, wr);
+            recon(mbr, b, k, j, il, iu, vprim, wl_jp1, wr);
             mbr.team_barrier();
+
+            // Fall back to PCM if needed
+            // the barrier is inside
+            correct_recon<FLUID_TYPE>(mbr, X2DIR, b, k, j, il, iu, vprim, wl_jp1, wr);
 
             if (j > jl) {
               // compute fluxes over [js,je+1]
               RiemannSolver<RIEMANN, FLUID_TYPE> riemann;
-              riemann.solve(eos, mbr, b, k, j, il, iu, X2DIR, wl, wr, vprim, vflux,
-                            vface);
+              riemann(eos, c, chat, mbr, b, k, j, il, iu, X2DIR, wl, wr, vprim, vflux,
+                      vface);
               mbr.team_barrier();
 
               // Scale X2-momentum flux by appropriate scale factor for coord system
@@ -192,14 +208,17 @@ TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PackPrim vprim,
 
             // Reconstruct qR[k] and qL[k+1]
             Reconstruction<RECON, X3DIR, GEOM> recon;
-            recon.apply(mbr, b, k, j, il, iu, vprim, wl_kp1, wr);
+            recon(mbr, b, k, j, il, iu, vprim, wl_kp1, wr);
             mbr.team_barrier();
+            // Fall back to PCM if needed
+            // the barrier is inside
+            correct_recon<FLUID_TYPE>(mbr, X3DIR, b, k, j, il, iu, vprim, wl_kp1, wr);
 
             // compute fluxes over [ks,ke+1]
             if (k > kl) {
               RiemannSolver<RIEMANN, FLUID_TYPE> riemann;
-              riemann.solve(eos, mbr, b, k, j, il, iu, X3DIR, wl, wr, vprim, vflux,
-                            vface);
+              riemann(eos, c, chat, mbr, b, k, j, il, iu, X3DIR, wl, wr, vprim, vflux,
+                      vface);
               mbr.team_barrier();
 
               // Scale X3-momentum flux by appropriate scale factor for coord system
@@ -246,8 +265,13 @@ TaskStatus CalculateFluxesRiemannSelect(MeshData<Real> *md, PKG &pkg, PackPrim v
   const RSolver riemann_method = pkg->template Param<RSolver>("rsolver");
 
   if (riemann_method == RSolver::hllc) {
-    return CalculateFluxesReconSelect<GEOM, FLUID_TYPE, RSolver::hllc>(md, pkg, vprim,
-                                                                       vflux, vface, pcm);
+    if constexpr (is_grey<FLUID_TYPE>()) {
+      PARTHENON_FAIL("Radiationf fluid does not support an HLLC solver");
+      return TaskStatus::complete;
+    } else {
+      return CalculateFluxesReconSelect<GEOM, FLUID_TYPE, RSolver::hllc>(
+          md, pkg, vprim, vflux, vface, pcm);
+    }
   } else if (riemann_method == RSolver::hlle) {
     return CalculateFluxesReconSelect<GEOM, FLUID_TYPE, RSolver::hlle>(md, pkg, vprim,
                                                                        vflux, vface, pcm);
@@ -318,8 +342,15 @@ TaskStatus FluxSourceImpl(MeshData<Real> *md, PKG &pkg, PackPrim vprim, PackCons
     nvar = 5;
   } else if constexpr (FLUID_TYPE == Fluid::dust) {
     nvar = 4;
+  } else if constexpr (is_grey<FLUID_TYPE>()) {
+    nvar = 5;
   }
   const int nspecies = vprim.GetMaxNumberOfVars() / nvar;
+  Real c = Null<Real>(), chat = Null<Real>();
+  if constexpr (is_grey<FLUID_TYPE>()) {
+    c = pkg->template Param<Real>("c");
+    chat = pkg->template Param<Real>("chat");
+  }
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "GeometricSourceTerms", parthenon::DevExecSpace(), 0,
       md->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s - 2, ib.e + 1,
@@ -390,11 +421,33 @@ TaskStatus FluxSourceImpl(MeshData<Real> *md, PKG &pkg, PackPrim vprim, PackCons
                                          (ax3[1] * vface_(b, TE::F3, n, k + 1, j, i) -
                                           ax3[0] * vface_(b, TE::F3, n, k, j, i));
             }
+          } else if constexpr (is_grey<FLUID_TYPE>()) {
+            const int IPR = nspecies * 4 + n;
+            vcons_(b, IMX, k, j, i) += dt_ / dx[0] *
+                                       (vprim_.flux(b, X1DIR, IPR, k, j, i) -
+                                        vprim_.flux(b, X1DIR, IPR, k, j, i + 1));
+            if (multi_d_) {
+              vcons_(b, IMY, k, j, i) += dt_ / dx[1] *
+                                         (vprim_.flux(b, X2DIR, IPR, k, j, i) -
+                                          vprim_.flux(b, X2DIR, IPR, k, j + 1, i));
+            }
+            if (three_d_) {
+              vcons_(b, IMZ, k, j, i) += dt_ / dx[2] *
+                                         (vprim_.flux(b, X3DIR, IPR, k, j, i) -
+                                          vprim_.flux(b, X3DIR, IPR, k + 1, j, i));
+            }
           }
 
           // Add coordinate source term
-          const Real &dens = vprim(b, n, k, j, i);
-          const Real rdt = dens * dt;
+          Real rdt = vprim(b, n, k, j, i) * dt;
+          const Real cfac_ = c * chat;
+          if constexpr (is_grey<FLUID_TYPE>()) {
+            const Real f2 =
+                std::sqrt(SQR(vprim(b, IVX, k, j, i)) + SQR(vprim(b, IVY, k, j, i)) +
+                          SQR(vprim(b, IVZ, k, j, i)));
+            const Real chi = Radiation::EddingtonFactor<FLUID_TYPE>(std::sqrt(f2));
+            rdt *= (3. * chi - 1.) * 0.5 * cfac_ / (f2 + Fuzz<Real>());
+          }
           if (x1dep) {
             vcons(b, IMX, k, j, i) +=
                 rdt * (dhdx1[0] * SQR(vprim(b, IVX, k, j, i) + vf[0]) +
@@ -424,8 +477,8 @@ TaskStatus FluxSourceImpl(MeshData<Real> *md, PKG &pkg, PackPrim vprim, PackCons
 //! \brief Dispatch templated function depending on runtime coordinate system.
 template <Fluid FLUID_TYPE, typename PackPrim, typename PackCons, typename PackFace,
           typename PKG>
-TaskStatus FluxSourceGeomSelect(MeshData<Real> *md, PKG &pkg, PackPrim vprim,
-                                PackCons vcons, PackFace vface, const Real dt) {
+TaskStatus FluxSource(MeshData<Real> *md, PKG &pkg, PackPrim vprim, PackCons vcons,
+                      PackFace vface, const Real dt) {
   typedef Coordinates C;
   const C sys = pkg->template Param<C>("coords");
   auto pm = md->GetParentPointer();
@@ -456,22 +509,6 @@ TaskStatus FluxSourceGeomSelect(MeshData<Real> *md, PKG &pkg, PackPrim vprim,
                                                        dt);
   } else {
     PARTHENON_FAIL("Coordinate type not recognized!");
-  }
-}
-
-//----------------------------------------------------------------------------------------
-//! \fn  TaskStatus ArtemisUtils::FluxSource
-//! \brief Dispatch templated function depending on fluid type.
-template <typename PackPrim, typename PackCons, typename PackFace, typename PKG>
-TaskStatus FluxSource(MeshData<Real> *md, PKG &pkg, PackPrim vprim, PackCons vcons,
-                      PackFace vface, const Real dt) {
-  const Fluid fluid_type = pkg->template Param<Fluid>("fluid_type");
-  if (fluid_type == Fluid::gas) {
-    return FluxSourceGeomSelect<Fluid::gas>(md, pkg, vprim, vcons, vface, dt);
-  } else if (fluid_type == Fluid::dust) {
-    return FluxSourceGeomSelect<Fluid::dust>(md, pkg, vprim, vcons, vface, dt);
-  } else {
-    PARTHENON_FAIL("Fluid type not recognized!");
   }
 }
 

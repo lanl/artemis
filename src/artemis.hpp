@@ -68,6 +68,19 @@ ARTEMIS_VARIABLE(dust.prim, density);
 ARTEMIS_VARIABLE(dust.prim, velocity);
 } // namespace prim
 } // namespace dust
+
+namespace rad {
+namespace cons {
+ARTEMIS_VARIABLE(rad.cons, energy);
+ARTEMIS_VARIABLE(rad.cons, flux);
+} // namespace cons
+namespace prim {
+ARTEMIS_VARIABLE(rad.prim, energy);
+ARTEMIS_VARIABLE(rad.prim, pressure);
+ARTEMIS_VARIABLE(rad.prim, flux);
+} // namespace prim
+} // namespace rad
+
 #undef ARTEMIS_VARIABLE
 
 #ifdef PORTABLE_RESTART
@@ -97,7 +110,7 @@ enum class Upwind { l, r, null };
 // ...Reconstrution algorithms
 enum class ReconstructionMethod { pcm, plm, ppm, null };
 // ...Fluid types
-enum class Fluid { gas, dust, null };
+enum class Fluid { gas, dust, greyP1, greyM1, null };
 // ...Boundary conditions
 enum class ArtemisBC {
   reflect,
@@ -111,6 +124,13 @@ enum class ArtemisBC {
   periodic,
   none
 };
+
+template <Fluid FLUID_TYPE>
+constexpr KOKKOS_INLINE_FUNCTION bool is_grey() {
+  return ((FLUID_TYPE == Fluid::greyM1) || (FLUID_TYPE == Fluid::greyP1));
+}
+
+enum TensIdx { X11 = 0, X22 = 1, X33 = 2, X23 = 3, X13 = 4, X12 = 5 };
 
 // Floating point limits
 template <typename T = Real>

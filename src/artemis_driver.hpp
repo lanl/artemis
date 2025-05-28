@@ -48,13 +48,16 @@ class ArtemisDriver : public EvolutionDriver {
   void PreStepTasks();
   TaskCollection StepTasks();
   TaskCollection PostStepTasks();
+  TaskCollection RadiationTasks();
+  TaskListStatus RadiationDriver();
 
  protected:
-  IntegratorPtr_t integrator, nbody_integrator;
+  IntegratorPtr_t integrator, nbody_integrator, rad_integrator;
   StateDescriptor *artemis_pkg;
   bool do_gas, do_dust, do_gravity, do_rotating_frame, do_shear, do_cooling, do_drag,
-      do_viscosity, do_nbody, do_conduction, do_diffusion, do_radiation;
+      do_viscosity, do_nbody, do_conduction, do_diffusion, do_moment, do_imc;
   const bool is_restart;
+  Real trad, dtr;
 };
 
 using TaskCollectionFnPtr = TaskCollection (*)(Mesh *pm, const Real time, const Real dt);

@@ -39,13 +39,15 @@ void PrintArtemisConfiguration(Packages_t &packages) {
     if (params.Get<bool>("do_viscosity")) msg += hfill + "Viscosity\n";
     if (params.Get<bool>("do_drag")) msg += hfill + "Drag\n";
     if (params.Get<bool>("do_nbody")) msg += hfill + "N-body\n";
-    if (params.Get<bool>("do_radiation")) msg += hfill + "IMC radiation\n";
-    printf("\n=======================================================\n");
+    if (params.Get<bool>("do_imc")) msg += hfill + "IMC radiation\n";
+    if (params.Get<bool>("do_moment")) msg += hfill + "Moment radiation\n";
+    printf("\n=====================================================\n");
     printf("  ARTEMIS\n");
     printf("    name:            %s\n", params.Get<std::string>("job_name").c_str());
     printf("    problem:         %s\n", params.Get<std::string>("pgen_name").c_str());
     printf("    coordinates:     %dD %s\n", nd,
            params.Get<std::string>("coord_sys").c_str());
+    printf("    integrator:      %s\n", params.Get<std::string>("integrator").c_str());
     printf("    MPI ranks:       %d\n", parthenon::Globals::nranks);
     printf("    dimensions:      %dx%dx%d\n", nx[0], nx[1], nx[2]);
     printf("    meshblock:       %dx%dx%d\n", nb[0], nb[1], nb[2]);

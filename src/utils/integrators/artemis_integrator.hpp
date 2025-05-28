@@ -50,24 +50,55 @@ inline TaskStatus DeepCopyConservedData(MeshData<Real> *to, MeshData<Real> *from
   return TaskStatus::complete;
 }
 
+template <typename SparsePackFlux>
+TaskStatus ZeroFluxImpl(MeshData<Real> *md, SparsePackFlux vf) {
+
+  IndexRange ib = md->GetBoundsI(IndexDomain::interior);
+  IndexRange jb = md->GetBoundsJ(IndexDomain::interior);
+  IndexRange kb = md->GetBoundsK(IndexDomain::interior);
+
+  auto pm = md->GetParentPointer();
+  const auto multi_d = (pm->ndim > 1);
+  const auto three_d = (pm->ndim > 2);
+
+  parthenon::par_for(
+      DEFAULT_LOOP_PATTERN, PARTHENON_AUTO_LABEL, parthenon::DevExecSpace(), 0,
+      md->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
+        for (int n = vf.GetLowerBound(b); n <= vf.GetUpperBound(b); ++n) {
+          vf.flux(b, X1DIR, n, k, j, i) = 0.0;
+          vf.flux(b, X2DIR, n, k, j, i) = 0.0;
+          vf.flux(b, X3DIR, n, k, j, i) = 0.0;
+
+          vf.flux(b, X1DIR, n, k, j, i + (i == ib.e)) = 0.0;
+          vf.flux(b, X2DIR, n, k, j + ((j == jb.e) && (multi_d)), i) = 0.0;
+          vf.flux(b, X3DIR, n, k + ((k == kb.e) && (three_d)), j, i) = 0.0;
+        }
+      });
+
+  return TaskStatus::complete;
+}
+
 //----------------------------------------------------------------------------------------
 //! \fn  TaskStatus ArtemisUtils::ApplyUpdate
 //! \brief
 template <Coordinates GEOM>
 TaskStatus ApplyUpdate(MeshData<Real> *u0, MeshData<Real> *u1, const int stage,
                        parthenon::LowStorageIntegrator *integrator) {
+
   using parthenon::MakePackDescriptor;
   using parthenon::variable_names::any;
   auto pm = u0->GetParentPointer();
-
   // Extract integrator weights
   const Real gam0 = integrator->gam0[stage - 1];
   const Real gam1 = integrator->gam1[stage - 1];
   const Real beta_dt = integrator->beta[stage - 1] * integrator->dt;
 
-  // Packing and indexing
-  std::vector<MetadataFlag> flags({Metadata::Conserved, Metadata::WithFluxes});
-  static auto desc = MakePackDescriptor<any>(u0, flags, {parthenon::PDOpt::WithFluxes});
+  static auto desc =
+      MakePackDescriptor<gas::cons::density, gas::cons::momentum, gas::cons::total_energy,
+                         gas::cons::internal_energy, dust::cons::density,
+                         dust::cons::momentum>(u0, {}, {parthenon::PDOpt::WithFluxes});
+
   const auto v0 = desc.GetPack(u0);
   const auto v1 = desc.GetPack(u1);
   const auto ib = u0->GetBoundsI(IndexDomain::interior);

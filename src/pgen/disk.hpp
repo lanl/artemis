@@ -41,6 +41,9 @@
 #include "utils/eos/eos.hpp"
 #include "utils/units.hpp"
 
+// jaybenne includes
+#include "jaybenne.hpp"
+
 using ArtemisUtils::EOS;
 using ArtemisUtils::VI;
 
@@ -61,8 +64,8 @@ struct DiskParams {
   Real alpha, nu0, nu_indx;
   Real mdot;
   Real temp_soft2;
-  Real kbmu;
-  bool do_dust;
+  Real kbmu, ar;
+  bool do_dust, do_moment, do_imc;
   bool nbody_temp;
   bool quiet_start;
 };
@@ -284,6 +287,10 @@ inline void InitDiskParams(MeshBlock *pmb, ParameterInput *pin) {
 
     disk_params.do_dust = params.Get<bool>("do_dust");
 
+    disk_params.do_imc = params.Get<bool>("do_imc");
+    disk_params.do_moment = params.Get<bool>("do_moment");
+    disk_params.ar = constants.GetARCode();
+
     Real q = pin->GetOrAddReal("problem", "tslope", -Big<Real>());
     Real flare = pin->GetOrAddReal("problem", "flare", -Big<Real>());
 
@@ -368,6 +375,14 @@ DiskICImpl(V1 v, const int b, const int k, const int j, const int i, V2 pco, EOS
       v(b, dust::prim::velocity(VI(n, 2)), k, j, i) = dvel3;
     }
   }
+  if (dp.do_moment) {
+    for (int n = 0; n < v.GetSize(b, rad::prim::energy()); ++n) {
+      v(b, rad::prim::energy(n), k, j, i) = dp.ar * SQR(SQR(gtemp));
+      v(b, rad::prim::flux(VI(n, 0)), k, j, i) = 0.0;
+      v(b, rad::prim::flux(VI(n, 1)), k, j, i) = 0.0;
+      v(b, rad::prim::flux(VI(n, 2)), k, j, i) = 0.0;
+    }
+  }
 }
 
 //----------------------------------------------------------------------------------------
@@ -394,8 +409,8 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   }
   static auto desc =
       MakePackDescriptor<gas::prim::density, gas::prim::velocity, gas::prim::sie,
-                         dust::prim::density, dust::prim::velocity>(
-          (pmb->resolved_packages).get());
+                         dust::prim::density, dust::prim::velocity, rad::prim::energy,
+                         rad::prim::flux>((pmb->resolved_packages).get());
   auto v = desc.GetPack(md.get());
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
@@ -416,6 +431,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
         DiskICImpl<GEOM>(v, 0, k, j, i, pco, eos_d, dp, particles, npart);
       });
+  if (dp.do_imc) jaybenne::InitializeRadiation(md.get(), true);
 }
 
 //----------------------------------------------------------------------------------------
@@ -435,16 +451,16 @@ void DiskBoundaryVisc(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) {
   auto disk_params = artemis_pkg->Param<DiskParams>("disk_params");
 
   const bool do_dust = artemis_pkg->Param<bool>("do_dust");
+  const bool do_rad = artemis_pkg->Param<bool>("do_moment");
 
   auto &gas_pkg = pmb->packages.Get("gas");
   auto eos_d = gas_pkg->template Param<EOS>("eos_d");
 
   const bool fine = false;
 
-  static auto descriptors =
-      ArtemisUtils::GetBoundaryPackDescriptorMap<gas::prim::density, gas::prim::velocity,
-                                                 gas::prim::sie, dust::prim::density,
-                                                 dust::prim::velocity>(mbd);
+  static auto descriptors = ArtemisUtils::GetBoundaryPackDescriptorMap<
+      gas::prim::density, gas::prim::velocity, gas::prim::sie, dust::prim::density,
+      dust::prim::velocity, rad::prim::energy, rad::prim::flux>(mbd);
 
   auto v = descriptors[coarse].GetPack(mbd.get());
 
@@ -594,6 +610,18 @@ void DiskBoundaryVisc(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) {
             v(0, dust::prim::velocity(VI(n, ix3)), k, j, i) = dvel[ix3];
           }
         }
+        if (do_rad) {
+          for (int n = 0; n < v.GetSize(0, rad::prim::energy()); ++n) {
+            v(0, rad::prim::energy(n), k, j, i) =
+                v(0, rad::prim::energy(n), ia[0], ia[1], ia[2]);
+            v(0, rad::prim::flux(VI(n, ix1)), k, j, i) =
+                v(0, rad::prim::flux(VI(n, ix1)), ia[0], ia[1], ia[2]);
+            v(0, rad::prim::flux(VI(n, ix2)), k, j, i) =
+                v(0, rad::prim::flux(VI(n, ix2)), ia[0], ia[1], ia[2]);
+            v(0, rad::prim::flux(VI(n, ix3)), k, j, i) =
+                v(0, rad::prim::flux(VI(n, ix3)), ia[0], ia[1], ia[2]);
+          }
+        }
       });
 }
 
@@ -610,10 +638,9 @@ void DiskBoundaryIC(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) {
   auto &gas_pkg = pmb->packages.Get("gas");
   auto eos_d = gas_pkg->template Param<EOS>("eos_d");
 
-  static auto descriptors =
-      ArtemisUtils::GetBoundaryPackDescriptorMap<gas::prim::density, gas::prim::velocity,
-                                                 gas::prim::sie, dust::prim::density,
-                                                 dust::prim::velocity>(mbd);
+  static auto descriptors = ArtemisUtils::GetBoundaryPackDescriptorMap<
+      gas::prim::density, gas::prim::velocity, gas::prim::sie, dust::prim::density,
+      dust::prim::velocity, rad::prim::energy, rad::prim::flux>(mbd);
 
   auto v = descriptors[coarse].GetPack(mbd.get());
 
@@ -649,6 +676,7 @@ void DiskBoundaryExtrap(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) 
   // Extract artemis parameters
   auto artemis_pkg = pmb->packages.Get("artemis");
   const bool do_dust = artemis_pkg->Param<bool>("do_dust");
+  const bool do_rad = artemis_pkg->Param<bool>("do_moment");
 
   // Extract gas parameters
   auto &gas_pkg = pmb->packages.Get("gas");
@@ -658,10 +686,9 @@ void DiskBoundaryExtrap(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) 
   auto &dp = disk_params;
 
   // Packing
-  static auto descriptors =
-      ArtemisUtils::GetBoundaryPackDescriptorMap<gas::prim::density, gas::prim::velocity,
-                                                 gas::prim::sie, dust::prim::density,
-                                                 dust::prim::velocity>(mbd);
+  static auto descriptors = ArtemisUtils::GetBoundaryPackDescriptorMap<
+      gas::prim::density, gas::prim::velocity, gas::prim::sie, dust::prim::density,
+      dust::prim::velocity, rad::prim::energy, rad::prim::flux>(mbd);
 
   auto v = descriptors[coarse].GetPack(mbd.get());
 
@@ -815,6 +842,18 @@ void DiskBoundaryExtrap(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) 
             v(0, dust::prim::velocity(VI(n, ix1)), k, j, i) = dvel[ix1];
             v(0, dust::prim::velocity(VI(n, ix2)), k, j, i) = dvel[ix2];
             v(0, dust::prim::velocity(VI(n, ix3)), k, j, i) = dvel[ix3];
+          }
+        }
+        if (do_rad) {
+          for (int n = 0; n < v.GetSize(0, rad::prim::energy()); ++n) {
+            v(0, rad::prim::energy(n), k, j, i) =
+                v(0, rad::prim::energy(n), ia[0], ia[1], ia[2]);
+            v(0, rad::prim::flux(VI(n, ix1)), k, j, i) =
+                v(0, rad::prim::flux(VI(n, ix1)), ia[0], ia[1], ia[2]);
+            v(0, rad::prim::flux(VI(n, ix2)), k, j, i) =
+                v(0, rad::prim::flux(VI(n, ix2)), ia[0], ia[1], ia[2]);
+            v(0, rad::prim::flux(VI(n, ix3)), k, j, i) =
+                v(0, rad::prim::flux(VI(n, ix3)), ia[0], ia[1], ia[2]);
           }
         }
       });

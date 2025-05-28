@@ -21,6 +21,7 @@
 #include "geometry/geometry.hpp"
 #include "gravity/gravity.hpp"
 #include "nbody/nbody.hpp"
+#include "radiation/moment/radiation.hpp"
 #include "rotating_frame/rotating_frame.hpp"
 #include "utils/artemis_utils.hpp"
 #include "utils/history.hpp"
@@ -44,6 +45,7 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   // Store selected pgen name
   artemis->AddParam("pgen_name", pin->GetString("artemis", "problem"));
   artemis->AddParam("job_name", pin->GetString("parthenon/job", "problem_id"));
+  artemis->AddParam("integrator", pin->GetString("parthenon/time", "integrator"));
   std::array<int, 3> nx{pin->GetInteger("parthenon/mesh", "nx1"),
                         pin->GetInteger("parthenon/mesh", "nx2"),
                         pin->GetInteger("parthenon/mesh", "nx3")};
@@ -70,6 +72,14 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   const bool do_viscosity = pin->GetOrAddBoolean("physics", "viscosity", false);
   const bool do_conduction = pin->GetOrAddBoolean("physics", "conduction", false);
   const bool do_radiation = pin->GetOrAddBoolean("physics", "radiation", false);
+  // Check if we are using IMC or moment based radiation
+  // This maybe is not great if user doesn't comment out unused node...
+  const bool do_imc = do_radiation && pin->DoesBlockExist("radiation/imc");
+  const bool do_moment = do_radiation && pin->DoesBlockExist("radiation/moment");
+  PARTHENON_REQUIRE(
+      !(do_imc && do_moment),
+      "You cannot have both a <radiation/imc> block and a <radiation/moment> block");
+
   artemis->AddParam("do_gas", do_gas);
   artemis->AddParam("do_dust", do_dust);
   artemis->AddParam("do_gravity", do_gravity);
@@ -81,6 +91,8 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   artemis->AddParam("do_conduction", do_conduction);
   artemis->AddParam("do_diffusion", do_conduction || do_viscosity);
   artemis->AddParam("do_radiation", do_radiation);
+  artemis->AddParam("do_imc", do_imc);
+  artemis->AddParam("do_moment", do_moment);
   PARTHENON_REQUIRE(!(do_cooling) || (do_cooling && do_gas),
                     "Cooling requires the gas package, but there is not gas!");
   PARTHENON_REQUIRE(!(do_viscosity) || (do_viscosity && do_gas),
@@ -106,12 +118,20 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   if (do_cooling) packages.Add(Gas::Cooling::Initialize(pin.get()));
   if (do_drag) packages.Add(Drag::Initialize(pin.get()));
   if (do_radiation) {
-    auto eos_h = packages.Get("gas")->Param<EOS>("eos_h");
-    auto opacity_h = packages.Get("gas")->Param<MeanOpacity>("opacity_h");
-    auto scattering_h = packages.Get("gas")->Param<MeanScattering>("scattering_h");
-    packages.Add(jaybenne::Initialize(pin.get(), opacity_h, scattering_h, eos_h));
-    PARTHENON_REQUIRE(coords == Coordinates::cartesian,
-                      "Jaybenne currently supports only Cartesian coordinates!");
+    // swap between native artemis radiation and jaybenne imc
+    if (do_imc) {
+      auto eos_h = packages.Get("gas")->Param<EOS>("eos_h");
+      auto opacity_h = packages.Get("gas")->Param<MeanOpacity>("opacity_h");
+      auto scattering_h = packages.Get("gas")->Param<MeanScattering>("scattering_h");
+      packages.Add(jaybenne::Initialize(pin.get(), opacity_h, scattering_h, eos_h,
+                                        "radiation/imc"));
+      PARTHENON_REQUIRE(coords == Coordinates::cartesian,
+                        "Jaybenne currently supports only Cartesian coordinates!");
+    } else if (do_moment) {
+      packages.Add(Radiation::Initialize(pin.get(), constants));
+    } else {
+      PARTHENON_FAIL("Unknown radiation model!");
+    }
   }
 
   // Assign geometry-specific FillDerived functions

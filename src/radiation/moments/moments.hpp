@@ -45,25 +45,32 @@ static TaskCollection MomentsTasks(Mesh *pmesh, const SimTime &tm,
   const auto any = parthenon::BoundaryType::any;
   const int num_partitions = pmesh->DefaultNumPartitions();
 
-  // Deep copy u0m into u1m for integrator logic
+  // Deep copy u0c into u1c for integrator logic
   auto &init_region = tc.AddRegion(num_partitions);
   for (int i = 0; i < num_partitions; i++) {
     auto &tl = init_region[i];
     auto &u0m = pmesh->mesh_data.GetOrAdd("u0m", i);
     auto &u1m = pmesh->mesh_data.GetOrAdd("u1m", i);
     tl.AddTask(none, ArtemisUtils::DeepCopyConservedData, u1m.get(), u0m.get());
+    auto &u0 = pmesh->mesh_data.GetOrAdd("u0", i);
+    auto &u1 = pmesh->mesh_data.GetOrAdd("u1", i);
+    tl.AddTask(none, ArtemisUtils::DeepCopyConservedData, u1.get(), u0.get());
   }
 
   // Now do explicit subcycling of radiation moment physics
   for (int stage = 1; stage <= integrator->nstages; stage++) {
+    const Real g0 = integrator->gam0[stage - 1];
+    const Real g1 = integrator->gam1[stage - 1];
     const Real bdt = integrator->beta[stage - 1] * integrator->dt;
 
     TaskRegion &tr = tc.AddRegion(num_partitions);
     for (int i = 0; i < num_partitions; i++) {
       auto &tl = tr[i];
-      auto &u0c = pmesh->mesh_data.GetOrAdd("u0c", i);
+      auto &u0 = pmesh->mesh_data.GetOrAdd("u0", i);
+      auto &u1 = pmesh->mesh_data.GetOrAdd("u1", i);
       auto &u0m = pmesh->mesh_data.GetOrAdd("u0m", i);
       auto &u1m = pmesh->mesh_data.GetOrAdd("u1m", i);
+      auto &u0c = pmesh->mesh_data.GetOrAdd("u0c", i);
 
       // Start looking for incoming messages (including for flux correction)
       auto start_recv = tl.AddTask(none, parthenon::StartReceiveBoundBufs<any>, u0c);
@@ -78,12 +85,15 @@ static TaskCollection MomentsTasks(Mesh *pmesh, const SimTime &tm,
       auto recv_flx = tl.AddTask(start_flx_recv, parthenon::ReceiveFluxCorrections, u0m);
       auto set_flx = tl.AddTask(recv_flx, parthenon::SetFluxCorrections, u0m);
 
-      // Apply flux divergence
-      auto update = tl.AddTask(rad_flx | set_flx, ArtemisUtils::ApplyUpdate<GEOM>,
-                               u0m.get(), u1m.get(), stage, integrator);
+      // Apply RK logic (and potentially flux divergence) operator to fields
+      auto rupdate = tl.AddTask(rad_flx | set_flx, ArtemisUtils::ApplyUpdate<GEOM>,
+                                u0m.get(), u1m.get(), g0, g1, bdt);
+      auto cupdate = tl.AddTask(none, ArtemisUtils::ApplyUpdate<GEOM>, u0.get(), u1.get(),
+                                g0, g1, 0.0);
 
       // Apply "coordinate source terms"
-      auto coord_src = tl.AddTask(update, Radiation::FluxSource, u0m.get(), bdt);
+      auto coord_src =
+          tl.AddTask(rupdate | cupdate, Radiation::FluxSource, u0m.get(), bdt);
 
       // Apply matter-coupling step
       auto coupling =

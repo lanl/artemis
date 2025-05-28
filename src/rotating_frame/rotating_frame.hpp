@@ -253,7 +253,7 @@ static TaskStatus UpwindAdvection(MeshData<Real> *u0, MeshData<Real> *u1, const 
 
 //----------------------------------------------------------------------------------------
 //! \fn  TaskCollection LinearAdvectionStep
-static TaskCollection LinearAdvectionStep(Mesh *pmesh, const Real time, const Real dt,
+static TaskCollection LinearAdvectionStep(Mesh *pmesh, const SimTime &tm,
                                           parthenon::LowStorageIntegrator *integrator) {
   TaskCollection tc;
   if (!(pmesh->ndim >= 2)) return tc;
@@ -298,9 +298,9 @@ static TaskCollection LinearAdvectionStep(Mesh *pmesh, const Real time, const Re
 //----------------------------------------------------------------------------------------
 //! \fn TaskListStatus RotatingFrame::Advect
 //! \brief Executes linear advection term for orbital advection
-static TaskListStatus Advect(Mesh *pmesh, const Real time, const Real dt,
+static TaskListStatus Advect(Mesh *pmesh, const SimTime &tm,
                              parthenon::LowStorageIntegrator *integrator) {
-  return LinearAdvectionStep(pmesh, time, dt, integrator).Execute();
+  return LinearAdvectionStep(pmesh, tm, integrator).Execute();
 }
 
 } // namespace RotatingFrame

@@ -54,16 +54,11 @@ inline TaskStatus DeepCopyConservedData(MeshData<Real> *to, MeshData<Real> *from
 //! \fn  TaskStatus ArtemisUtils::ApplyUpdate
 //! \brief
 template <Coordinates GEOM>
-TaskStatus ApplyUpdate(MeshData<Real> *u0, MeshData<Real> *u1, const int stage,
-                       parthenon::LowStorageIntegrator *integrator) {
+TaskStatus ApplyUpdate(MeshData<Real> *u0, MeshData<Real> *u1, const Real g0,
+                       const Real g1, const Real beta_dt) {
   using parthenon::MakePackDescriptor;
   using parthenon::variable_names::any;
   auto pm = u0->GetParentPointer();
-
-  // Extract integrator weights
-  const Real g0 = integrator->gam0[stage - 1];
-  const Real g1 = integrator->gam1[stage - 1];
-  const Real beta_dt = integrator->beta[stage - 1] * integrator->dt;
 
   // Packing and indexing
   std::vector<MetadataFlag> flags({Metadata::Conserved, Metadata::WithFluxes});

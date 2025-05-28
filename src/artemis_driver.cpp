@@ -120,7 +120,7 @@ TaskListStatus ArtemisDriver<GEOM>::Step() {
   if (status != TaskListStatus::complete) return status;
 
   // Operator split, background linear advection (for shearing box)
-  if (do_shear) status = RotatingFrame::Advect(pmesh, tm.time, tm.dt, integrator.get());
+  if (do_shear) status = RotatingFrame::Advect(pmesh, tm, integrator.get());
   if (status != TaskListStatus::complete) return status;
 
   // Operator split, IMC/DDMC radiation with Jaybenne
@@ -202,6 +202,8 @@ TaskCollection ArtemisDriver<GEOM>::StepTasks() {
   // Now do explicit integration of unsplit physics
   for (int stage = 1; stage <= integrator->nstages; stage++) {
     const Real time = tm.time;
+    const Real g0 = integrator->gam0[stage - 1];
+    const Real g1 = integrator->gam1[stage - 1];
     const Real bdt = integrator->beta[stage - 1] * integrator->dt;
 
     TaskRegion &tr = tc.AddRegion(num_partitions);
@@ -241,7 +243,7 @@ TaskCollection ArtemisDriver<GEOM>::StepTasks() {
       // Apply flux divergence
       auto update =
           tl.AddTask(gas_flx | dust_flx | set_flx, ArtemisUtils::ApplyUpdate<GEOM>,
-                     u0.get(), u1.get(), stage, integrator.get());
+                     u0.get(), u1.get(), g0, g1, bdt);
 
       // Apply "coordinate source terms"
       TaskID gas_coord_src = update, dust_coord_src = update;

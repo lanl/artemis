@@ -364,7 +364,7 @@ TaskStatus FluxSourceImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, CONS vcons, FAC
                                     (vp_.flux(b, d3, IPR, k, j, i) +
                                      vp_.flux(b, d3, IPR, k + three_d, j, i)) *
                                     (ax3[0] * vface_(b, f3, n, k, j, i) -
-                                     ax3[1] * vface_(b, f3, n, k + three_d, j, i))
+                                     ax3[1] * vface_(b, f3, n, k + three_d, j, i));
             // clang-format on
           }
 
@@ -380,7 +380,7 @@ TaskStatus FluxSourceImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, CONS vcons, FAC
               const Real &fz = vp_(b, IVZ, k, j, i);
               const Real ff = std::sqrt(SQR(fx) + SQR(fy) + SQR(fz));
               const Real chi = Radiation::EddingtonFactor<C>(ff);
-              wdt *= (3.0 * chi - 1.0) * hcchat_ / (f2 + Fuzz<Real>());
+              wdt *= (3.0 * chi - 1.0) * hcchat_ / (ff + Fuzz<Real>());
             }
 
             // Update momenta

@@ -41,7 +41,6 @@ correct_recon(parthenon::team_mbr_t const &member, const int dir, const int b,
   constexpr int nvar = 5;
   const int nspecies = q.GetMaxNumberOfVars() / nvar;
   for (int n = 0; n < nspecies; ++n) {
-    const int IER = n;
     const int IFX = nspecies + (n * 3) + ((dir - 1));
     const int IFY = nspecies + (n * 3) + ((dir - 1) + 1) % 3;
     const int IFZ = nspecies + (n * 3) + ((dir - 1) + 2) % 3;

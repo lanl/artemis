@@ -1,5 +1,5 @@
 //========================================================================================
-// (C) (or copyright) 2023-2024. Triad National Security, LLC. All rights reserved.
+// (C) (or copyright) 2023-2025. Triad National Security, LLC. All rights reserved.
 //
 // This program was produced under U.S. Government contract 89233218CNA000001 for Los
 // Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -18,7 +18,7 @@
 #include "artemis.hpp"
 #include "geometry/geometry.hpp"
 #include "matter_coupling.hpp"
-#include "radiation.hpp"
+#include "moments.hpp"
 #include "utils/artemis_utils.hpp"
 #include "utils/fluxes/fluid_fluxes.hpp"
 #include "utils/history.hpp"
@@ -37,15 +37,19 @@ namespace Radiation {
 //! \brief Adds intialization function for radiation hydrodynamics package
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
                                             ArtemisUtils::Constants &constants) {
-  auto radiation = std::make_shared<StateDescriptor>("radiation");
+  auto radiation = std::make_shared<StateDescriptor>("moments");
   Params &params = radiation->AllParams();
 
-  // Fluid behavior for this package
+  // Metadata flags
+  auto MetadataMoments = radiation->GetMetadataFlag();
+  auto MetadataOperatorSplit = Metadata::GetUserFlag("OperatorSplit");
+
+  // Closure type
   auto closure = pin->GetOrAddString("radiation/moment", "closure", "m1");
   if (closure == "m1") {
-    params.Add("fluid_type", Fluid::greyM1);
+    params.Add("closure_type", Closure::m1);
   } else if (closure == "p1") {
-    params.Add("fluid_type", Fluid::greyP1);
+    params.Add("closure_type", Closure::p1);
   } else {
     PARTHENON_FAIL("Invalid radiation closure");
   }
@@ -129,6 +133,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   params.Add("inner_iteration_tol",
              pin->GetOrAddReal("radiation/moment", "inner_iteration_tol", 1e-10));
 
+  // Number of radiation "species" (i.e., groups)
   std::vector<int> fluidids;
   for (int n = 0; n < nspecies; ++n)
     fluidids.push_back(n);
@@ -140,52 +145,47 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   // Control field for sparse radiation fields
   std::string control_field = rad::cons::energy::name();
 
-  // Conserved Energy density
+  // Conserved Energy Density
   Metadata m = Metadata({Metadata::Cell, Metadata::Conserved, Metadata::Independent,
-                         Metadata::WithFluxes, Metadata::Sparse});
+                         Metadata::WithFluxes, Metadata::Sparse, MetadataMoments,
+                         MetadataOperatorSplit});
   ArtemisUtils::EnrollArtemisRefinementOps(m, coords);
   m.SetSparseThresholds(0.0, 0.0, 0.0);
   radiation->AddSparsePool<rad::cons::energy>(m, control_field, fluidids);
 
   // Conserved Flux
   m = Metadata({Metadata::Cell, Metadata::Vector, Metadata::Conserved,
-                Metadata::Independent, Metadata::WithFluxes, Metadata::Sparse},
+                Metadata::Independent, Metadata::WithFluxes, Metadata::Sparse,
+                MetadataMoments, MetadataOperatorSplit},
                std::vector<int>({3}));
   ArtemisUtils::EnrollArtemisRefinementOps(m, coords);
   m.SetSparseThresholds(0.0, 0.0, 0.0);
   radiation->AddSparsePool<rad::cons::flux>(m, control_field, fluidids);
 
-  // Primitive Energy density
+  // Primitive Energy Density
   m = Metadata({Metadata::Cell, Metadata::Derived, Metadata::Intensive, Metadata::OneCopy,
-                Metadata::FillGhost, Metadata::Sparse});
+                Metadata::FillGhost, Metadata::Sparse, MetadataMoments,
+                MetadataOperatorSplit});
   ArtemisUtils::EnrollArtemisRefinementOps(m, coords);
   m.SetSparseThresholds(0.0, 0.0, 0.0);
   radiation->AddSparsePool<rad::prim::energy>(m, control_field, fluidids);
 
   // Primitive Pressure (and associated Riemann pressures)
   m = Metadata({Metadata::Cell, Metadata::Derived, Metadata::Intensive, Metadata::OneCopy,
-                Metadata::WithFluxes, Metadata::Sparse});
+                Metadata::WithFluxes, Metadata::Sparse, MetadataMoments,
+                MetadataOperatorSplit});
   ArtemisUtils::EnrollArtemisRefinementOps(m, coords);
   m.SetSparseThresholds(0.0, 0.0, 0.0);
   radiation->AddSparsePool<rad::prim::pressure>(m, control_field, fluidids);
 
-  // Primitive reduced flux
+  // Primitive Reduced Flux
   m = Metadata({Metadata::Cell, Metadata::Vector, Metadata::Derived, Metadata::Intensive,
-                Metadata::OneCopy, Metadata::FillGhost, Metadata::Sparse},
+                Metadata::OneCopy, Metadata::FillGhost, Metadata::Sparse, MetadataMoments,
+                MetadataOperatorSplit},
                std::vector<int>({3}));
   ArtemisUtils::EnrollArtemisRefinementOps(m, coords);
   m.SetSparseThresholds(0.0, 0.0, 0.0);
   radiation->AddSparsePool<rad::prim::flux>(m, control_field, fluidids);
-
-  // Eddington Tensor
-  // NOTE(AMD): If/when we add something like VET, then uncomment this
-  // m = Metadata({Metadata::Cell, Metadata::Derived, Metadata::Intensive,
-  // Metadata::OneCopy,
-  //              Metadata::FillGhost, Metadata::Sparse},
-  //             std::vector<int>({6}));
-  // ArtemisUtils::EnrollArtemisRefinementOps(m, coords);
-  // m.SetSparseThresholds(0.0, 0.0, 0.0);
-  // radiation->AddSparsePool<rad::prim::fedd>(m, control_field, fluidids);
 
   // Radiation refinement criterion
   const std::string refine_field =
@@ -211,48 +211,48 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
       const Real thr = pin->GetReal("radiation/moment", "refine_thr");
       params.Add("refine_thr", thr);
       // Geometry specific refinement criteria
-      typedef Coordinates C;
+      typedef Coordinates G;
       typedef rad::prim::energy pdens;
       typedef rad::prim::pressure ppres;
       // Cartesian
-      if (coords == C::cartesian) {
+      if (coords == G::cartesian) {
         if (ref_dens) {
-          radiation->CheckRefinementBlock = ScalarFirstDerivative<pdens, C::cartesian>;
+          radiation->CheckRefinementBlock = ScalarFirstDerivative<pdens, G::cartesian>;
         } else if (ref_pres) {
-          radiation->CheckRefinementBlock = ScalarFirstDerivative<ppres, C::cartesian>;
+          radiation->CheckRefinementBlock = ScalarFirstDerivative<ppres, G::cartesian>;
         }
         // Spherical
-      } else if (coords == C::spherical1D) {
+      } else if (coords == G::spherical1D) {
         if (ref_dens) {
-          radiation->CheckRefinementBlock = ScalarFirstDerivative<pdens, C::spherical1D>;
+          radiation->CheckRefinementBlock = ScalarFirstDerivative<pdens, G::spherical1D>;
         } else if (ref_pres) {
-          radiation->CheckRefinementBlock = ScalarFirstDerivative<ppres, C::spherical1D>;
+          radiation->CheckRefinementBlock = ScalarFirstDerivative<ppres, G::spherical1D>;
         }
-      } else if (coords == C::spherical2D) {
+      } else if (coords == G::spherical2D) {
         if (ref_dens) {
-          radiation->CheckRefinementBlock = ScalarFirstDerivative<pdens, C::spherical2D>;
+          radiation->CheckRefinementBlock = ScalarFirstDerivative<pdens, G::spherical2D>;
         } else if (ref_pres) {
-          radiation->CheckRefinementBlock = ScalarFirstDerivative<ppres, C::spherical2D>;
+          radiation->CheckRefinementBlock = ScalarFirstDerivative<ppres, G::spherical2D>;
         }
-      } else if (coords == C::spherical3D) {
+      } else if (coords == G::spherical3D) {
         if (ref_dens) {
-          radiation->CheckRefinementBlock = ScalarFirstDerivative<pdens, C::spherical3D>;
+          radiation->CheckRefinementBlock = ScalarFirstDerivative<pdens, G::spherical3D>;
         } else if (ref_pres) {
-          radiation->CheckRefinementBlock = ScalarFirstDerivative<ppres, C::spherical3D>;
+          radiation->CheckRefinementBlock = ScalarFirstDerivative<ppres, G::spherical3D>;
         }
         // Cylindrical
-      } else if (coords == C::cylindrical) {
+      } else if (coords == G::cylindrical) {
         if (ref_dens) {
-          radiation->CheckRefinementBlock = ScalarFirstDerivative<pdens, C::cylindrical>;
+          radiation->CheckRefinementBlock = ScalarFirstDerivative<pdens, G::cylindrical>;
         } else if (ref_pres) {
-          radiation->CheckRefinementBlock = ScalarFirstDerivative<ppres, C::cylindrical>;
+          radiation->CheckRefinementBlock = ScalarFirstDerivative<ppres, G::cylindrical>;
         }
         // Axisymmetric
-      } else if (coords == C::axisymmetric) {
+      } else if (coords == G::axisymmetric) {
         if (ref_dens) {
-          radiation->CheckRefinementBlock = ScalarFirstDerivative<pdens, C::axisymmetric>;
+          radiation->CheckRefinementBlock = ScalarFirstDerivative<pdens, G::axisymmetric>;
         } else if (ref_pres) {
-          radiation->CheckRefinementBlock = ScalarFirstDerivative<ppres, C::axisymmetric>;
+          radiation->CheckRefinementBlock = ScalarFirstDerivative<ppres, G::axisymmetric>;
         }
       }
     } else if (ref_mag) {
@@ -278,9 +278,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
 TaskStatus CalculateFluxes(MeshData<Real> *md) {
   auto pm = md->GetParentPointer();
   auto &resolved_pkgs = pm->resolved_packages;
+  auto &pkg = pm->packages.Get("moments");
 
-  auto &pkg = pm->packages.Get("radiation");
-
+  // Packing
   static auto desc_prim =
       parthenon::MakePackDescriptor<rad::prim::energy, rad::prim::flux,
                                     rad::prim::pressure>(resolved_pkgs.get(), {},
@@ -292,13 +292,14 @@ TaskStatus CalculateFluxes(MeshData<Real> *md) {
   auto vflux = desc_flux.GetPack(md);
   SparsePack vface;
 
-  auto fluid_type = pkg->Param<Fluid>("fluid_type");
-  if (fluid_type == Fluid::greyM1) {
-    return ArtemisUtils::CalculateFluxes<Fluid::greyM1>(md, pkg, vprim, vflux, vface,
-                                                        false);
-  } else if (fluid_type == Fluid::greyP1) {
-    return ArtemisUtils::CalculateFluxes<Fluid::greyP1>(md, pkg, vprim, vflux, vface,
-                                                        false);
+  // Call CalculateFluxes with appropriate Fluid and Closure type
+  auto closure_type = pkg->Param<Closure>("closure_type");
+  if (closure_type == Closure::m1) {
+    return ArtemisUtils::CalculateFluxes<Fluid::radiation, Closure::m1>(
+        md, pkg, vprim, vflux, vface, false);
+  } else if (closure_type == Closure::p1) {
+    return ArtemisUtils::CalculateFluxes<Fluid::radiation, Closure::p1>(
+        md, pkg, vprim, vflux, vface, false);
   }
   return TaskStatus::complete;
 }
@@ -309,9 +310,9 @@ TaskStatus CalculateFluxes(MeshData<Real> *md) {
 TaskStatus FluxSource(MeshData<Real> *md, const Real dt) {
   auto pm = md->GetParentPointer();
   auto &resolved_pkgs = pm->resolved_packages;
+  auto &pkg = pm->packages.Get("moments");
 
-  auto &pkg = pm->packages.Get("radiation");
-
+  // Packing
   static auto desc_prim =
       parthenon::MakePackDescriptor<rad::prim::energy, rad::prim::flux,
                                     rad::prim::pressure>(resolved_pkgs.get(), {},
@@ -322,137 +323,61 @@ TaskStatus FluxSource(MeshData<Real> *md, const Real dt) {
   auto vcons = desc_cons.GetPack(md);
   SparsePack vface;
 
-  auto fluid_type = pkg->Param<Fluid>("fluid_type");
-  if (fluid_type == Fluid::greyM1) {
-    return ArtemisUtils::FluxSource<Fluid::greyM1>(md, pkg, vprim, vcons, vface, dt);
-  } else if (fluid_type == Fluid::greyP1) {
-    return ArtemisUtils::FluxSource<Fluid::greyP1>(md, pkg, vprim, vcons, vface, dt);
+  // Call FluxSource with appropriate Fluid and Closure type
+  auto closure_type = pkg->Param<Closure>("closure_type");
+  if (closure_type == Closure::m1) {
+    return ArtemisUtils::FluxSource<Fluid::radiation, Closure::m1>(md, pkg, vprim, vcons,
+                                                                   vface, dt);
+  } else if (closure_type == Closure::p1) {
+    return ArtemisUtils::FluxSource<Fluid::radiation, Closure::p1>(md, pkg, vprim, vcons,
+                                                                   vface, dt);
   }
   return TaskStatus::complete;
 }
 
 //----------------------------------------------------------------------------------------
-//! \fn  TaskStatus Radiation::ApplyUpdate
+//! \fn  TaskStatus MatterCoupling
 //! \brief
-template <Coordinates GEOM>
-TaskStatus ApplyUpdate(MeshData<Real> *u0, MeshData<Real> *u1, const int stage,
-                       const Real gam0, const Real gam1, const Real beta_dt) {
-  using parthenon::MakePackDescriptor;
-  using parthenon::variable_names::any;
-  auto pm = u0->GetParentPointer();
-  auto &resolved_pkgs = pm->resolved_packages;
-  // Packing and indexing
-  static auto desc =
-      parthenon::MakePackDescriptor<rad::cons::energy, rad::cons::flux,
-                                    gas::cons::momentum, gas::cons::total_energy,
-                                    gas::cons::internal_energy>(
-          resolved_pkgs.get(), {}, {parthenon::PDOpt::WithFluxes});
-
-  const auto v0 = desc.GetPack(u0);
-  const auto v1 = desc.GetPack(u1);
-  const auto ib = u0->GetBoundsI(IndexDomain::interior);
-  const auto jb = u0->GetBoundsJ(IndexDomain::interior);
-  const auto kb = u0->GetBoundsK(IndexDomain::interior);
-  const bool multi_d = (pm->ndim > 1);
-  const bool three_d = (pm->ndim > 2);
-
-  parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "ApplyUpdate", parthenon::DevExecSpace(), 0,
-      u0->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
-      KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
-        // Extract coordinates
-        using parthenon::TopologicalElement;
-        geometry::Coords<GEOM> coords(v0.GetCoordinates(b), k, j, i);
-
-        const auto ax1 = coords.GetFaceAreaX1();
-        const auto ax2 = (multi_d) ? coords.GetFaceAreaX2() : NewArray<Real, 2>(0.0);
-        const auto ax3 = (three_d) ? coords.GetFaceAreaX3() : NewArray<Real, 2>(0.0);
-
-        const Real vol = coords.Volume();
-
-        for (int n = v0.GetLowerBound(b); n <= v0.GetUpperBound(b); ++n) {
-          // compute flux divergence
-          Real divf = (ax1[0] * v0.flux(b, X1DIR, n, k, j, i) -
-                       ax1[1] * v0.flux(b, X1DIR, n, k, j, i + 1));
-          if (multi_d)
-            divf += (ax2[0] * v0.flux(b, X2DIR, n, k, j, i) -
-                     ax2[1] * v0.flux(b, X2DIR, n, k, j + 1, i));
-          if (three_d)
-            divf += (ax3[0] * v0.flux(b, X3DIR, n, k, j, i) -
-                     ax3[1] * v0.flux(b, X3DIR, n, k + 1, j, i));
-          // Apply update
-          v0(b, n, k, j, i) =
-              gam0 * v0(b, n, k, j, i) + gam1 * v1(b, n, k, j, i) + divf * beta_dt / vol;
-        }
-      });
-  return TaskStatus::complete;
-}
-
 template <Coordinates GEOM>
 TaskStatus MatterCoupling(MeshData<Real> *u0, const Real dt) {
   auto pm = u0->GetParentPointer();
   auto &artemis_pkg = pm->packages.Get("artemis");
 
+  // Immediately exit if not evolving gas
   const bool do_gas = artemis_pkg->template Param<bool>("do_gas");
-  if (not do_gas) return TaskStatus::complete;
+  if (!(do_gas)) return TaskStatus::complete;
 
-  auto &radiation_pkg = pm->packages.Get("radiation");
-  auto fluid_type = radiation_pkg->template Param<Fluid>("fluid_type");
+  // Extract moments package and params
+  auto &radiation_pkg = pm->packages.Get("moments");
+  auto closure_type = radiation_pkg->template Param<Closure>("closure_type");
   auto full_coupling = radiation_pkg->template Param<bool>("full_coupling");
 
-  if (fluid_type == Fluid::greyM1) {
+  // Call MatterCoupling with appropriate GEOM, Fluid, and Closure type given coupling
+  if (closure_type == Closure::m1) {
     if (full_coupling) {
-      return MatterCouplingFullSingleImpl<GEOM, Fluid::greyM1>(u0, dt);
+      return MatterCouplingFullSingleImpl<GEOM, Closure::m1>(u0, dt);
     } else {
-      return MatterCouplingSimpleImpl<GEOM, Fluid::greyM1>(u0, dt);
+      return MatterCouplingSimpleImpl<GEOM, Closure::m1>(u0, dt);
     }
-  } else if (fluid_type == Fluid::greyP1) {
+  } else if (closure_type == Closure::p1) {
     if (full_coupling) {
-      return MatterCouplingFullSingleImpl<GEOM, Fluid::greyP1>(u0, dt);
+      return MatterCouplingFullSingleImpl<GEOM, Closure::p1>(u0, dt);
     } else {
-      return MatterCouplingSimpleImpl<GEOM, Fluid::greyP1>(u0, dt);
+      return MatterCouplingSimpleImpl<GEOM, Closure::p1>(u0, dt);
     }
   }
   return TaskStatus::complete;
 }
 
-template TaskStatus ApplyUpdate<Coordinates::cartesian>(MeshData<Real> *u0,
-                                                        MeshData<Real> *u1,
-                                                        const int stage, const Real gam0,
-                                                        const Real gam1,
-                                                        const Real beta_dt);
-template TaskStatus
-ApplyUpdate<Coordinates::cylindrical>(MeshData<Real> *u0, MeshData<Real> *u1,
-                                      const int stage, const Real gam0, const Real gam1,
-                                      const Real beta_dt);
-template TaskStatus
-ApplyUpdate<Coordinates::axisymmetric>(MeshData<Real> *u0, MeshData<Real> *u1,
-                                       const int stage, const Real gam0, const Real gam1,
-                                       const Real beta_dt);
-template TaskStatus
-ApplyUpdate<Coordinates::spherical1D>(MeshData<Real> *u0, MeshData<Real> *u1,
-                                      const int stage, const Real gam0, const Real gam1,
-                                      const Real beta_dt);
-template TaskStatus
-ApplyUpdate<Coordinates::spherical2D>(MeshData<Real> *u0, MeshData<Real> *u1,
-                                      const int stage, const Real gam0, const Real gam1,
-                                      const Real beta_dt);
-template TaskStatus
-ApplyUpdate<Coordinates::spherical3D>(MeshData<Real> *u0, MeshData<Real> *u1,
-                                      const int stage, const Real gam0, const Real gam1,
-                                      const Real beta_dt);
-
-template TaskStatus MatterCoupling<Coordinates::cartesian>(MeshData<Real> *u0,
-                                                           const Real dt);
-template TaskStatus MatterCoupling<Coordinates::cylindrical>(MeshData<Real> *u0,
-                                                             const Real dt);
-template TaskStatus MatterCoupling<Coordinates::axisymmetric>(MeshData<Real> *u0,
-                                                              const Real dt);
-template TaskStatus MatterCoupling<Coordinates::spherical1D>(MeshData<Real> *u0,
-                                                             const Real dt);
-template TaskStatus MatterCoupling<Coordinates::spherical2D>(MeshData<Real> *u0,
-                                                             const Real dt);
-template TaskStatus MatterCoupling<Coordinates::spherical3D>(MeshData<Real> *u0,
-                                                             const Real dt);
+//----------------------------------------------------------------------------------------
+//! template instantiations
+typedef Coordinates G;
+typedef MeshData<Real> MD;
+template TaskStatus MatterCoupling<G::cartesian>(MD *u0, const Real dt);
+template TaskStatus MatterCoupling<G::cylindrical>(MD *u0, const Real dt);
+template TaskStatus MatterCoupling<G::axisymmetric>(MD *u0, const Real dt);
+template TaskStatus MatterCoupling<G::spherical1D>(MD *u0, const Real dt);
+template TaskStatus MatterCoupling<G::spherical2D>(MD *u0, const Real dt);
+template TaskStatus MatterCoupling<G::spherical3D>(MD *u0, const Real dt);
 
 } // namespace Radiation

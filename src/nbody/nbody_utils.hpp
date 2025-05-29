@@ -1,5 +1,5 @@
 //========================================================================================
-// (C) (or copyright) 2024. Triad National Security, LLC. All rights reserved.
+// (C) (or copyright) 2025. Triad National Security, LLC. All rights reserved.
 //
 // This program was produced under U.S. Government contract 89233218CNA000001 for Los
 // Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -36,6 +36,9 @@ namespace NBody {
 extern void reb_extra_forces(struct reb_simulation *rsim);
 extern int collision_resolution(struct reb_simulation *const r, struct reb_collision c);
 
+//----------------------------------------------------------------------------------------
+//! \class RebSim
+//!
 class RebSim {
  public:
   // Constructor to initialize the shared_ptr
@@ -203,6 +206,9 @@ static void enable_stderr(int stderr_save_fd) {
   }
 }
 
+//----------------------------------------------------------------------------------------
+//! \fn  int NBody::write_bytes_to_file
+//! \brief
 inline void write_bytes_to_file(std::string filename, std::vector<BYTE> &bytes) {
   std::ofstream outfile(filename.c_str(), std::ios::binary);
   if (outfile.is_open()) {
@@ -213,6 +219,9 @@ inline void write_bytes_to_file(std::string filename, std::vector<BYTE> &bytes) 
   PARTHENON_FAIL("Unable to open binary file to write");
 }
 
+//----------------------------------------------------------------------------------------
+//! \fn  int NBody::read_bytes_from_file
+//! \brief
 inline std::vector<BYTE> read_bytes_from_file(std::string filename) {
   std::ifstream file(NBody::rebound_filename, std::ios::binary | std::ios::ate);
   if (file.is_open()) {

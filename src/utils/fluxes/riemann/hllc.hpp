@@ -1,5 +1,5 @@
 //========================================================================================
-// (C) (or copyright) 2023-2024. Triad National Security, LLC. All rights reserved.
+// (C) (or copyright) 2023-2025. Triad National Security, LLC. All rights reserved.
 //
 // This program was produced under U.S. Government contract 89233218CNA000001 for Los
 // Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -42,9 +42,9 @@ namespace ArtemisUtils {
 //----------------------------------------------------------------------------------------
 //! \class ArtemisUtils::RiemannSolver<RSolver::hllc, ...>
 //! \brief The HLLC Riemann solver for ideal gas hydrodynamics
-template <Fluid FLUID_TYPE>
-struct RiemannSolver<RSolver::hllc, FLUID_TYPE,
-                     std::enable_if_t<!is_grey<FLUID_TYPE>()>> {
+template <Fluid FLUID_TYPE, Closure CTYPE>
+struct RiemannSolver<RSolver::hllc, FLUID_TYPE, CTYPE,
+                     std::enable_if_t<FLUID_TYPE == Fluid::gas>> {
   template <typename V1, typename V2, typename V3>
   KOKKOS_INLINE_FUNCTION void operator()(const EOS &eos, const Real c, const Real chat,
                                          parthenon::team_mbr_t const &member, const int b,
@@ -61,8 +61,8 @@ struct RiemannSolver<RSolver::hllc, FLUID_TYPE,
     // TODO(BRR) temporary
     const Real gm1 = eos.GruneisenParamFromDensityTemperature(Null<Real>(), Null<Real>());
 
-    // Obtain number of species (energy equation required for HLLC)
-    const int nspecies = p.GetMaxNumberOfVars() / 6;
+    // Obtain number of species
+    const int nspecies = q.GetSize(b, gas::cons::density());
 
     for (int n = 0; n < nspecies; ++n) {
       const int IDN = n;

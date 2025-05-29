@@ -48,8 +48,7 @@ void PLM(const Real &q_im1, const Real &q_i, const Real &q_ip1, Real &ql_ip1,
 
 //----------------------------------------------------------------------------------------
 //! \fn ArtemisUtils::PLM_G()
-//! \brief General PLM routine for non-uniform or non-Cartesian geometries. See Mignone
-//! (2013).
+//! \brief PLM routine for non-uniform/non-Cartesian geometries. See Mignone (2013).
 KOKKOS_INLINE_FUNCTION
 void PLM_G(const Real &q_im1, const Real &q_i, const Real &q_ip1, Real &ql_ip1,
            Real &qr_i, const Real x_im1, const Real x_i, const Real x_ip1,

@@ -1,5 +1,5 @@
 //========================================================================================
-// (C) (or copyright) 2023-2024. Triad National Security, LLC. All rights reserved.
+// (C) (or copyright) 2023-2025. Triad National Security, LLC. All rights reserved.
 //
 // This program was produced under U.S. Government contract 89233218CNA000001 for Los
 // Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -10,12 +10,12 @@
 // license in this material to reproduce, prepare derivative works, distribute copies to
 // the public, perform publicly and display publicly, and to permit others to do so.
 //========================================================================================
-#ifndef RADIATION_MOMENT_MATTER_COUPLING_HPP_
-#define RADIATION_MOMENT_MATTER_COUPLING_HPP_
+#ifndef RADIATION_MOMENTS_MATTER_COUPLING_HPP_
+#define RADIATION_MOMENTS_MATTER_COUPLING_HPP_
 
 #include "artemis.hpp"
 #include "geometry/geometry.hpp"
-#include "radiation.hpp"
+#include "moments.hpp"
 #include "rotating_frame/rotating_frame.hpp"
 #include "utils/artemis_utils.hpp"
 #include "utils/eos/eos.hpp"
@@ -28,15 +28,17 @@ using ArtemisUtils::VI;
 
 namespace Radiation {
 
-template <Coordinates GEOM, Fluid CLOSURE>
+//----------------------------------------------------------------------------------------
+//! \fn TaskStatus Radiation::MatterCouplingSimpleImpl
+//! \brief Implementation for simple radiation-matter coupling source
+template <Coordinates GEOM, Closure CLOSURE>
 TaskStatus MatterCouplingSimpleImpl(MeshData<Real> *u0, const Real dt) {
   using parthenon::MakePackDescriptor;
   using parthenon::variable_names::any;
   auto pm = u0->GetParentPointer();
   auto &resolved_pkgs = pm->resolved_packages;
-  auto &artemis_pkg = pm->packages.Get("artemis");
-  auto &radiation_pkg = pm->packages.Get("radiation");
 
+  // Extract gas package and params
   auto &gas_pkg = pm->packages.Get("gas");
   auto eos_d = gas_pkg->template Param<EOS>("eos_d");
   auto opac_d = gas_pkg->template Param<MeanOpacity>("opacity_d");
@@ -45,19 +47,20 @@ TaskStatus MatterCouplingSimpleImpl(MeshData<Real> *u0, const Real dt) {
   auto dflr = gas_pkg->template Param<Real>("dfloor");
   auto de_switch = gas_pkg->template Param<Real>("de_switch");
 
-  auto &rad_pkg = pm->packages.Get("radiation");
-  auto &params = radiation_pkg->AllParams();
-  const auto chat = params.template Get<Real>("chat");
-  const auto c = params.template Get<Real>("c");
-  const auto arad = params.template Get<Real>("arad");
-  const auto outer_max = params.template Get<int>("outer_iteration_max");
-  const auto inner_max = params.template Get<int>("inner_iteration_max");
-  const auto outer_tol = params.template Get<Real>("outer_iteration_tol");
-  const auto inner_tol = params.template Get<Real>("inner_iteration_tol");
+  // Extract radiation package and params
+  auto &rad_pkg = pm->packages.Get("moments");
+  const auto chat = rad_pkg->template Param<Real>("chat");
+  const auto c = rad_pkg->template Param<Real>("c");
+  const auto arad = rad_pkg->template Param<Real>("arad");
+  const auto outer_max = rad_pkg->template Param<int>("outer_iteration_max");
+  const auto inner_max = rad_pkg->template Param<int>("inner_iteration_max");
+  const auto outer_tol = rad_pkg->template Param<Real>("outer_iteration_tol");
+  const auto inner_tol = rad_pkg->template Param<Real>("inner_iteration_tol");
 
+  // Extract rotating frame quantities
   Real om0 = 0.0;
   Real qshear = 0.0;
-  if (artemis_pkg->Param<bool>("do_rotating_frame")) {
+  if (pm->packages.Get("artemis")->Param<bool>("do_rotating_frame")) {
     auto &rframe_pkg = pm->packages.Get("rotating_frame");
     qshear = rframe_pkg->Param<Real>("qshear");
     om0 = rframe_pkg->Param<Real>("omega");
@@ -69,7 +72,6 @@ TaskStatus MatterCouplingSimpleImpl(MeshData<Real> *u0, const Real dt) {
                                     gas::cons::density, gas::cons::momentum,
                                     gas::cons::internal_energy, gas::cons::total_energy>(
           resolved_pkgs.get());
-
   const auto v0 = desc.GetPack(u0);
   const auto ib = u0->GetBoundsI(IndexDomain::interior);
   const auto jb = u0->GetBoundsJ(IndexDomain::interior);
@@ -165,26 +167,31 @@ TaskStatus MatterCouplingSimpleImpl(MeshData<Real> *u0, const Real dt) {
                          ((SQR(vn[0]) - SQR(v[0])) + (SQR(vn[1]) - SQR(v[1])) +
                           (SQR(vn[2]) - SQR(v[2])));
 
+        // Update state vector (both gas and radiation)
         v0(b, rad::cons::energy(), k, j, i) += chat / c * (dEk - dEg);
         v0(b, gas::cons::total_energy(), k, j, i) += dEg + dEk;
         v0(b, gas::cons::internal_energy(), k, j, i) += dEg;
-        for (int d = 0; d < 3; d++) {
-          v0(b, rad::cons::flux(d), k, j, i) += dF[d] * hx[d];
-          v0(b, gas::cons::momentum(d), k, j, i) += dv[d] * dens * hx[d];
-        }
+        v0(b, rad::cons::flux(0), k, j, i) += dF[0] * hx[0];
+        v0(b, gas::cons::momentum(0), k, j, i) += dv[0] * dens * hx[0];
+        v0(b, rad::cons::flux(1), k, j, i) += dF[1] * hx[1];
+        v0(b, gas::cons::momentum(1), k, j, i) += dv[1] * dens * hx[1];
+        v0(b, rad::cons::flux(2), k, j, i) += dF[2] * hx[2];
+        v0(b, gas::cons::momentum(2), k, j, i) += dv[2] * dens * hx[2];
       });
   return TaskStatus::complete;
 }
 
-template <Coordinates GEOM, Fluid CLOSURE>
+//----------------------------------------------------------------------------------------
+//! \fn TaskStatus Radiation::MatterCouplingSimpleImpl
+//! \brief Implementation for "full" radiation-matter coupling source
+template <Coordinates GEOM, Closure CLOSURE>
 TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
   using parthenon::MakePackDescriptor;
   using parthenon::variable_names::any;
   auto pm = u0->GetParentPointer();
   auto &resolved_pkgs = pm->resolved_packages;
-  auto &artemis_pkg = pm->packages.Get("artemis");
-  auto &radiation_pkg = pm->packages.Get("radiation");
 
+  // Extract gas package and params
   auto &gas_pkg = pm->packages.Get("gas");
   auto eos_d = gas_pkg->template Param<EOS>("eos_d");
   auto opac_d = gas_pkg->template Param<MeanOpacity>("opacity_d");
@@ -193,19 +200,20 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
   auto dflr = gas_pkg->template Param<Real>("dfloor");
   auto de_switch = gas_pkg->template Param<Real>("de_switch");
 
-  auto &rad_pkg = pm->packages.Get("radiation");
-  auto &params = radiation_pkg->AllParams();
-  const auto chat = params.template Get<Real>("chat");
-  const auto c = params.template Get<Real>("c");
-  const auto arad = params.template Get<Real>("arad");
-  const auto outer_max = params.template Get<int>("outer_iteration_max");
-  const auto inner_max = params.template Get<int>("inner_iteration_max");
-  const auto outer_tol = params.template Get<Real>("outer_iteration_tol");
-  const auto inner_tol = params.template Get<Real>("inner_iteration_tol");
+  // Extract radiation package and params
+  auto &rad_pkg = pm->packages.Get("moments");
+  const auto chat = rad_pkg->template Param<Real>("chat");
+  const auto c = rad_pkg->template Param<Real>("c");
+  const auto arad = rad_pkg->template Param<Real>("arad");
+  const auto outer_max = rad_pkg->template Param<int>("outer_iteration_max");
+  const auto inner_max = rad_pkg->template Param<int>("inner_iteration_max");
+  const auto outer_tol = rad_pkg->template Param<Real>("outer_iteration_tol");
+  const auto inner_tol = rad_pkg->template Param<Real>("inner_iteration_tol");
 
+  // Extract rotating frame quantities
   Real om0 = 0.0;
   Real qshear = 0.0;
-  if (artemis_pkg->Param<bool>("do_rotating_frame")) {
+  if (pm->packages.Get("artemis")->Param<bool>("do_rotating_frame")) {
     auto &rframe_pkg = pm->packages.Get("rotating_frame");
     qshear = rframe_pkg->Param<Real>("qshear");
     om0 = rframe_pkg->Param<Real>("omega");
@@ -397,14 +405,16 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
           PARTHENON_FAIL("Outer not converged");
         }
 
-        // Update the registers
+        // Update state vector (both gas and radiation)
         v0(b, gas::cons::internal_energy(), k, j, i) += dEg;
         v0(b, gas::cons::total_energy(), k, j, i) += dEg + dEk;
         v0(b, rad::cons::energy(), k, j, i) += dEr;
-        for (int d = 0; d < 3; d++) {
-          v0(b, gas::cons::momentum(d), k, j, i) += dv[d] * dens * hx[d];
-          v0(b, rad::cons::flux(d), k, j, i) += dF[d] * hx[d];
-        }
+        v0(b, gas::cons::momentum(0), k, j, i) += dv[0] * dens * hx[0];
+        v0(b, gas::cons::momentum(1), k, j, i) += dv[1] * dens * hx[1];
+        v0(b, gas::cons::momentum(2), k, j, i) += dv[2] * dens * hx[2];
+        v0(b, rad::cons::flux(0), k, j, i) += dF[0] * hx[0];
+        v0(b, rad::cons::flux(1), k, j, i) += dF[1] * hx[1];
+        v0(b, rad::cons::flux(2), k, j, i) += dF[2] * hx[2];
       });
 
   return TaskStatus::complete;
@@ -412,4 +422,4 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
 
 } // namespace Radiation
 
-#endif //  RADIATION_MOMENT_MATTER_COUPLING_HPP_
+#endif //  RADIATION_MOMENTS_MATTER_COUPLING_HPP_

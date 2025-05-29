@@ -22,20 +22,21 @@
 using ArtemisUtils::EOS;
 
 namespace {
-
 struct LWParams {
   Real rho0, rho1;
   Real pres0, pres1;
   Real sie0, sie1;
   Real y0;
 };
-
 } // end anonymous namespace
 
 namespace lw {
 
 static LWParams lw_params;
 
+//----------------------------------------------------------------------------------------
+//! \fn void ProblemGenerator::LW
+//! \brief
 template <Coordinates GEOM>
 inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   using parthenon::MakePackDescriptor;

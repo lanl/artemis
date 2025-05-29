@@ -1,5 +1,5 @@
 //========================================================================================
-// (C) (or copyright) 2023-2024. Triad National Security, LLC. All rights reserved.
+// (C) (or copyright) 2023-2025. Triad National Security, LLC. All rights reserved.
 //
 // This program was produced under U.S. Government contract 89233218CNA000001 for Los
 // Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -83,7 +83,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   Real ar = Null<Real>();
   if (do_moment) {
-    ar = pmb->packages.Get("radiation")->Param<Real>("arad");
+    ar = pmb->packages.Get("moments")->Param<Real>("arad");
   }
 
   // packing and capture variables for kernel
@@ -145,7 +145,7 @@ inline void ShockInnerX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse)
   auto eos_d = pmb->packages.Get("gas")->Param<EOS>("eos_d");
   Real ar = Null<Real>();
   if (do_moment) {
-    ar = pmb->packages.Get("radiation")->Param<Real>("arad");
+    ar = pmb->packages.Get("moments")->Param<Real>("arad");
   }
   const auto nb = IndexRange{0, 0};
 
@@ -154,25 +154,29 @@ inline void ShockInnerX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse)
                                                  gas::prim::sie, rad::prim::energy,
                                                  rad::prim::flux>(mbd);
   auto v = descriptors[coarse].GetPack(mbd.get());
-  if (v.GetMaxNumberOfVars() > 0) {
-    pmb->par_for_bndry(
-        "ShockInnerX1", nb, IndexDomain::inner_x1, parthenon::TopologicalElement::CC,
-        coarse, false,
-        KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
-          v(0, gas::prim::density(0), k, j, i) = shkp.rhol;
-          v(0, gas::prim::velocity(0), k, j, i) = shkp.vxl;
-          v(0, gas::prim::velocity(1), k, j, i) = 0.0;
-          v(0, gas::prim::velocity(2), k, j, i) = 0.0;
-          v(0, gas::prim::sie(0), k, j, i) =
+  if (v.GetMaxNumberOfVars() == 0) return;
+
+  pmb->par_for_bndry(
+      "ShockInnerX1", nb, IndexDomain::inner_x1, parthenon::TopologicalElement::CC,
+      coarse, false,
+      KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
+        for (int n = 0; n < v.GetSize(0, gas::prim::density()); ++n) {
+          v(0, gas::prim::density(n), k, j, i) = shkp.rhol;
+          v(0, gas::prim::velocity(VI(n, 0)), k, j, i) = shkp.vxl;
+          v(0, gas::prim::velocity(VI(n, 1)), k, j, i) = 0.0;
+          v(0, gas::prim::velocity(VI(n, 2)), k, j, i) = 0.0;
+          v(0, gas::prim::sie(n), k, j, i) =
               eos_d.InternalEnergyFromDensityTemperature(shkp.rhol, shkp.tl);
-          if (do_moment) {
-            v(0, rad::prim::energy(0), k, j, i) = ar * SQR(SQR(shkp.tl));
-            v(0, rad::prim::flux(0), k, j, i) = 0.0;
-            v(0, rad::prim::flux(1), k, j, i) = 0.0;
-            v(0, rad::prim::flux(2), k, j, i) = 0.0;
+        }
+        if (do_moment) {
+          for (int n = 0; n < v.GetSize(0, rad::prim::energy()); ++n) {
+            v(0, rad::prim::energy(n), k, j, i) = ar * SQR(SQR(shkp.tl));
+            v(0, rad::prim::flux(VI(n, 0)), k, j, i) = 0.0;
+            v(0, rad::prim::flux(VI(n, 1)), k, j, i) = 0.0;
+            v(0, rad::prim::flux(VI(n, 2)), k, j, i) = 0.0;
           }
-        });
-  }
+        }
+      });
 
   return;
 }
@@ -191,7 +195,7 @@ inline void ShockOuterX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse)
   auto eos_d = pmb->packages.Get("gas")->Param<EOS>("eos_d");
   Real ar = Null<Real>();
   if (do_moment) {
-    ar = pmb->packages.Get("radiation")->Param<Real>("arad");
+    ar = pmb->packages.Get("moments")->Param<Real>("arad");
   }
   const auto nb = IndexRange{0, 0};
 
@@ -200,25 +204,29 @@ inline void ShockOuterX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse)
                                                  gas::prim::sie, rad::prim::energy,
                                                  rad::prim::flux>(mbd);
   auto v = descriptors[coarse].GetPack(mbd.get());
-  if (v.GetMaxNumberOfVars() > 0) {
-    pmb->par_for_bndry(
-        "ShockOuterX1", nb, IndexDomain::outer_x1, parthenon::TopologicalElement::CC,
-        coarse, false,
-        KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
-          v(0, gas::prim::density(0), k, j, i) = shkp.rhor;
-          v(0, gas::prim::velocity(0), k, j, i) = shkp.vxr;
-          v(0, gas::prim::velocity(1), k, j, i) = 0.0;
-          v(0, gas::prim::velocity(2), k, j, i) = 0.0;
-          v(0, gas::prim::sie(0), k, j, i) =
+  if (v.GetMaxNumberOfVars() == 0) return;
+
+  pmb->par_for_bndry(
+      "ShockOuterX1", nb, IndexDomain::outer_x1, parthenon::TopologicalElement::CC,
+      coarse, false,
+      KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
+        for (int n = 0; n < v.GetSize(0, gas::prim::density()); ++n) {
+          v(0, gas::prim::density(n), k, j, i) = shkp.rhor;
+          v(0, gas::prim::velocity(VI(n, 0)), k, j, i) = shkp.vxr;
+          v(0, gas::prim::velocity(VI(n, 1)), k, j, i) = 0.0;
+          v(0, gas::prim::velocity(VI(n, 2)), k, j, i) = 0.0;
+          v(0, gas::prim::sie(n), k, j, i) =
               eos_d.InternalEnergyFromDensityTemperature(shkp.rhor, shkp.tr);
-          if (do_moment) {
-            v(0, rad::prim::energy(0), k, j, i) = ar * SQR(SQR(shkp.tr));
-            v(0, rad::prim::flux(0), k, j, i) = 0.0;
-            v(0, rad::prim::flux(1), k, j, i) = 0.0;
-            v(0, rad::prim::flux(2), k, j, i) = 0.0;
+        }
+        if (do_moment) {
+          for (int n = 0; n < v.GetSize(0, rad::prim::energy()); ++n) {
+            v(0, rad::prim::energy(n), k, j, i) = ar * SQR(SQR(shkp.tr));
+            v(0, rad::prim::flux(VI(n, 0)), k, j, i) = 0.0;
+            v(0, rad::prim::flux(VI(n, 1)), k, j, i) = 0.0;
+            v(0, rad::prim::flux(VI(n, 2)), k, j, i) = 0.0;
           }
-        });
-  }
+        }
+      });
 
   return;
 }

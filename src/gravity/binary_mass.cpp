@@ -1,5 +1,5 @@
 //========================================================================================
-// (C) (or copyright) 2023-2024. Triad National Security, LLC. All rights reserved.
+// (C) (or copyright) 2023-2025. Triad National Security, LLC. All rights reserved.
 //
 // This program was produced under U.S. Government contract 89233218CNA000001 for Los
 // Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -30,12 +30,14 @@ TaskStatus BinaryMassGravity(MeshData<Real> *md, const Real time, const Real dt)
   auto pm = md->GetParentPointer();
   auto &resolved_pkgs = pm->resolved_packages;
 
+  // Extract artemis package and parameters.  Exit immediately if not evolving gas or dust
   auto &artemis_pkg = pm->packages.Get("artemis");
   const bool do_gas = artemis_pkg->template Param<bool>("do_gas");
   const bool do_dust = artemis_pkg->template Param<bool>("do_dust");
   const bool do_rf = artemis_pkg->template Param<bool>("do_rotating_frame");
   if (!(do_gas || do_dust)) return TaskStatus::complete;
 
+  // Extract gravity package and parameters
   auto &gravity_pkg = pm->packages.Get("gravity");
   const Real gm = gravity_pkg->template Param<Real>("gm");
   const Real qb = gravity_pkg->template Param<Real>("q");
@@ -48,6 +50,7 @@ TaskStatus BinaryMassGravity(MeshData<Real> *md, const Real time, const Real dt)
   const Real rsft1 = gravity_pkg->template Param<Real>("soft1");
   const Real rsft2 = gravity_pkg->template Param<Real>("soft2");
 
+  // Extract rotating frame parameters
   const Real omf =
       (do_rf) ? pm->packages.Get("rotating_frame")->template Param<Real>("omega") : 0.0;
 
@@ -90,11 +93,9 @@ TaskStatus BinaryMassGravity(MeshData<Real> *md, const Real time, const Real dt)
         // Extract coordinate information
         geometry::Coords<GEOM> coords(vmesh.GetCoordinates(b), k, j, i);
         const auto &dx = coords.GetCellCenter();
-
         const auto &[dxc1_, ex1, ex2, ex3] = coords.ConvertToCartWithVec(dx);
         auto dxc1 = dxc1_;
         auto dxc2 = NewArray<Real, 3>();
-
         const auto &hx = coords.GetScaleFactors();
 
         // Calculate force in Cartesian coordinates
@@ -208,10 +209,10 @@ TaskStatus BinaryMassGravity(MeshData<Real> *md, const Real time, const Real dt)
 
 //----------------------------------------------------------------------------------------
 //! template instantiations
-typedef Coordinates C;
+typedef Coordinates G;
 typedef MeshData<Real> MD;
-template TaskStatus BinaryMassGravity<C::cartesian>(MD *m, const Real t, const Real d);
-template TaskStatus BinaryMassGravity<C::cylindrical>(MD *m, const Real t, const Real d);
-template TaskStatus BinaryMassGravity<C::spherical3D>(MD *m, const Real t, const Real d);
+template TaskStatus BinaryMassGravity<G::cartesian>(MD *m, const Real t, const Real d);
+template TaskStatus BinaryMassGravity<G::cylindrical>(MD *m, const Real t, const Real d);
+template TaskStatus BinaryMassGravity<G::spherical3D>(MD *m, const Real t, const Real d);
 
 } // namespace Gravity

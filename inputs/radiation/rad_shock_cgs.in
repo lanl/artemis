@@ -1,5 +1,5 @@
 # ========================================================================================
-#  (C) (or copyright) 2023-2024. Triad National Security, LLC. All rights reserved.
+#  (C) (or copyright) 2023-2025. Triad National Security, LLC. All rights reserved.
 #
 #  This program was produced under U.S. Government contract 89233218CNA000001 for Los
 #  Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -15,7 +15,7 @@
 problem = shock          # name of the pgen
 coordinates = cartesian  # coordinate system
 physical_units = cgs     # not scale-free
-unit_conversion = base   
+unit_conversion = base
 
 <parthenon/job>
 problem_id = shock  # problem ID: basename of output filenames
@@ -24,7 +24,7 @@ problem_id = shock  # problem ID: basename of output filenames
 variables = gas.prim.density,  &
             gas.prim.velocity, &
             gas.prim.sie,      &
-            rad.prim.energy, &
+            rad.prim.energy,   &
             field.jaybenne.energy_tally
 file_type = hdf5   # HDF5 data dump
 dt        = 1e-10  # time increment between outputs
@@ -94,7 +94,6 @@ creduc = 43.3526011561
 # <radiation/imc>
 # num_particles = 100000  # particle resolution
 # use_ddmc = false        # use DDMC?
-
 
 <problem>
 rhol = 5.69    # density (left)

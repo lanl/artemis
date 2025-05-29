@@ -38,23 +38,23 @@ integrator = rk2   # time integration algorithm
 ncycle_out = 1     # interval for stdout summary info
 
 <parthenon/mesh>
-nx1    = 128                 # Number of zones in X1-direction
-x1min  = 0.3                 # minimum value of X1
-x1max  = 4.3                 # maximum value of X1
-ix1_bc = ic                  # Inner-X1 boundary condition flag
-ox1_bc = ic                  # Outer-X1 boundary condition flag
+nx1    = 128       # Number of zones in X1-direction
+x1min  = 0.3       # minimum value of X1
+x1max  = 4.3       # maximum value of X1
+ix1_bc = ic        # Inner-X1 boundary condition flag
+ox1_bc = ic        # Outer-X1 boundary condition flag
 
-nx2    = 64                  # Number of zones in X2-direction
-x2min  = -2.0                # minimum value of X2
-x2max  = 2.0                 # maximum value of X2
-ix2_bc = ic                  # Inner-X2 boundary condition flag
-ox2_bc = ic                  # Outer-X2 boundary condition flag
+nx2    = 64        # Number of zones in X2-direction
+x2min  = -2.0      # minimum value of X2
+x2max  = 2.0       # maximum value of X2
+ix2_bc = ic        # Inner-X2 boundary condition flag
+ox2_bc = ic        # Outer-X2 boundary condition flag
 
-nx3    = 1                   # Number of zones in X3-direction
-x3min  = -0.5                # minimum value of X3
-x3max  =  0.5                # maximum value of X3
-ix3_bc = periodic            # Inner-X3 boundary condition flag
-ox3_bc = periodic            # Outer-X3 boundary condition flag
+nx3    = 1         # Number of zones in X3-direction
+x3min  = -0.5      # minimum value of X3
+x3max  =  0.5      # maximum value of X3
+ix3_bc = periodic  # Inner-X3 boundary condition flag
+ox3_bc = periodic  # Outer-X3 boundary condition flag
 
 <parthenon/meshblock>
 nx1 = 32  # Number of cells in each MeshBlock, X1-dir

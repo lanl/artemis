@@ -1,5 +1,5 @@
 # ========================================================================================
-#  (C) (or copyright) 2023-2024. Triad National Security, LLC. All rights reserved.
+#  (C) (or copyright) 2023-2025. Triad National Security, LLC. All rights reserved.
 #
 #  This program was produced under U.S. Government contract 89233218CNA000001 for Los
 #  Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -102,7 +102,6 @@ temp_exp = 0.0            # temp exponent for opacity powerlaw
 <radiation/imc>
 num_particles = 100000  # particle resolution
 use_ddmc = false        # use DDMC?
-
 
 <problem>
 rhol = 5.69      # density (left)

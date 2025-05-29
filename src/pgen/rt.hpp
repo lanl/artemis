@@ -22,7 +22,6 @@
 using ArtemisUtils::EOS;
 
 namespace {
-
 struct RTParams {
   Real rho0, rho1;
   Real pres0;
@@ -30,13 +29,15 @@ struct RTParams {
   Real amp, freq;
   Real g;
 };
-
 } // end anonymous namespace
 
 namespace rt {
 
 static RTParams RT_params;
 
+//----------------------------------------------------------------------------------------
+//! \fn void ProblemGenerator::RT
+//! \brief
 template <Coordinates GEOM>
 inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   using parthenon::MakePackDescriptor;

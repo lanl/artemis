@@ -49,7 +49,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const auto eos = gas_pkg->Param<EOS>("eos_d");
   Real ar = Null<Real>();
   if (do_moment) {
-    auto rad_pkg = pmb->packages.Get("radiation");
+    auto rad_pkg = pmb->packages.Get("moments");
     ar = rad_pkg->Param<Real>("arad");
   }
 

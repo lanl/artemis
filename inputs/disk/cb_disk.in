@@ -1,5 +1,5 @@
 # ========================================================================================
-#  (C) (or copyright) 2023-2024. Triad National Security, LLC. All rights reserved.
+#  (C) (or copyright) 2023-2025. Triad National Security, LLC. All rights reserved.
 #
 #  This program was produced under U.S. Government contract 89233218CNA000001 for Los
 #  Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -38,17 +38,17 @@ nghost = 2
 refinement = adaptive
 numlevel = 3
 
-nx1    = 512      # Number of zones in X1-direction
-x1min  = -10.0    # minimum value of X1
-x1max  = 10.0     # maximum value of X1
-ix1_bc = ic       # Inner-X1 boundary condition flag
-ox1_bc = ic       # Outer-X1 boundary condition flag
+nx1    = 512       # Number of zones in X1-direction
+x1min  = -10.0     # minimum value of X1
+x1max  = 10.0      # maximum value of X1
+ix1_bc = ic        # Inner-X1 boundary condition flag
+ox1_bc = ic        # Outer-X1 boundary condition flag
 
-nx2    = 512      # Number of zones in X2-direction
-x2min  = -10.0    # minimum value of X2
-x2max  = 10.0     # maximum value of X2
-ix2_bc = ic       # Inner-X2 boundary condition flag
-ox2_bc = ic       # Outer-X2 boundary condition flag
+nx2    = 512       # Number of zones in X2-direction
+x2min  = -10.0     # minimum value of X2
+x2max  = 10.0      # maximum value of X2
+ix2_bc = ic        # Inner-X2 boundary condition flag
+ox2_bc = ic        # Outer-X2 boundary condition flag
 
 nx3    = 1         # Number of zones in X3-direction
 x3min  = -0.5      # minimum value of X3
@@ -99,7 +99,7 @@ rsink = 0.01
 gamma = 50.0
 couple = 1
 refine_distance = 0.8
- 
+
 <cooling>
 type = beta
 beta0 = 1e-8
@@ -120,8 +120,6 @@ inner_x3 = -9.0
 inner_x3_rate = 30.0
 outer_x3 = 9.0
 outer_x3_rate = 30.0
-
-
 
 <problem>
 r0 = 1.0

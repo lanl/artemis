@@ -22,8 +22,10 @@
 #include "utils/fluxes/riemann/riemann.hpp"
 
 using ArtemisUtils::VI;
+using parthenon::MakePackDescriptor;
 using parthenon::ScratchPad1D;
 using parthenon::ScratchPad2D;
+using TE = parthenon::TopologicalElement;
 
 namespace ArtemisUtils {
 //----------------------------------------------------------------------------------------
@@ -77,10 +79,9 @@ KOKKOS_INLINE_FUNCTION void ScaleMomentumFlux(parthenon::team_mbr_t const &membe
 //! \brief Calculate hydrodynamic fluxes from reconstructed primitive variables.
 //! NOTE(PDM): flux kernel largely borrowed from AthenaPK/Parthenon-Hydro/AthenaK
 template <Coordinates G, Fluid F, Closure C, RSolver RIEMANN, ReconstructionMethod RECON,
-          typename PRIM, typename FLUX, typename FACE, typename PKG>
+          typename PKG, typename PRIM, typename FLUX, typename FACE>
 TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, FLUX vflx,
                                FACE vface) {
-  using parthenon::MakePackDescriptor;
   auto pm = md->GetParentPointer();
 
   // Bounds and indexing
@@ -249,19 +250,15 @@ TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, FLUX vflx,
 //!         - the PdV work term
 //!         - the geometric source terms (be wary of rotating frame...)
 //!           <1/h_k * dh_k/dxi>  (rho*v_i^2 + P)
-template <Coordinates G, Fluid F, Closure C, typename PRIM, typename CONS, typename FACE,
-          typename PKG>
+template <Coordinates G, Fluid F, Closure C, typename PKG, typename PRIM, typename CONS,
+          typename FACE>
 TaskStatus FluxSourceImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, CONS vcons, FACE vface,
                           const Real omf, const Real dt) {
-  using parthenon::MakePackDescriptor;
-  using TE = parthenon::TopologicalElement;
-  auto pm = md->GetParentPointer();
-
   // Indexing and geometry
   const auto ib = md->GetBoundsI(IndexDomain::interior);
   const auto jb = md->GetBoundsJ(IndexDomain::interior);
   const auto kb = md->GetBoundsK(IndexDomain::interior);
-  const int ndim = pm->ndim;
+  const int ndim = md->GetParentPointer()->ndim;
   const bool multi_d = (ndim >= 2);
   const bool three_d = (ndim == 3);
   const int d1 = X1DIR;
@@ -271,32 +268,29 @@ TaskStatus FluxSourceImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, CONS vcons, FAC
   const auto f2 = (multi_d) ? TE::F2 : f1;
   const auto f3 = (three_d) ? TE::F3 : f2;
   const bool x1dep = geometry::x1dep<G>();
-  const bool x2dep = (geometry::x2dep<G>()) && (multi_d);
-  const bool x3dep = (geometry::x3dep<G>()) && (three_d);
+  const bool x2dep = (geometry::x2dep<G>() && multi_d);
+  const bool x3dep = (geometry::x3dep<G>() && three_d);
 
   // Obtain number of species
-  int nvar = Null<int>();
+  int nspecies = Null<int>();
   if constexpr (F == Fluid::gas) {
-    nvar = 5;
+    nspecies = vp.GetMaxNumberOfVars() / 5;
   } else if constexpr (F == Fluid::dust) {
-    nvar = 4;
+    nspecies = vp.GetMaxNumberOfVars() / 4;
   } else if constexpr (F == Fluid::radiation) {
-    nvar = 5;
+    nspecies = vp.GetMaxNumberOfVars() / 5;
   }
-  const int nspecies = vp.GetMaxNumberOfVars() / nvar;
 
-  // Extract speed of light
-  Real c = Null<Real>(), chat = Null<Real>(), hcchat = Null<Real>();
+  // Extract (reduced, weighted) speed of light
+  Real hcchat = Null<Real>();
   if constexpr (F == Fluid::radiation) {
-    c = pkg->template Param<Real>("c");
-    chat = pkg->template Param<Real>("chat");
-    hcchat = 0.5 * c * chat;
+    hcchat = 0.5 * pkg->template Param<Real>("c") * pkg->template Param<Real>("chat");
   }
 
   // Apply flux sources
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "GeometricSourceTerms", parthenon::DevExecSpace(), 0,
-      md->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s - 2, ib.e + 1,
+      md->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
         // Extract coordinates
         geometry::Coords<G> coords(vp.GetCoordinates(b), k, j, i);
@@ -310,7 +304,7 @@ TaskStatus FluxSourceImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, CONS vcons, FAC
 
         // Get the rotational velocity
         const auto xv = coords.GetCellCenter();
-        const auto vf = RotatingFrame::RotationVelocity<G>(xv, omf);
+        const auto rfv = RotatingFrame::RotationVelocity<G>(xv, omf);
 
         // Timestep weighted by dx
         geometry::BBox bnds = coords.bnds;
@@ -322,10 +316,6 @@ TaskStatus FluxSourceImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, CONS vcons, FAC
         const Real hdtv = 0.5 * dt / vol;
         const std::array<Real, 3> hdtvol = {hdtv, multi_d * hdtv, three_d * hdtv};
 
-        // Index gymnastics
-        const int nspec3 = nspecies * 3;
-        const int nspec4 = nspecies * 4;
-
         // Add the "flux source terms"
         for (int n = 0; n < nspecies; ++n) {
           const int IMX = VI(n, 0);
@@ -334,17 +324,14 @@ TaskStatus FluxSourceImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, CONS vcons, FAC
           const int IVX = nspecies + IMX;
           const int IVY = nspecies + IMY;
           const int IVZ = nspecies + IMZ;
-          const int IPR = nspec4 + n; // may not be used
-          const int IEG = nspec3 + n; // may not be used
+          const int IPR = nspecies * 4 + n; // may not be used
+          const int IEG = nspecies * 3 + n; // may not be used
 
-          // Add the pressure gradient and PdV term
+          // Captures for constexpr
           [[maybe_unused]] auto &vp_ = vp;
           [[maybe_unused]] auto &vc_ = vcons;
-          [[maybe_unused]] auto &vf_ = vface;
-          [[maybe_unused]] auto &dt_ = dt;
-          [[maybe_unused]] auto &multi_d_ = multi_d;
-          [[maybe_unused]] auto &three_d_ = three_d;
-          [[maybe_unused]] const auto &hcchat_ = hcchat;
+          [[maybe_unused]] auto &vface_ = vface;
+          [[maybe_unused]] auto &hcchat_ = hcchat;
 
           // Pressure gradient force for gas and radiation
           if constexpr (F == Fluid::gas || F == Fluid::radiation) {
@@ -353,9 +340,9 @@ TaskStatus FluxSourceImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, CONS vcons, FAC
             const Real dp1 = (vp_.flux(b, d1, IPR, k, j, i) -
                               vp_.flux(b, d1, IPR, k, j, i + 1));
             const Real dp2 = (vp_.flux(b, d2, IPR, k, j, i) -
-                              vp_.flux(b, d2, IPR, k, j + multi_d_, i));
+                              vp_.flux(b, d2, IPR, k, j + multi_d, i));
             const Real dp3 = (vp_.flux(b, d3, IPR, k, j, i) -
-                              vp_.flux(b, d3, IPR, k + three_d_, j, i));
+                              vp_.flux(b, d3, IPR, k + three_d, j, i));
             // clang-format on
             vc_(b, IMX, k, j, i) += dtdx[0] * dp1;
             vc_(b, IMY, k, j, i) += dtdx[1] * dp2;
@@ -369,15 +356,15 @@ TaskStatus FluxSourceImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, CONS vcons, FAC
             const Real pp1 = (vp_.flux(b, d1, IPR, k, j, i) +
                               vp_.flux(b, d1, IPR, k, j, i + 1));
             const Real pp2 = (vp_.flux(b, d2, IPR, k, j, i) +
-                              vp_.flux(b, d2, IPR, k, j + multi_d_, i));
+                              vp_.flux(b, d2, IPR, k, j + multi_d, i));
             const Real pp3 = (vp_.flux(b, d3, IPR, k, j, i) +
-                              vp_.flux(b, d3, IPR, k + three_d_, j, i));
-            const Real dva1 = (ax1[0] * vf_(b, f1, n, k, j, i) -
-                               ax1[1] * vf_(b, f1, n, k, j, i + 1));
-            const Real dva2 = (ax2[0] * vf_(b, f2, n, k, j, i) -
-                               ax2[1] * vf_(b, f2, n, k, j + multi_d_, i));
-            const Real dva3 = (ax3[0] * vf_(b, f3, n, k, j, i) -
-                               ax3[1] * vf_(b, f3, n, k + three_d_, j, i));
+                              vp_.flux(b, d3, IPR, k + three_d, j, i));
+            const Real dva1 = (ax1[0] * vface_(b, f1, n, k, j, i) -
+                               ax1[1] * vface_(b, f1, n, k, j, i + 1));
+            const Real dva2 = (ax2[0] * vface_(b, f2, n, k, j, i) -
+                               ax2[1] * vface_(b, f2, n, k, j + multi_d, i));
+            const Real dva3 = (ax3[0] * vface_(b, f3, n, k, j, i) -
+                               ax3[1] * vface_(b, f3, n, k + three_d, j, i));
             // clang-format on
             vc_(b, IEG, k, j, i) += hdtvol[0] * pp1 * dva1;
             vc_(b, IEG, k, j, i) += hdtvol[1] * pp2 * dva2;
@@ -403,9 +390,9 @@ TaskStatus FluxSourceImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, CONS vcons, FAC
             const Real dt1 = rdt * x1dep;
             const Real dt2 = rdt * x2dep;
             const Real dt3 = rdt * x3dep;
-            const Real t1 = SQR(vp(b, IVX, k, j, i) + vf[0]);
-            const Real t2 = SQR(vp(b, IVY, k, j, i) + vf[1]);
-            const Real t3 = SQR(vp(b, IVZ, k, j, i) + vf[2]);
+            const Real t1 = SQR(vp_(b, IVX, k, j, i) + rfv[0]);
+            const Real t2 = SQR(vp_(b, IVY, k, j, i) + rfv[1]);
+            const Real t3 = SQR(vp_(b, IVZ, k, j, i) + rfv[2]);
             vc_(b, IMX, k, j, i) += dt1 * (dhdx1[0] * t1 + dhdx1[1] * t2 + dhdx1[2] * t3);
             vc_(b, IMY, k, j, i) += dt2 * (dhdx2[0] * t1 + dhdx2[1] * t2 + dhdx2[2] * t3);
             vc_(b, IMZ, k, j, i) += dt3 * (dhdx3[0] * t1 + dhdx3[1] * t2 + dhdx3[2] * t3);
@@ -419,8 +406,8 @@ TaskStatus FluxSourceImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, CONS vcons, FAC
 //----------------------------------------------------------------------------------------
 //! \fn  TaskStatus ArtemisUtils::CalculateFluxesReconSelect
 //! \brief Dispatch templated function depending on runtime reconstruction option.
-template <Coordinates G, Fluid F, Closure C, RSolver R, typename PRIM, typename FLUX,
-          typename FACE, typename PKG>
+template <Coordinates G, Fluid F, Closure C, RSolver R, typename PKG, typename PRIM,
+          typename FLUX, typename FACE>
 TaskStatus CalculateFluxesReconSelect(MeshData<Real> *md, PKG &pkg, PRIM vp, FLUX vflx,
                                       FACE vface, const bool pcm) {
   const auto recon_method = pkg->template Param<ReconstructionMethod>("recon");
@@ -441,8 +428,8 @@ TaskStatus CalculateFluxesReconSelect(MeshData<Real> *md, PKG &pkg, PRIM vp, FLU
 //----------------------------------------------------------------------------------------
 //! \fn  TaskStatus ArtemisUtils::CalculateFluxesRiemannSelect
 //! \brief Dispatch templated function depending on runtime Riemann solver option.
-template <Coordinates G, Fluid F, Closure C, typename PRIM, typename FLUX, typename FACE,
-          typename PKG>
+template <Coordinates G, Fluid F, Closure C, typename PKG, typename PRIM, typename FLUX,
+          typename FACE>
 TaskStatus CalculateFluxesRiemannSelect(MeshData<Real> *md, PKG &pkg, PRIM vp, FLUX vflx,
                                         FACE vface, const bool pcm) {
   const auto riemann_method = pkg->template Param<RSolver>("rsolver");
@@ -467,8 +454,8 @@ TaskStatus CalculateFluxesRiemannSelect(MeshData<Real> *md, PKG &pkg, PRIM vp, F
 //----------------------------------------------------------------------------------------
 //! \fn  TaskStatus ArtemisUtils::CalculateFluxes
 //! \brief Hierarchically dispatch templated function depending on runtime coord system
-template <Fluid F, Closure C = Closure::null, typename PRIM, typename FLUX, typename FACE,
-          typename PKG>
+template <Fluid F, Closure C = Closure::null, typename PKG, typename PRIM, typename FLUX,
+          typename FACE>
 TaskStatus CalculateFluxes(MeshData<Real> *md, PKG &pkg, PRIM vp, FLUX vflx, FACE vf,
                            const bool dc) {
   const auto sys = pkg->template Param<Coordinates>("coords");
@@ -495,8 +482,8 @@ TaskStatus CalculateFluxes(MeshData<Real> *md, PKG &pkg, PRIM vp, FLUX vflx, FAC
 //----------------------------------------------------------------------------------------
 //! \fn  TaskStatus ArtemisUtils::FluxSourceGeomSelect
 //! \brief Dispatch templated function depending on runtime coordinate system.
-template <Fluid F, Closure C = Closure::null, typename PRIM, typename CONS, typename FACE,
-          typename PKG>
+template <Fluid F, Closure C = Closure::null, typename PKG, typename PRIM, typename CONS,
+          typename FACE>
 TaskStatus FluxSource(MeshData<Real> *md, PKG &pkg, PRIM vp, CONS vcons, FACE vface,
                       const Real dt) {
   auto pm = md->GetParentPointer();

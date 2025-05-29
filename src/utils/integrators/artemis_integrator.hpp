@@ -70,9 +70,6 @@ TaskStatus ApplyUpdate(MeshData<Real> *u0, MeshData<Real> *u1, const Real g0,
   const auto kb = u0->GetBoundsK(IndexDomain::interior);
   const bool multi_d = (pm->ndim > 1);
   const bool three_d = (pm->ndim > 2);
-  const int d1 = X1DIR;
-  const int d2 = d1 + multi_d;
-  const int d3 = d2 + three_d;
 
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "ApplyUpdate", parthenon::DevExecSpace(), 0,
@@ -83,6 +80,9 @@ TaskStatus ApplyUpdate(MeshData<Real> *u0, MeshData<Real> *u1, const Real g0,
         const auto ax1 = coords.GetFaceAreaX1();
         const auto ax2 = (multi_d) ? coords.GetFaceAreaX2() : NewArray<Real, 2>(0.0);
         const auto ax3 = (three_d) ? coords.GetFaceAreaX3() : NewArray<Real, 2>(0.0);
+        const int d1 = X1DIR;
+        const int d2 = d1 + multi_d;
+        const int d3 = d2 + three_d;
         const Real bdt_vol = beta_dt / coords.Volume();
 
         // Advance state vector with flux divergence

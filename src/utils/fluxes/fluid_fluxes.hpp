@@ -316,6 +316,22 @@ TaskStatus FluxSourceImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, CONS vcons, FAC
         const Real hdtv = 0.5 * dt / vol;
         const std::array<Real, 3> hdtvol = {hdtv, multi_d * hdtv, three_d * hdtv};
 
+        // Face indexing
+        // NOTE(@pdmullen): Including outside kernel seems to encroach upon internal NVCC
+        // capture limits? Would need an extra capture for constexpr anyways...
+        const int d1 = X1DIR;
+        const int d2 = d1 + multi_d;
+        const int d3 = d2 + three_d;
+        const auto f1 = TE::F1;
+        const auto f2 = (multi_d) ? TE::F2 : f1;
+        const auto f3 = (three_d) ? TE::F3 : f2;
+
+        // (Remaining) captures for constexpr
+        [[maybe_unused]] auto &vp_ = vp;
+        [[maybe_unused]] auto &vc_ = vcons;
+        [[maybe_unused]] auto &vface_ = vface;
+        [[maybe_unused]] auto &hcchat_ = hcchat;
+
         // Add the "flux source terms"
         for (int n = 0; n < nspecies; ++n) {
           const int IMX = VI(n, 0);
@@ -326,12 +342,6 @@ TaskStatus FluxSourceImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, CONS vcons, FAC
           const int IVZ = nspecies + IMZ;
           const int IPR = nspecies * 4 + n; // may not be used
           const int IEG = nspecies * 3 + n; // may not be used
-
-          // Captures for constexpr
-          [[maybe_unused]] auto &vp_ = vp;
-          [[maybe_unused]] auto &vc_ = vcons;
-          [[maybe_unused]] auto &vface_ = vface;
-          [[maybe_unused]] auto &hcchat_ = hcchat;
 
           // Pressure gradient force for gas and radiation
           if constexpr (F == Fluid::gas || F == Fluid::radiation) {

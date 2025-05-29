@@ -70,20 +70,18 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   const bool do_dust = pin->GetOrAddBoolean("physics", "dust", false);
   const bool do_gravity = pin->GetOrAddBoolean("physics", "gravity", false);
   const bool do_nbody = pin->GetOrAddBoolean("physics", "nbody", false);
-  const bool do_rframe = pin->GetOrAddBoolean("physics", "rotating_frame", false);
-  const bool do_shear = (do_rframe && (pin->GetReal("rotating_frame", "qshear") > 0));
+  const bool do_rotating_frame = pin->GetOrAddBoolean("physics", "rotating_frame", false);
   const bool do_cooling = pin->GetOrAddBoolean("physics", "cooling", false);
   const bool do_drag = pin->GetOrAddBoolean("physics", "drag", false);
   const bool do_viscosity = pin->GetOrAddBoolean("physics", "viscosity", false);
   const bool do_conduction = pin->GetOrAddBoolean("physics", "conduction", false);
   const bool do_radiation = pin->GetOrAddBoolean("physics", "radiation", false);
 
-  // Determine input file specified algorithm for radiation
+  // Determine input file specified algorithms
   const bool do_imc = do_radiation && pin->DoesBlockExist("radiation/imc");
   const bool do_moment = do_radiation && pin->DoesBlockExist("radiation/moment");
-  PARTHENON_REQUIRE(
-      !(do_imc && do_moment),
-      "You cannot have both a <radiation/imc> block and a <radiation/moment> block");
+  const bool do_shear =
+      do_rotating_frame ? (pin->GetOrAddReal("rotating_frame", "qshear", 0) > 0) : false;
 
   // Check configuration selection compatibility
   PARTHENON_REQUIRE(!(do_cooling) || (do_cooling && do_gas),
@@ -96,14 +94,15 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
                     "Radiation requires the gas package, but there is not gas!");
   PARTHENON_REQUIRE(!(do_viscosity) || !(do_shear),
                     "Viscosity it not yet supported for shearing box!");
+  PARTHENON_REQUIRE(!(do_imc && do_moment),
+                    "Cannot simultaneously evolve IMC and moments radiation");
 
   // Store configuration choices in params
   artemis->AddParam("do_gas", do_gas);
   artemis->AddParam("do_dust", do_dust);
   artemis->AddParam("do_gravity", do_gravity);
   artemis->AddParam("do_nbody", do_nbody);
-  artemis->AddParam("do_rotating_frame", do_rframe);
-  artemis->AddParam("do_shear", do_shear);
+  artemis->AddParam("do_rotating_frame", do_rotating_frame);
   artemis->AddParam("do_cooling", do_cooling);
   artemis->AddParam("do_drag", do_drag);
   artemis->AddParam("do_viscosity", do_viscosity);
@@ -112,6 +111,7 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   artemis->AddParam("do_radiation", do_radiation);
   artemis->AddParam("do_imc", do_imc);
   artemis->AddParam("do_moment", do_moment);
+  artemis->AddParam("do_shear", do_shear);
 
   // Set coordinate system
   const int ndim = ProblemDimension(pin.get());
@@ -125,7 +125,7 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   if (do_gravity) packages.Add(Gravity::Initialize(pin.get(), constants, packages));
   if (do_gas) packages.Add(Gas::Initialize(pin.get(), units, constants, packages));
   if (do_dust) packages.Add(Dust::Initialize(pin.get(), units));
-  if (do_rframe) packages.Add(RotatingFrame::Initialize(pin.get()));
+  if (do_rotating_frame) packages.Add(RotatingFrame::Initialize(pin.get()));
   if (do_cooling) packages.Add(Gas::Cooling::Initialize(pin.get()));
   if (do_drag) packages.Add(Drag::Initialize(pin.get()));
   if (do_radiation) {

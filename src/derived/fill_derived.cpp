@@ -136,7 +136,6 @@ void ConsToPrim(MeshData<Real> *md) {
         geometry::Coords<GEOM> coords(vmesh.GetCoordinates(b), k, j, i);
         const auto &xv = coords.GetCellCenter();
         const auto &hx = coords.GetScaleFactors();
-        const Real ih[3] = {1.0 / hx[0], 1.0 / hx[1], 1.0 / hx[2]};
 
         if (do_gas) {
           for (int n = 0; n < vmesh.GetSize(b, gas::prim::density()); ++n) {
@@ -147,16 +146,15 @@ void ConsToPrim(MeshData<Real> *md) {
             w_d = (dfloor)*u_d + (!dfloor) * dflr_gas;
 
             // Set primitive velocity
-            const Real iwd = 1.0 / w_d;
             Real &vel1 = vmesh(b, gas::prim::velocity(VI(n, 0)), k, j, i);
             Real &vel2 = vmesh(b, gas::prim::velocity(VI(n, 1)), k, j, i);
             Real &vel3 = vmesh(b, gas::prim::velocity(VI(n, 2)), k, j, i);
-            vel1 = vmesh(b, gas::cons::momentum(VI(n, 0)), k, j, i) * iwd * ih[0];
-            vel2 = vmesh(b, gas::cons::momentum(VI(n, 1)), k, j, i) * iwd * ih[1];
-            vel3 = vmesh(b, gas::cons::momentum(VI(n, 2)), k, j, i) * iwd * ih[2];
+            vel1 = vmesh(b, gas::cons::momentum(VI(n, 0)), k, j, i) / (w_d * hx[0]);
+            vel2 = vmesh(b, gas::cons::momentum(VI(n, 1)), k, j, i) / (w_d * hx[1]);
+            vel3 = vmesh(b, gas::cons::momentum(VI(n, 2)), k, j, i) / (w_d * hx[2]);
 
             // Set primitive specific internal energy and apply floor
-            const Real w_s = vmesh(b, gas::cons::internal_energy(n), k, j, i) * iwd;
+            const Real w_s = vmesh(b, gas::cons::internal_energy(n), k, j, i) / w_d;
             const bool siefloor = (w_s > sieflr_gas);
             vmesh(b, gas::prim::sie(n), k, j, i) =
                 (siefloor)*w_s + (!siefloor) * sieflr_gas;
@@ -172,13 +170,12 @@ void ConsToPrim(MeshData<Real> *md) {
             w_d = (dfloor)*u_d + (u_d <= dflr_dust) * dflr_dust;
 
             // Set primitive velocity
-            const Real iwd = 1.0 / w_d;
             Real &vel1 = vmesh(b, dust::prim::velocity(VI(n, 0)), k, j, i);
             Real &vel2 = vmesh(b, dust::prim::velocity(VI(n, 1)), k, j, i);
             Real &vel3 = vmesh(b, dust::prim::velocity(VI(n, 2)), k, j, i);
-            vel1 = vmesh(b, dust::cons::momentum(VI(n, 0)), k, j, i) * iwd * ih[0];
-            vel2 = vmesh(b, dust::cons::momentum(VI(n, 1)), k, j, i) * iwd * ih[1];
-            vel3 = vmesh(b, dust::cons::momentum(VI(n, 2)), k, j, i) * iwd * ih[2];
+            vel1 = vmesh(b, dust::cons::momentum(VI(n, 0)), k, j, i) / (w_d * hx[0]);
+            vel2 = vmesh(b, dust::cons::momentum(VI(n, 1)), k, j, i) / (w_d * hx[1]);
+            vel3 = vmesh(b, dust::cons::momentum(VI(n, 2)), k, j, i) / (w_d * hx[2]);
           }
         }
 
@@ -192,7 +189,7 @@ void ConsToPrim(MeshData<Real> *md) {
 
             // Set primitive radiation flux
             const Real cer = c * w_er;
-            const Real conv[3] = {cer * hx[0], cer * hx[1], cer * hx[2]};
+            const std::array<Real, 3> conv = {cer * hx[0], cer * hx[1], cer * hx[2]};
             const Real hfx1 = vmesh(b, rad::cons::flux(VI(n, 0)), k, j, i) / conv[0];
             const Real hfx2 = vmesh(b, rad::cons::flux(VI(n, 1)), k, j, i) / conv[1];
             const Real hfx3 = vmesh(b, rad::cons::flux(VI(n, 2)), k, j, i) / conv[2];
@@ -343,7 +340,7 @@ void PrimToCons(T *md) {
 
             // Sync radiation fluxes
             const Real cer = c * w_er;
-            const Real conv[3] = {cer * hx[0], cer * hx[1], cer * hx[2]};
+            const std::array<Real, 3> conv = {cer * hx[0], cer * hx[1], cer * hx[2]};
             const Real fx1 = vmesh(b, rad::prim::flux(VI(n, 0)), k, j, i);
             const Real fx2 = vmesh(b, rad::prim::flux(VI(n, 1)), k, j, i);
             const Real fx3 = vmesh(b, rad::prim::flux(VI(n, 2)), k, j, i);
@@ -357,7 +354,7 @@ void PrimToCons(T *md) {
 
             // Radiation pressure
             Real &w_p = vmesh(b, rad::prim::pressure(n), k, j, i);
-            w_p = w_er / 3.0;
+            w_p = ONE_3RD * w_er;
           }
         }
       });

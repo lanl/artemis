@@ -70,7 +70,8 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   const bool do_dust = pin->GetOrAddBoolean("physics", "dust", false);
   const bool do_gravity = pin->GetOrAddBoolean("physics", "gravity", false);
   const bool do_nbody = pin->GetOrAddBoolean("physics", "nbody", false);
-  const bool do_rotating_frame = pin->GetOrAddBoolean("physics", "rotating_frame", false);
+  const bool do_rframe = pin->GetOrAddBoolean("physics", "rotating_frame", false);
+  const bool do_shear = (do_rframe && (pin->GetReal("rotating_frame", "qshear") > 0));
   const bool do_cooling = pin->GetOrAddBoolean("physics", "cooling", false);
   const bool do_drag = pin->GetOrAddBoolean("physics", "drag", false);
   const bool do_viscosity = pin->GetOrAddBoolean("physics", "viscosity", false);
@@ -93,13 +94,16 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
                     "Conduction requires the gas package, but there is not gas!");
   PARTHENON_REQUIRE(!(do_radiation) || (do_radiation && do_gas),
                     "Radiation requires the gas package, but there is not gas!");
+  PARTHENON_REQUIRE(!(do_viscosity) || !(do_shear),
+                    "Viscosity it not yet supported for shearing box!");
 
   // Store configuration choices in params
   artemis->AddParam("do_gas", do_gas);
   artemis->AddParam("do_dust", do_dust);
   artemis->AddParam("do_gravity", do_gravity);
   artemis->AddParam("do_nbody", do_nbody);
-  artemis->AddParam("do_rotating_frame", do_rotating_frame);
+  artemis->AddParam("do_rotating_frame", do_rframe);
+  artemis->AddParam("do_shear", do_shear);
   artemis->AddParam("do_cooling", do_cooling);
   artemis->AddParam("do_drag", do_drag);
   artemis->AddParam("do_viscosity", do_viscosity);
@@ -121,7 +125,7 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   if (do_gravity) packages.Add(Gravity::Initialize(pin.get(), constants, packages));
   if (do_gas) packages.Add(Gas::Initialize(pin.get(), units, constants, packages));
   if (do_dust) packages.Add(Dust::Initialize(pin.get(), units));
-  if (do_rotating_frame) packages.Add(RotatingFrame::Initialize(pin.get()));
+  if (do_rframe) packages.Add(RotatingFrame::Initialize(pin.get()));
   if (do_cooling) packages.Add(Gas::Cooling::Initialize(pin.get()));
   if (do_drag) packages.Add(Drag::Initialize(pin.get()));
   if (do_radiation) {

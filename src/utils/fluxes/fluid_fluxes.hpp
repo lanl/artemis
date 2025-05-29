@@ -314,13 +314,13 @@ TaskStatus FluxSourceImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, CONS vcons, FAC
 
         // Timestep weighted by dx
         geometry::BBox bnds = coords.bnds;
-        const Real dtdx[3] = {dt / (bnds.x1[1] - bnds.x1[0]),
-                              multi_d * dt / (bnds.x2[1] - bnds.x2[0]),
-                              three_d * dt / (bnds.x3[1] - bnds.x3[0])};
+        const std::array<Real, 3> dtdx = {dt / (bnds.x1[1] - bnds.x1[0]),
+                                          multi_d * dt / (bnds.x2[1] - bnds.x2[0]),
+                                          three_d * dt / (bnds.x3[1] - bnds.x3[0])};
 
         // Timestep weighted by (half) volume
         const Real hdtv = 0.5 * dt / vol;
-        const Real hdtvol[3] = {hdtv, multi_d * hdtv, three_d * hdtv};
+        const std::array<Real, 3> hdtvol = {hdtv, multi_d * hdtv, three_d * hdtv};
 
         // Index gymnastics
         const int nspec3 = nspecies * 3;

@@ -60,7 +60,7 @@ ArtemisDriver<GEOM>::ArtemisDriver(ParameterInput *pin, ApplicationInput *app_in
   do_dust = artemis_pkg->template Param<bool>("do_dust");
   do_gravity = artemis_pkg->template Param<bool>("do_gravity");
   do_rotating_frame = artemis_pkg->template Param<bool>("do_rotating_frame");
-  do_shear = (do_rotating_frame && (pin->GetReal("rotating_frame", "qshear") > 0));
+  do_shear = artemis_pkg->template Param<bool>("do_shear");
   do_cooling = artemis_pkg->template Param<bool>("do_cooling");
   do_drag = artemis_pkg->template Param<bool>("do_drag");
   do_viscosity = artemis_pkg->template Param<bool>("do_viscosity");

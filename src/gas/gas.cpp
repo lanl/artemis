@@ -461,13 +461,12 @@ Real EstimateTimestepMesh(MeshData<Real> *md) {
 
   // NOTE(@pdmullen): Without FARGO, dt must be additionally limited by the linear
   // advection of the shear background flow (vy0 = -q Omega x)
-  bool do_shear = false;
   Real qshear = 0.0, om0 = 0.0;
-  if (pm->packages.Get("artemis")->Param<bool>("do_rotating_frame")) {
+  const bool do_shear = pm->packages.Get("artemis")->Param<bool>("do_shear");
+  if (do_shear) {
     auto &rframe_pkg = pm->packages.Get("rotating_frame");
     qshear = rframe_pkg->Param<Real>("qshear");
     om0 = rframe_pkg->Param<Real>("omega");
-    do_shear = (qshear * om0 != 0.0);
   }
 
   static auto desc =
@@ -508,6 +507,7 @@ Real EstimateTimestepMesh(MeshData<Real> *md) {
       },
       Kokkos::Min<Real>(min_dt));
 
+  // Viscosity
   Real visc_dt = Big<Real>();
   const auto do_viscosity = params.template Get<bool>("do_viscosity");
   if (do_viscosity) {
@@ -523,6 +523,7 @@ Real EstimateTimestepMesh(MeshData<Real> *md) {
     }
   }
 
+  // Conduction
   Real cond_dt = Big<Real>();
   const auto do_conduction = params.template Get<bool>("do_conduction");
   if (do_conduction) {

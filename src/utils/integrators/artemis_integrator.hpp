@@ -53,7 +53,7 @@ inline TaskStatus DeepCopyConservedData(MeshData<Real> *to, MeshData<Real> *from
 //----------------------------------------------------------------------------------------
 //! \fn  TaskStatus ArtemisUtils::ApplyUpdate
 //! \brief
-template <Coordinates GEOM>
+template <Coordinates GEOM, bool include_divf = true>
 TaskStatus ApplyUpdate(MeshData<Real> *u0, MeshData<Real> *u1, const Real g0,
                        const Real g1, const Real beta_dt) {
   using parthenon::MakePackDescriptor;
@@ -61,7 +61,7 @@ TaskStatus ApplyUpdate(MeshData<Real> *u0, MeshData<Real> *u1, const Real g0,
   auto pm = u0->GetParentPointer();
 
   // Packing and indexing
-  std::vector<MetadataFlag> flags({Metadata::Conserved, Metadata::WithFluxes});
+  std::vector<MetadataFlag> flags({Metadata::Conserved});
   static auto desc = MakePackDescriptor<any>(u0, flags, {parthenon::PDOpt::WithFluxes});
   const auto v0 = desc.GetPack(u0);
   const auto v1 = desc.GetPack(u1);
@@ -89,13 +89,15 @@ TaskStatus ApplyUpdate(MeshData<Real> *u0, MeshData<Real> *u1, const Real g0,
         for (int n = v0.GetLowerBound(b); n <= v0.GetUpperBound(b); ++n) {
           Real &v0n = v0(b, n, k, j, i);
           Real &v1n = v1(b, n, k, j, i);
-          const Real divf = (ax1[0] * v0.flux(b, d1, n, k, j, i) -
-                             ax1[1] * v0.flux(b, d1, n, k, j, i + 1)) +
-                            (ax2[0] * v0.flux(b, d2, n, k, j, i) -
-                             ax2[1] * v0.flux(b, d2, n, k, j + multi_d, i)) +
-                            (ax3[0] * v0.flux(b, d3, n, k, j, i) -
-                             ax3[1] * v0.flux(b, d3, n, k + three_d, j, i));
-          v0n = g0 * v0n + g1 * v1n + divf * bdt_vol;
+          v0n = g0 * v0n + g1 * v1n;
+          if constexpr (include_divf) {
+            v0n += bdt_vol * ((ax1[0] * v0.flux(b, d1, n, k, j, i) -
+                               ax1[1] * v0.flux(b, d1, n, k, j, i + 1)) +
+                              (ax2[0] * v0.flux(b, d2, n, k, j, i) -
+                               ax2[1] * v0.flux(b, d2, n, k, j + multi_d, i)) +
+                              (ax3[0] * v0.flux(b, d3, n, k, j, i) -
+                               ax3[1] * v0.flux(b, d3, n, k + three_d, j, i)));
+          }
         }
       });
   return TaskStatus::complete;

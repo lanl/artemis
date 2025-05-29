@@ -71,11 +71,14 @@ set (SRC_LIST
   pgen/strat.hpp
   pgen/thermalization.hpp
 
+  radiation/imc/imc_driver.cpp
   radiation/imc/imc.hpp
   radiation/moments/moments.cpp
   radiation/moments/moments.hpp
+  radiation/moments/moments_driver.cpp
   radiation/moments/matter_coupling.hpp
 
+  rotating_frame/ladv_driver.cpp
   rotating_frame/rotating_frame.cpp
   rotating_frame/rotating_frame_impl.hpp
   rotating_frame/rotating_frame.hpp

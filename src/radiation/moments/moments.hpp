@@ -31,92 +31,13 @@ TaskStatus MatterCoupling(MeshData<Real> *u0, const Real dt);
 
 void AddHistory(Coordinates coords, Params &params);
 
-//----------------------------------------------------------------------------------------
-//! \fn TaskListStatus ArtemisDriver::MomentsTasks
-//! \brief
 template <Coordinates GEOM>
-static TaskCollection MomentsTasks(Mesh *pmesh, const SimTime &tm,
-                                   parthenon::LowStorageIntegrator *integrator) {
-  using TQ = TaskQualifier;
-  TaskCollection tc;
+TaskListStatus MomentsDriver(Mesh *pmesh, const SimTime &tm,
+                             parthenon::LowStorageIntegrator *integrator);
 
-  using namespace ::parthenon::Update;
-  TaskID none(0);
-  const auto any = parthenon::BoundaryType::any;
-  const int num_partitions = pmesh->DefaultNumPartitions();
-
-  // Deep copy u0c into u1c for integrator logic
-  auto &init_region = tc.AddRegion(num_partitions);
-  for (int i = 0; i < num_partitions; i++) {
-    auto &tl = init_region[i];
-    auto &u0m = pmesh->mesh_data.GetOrAdd("u0m", i);
-    auto &u1m = pmesh->mesh_data.GetOrAdd("u1m", i);
-    tl.AddTask(none, ArtemisUtils::DeepCopyConservedData, u1m.get(), u0m.get());
-    auto &u0 = pmesh->mesh_data.GetOrAdd("u0", i);
-    auto &u1 = pmesh->mesh_data.GetOrAdd("u1", i);
-    tl.AddTask(none, ArtemisUtils::DeepCopyConservedData, u1.get(), u0.get());
-  }
-
-  // Now do explicit subcycling of radiation moment physics
-  for (int stage = 1; stage <= integrator->nstages; stage++) {
-    const Real g0 = integrator->gam0[stage - 1];
-    const Real g1 = integrator->gam1[stage - 1];
-    const Real bdt = integrator->beta[stage - 1] * integrator->dt;
-
-    TaskRegion &tr = tc.AddRegion(num_partitions);
-    for (int i = 0; i < num_partitions; i++) {
-      auto &tl = tr[i];
-      auto &u0 = pmesh->mesh_data.GetOrAdd("u0", i);
-      auto &u1 = pmesh->mesh_data.GetOrAdd("u1", i);
-      auto &u0m = pmesh->mesh_data.GetOrAdd("u0m", i);
-      auto &u1m = pmesh->mesh_data.GetOrAdd("u1m", i);
-      auto &u0c = pmesh->mesh_data.GetOrAdd("u0c", i);
-
-      // Start looking for incoming messages (including for flux correction)
-      auto start_recv = tl.AddTask(none, parthenon::StartReceiveBoundBufs<any>, u0c);
-      auto start_flx_recv = tl.AddTask(none, parthenon::StartReceiveFluxCorrections, u0m);
-
-      // Compute radiation fluxes
-      auto rad_flx = tl.AddTask(none, Radiation::CalculateFluxes, u0m.get());
-
-      // Communicate and set fluxes
-      auto send_flx = tl.AddTask(
-          rad_flx, parthenon::SendBoundBufs<parthenon::BoundaryType::flxcor_send>, u0m);
-      auto recv_flx = tl.AddTask(start_flx_recv, parthenon::ReceiveFluxCorrections, u0m);
-      auto set_flx = tl.AddTask(recv_flx, parthenon::SetFluxCorrections, u0m);
-
-      // Apply RK logic (and potentially flux divergence) operator to fields
-      auto rupdate = tl.AddTask(rad_flx | set_flx, ArtemisUtils::ApplyUpdate<GEOM>,
-                                u0m.get(), u1m.get(), g0, g1, bdt);
-      auto cupdate = tl.AddTask(none, ArtemisUtils::ApplyUpdate<GEOM>, u0.get(), u1.get(),
-                                g0, g1, 0.0);
-
-      // Apply "coordinate source terms"
-      auto coord_src =
-          tl.AddTask(rupdate | cupdate, Radiation::FluxSource, u0m.get(), bdt);
-
-      // Apply matter-coupling step
-      auto coupling =
-          tl.AddTask(coord_src, Radiation::MatterCoupling<GEOM>, u0c.get(), bdt);
-
-      // Set auxillary fields
-      auto set_aux =
-          tl.AddTask(coupling, ArtemisDerived::SetAuxillaryFields<GEOM>, u0c.get());
-
-      // Set (remaining) fields to be communicated
-      auto pre_comm = tl.AddTask(set_aux, PreCommFillDerived<MeshData<Real>>, u0c.get());
-
-      // Set boundary conditions (both physical and logical)
-      auto bcs =
-          parthenon::AddBoundaryExchangeTasks(pre_comm, tl, u0c, pmesh->multilevel);
-
-      // Update primitive variables
-      auto c2p = tl.AddTask(bcs, FillDerived<MeshData<Real>>, u0c.get());
-    }
-  }
-
-  return tc;
-}
+template <Coordinates GEOM>
+TaskCollection MomentsTasks(Mesh *pmesh, const SimTime &tm,
+                            parthenon::LowStorageIntegrator *integrator);
 
 //----------------------------------------------------------------------------------------
 //! \fn Real Radiation::EstimateTimeStep
@@ -176,46 +97,18 @@ Real EstimateTimeStep(parthenon::Mesh *pmesh) {
 }
 
 //----------------------------------------------------------------------------------------
-//! \fn TaskListStatus MomentsDriver
-//! \brief
-template <Coordinates GEOM>
-static TaskListStatus MomentsDriver(Mesh *pmesh, const SimTime &tm,
-                                    parthenon::LowStorageIntegrator *integrator) {
-  // Craft a series of **equal** substeps that sum to the unsplit step
-  const Real dtlimit = Radiation::EstimateTimeStep<GEOM>(pmesh);
-  const int nsteps = static_cast<int>(std::ceil(integrator->dt / dtlimit));
-  integrator->dt = integrator->dt / nsteps;
-
-  // Report number of substeps
-  if (tm.ncycle % tm.ncycle_out == 0) {
-    if (Globals::my_rank == 0) {
-      std::cout << "(Radiation Moments) "
-                << "Executing " << nsteps << " substeps"
-                << " with dt=" << integrator->dt << std::endl;
-    }
-  }
-
-  // Execute MomentsTasks over substeps
-  for (int step = 1; step <= nsteps; step++) {
-    auto status = MomentsTasks<GEOM>(pmesh, tm, integrator).Execute();
-    if (status != TaskListStatus::complete) return status;
-  }
-
-  return TaskListStatus::complete;
-}
-
-//----------------------------------------------------------------------------------------
 //! \fn Real Radiation::EddingtonFactor
 //! \brief Computes Eddington factor given closure model
 template <Closure CTYP>
 KOKKOS_INLINE_FUNCTION Real EddingtonFactor(const Real f) {
   if constexpr (CTYP == Closure::p1) {
-    return 1. / 3.;
+    return ONE_3RD;
   } else if (CTYP == Closure::m1) {
     const Real f2 = f * f;
     return (3. + 4. * f2) / (5. + 2. * std::sqrt(4. - 3. * f2));
   } else {
     PARTHENON_FAIL("Closure model not recognized!");
+    return 0;
   }
 }
 
@@ -241,6 +134,7 @@ EddingtonTensor(const std::array<Real, 3> fred) {
             cb * n[1] * n[2],      cb * n[0] * n[2],      cb * n[0] * n[1]};
   } else {
     PARTHENON_FAIL("Closure model not recognized!");
+    return {0, 0, 0, 0, 0, 0};
   }
 }
 
@@ -261,6 +155,7 @@ KOKKOS_INLINE_FUNCTION std::tuple<Real, Real> WaveSpeed(const Real mu, const Rea
     return {norm * (mu * f - fac), norm * (mu * f + fac)};
   } else {
     PARTHENON_FAIL("Closure model not recognized!");
+    return {0, 0};
   }
 }
 

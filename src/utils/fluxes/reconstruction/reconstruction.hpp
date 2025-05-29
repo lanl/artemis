@@ -38,8 +38,7 @@ KOKKOS_INLINE_FUNCTION void
 correct_recon(parthenon::team_mbr_t const &member, const int dir, const int b,
               const int k, const int j, const int il, const int iu, const V &q,
               parthenon::ScratchPad2D<Real> &ql, parthenon::ScratchPad2D<Real> &qr) {
-  constexpr int nvar = 5;
-  const int nspecies = q.GetMaxNumberOfVars() / nvar;
+  const int nspecies = q.GetSize(b, rad::prim::energy());
   for (int n = 0; n < nspecies; ++n) {
     const int IFX = nspecies + (n * 3) + ((dir - 1));
     const int IFY = nspecies + (n * 3) + ((dir - 1) + 1) % 3;

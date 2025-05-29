@@ -48,7 +48,7 @@
 namespace ArtemisUtils {
 //----------------------------------------------------------------------------------------
 //! \class ArtemisUtils::RiemannSolver<RSolver::hlle, ...>
-//! \brief The HLLE Riemann solver for ideal gas hydrodynamics
+//! \brief The HLLE Riemann solver for ideal gas/dust hydrodynamics
 template <Fluid FLUID_TYPE, Closure CTYPE>
 struct RiemannSolver<RSolver::hlle, FLUID_TYPE, CTYPE,
                      std::enable_if_t<FLUID_TYPE != Fluid::radiation>> {
@@ -69,13 +69,12 @@ struct RiemannSolver<RSolver::hlle, FLUID_TYPE, CTYPE,
     const Real gm1 = eos.GruneisenParamFromDensityTemperature(Null<Real>(), Null<Real>());
 
     // Obtain number of species
-    int nvar = Null<int>();
+    int nspecies = Null<int>();
     if constexpr (FLUID_TYPE == Fluid::gas) {
-      nvar = 6;
+      nspecies = q.GetSize(b, gas::cons::density());
     } else if constexpr (FLUID_TYPE == Fluid::dust) {
-      nvar = 4;
+      nspecies = q.GetSize(b, dust::cons::density());
     }
-    const int nspecies = p.GetMaxNumberOfVars() / nvar;
 
     for (int n = 0; n < nspecies; ++n) {
       const int IDN = n;
@@ -225,6 +224,9 @@ struct RiemannSolver<RSolver::hlle, FLUID_TYPE, CTYPE,
   }
 };
 
+//----------------------------------------------------------------------------------------
+//! \class ArtemisUtils::RiemannSolver<RSolver::hlle, ...>
+//! \brief The HLLE Riemann solver for radiation
 template <Fluid FLUID_TYPE, Closure CTYPE>
 struct RiemannSolver<RSolver::hlle, FLUID_TYPE, CTYPE,
                      std::enable_if_t<FLUID_TYPE == Fluid::radiation>> {
@@ -240,8 +242,7 @@ struct RiemannSolver<RSolver::hlle, FLUID_TYPE, CTYPE,
     // Check sensibility of flux direction
     PARTHENON_REQUIRE(dir > 0 && dir <= 3, "Invalid flux direction!");
     // Obtain number of species
-    constexpr int nvar = 5;
-    const int nspecies = p.GetMaxNumberOfVars() / nvar;
+    const int nspecies = q.GetSize(b, rad::cons::energy());
 
     for (int n = 0; n < nspecies; ++n) {
       const int IDN = n;

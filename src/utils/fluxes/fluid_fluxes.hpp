@@ -40,15 +40,14 @@ KOKKOS_INLINE_FUNCTION void ScaleMomentumFlux(parthenon::team_mbr_t const &membe
   PARTHENON_REQUIRE(DIR > 0 && DIR <= 3, "Invalid flux direction!");
 
   // Obtain number of species
-  int nvar = Null<int>();
+  int nspecies = Null<int>();
   if constexpr (F == Fluid::gas) {
-    nvar = 6;
+    nspecies = q.GetSize(b, gas::cons::density());
   } else if constexpr (F == Fluid::dust) {
-    nvar = 4;
+    nspecies = q.GetSize(b, dust::cons::density());
   } else if constexpr (F == Fluid::radiation) {
-    nvar = 4;
+    nspecies = q.GetSize(b, rad::cons::energy());
   }
-  const int nspecies = q.GetMaxNumberOfVars() / nvar;
 
   // Scale the Momentum Flux in the DIR direction
   for (int n = 0; n < nspecies; ++n) {
@@ -109,7 +108,6 @@ TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, FLUX vflx,
   // Scratch properties
   // NOTE(PDM): Scratch here must be able to contain up to the total number of species,
   // even if some blocks don't contain all species
-  const int nspecies = pkg->template Param<int>("nspecies");
   const int nvars = vp.GetMaxNumberOfVars();
   const int scr_level = pkg->template Param<int>("scr_level");
   int scr_size = ScratchPad2D<Real>::shmem_size(nvars, ncells1) * 2;
@@ -265,16 +263,6 @@ TaskStatus FluxSourceImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, CONS vcons, FAC
   const bool x2dep = (geometry::x2dep<G>() && multi_d);
   const bool x3dep = (geometry::x3dep<G>() && three_d);
 
-  // Obtain number of species
-  int nspecies = Null<int>();
-  if constexpr (F == Fluid::gas) {
-    nspecies = vp.GetMaxNumberOfVars() / 5;
-  } else if constexpr (F == Fluid::dust) {
-    nspecies = vp.GetMaxNumberOfVars() / 4;
-  } else if constexpr (F == Fluid::radiation) {
-    nspecies = vp.GetMaxNumberOfVars() / 5;
-  }
-
   // Extract (reduced, weighted) speed of light
   Real hcchat = Null<Real>();
   if constexpr (F == Fluid::radiation) {
@@ -283,7 +271,7 @@ TaskStatus FluxSourceImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, CONS vcons, FAC
 
   // Apply flux sources
   parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "GeometricSourceTerms", parthenon::DevExecSpace(), 0,
+      DEFAULT_LOOP_PATTERN, "FluxSourceTerms", parthenon::DevExecSpace(), 0,
       md->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
         // Extract coordinates
@@ -323,6 +311,16 @@ TaskStatus FluxSourceImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, CONS vcons, FAC
         [[maybe_unused]] auto &vc_ = vcons;
         [[maybe_unused]] auto &vface_ = vface;
         [[maybe_unused]] auto &hcchat_ = hcchat;
+
+        // Extract nspecies
+        int nspecies = Null<int>();
+        if constexpr (F == Fluid::gas) {
+          nspecies = vp_.GetSize(b, gas::prim::density());
+        } else if constexpr (F == Fluid::dust) {
+          nspecies = vp_.GetSize(b, dust::prim::density());
+        } else if constexpr (F == Fluid::radiation) {
+          nspecies = vp_.GetSize(b, rad::prim::energy());
+        }
 
         // Add the "flux source terms"
         for (int n = 0; n < nspecies; ++n) {
@@ -433,7 +431,7 @@ TaskStatus CalculateFluxesRiemannSelect(MeshData<Real> *md, PKG &pkg, PRIM vp, F
   // Select CalculateFluxesReconSelect based on Riemann solver
   typedef RSolver R;
   if (riemann_method == R::hllc) {
-    if constexpr (F != Fluid::radiation) {
+    if constexpr (F != Fluid::radiation && F != Fluid::dust) {
       return CalculateFluxesReconSelect<G, F, C, R::hllc>(md, pkg, vp, vflx, vface, pcm);
     } else {
       PARTHENON_FAIL("Radiation fluid does not support an HLLC solver")

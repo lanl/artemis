@@ -613,7 +613,7 @@ TaskStatus ViscousFlux(MeshData<Real> *md) {
   // Assumes this packing ordering
   static auto desc_flux =
       parthenon::MakePackDescriptor<gas::diff::momentum, gas::diff::energy>(
-          resolved_pkgs.get(), {}, {parthenon::PDOpt::WithFluxes});
+          resolved_pkgs.get());
 
   auto vprim = desc_prim.GetPack(md);
   auto vf = desc_flux.GetPack(md);
@@ -650,8 +650,8 @@ TaskStatus ThermalFlux(MeshData<Real> *md) {
           resolved_pkgs.get());
 
   // Assumes this packing ordering
-  static auto desc_flux = parthenon::MakePackDescriptor<gas::diff::energy>(
-      resolved_pkgs.get(), {}, {parthenon::PDOpt::WithFluxes});
+  static auto desc_flux =
+      parthenon::MakePackDescriptor<gas::diff::energy>(resolved_pkgs.get());
 
   auto vprim = desc_prim.GetPack(md);
   auto vf = desc_flux.GetPack(md);
@@ -682,7 +682,7 @@ TaskStatus ZeroDiffusionFlux(MeshData<Real> *md) {
   auto &resolved_pkgs = pm->resolved_packages;
   static auto desc_flux =
       parthenon::MakePackDescriptor<gas::diff::momentum, gas::diff::energy>(
-          resolved_pkgs.get(), {}, {parthenon::PDOpt::WithFluxes});
+          resolved_pkgs.get());
 
   auto vf = desc_flux.GetPack(md);
   return Diffusion::ZeroDiffusionImpl(md, vf);

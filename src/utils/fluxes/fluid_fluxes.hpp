@@ -261,12 +261,6 @@ TaskStatus FluxSourceImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, CONS vcons, FAC
   const int ndim = md->GetParentPointer()->ndim;
   const bool multi_d = (ndim >= 2);
   const bool three_d = (ndim == 3);
-  const int d1 = X1DIR;
-  const int d2 = d1 + multi_d;
-  const int d3 = d2 + three_d;
-  const auto f1 = TE::F1;
-  const auto f2 = (multi_d) ? TE::F2 : f1;
-  const auto f3 = (three_d) ? TE::F3 : f2;
   const bool x1dep = geometry::x1dep<G>();
   const bool x2dep = (geometry::x2dep<G>() && multi_d);
   const bool x3dep = (geometry::x3dep<G>() && three_d);
@@ -294,17 +288,15 @@ TaskStatus FluxSourceImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, CONS vcons, FAC
       KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
         // Extract coordinates
         geometry::Coords<G> coords(vp.GetCoordinates(b), k, j, i);
-        const auto dhdx1 = (x1dep) ? coords.GetConnX1() : NewArray<Real, 3>(0.0);
-        const auto dhdx2 = (x2dep) ? coords.GetConnX2() : NewArray<Real, 3>(0.0);
-        const auto dhdx3 = (x3dep) ? coords.GetConnX3() : NewArray<Real, 3>(0.0);
         const auto ax1 = coords.GetFaceAreaX1();
         const auto ax2 = (multi_d) ? coords.GetFaceAreaX2() : NewArray<Real, 2>(0.0);
         const auto ax3 = (three_d) ? coords.GetFaceAreaX3() : NewArray<Real, 2>(0.0);
-        const Real vol = coords.Volume();
+        const auto dh1 = (x1dep) ? coords.GetConnX1() : NewArray<Real, 3>(0.0);
+        const auto dh2 = (x2dep) ? coords.GetConnX2() : NewArray<Real, 3>(0.0);
+        const auto dh3 = (x3dep) ? coords.GetConnX3() : NewArray<Real, 3>(0.0);
 
         // Get the rotational velocity
-        const auto xv = coords.GetCellCenter();
-        const auto rfv = RotatingFrame::RotationVelocity<G>(xv, omf);
+        const auto rfv = RotatingFrame::RotationVelocity<G>(coords.GetCellCenter(), omf);
 
         // Timestep weighted by dx
         geometry::BBox bnds = coords.bnds;
@@ -313,7 +305,7 @@ TaskStatus FluxSourceImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, CONS vcons, FAC
                                           three_d * dt / (bnds.x3[1] - bnds.x3[0])};
 
         // Timestep weighted by (half) volume
-        const Real hdtv = 0.5 * dt / vol;
+        const Real hdtv = 0.5 * dt / coords.Volume();
         const std::array<Real, 3> hdtvol = {hdtv, multi_d * hdtv, three_d * hdtv};
 
         // Face indexing
@@ -346,66 +338,60 @@ TaskStatus FluxSourceImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, CONS vcons, FAC
           // Pressure gradient force for gas and radiation
           if constexpr (F == Fluid::gas || F == Fluid::radiation) {
             // Pressure gradient force
-            // clang-format off
-            const Real dp1 = (vp_.flux(b, d1, IPR, k, j, i) -
-                              vp_.flux(b, d1, IPR, k, j, i + 1));
-            const Real dp2 = (vp_.flux(b, d2, IPR, k, j, i) -
-                              vp_.flux(b, d2, IPR, k, j + multi_d, i));
-            const Real dp3 = (vp_.flux(b, d3, IPR, k, j, i) -
-                              vp_.flux(b, d3, IPR, k + three_d, j, i));
-            // clang-format on
-            vc_(b, IMX, k, j, i) += dtdx[0] * dp1;
-            vc_(b, IMY, k, j, i) += dtdx[1] * dp2;
-            vc_(b, IMZ, k, j, i) += dtdx[2] * dp3;
+            vc_(b, IMX, k, j, i) += dtdx[0] * (vp_.flux(b, d1, IPR, k, j, i) -
+                                               vp_.flux(b, d1, IPR, k, j, i + 1));
+            vc_(b, IMY, k, j, i) += dtdx[1] * (vp_.flux(b, d2, IPR, k, j, i) -
+                                               vp_.flux(b, d2, IPR, k, j + multi_d, i));
+            vc_(b, IMZ, k, j, i) += dtdx[2] * (vp_.flux(b, d3, IPR, k, j, i) -
+                                               vp_.flux(b, d3, IPR, k + three_d, j, i));
           }
 
           // pdV source for gas internal energy equation
           if constexpr (F == Fluid::gas) {
             // pdV source term
             // clang-format off
-            const Real pp1 = (vp_.flux(b, d1, IPR, k, j, i) +
-                              vp_.flux(b, d1, IPR, k, j, i + 1));
-            const Real pp2 = (vp_.flux(b, d2, IPR, k, j, i) +
-                              vp_.flux(b, d2, IPR, k, j + multi_d, i));
-            const Real pp3 = (vp_.flux(b, d3, IPR, k, j, i) +
-                              vp_.flux(b, d3, IPR, k + three_d, j, i));
-            const Real dva1 = (ax1[0] * vface_(b, f1, n, k, j, i) -
-                               ax1[1] * vface_(b, f1, n, k, j, i + 1));
-            const Real dva2 = (ax2[0] * vface_(b, f2, n, k, j, i) -
-                               ax2[1] * vface_(b, f2, n, k, j + multi_d, i));
-            const Real dva3 = (ax3[0] * vface_(b, f3, n, k, j, i) -
-                               ax3[1] * vface_(b, f3, n, k + three_d, j, i));
+            vc_(b, IEG, k, j, i) += hdtvol[0] *
+                                    (vp_.flux(b, d1, IPR, k, j, i) +
+                                     vp_.flux(b, d1, IPR, k, j, i + 1)) *
+                                    (ax1[0] * vface_(b, f1,n, k, j, i) -
+                                     ax1[1] * vface_(b, f1,n, k, j, i + 1));
+            vc_(b, IEG, k, j, i) += hdtvol[1] *
+                                    (vp_.flux(b, d2, IPR, k, j, i) +
+                                     vp_.flux(b, d2, IPR, k, j + multi_d, i)) *
+                                    (ax2[0] * vface_(b, f2, n, k, j, i) -
+                                     ax2[1] * vface_(b, f2, n, k, j + multi_d, i));
+            vc_(b, IEG, k, j, i) += hdtvol[2] *
+                                    (vp_.flux(b, d3, IPR, k, j, i) +
+                                     vp_.flux(b, d3, IPR, k + three_d, j, i)) *
+                                    (ax3[0] * vface_(b, f3, n, k, j, i) -
+                                     ax3[1] * vface_(b, f3, n, k + three_d, j, i))
             // clang-format on
-            vc_(b, IEG, k, j, i) += hdtvol[0] * pp1 * dva1;
-            vc_(b, IEG, k, j, i) += hdtvol[1] * pp2 * dva2;
-            vc_(b, IEG, k, j, i) += hdtvol[2] * pp3 * dva3;
           }
 
           // Apply "coordinate source terms" (if not Cartesian)
           if constexpr (G != Coordinates::cartesian) {
             // Extract primitive weighted timestep
-            Real rdt = vp_(b, n, k, j, i) * dt;
+            Real wdt = vp_(b, n, k, j, i) * dt;
 
             // Additionally weight by closure for radiation moments
             if constexpr (F == Fluid::radiation) {
               const Real &fx = vp_(b, IVX, k, j, i);
               const Real &fy = vp_(b, IVY, k, j, i);
               const Real &fz = vp_(b, IVZ, k, j, i);
-              const Real f2 = std::sqrt(SQR(fx) + SQR(fy) + SQR(fz));
-              const Real chi = Radiation::EddingtonFactor<C>(std::sqrt(f2));
-              rdt *= (3.0 * chi - 1.0) * hcchat_ / (f2 + Fuzz<Real>());
+              const Real ff = std::sqrt(SQR(fx) + SQR(fy) + SQR(fz));
+              const Real chi = Radiation::EddingtonFactor<C>(ff);
+              wdt *= (3.0 * chi - 1.0) * hcchat_ / (f2 + Fuzz<Real>());
             }
 
             // Update momenta
-            const Real dt1 = rdt * x1dep;
-            const Real dt2 = rdt * x2dep;
-            const Real dt3 = rdt * x3dep;
+            // clang-format off
             const Real t1 = SQR(vp_(b, IVX, k, j, i) + rfv[0]);
             const Real t2 = SQR(vp_(b, IVY, k, j, i) + rfv[1]);
             const Real t3 = SQR(vp_(b, IVZ, k, j, i) + rfv[2]);
-            vc_(b, IMX, k, j, i) += dt1 * (dhdx1[0] * t1 + dhdx1[1] * t2 + dhdx1[2] * t3);
-            vc_(b, IMY, k, j, i) += dt2 * (dhdx2[0] * t1 + dhdx2[1] * t2 + dhdx2[2] * t3);
-            vc_(b, IMZ, k, j, i) += dt3 * (dhdx3[0] * t1 + dhdx3[1] * t2 + dhdx3[2] * t3);
+            vc_(b, IMX, k, j, i) += x1dep * wdt * (dh1[0]*t1 + dh1[1]*t2 + dh1[2]*t3);
+            vc_(b, IMY, k, j, i) += x2dep * wdt * (dh2[0]*t1 + dh2[1]*t2 + dh2[2]*t3);
+            vc_(b, IMZ, k, j, i) += x3dep * wdt * (dh3[0]*t1 + dh3[1]*t2 + dh3[2]*t3);
+            // clang-format on
           }
         }
       });

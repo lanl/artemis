@@ -18,8 +18,8 @@
 // C++/C includes
 #include <cstdio>
 #include <fcntl.h>
-#include <iostream>
 #include <fstream>
+#include <iostream>
 #include <unistd.h> // for dup and dup2 on Unix-like systems
 
 // REBOUND includes

@@ -143,7 +143,8 @@
         "CMAKE_BUILD_TYPE": "Release",
         "HDF5_INCLUDE_DIR": "$env{HDF5_ROOT}/include",
         "CMAKE_C_COMPILER": "cc",
-        "CMAKE_CXX_COMPILER": "hipcc",
+        "CMAKE_CXX_COMPILER": "CC",
+        "CMAKE_CXX_FLAGS": "-noopenmp -mllvm -amdgpu-function-calls=false",
         "ARTEMIS_ENABLE_HIP": "ON",
       	"Kokkos_ARCH_AMD_GFX90A" : "ON"
       }
@@ -155,7 +156,8 @@
         "CMAKE_BUILD_TYPE": "Debug",
         "HDF5_INCLUDE_DIR": "$env{HDF5_ROOT}/include",
         "CMAKE_C_COMPILER": "cc",
-        "CMAKE_CXX_COMPILER": "hipcc",
+        "CMAKE_CXX_COMPILER": "CC",
+        "CMAKE_CXX_FLAGS": "-noopenmp -mllvm -amdgpu-function-calls=false",
         "ARTEMIS_ENABLE_HIP": "ON",
       	"Kokkos_ARCH_AMD_GFX90A" : "ON",
         "Kokkos_ENABLE_DEBUG_BOUNDS_CHECK": "ON"

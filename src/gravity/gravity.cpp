@@ -1,5 +1,5 @@
 //========================================================================================
-// (C) (or copyright) 2023-2024. Triad National Security, LLC. All rights reserved.
+// (C) (or copyright) 2023-2025. Triad National Security, LLC. All rights reserved.
 //
 // This program was produced under U.S. Government contract 89233218CNA000001 for Los
 // Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -28,10 +28,12 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   auto gravity = std::make_shared<StateDescriptor>("gravity");
   Params &params = gravity->AllParams();
 
+  // Problem dimensionality
   const int ndim = ProblemDimension(pin);
   std::string sys = pin->GetOrAddString("artemis", "coordinates", "cartesian");
   Coordinates coords = geometry::CoordSelect(sys, ndim);
 
+  // Start and stop time for gravity (if applicable)
   params.Add("tstart",
              pin->GetOrAddReal("gravity", "tstart", std::numeric_limits<Real>::lowest()));
   params.Add("tstop", pin->GetOrAddReal("gravity", "tstop", Big<Real>()));
@@ -160,13 +162,13 @@ TaskStatus ExternalGravity(MeshData<Real> *md, const Real time, const Real dt) {
 
 //----------------------------------------------------------------------------------------
 //! template instantiations
-typedef Coordinates C;
+typedef Coordinates G;
 typedef MeshData<Real> MD;
-template TaskStatus ExternalGravity<C::cartesian>(MD *m, const Real t, const Real dt);
-template TaskStatus ExternalGravity<C::cylindrical>(MD *m, const Real t, const Real dt);
-template TaskStatus ExternalGravity<C::spherical1D>(MD *m, const Real t, const Real dt);
-template TaskStatus ExternalGravity<C::spherical2D>(MD *m, const Real t, const Real dt);
-template TaskStatus ExternalGravity<C::spherical3D>(MD *m, const Real t, const Real dt);
-template TaskStatus ExternalGravity<C::axisymmetric>(MD *m, const Real t, const Real dt);
+template TaskStatus ExternalGravity<G::cartesian>(MD *m, const Real t, const Real dt);
+template TaskStatus ExternalGravity<G::cylindrical>(MD *m, const Real t, const Real dt);
+template TaskStatus ExternalGravity<G::spherical1D>(MD *m, const Real t, const Real dt);
+template TaskStatus ExternalGravity<G::spherical2D>(MD *m, const Real t, const Real dt);
+template TaskStatus ExternalGravity<G::spherical3D>(MD *m, const Real t, const Real dt);
+template TaskStatus ExternalGravity<G::axisymmetric>(MD *m, const Real t, const Real dt);
 
 } // namespace Gravity

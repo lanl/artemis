@@ -1,5 +1,5 @@
 //========================================================================================
-// (C) (or copyright) 2023-2024. Triad National Security, LLC. All rights reserved.
+// (C) (or copyright) 2023-2025. Triad National Security, LLC. All rights reserved.
 //
 // This program was produced under U.S. Government contract 89233218CNA000001 for Los
 // Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -15,7 +15,7 @@
 //! \file conduction.hpp
 //! \brief Conduction initial conditions
 
-// artemis headers
+// Artemis headers
 #include "artemis.hpp"
 #include "geometry/geometry.hpp"
 #include "utils/artemis_utils.hpp"
@@ -56,6 +56,9 @@ inline void InitCondParams(MeshBlock *pmb, ParameterInput *pin) {
   }
 }
 
+//----------------------------------------------------------------------------------------
+//! \fn void ProblemGenerator::Conduction
+//! \brief
 template <Coordinates GEOM>
 inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   using parthenon::MakePackDescriptor;
@@ -81,8 +84,10 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
     }
   }
 
+  // Problem specific params
   const Real x1min = pin->GetReal("parthenon/mesh", "x1min");
-  // packing and capture variables for kernel
+
+  // Packing and capture variables for kernel
   auto &md = pmb->meshblock_data.Get();
   for (auto &var : md->GetVariableVector()) {
     if (!var->IsAllocated()) pmb->AllocateSparse(var->label());
@@ -124,28 +129,31 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 //! \brief Sets inner X1 boundary condition to the initial condition
 template <Coordinates GEOM, IndexDomain BDY, Diffusion::DiffType DTYP>
 void CondBoundaryImpl(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) {
-
   auto pmb = mbd->GetBlockPointer();
 
+  // Artemis package and params
   auto artemis_pkg = pmb->packages.Get("artemis");
-  auto &gas_pkg = pmb->packages.Get("gas");
   auto cond_params = artemis_pkg->Param<CondParams>("cond_pgen_params");
-  auto diff_params = gas_pkg->Param<Diffusion::DiffCoeffParams>("cond_params");
 
+  // Gas package and params
+  auto &gas_pkg = pmb->packages.Get("gas");
+  auto do_gas = artemis_pkg->template Param<bool>("do_gas");
+  auto diff_params = gas_pkg->Param<Diffusion::DiffCoeffParams>("cond_params");
   auto eos_d = gas_pkg->template Param<EOS>("eos_d");
 
-  const bool fine = false;
-
+  // Packing
   static auto descriptors =
       ArtemisUtils::GetBoundaryPackDescriptorMap<gas::prim::density, gas::prim::velocity,
                                                  gas::prim::sie>(mbd);
-
   auto v = descriptors[coarse].GetPack(mbd.get());
+  if (v.GetMaxNumberOfVars() == 0) return;
 
+  // Indexing
   const auto &pco = (coarse) ? pmb->pmr->GetCoarseCoords() : pmb->coords;
   auto &dp = cond_params;
   auto &dcp = diff_params;
   const auto nb = IndexRange{0, 0};
+  const bool fine = false;
 
   // Boundary index arithmetic
   int is = Null<int>(), ie = Null<int>();
@@ -177,9 +185,9 @@ void CondBoundaryImpl(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) {
   constexpr int ix2 = (ix1 + 1) % 3;
   constexpr int ix3 = (ix1 + 2) % 3;
 
+  // Gravity pacakage and params (with knowledge of x?dir)
   Real gx1 = 0.;
   auto do_gravity = artemis_pkg->template Param<bool>("do_gravity");
-  auto do_gas = artemis_pkg->template Param<bool>("do_gas");
   if (do_gravity) {
     auto grav_pkg = pmb->packages.Get("gravity");
     Gravity::GravityType gtype = grav_pkg->template Param<Gravity::GravityType>("type");

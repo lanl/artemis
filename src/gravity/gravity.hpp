@@ -1,5 +1,5 @@
 //========================================================================================
-// (C) (or copyright) 2023-2024. Triad National Security, LLC. All rights reserved.
+// (C) (or copyright) 2023-2025. Triad National Security, LLC. All rights reserved.
 //
 // This program was produced under U.S. Government contract 89233218CNA000001 for Los
 // Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -93,6 +93,7 @@ struct Orbit {
   }
 };
 
+//----------------------------------------------------------------------------------------
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
                                             const ArtemisUtils::Constants &constants,
                                             const Packages_t &packages);

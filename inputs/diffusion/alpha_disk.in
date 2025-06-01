@@ -1,5 +1,5 @@
 # ========================================================================================
-#  (C) (or copyright) 2023-2024. Triad National Security, LLC. All rights reserved.
+#  (C) (or copyright) 2023-2025. Triad National Security, LLC. All rights reserved.
 #
 #  This program was produced under U.S. Government contract 89233218CNA000001 for Los
 #  Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -41,11 +41,11 @@ x1max  = 3.0      # maximum value of X1
 ix1_bc = viscous  # Inner-X1 boundary condition flag
 ox1_bc = viscous  # Outer-X1 boundary condition flag
 
-nx2    = 1024                    # Number of zones in X2-direction
-x2min  = -3.141592653589793      # minimum value of X2
-x2max  =  3.141592653589793      # maximum value of X2
-ix2_bc = periodic                # Inner-X2 boundary condition flag
-ox2_bc = periodic                # Outer-X2 boundary condition flag
+nx2    = 1024                # Number of zones in X2-direction
+x2min  = -3.141592653589793  # minimum value of X2
+x2max  =  3.141592653589793  # maximum value of X2
+ix2_bc = periodic            # Inner-X2 boundary condition flag
+ox2_bc = periodic            # Outer-X2 boundary condition flag
 
 nx3    = 1          # Number of zones in X3-direction
 x3min  = -0.5       # minimum value of X3
@@ -94,5 +94,4 @@ h0 = 0.05
 dens_min = 1.0e-10
 pres_min = 1.0e-15
 polytropic_index = 1.0
-mdot = 2.3561944901923453e-05 
-
+mdot = 2.3561944901923453e-05

@@ -1,5 +1,5 @@
 //========================================================================================
-// (C) (or copyright) 2023-2024. Triad National Security, LLC. All rights reserved.
+// (C) (or copyright) 2023-2025. Triad National Security, LLC. All rights reserved.
 //
 // This program was produced under U.S. Government contract 89233218CNA000001 for Los
 // Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -57,10 +57,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   const int ndim = ProblemDimension(pin);
   std::string sys = pin->GetOrAddString("artemis", "coordinates", "cartesian");
   Coordinates coords = geometry::CoordSelect(sys, ndim);
-
   PARTHENON_REQUIRE(!(geometry::is_axisymmetric(coords)),
                     "<nbody> does not work with axisymmetric coordinates");
-
   params.Add("coords", coords);
 
   // Rebound integrator
@@ -76,6 +74,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   params.Add("mscale", pin->GetOrAddReal("nbody", "mscale", 1.0));
   Real mtot = pin->GetOrAddReal("nbody", "mtot", -Big<Real>());
 
+  // Extract gravitational constant
   const Real G = constants.GetGCode();
 
   // Extra forces

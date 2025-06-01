@@ -1,5 +1,5 @@
 //========================================================================================
-// (C) (or copyright) 2023. Triad National Security, LLC. All rights reserved.
+// (C) (or copyright) 2023-2025. Triad National Security, LLC. All rights reserved.
 //
 // This program was produced under U.S. Government contract 89233218CNA000001 for Los
 // Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -20,17 +20,17 @@
 namespace ArtemisUtils {
 //----------------------------------------------------------------------------------------
 //! \class  TaskStatus ArtemisUtils::RiemannSolver
-//! \brief Class that wraps templated Riemann solver call to allow for partial
+//! \brief Functor that wraps templated Riemann solver call to allow for partial
 //!        template specialization.
-template <RSolver R, Fluid FLUID_TYPE>
-class RiemannSolver {
- public:
+template <RSolver R, Fluid FLUID_TYPE, Closure CTYPE, typename Enable = void>
+struct RiemannSolver {
   template <typename V1, typename V2>
   KOKKOS_INLINE_FUNCTION void
-  solve(const EOS &eos, parthenon::team_mbr_t const &member, const int b, const int k,
-        const int j, const int il, const int iu, const int dir,
-        const parthenon::ScratchPad2D<Real> &wl, const parthenon::ScratchPad2D<Real> &wr,
-        const V1 &p, const V2 &q) const {
+  operator()(const EOS &eos, const Real c, const Real chat,
+             parthenon::team_mbr_t const &member, const int b, const int k, const int j,
+             const int il, const int iu, const int dir,
+             const parthenon::ScratchPad2D<Real> &wl,
+             const parthenon::ScratchPad2D<Real> &wr, const V1 &p, const V2 &q) const {
     PARTHENON_FAIL("No default implementation!");
   }
 };

@@ -41,10 +41,17 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const bool do_gas = artemis_pkg->Param<bool>("do_gas");
   const bool do_dust = artemis_pkg->Param<bool>("do_dust");
   const bool do_radiation = artemis_pkg->Param<bool>("do_radiation");
+  const bool do_imc = artemis_pkg->Param<bool>("do_imc");
+  const bool do_moment = artemis_pkg->Param<bool>("do_moment");
   PARTHENON_REQUIRE(do_gas, "Thermalization problem requires gas!");
   PARTHENON_REQUIRE(!(do_dust), "Thermalization problem does not permit dust!");
   auto gas_pkg = pmb->packages.Get("gas");
   const auto eos = gas_pkg->Param<EOS>("eos_d");
+  Real ar = Null<Real>();
+  if (do_moment) {
+    auto rad_pkg = pmb->packages.Get("moments");
+    ar = rad_pkg->Param<Real>("arad");
+  }
 
   // Initial conditions
   const Real rho = pin->GetOrAddReal("problem", "rho", 1.0e-3);
@@ -60,7 +67,8 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   // packing and capture variables for kernel
   static auto desc =
-      MakePackDescriptor<gas::prim::density, gas::prim::velocity, gas::prim::sie>(
+      MakePackDescriptor<gas::prim::density, gas::prim::velocity, gas::prim::sie,
+                         rad::prim::energy, rad::prim::flux>(
           (pmb->resolved_packages).get());
   auto v = desc.GetPack(md.get());
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
@@ -68,14 +76,16 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
 
   // Set state vector to initialize radiation field via trad
-  pmb->par_for(
-      "thermalization::trad", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
-      KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        v(0, gas::prim::density(), k, j, i) = rho;
-        v(0, gas::prim::sie(), k, j, i) =
-            eos.InternalEnergyFromDensityTemperature(rho, trad);
-      });
-  if (do_radiation) jaybenne::InitializeRadiation(md.get(), true);
+  if (do_imc) {
+    pmb->par_for(
+        "thermalization::trad", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+        KOKKOS_LAMBDA(const int k, const int j, const int i) {
+          v(0, gas::prim::density(), k, j, i) = rho;
+          v(0, gas::prim::sie(), k, j, i) =
+              eos.InternalEnergyFromDensityTemperature(rho, trad);
+        });
+    jaybenne::InitializeRadiation(md.get(), true);
+  }
 
   // Now reset fluid state out of thermal equilibrium via tgas
   pmb->par_for(
@@ -87,6 +97,13 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         v(0, gas::prim::velocity(2), k, j, i) = 0.0;
         v(0, gas::prim::sie(), k, j, i) =
             eos.InternalEnergyFromDensityTemperature(rho, tgas);
+
+        if (do_moment) {
+          v(0, rad::prim::energy(), k, j, i) = ar * SQR(SQR(trad));
+          v(0, rad::prim::flux(0), k, j, i) = 0.0;
+          v(0, rad::prim::flux(1), k, j, i) = 0.0;
+          v(0, rad::prim::flux(2), k, j, i) = 0.0;
+        }
       });
 }
 

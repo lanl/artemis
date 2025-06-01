@@ -68,8 +68,22 @@ ARTEMIS_VARIABLE(dust.prim, density);
 ARTEMIS_VARIABLE(dust.prim, velocity);
 } // namespace prim
 } // namespace dust
+
+namespace rad {
+namespace cons {
+ARTEMIS_VARIABLE(rad.cons, energy);
+ARTEMIS_VARIABLE(rad.cons, flux);
+} // namespace cons
+namespace prim {
+ARTEMIS_VARIABLE(rad.prim, energy);
+ARTEMIS_VARIABLE(rad.prim, pressure);
+ARTEMIS_VARIABLE(rad.prim, flux);
+} // namespace prim
+} // namespace rad
+
 #undef ARTEMIS_VARIABLE
 
+// Restart options (see Parthenon #1231)
 #ifdef PORTABLE_RESTART
 using BYTE = uint8_t;
 #else
@@ -94,10 +108,12 @@ enum class Coordinates {
 enum class RSolver { hllc, hlle, llf, null };
 // ... Upwinding (left vs right state)
 enum class Upwind { l, r, null };
-// ...Reconstrution algorithms
+// ...Reconstruction algorithms
 enum class ReconstructionMethod { pcm, plm, ppm, null };
 // ...Fluid types
-enum class Fluid { gas, dust, null };
+enum class Fluid { gas, dust, radiation, null };
+// ...Closure types
+enum class Closure { p1, m1, null };
 // ...Boundary conditions
 enum class ArtemisBC {
   reflect,
@@ -111,6 +127,9 @@ enum class ArtemisBC {
   periodic,
   none
 };
+
+// Tensor indexing (currently used in radiation moments)
+enum TensIdx { X11 = 0, X22 = 1, X33 = 2, X23 = 3, X13 = 4, X12 = 5 };
 
 // Floating point limits
 template <typename T = Real>
@@ -146,6 +165,7 @@ KOKKOS_FORCEINLINE_FUNCTION auto NewArray(T val = Null<T>()) {
   return arr;
 }
 
+// Problem dimensionality (determined from Parameter Input)
 inline int ProblemDimension(parthenon::ParameterInput *pin) {
   const int nx[3] = {pin->GetInteger("parthenon/mesh", "nx1"),
                      pin->GetInteger("parthenon/mesh", "nx2"),
@@ -154,6 +174,7 @@ inline int ProblemDimension(parthenon::ParameterInput *pin) {
   return (nx[0] > 1) + (nx[1] > 1) + (nx[2] > 1);
 }
 
+// Custom AMR criteria
 namespace artemis {
 extern std::function<AmrTag(MeshBlockData<Real> *mbd)> ProblemCheckRefinementBlock;
 } // namespace artemis

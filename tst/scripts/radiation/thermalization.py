@@ -16,6 +16,7 @@
 # Modules
 import logging
 import numpy as np
+import h5py
 import os
 from scipy.integrate import solve_ivp
 from scipy.optimize import fsolve
@@ -31,21 +32,12 @@ import matplotlib
 matplotlib.use("Agg")  # Use the Agg backend to avoid issues with DISPLAY not being set
 import matplotlib.pyplot as plt
 
-sys.path.insert(
-    0,
-    os.path.join(
-        artemis.get_artemis_dir(),
-        "external/parthenon/scripts/python/packages/parthenon_tools/parthenon_tools",
-    ),
-)
-from phdf import phdf
-
 # Plotting style
 colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
 
 # Commands
 _nranks = 1
-_file_id = "thermalization"
+_file_ids = ["thermalization_p1", "thermalization_imc"]
 
 # Constants
 _kb = 1.3806488e-16
@@ -60,32 +52,27 @@ _gamma = 1.4
 _mu = 28.96
 _tr0 = 5.0e5
 _tg0 = 1.0e6
-_tf = 6.0e-8
+_tf = 1.2e-7
 _thr = 5.0e-3
 
 
 # Run Artemis
 def run(**kwargs):
     logger.debug("Runnning test " + __name__)
-    arguments = [
-        "parthenon/job/problem_id=" + _file_id,
-        "artemis/coordinates=cartesian",
-        "artemis/physical_units=cgs",
-        "artemis/unit_conversion=base",
-        "parthenon/time/tlim={:24.16e}".format(_tf),
-        "gas/gamma={:24.16e}".format(_gamma),
-        "gas/mu={:24.16e}".format(_mu),
-        "gas/opacity/absorption/opacity_model=constant",
-        "gas/opacity/absorption/kappa_a={:24.16e}".format(_ka),
-        "jaybenne/dt=1.0e-10",
-        "jaybenne/num_particles=200000",
-        "jaybenne/use_ddmc=true",
-        "problem/rho={:24.16e}".format(_rho),
-        "problem/vx=0.0",
-        "problem/tgas={:24.16e}".format(_tg0),
-        "problem/trad={:24.16e}".format(_tr0),
-    ]
-    artemis.run(_nranks, "radiation/thermalization.in", arguments)
+    for fid in _file_ids:
+        arguments = [
+            "parthenon/job/problem_id=" + fid,
+            "parthenon/time/tlim={:24.16e}".format(_tf),
+            "gas/gamma={:24.16e}".format(_gamma),
+            "gas/mu={:24.16e}".format(_mu),
+            "gas/opacity/absorption/opacity_model=constant",
+            "gas/opacity/absorption/kappa_a={:24.16e}".format(_ka),
+            "problem/rho={:24.16e}".format(_rho),
+            "problem/vx=0.0",
+            "problem/tgas={:24.16e}".format(_tg0),
+            "problem/trad={:24.16e}".format(_tr0),
+        ]
+        artemis.run(_nranks, "radiation/{}.in".format(fid), arguments)
 
 
 # Analyze outputs
@@ -113,10 +100,13 @@ def analyze():
     tgas = []
     trad = []
     for file in files:
-        data = phdf(file)
-        sie = data.Get("gas.prim.sie_0", False, False)[0, 0, 0]
-        erad = data.Get("field.jaybenne.energy_tally", False, False)[0, 0, 0]
-        tt.append(data.Time)
+        with h5py.File(file, "r") as phdf:
+            sie = phdf["gas.prim.sie_0"][...].ravel()
+            try:
+                erad = phdf["field.jaybenne.energy_tally"][...].ravel()
+            except:
+                erad = phdf["rad.prim.energy_0"][...].ravel()
+            tt.append(phdf["Info"].attrs["Time"])
         tgas.append(sie / cv)
         trad.append((erad / _ar) ** 0.25)
     tgas = np.array(tgas)

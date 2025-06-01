@@ -27,6 +27,7 @@
 #include "utils/eos/eos.hpp"
 #include "utils/fluxes/fluid_fluxes.hpp"
 #include "utils/history.hpp"
+#include "utils/integrators/artemis_integrator.hpp"
 #include "utils/opacity/opacity.hpp"
 #include "utils/refinement/amr_criteria.hpp"
 #include "utils/units.hpp"
@@ -150,7 +151,6 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
             singularity::photons::MeanOpacityBase(table_filename), time, mass, length,
             temp);
   } else {
-
     // Instantiate mean absorption opacity object (i.e., table)
     const Real lRhoMin_a = pin->GetOrAddReal("gas/opacity/absorption", "lRhoMin", -1.0);
     const Real lRhoMax_a = pin->GetOrAddReal("gas/opacity/absorption", "lRhoMax", 1.0);
@@ -244,10 +244,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   params.Add("do_viscosity", do_viscosity);
   const bool do_conduction = pin->GetOrAddBoolean("physics", "conduction", false);
   params.Add("do_conduction", do_conduction);
-
   const bool do_diffusion = do_viscosity || do_conduction;
   params.Add("do_diffusion", do_diffusion);
-
   if (do_viscosity) {
     Diffusion::DiffCoeffParams dp("gas/viscosity", "viscosity", pin, constants, packages);
     params.Add("visc_params", dp);
@@ -386,48 +384,48 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
       const Real thr = pin->GetReal("gas", "refine_thr");
       params.Add("refine_thr", thr);
       // Geometry specific refinement criteria
-      typedef Coordinates C;
+      typedef Coordinates G;
       typedef gas::prim::density pdens;
       typedef gas::prim::pressure ppres;
       // Cartesian
-      if (coords == C::cartesian) {
+      if (coords == G::cartesian) {
         if (ref_dens) {
-          gas->CheckRefinementBlock = ScalarFirstDerivative<pdens, C::cartesian>;
+          gas->CheckRefinementBlock = ScalarFirstDerivative<pdens, G::cartesian>;
         } else if (ref_pres) {
-          gas->CheckRefinementBlock = ScalarFirstDerivative<ppres, C::cartesian>;
+          gas->CheckRefinementBlock = ScalarFirstDerivative<ppres, G::cartesian>;
         }
         // Spherical
-      } else if (coords == C::spherical1D) {
+      } else if (coords == G::spherical1D) {
         if (ref_dens) {
-          gas->CheckRefinementBlock = ScalarFirstDerivative<pdens, C::spherical1D>;
+          gas->CheckRefinementBlock = ScalarFirstDerivative<pdens, G::spherical1D>;
         } else if (ref_pres) {
-          gas->CheckRefinementBlock = ScalarFirstDerivative<ppres, C::spherical1D>;
+          gas->CheckRefinementBlock = ScalarFirstDerivative<ppres, G::spherical1D>;
         }
-      } else if (coords == C::spherical2D) {
+      } else if (coords == G::spherical2D) {
         if (ref_dens) {
-          gas->CheckRefinementBlock = ScalarFirstDerivative<pdens, C::spherical2D>;
+          gas->CheckRefinementBlock = ScalarFirstDerivative<pdens, G::spherical2D>;
         } else if (ref_pres) {
-          gas->CheckRefinementBlock = ScalarFirstDerivative<ppres, C::spherical2D>;
+          gas->CheckRefinementBlock = ScalarFirstDerivative<ppres, G::spherical2D>;
         }
-      } else if (coords == C::spherical3D) {
+      } else if (coords == G::spherical3D) {
         if (ref_dens) {
-          gas->CheckRefinementBlock = ScalarFirstDerivative<pdens, C::spherical3D>;
+          gas->CheckRefinementBlock = ScalarFirstDerivative<pdens, G::spherical3D>;
         } else if (ref_pres) {
-          gas->CheckRefinementBlock = ScalarFirstDerivative<ppres, C::spherical3D>;
+          gas->CheckRefinementBlock = ScalarFirstDerivative<ppres, G::spherical3D>;
         }
         // Cylindrical
-      } else if (coords == C::cylindrical) {
+      } else if (coords == G::cylindrical) {
         if (ref_dens) {
-          gas->CheckRefinementBlock = ScalarFirstDerivative<pdens, C::cylindrical>;
+          gas->CheckRefinementBlock = ScalarFirstDerivative<pdens, G::cylindrical>;
         } else if (ref_pres) {
-          gas->CheckRefinementBlock = ScalarFirstDerivative<ppres, C::cylindrical>;
+          gas->CheckRefinementBlock = ScalarFirstDerivative<ppres, G::cylindrical>;
         }
         // Axisymmetric
-      } else if (coords == C::axisymmetric) {
+      } else if (coords == G::axisymmetric) {
         if (ref_dens) {
-          gas->CheckRefinementBlock = ScalarFirstDerivative<pdens, C::axisymmetric>;
+          gas->CheckRefinementBlock = ScalarFirstDerivative<pdens, G::axisymmetric>;
         } else if (ref_pres) {
-          gas->CheckRefinementBlock = ScalarFirstDerivative<ppres, C::axisymmetric>;
+          gas->CheckRefinementBlock = ScalarFirstDerivative<ppres, G::axisymmetric>;
         }
       }
     } else if (ref_mag) {
@@ -463,13 +461,12 @@ Real EstimateTimestepMesh(MeshData<Real> *md) {
 
   // NOTE(@pdmullen): Without FARGO, dt must be additionally limited by the linear
   // advection of the shear background flow (vy0 = -q Omega x)
-  bool do_shear = false;
   Real qshear = 0.0, om0 = 0.0;
-  if (pm->packages.Get("artemis")->Param<bool>("do_rotating_frame")) {
+  const bool do_shear = pm->packages.Get("artemis")->Param<bool>("do_shear");
+  if (do_shear) {
     auto &rframe_pkg = pm->packages.Get("rotating_frame");
     qshear = rframe_pkg->Param<Real>("qshear");
     om0 = rframe_pkg->Param<Real>("omega");
-    do_shear = (qshear * om0 != 0.0);
   }
 
   static auto desc =
@@ -510,6 +507,7 @@ Real EstimateTimestepMesh(MeshData<Real> *md) {
       },
       Kokkos::Min<Real>(min_dt));
 
+  // Viscosity
   Real visc_dt = Big<Real>();
   const auto do_viscosity = params.template Get<bool>("do_viscosity");
   if (do_viscosity) {
@@ -525,6 +523,7 @@ Real EstimateTimestepMesh(MeshData<Real> *md) {
     }
   }
 
+  // Conduction
   Real cond_dt = Big<Real>();
   const auto do_conduction = params.template Get<bool>("do_conduction");
   if (do_conduction) {
@@ -593,7 +592,7 @@ TaskStatus FluxSource(MeshData<Real> *md, const Real dt) {
   auto vcons = desc_cons.GetPack(md);
   auto vface = desc_face.GetPack(md);
 
-  return ArtemisUtils::FluxSource(md, pkg, vprim, vcons, vface, dt);
+  return ArtemisUtils::FluxSource<Fluid::gas>(md, pkg, vprim, vcons, vface, dt);
 }
 
 //----------------------------------------------------------------------------------------
@@ -614,7 +613,7 @@ TaskStatus ViscousFlux(MeshData<Real> *md) {
   // Assumes this packing ordering
   static auto desc_flux =
       parthenon::MakePackDescriptor<gas::diff::momentum, gas::diff::energy>(
-          resolved_pkgs.get(), {}, {parthenon::PDOpt::WithFluxes});
+          resolved_pkgs.get());
 
   auto vprim = desc_prim.GetPack(md);
   auto vf = desc_flux.GetPack(md);
@@ -651,8 +650,8 @@ TaskStatus ThermalFlux(MeshData<Real> *md) {
           resolved_pkgs.get());
 
   // Assumes this packing ordering
-  static auto desc_flux = parthenon::MakePackDescriptor<gas::diff::energy>(
-      resolved_pkgs.get(), {}, {parthenon::PDOpt::WithFluxes});
+  static auto desc_flux =
+      parthenon::MakePackDescriptor<gas::diff::energy>(resolved_pkgs.get());
 
   auto vprim = desc_prim.GetPack(md);
   auto vf = desc_flux.GetPack(md);
@@ -683,7 +682,7 @@ TaskStatus ZeroDiffusionFlux(MeshData<Real> *md) {
   auto &resolved_pkgs = pm->resolved_packages;
   static auto desc_flux =
       parthenon::MakePackDescriptor<gas::diff::momentum, gas::diff::energy>(
-          resolved_pkgs.get(), {}, {parthenon::PDOpt::WithFluxes});
+          resolved_pkgs.get());
 
   auto vf = desc_flux.GetPack(md);
   return Diffusion::ZeroDiffusionImpl(md, vf);

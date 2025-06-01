@@ -1,5 +1,5 @@
 //========================================================================================
-// (C) (or copyright) 2023-2024. Triad National Security, LLC. All rights reserved.
+// (C) (or copyright) 2023-2025. Triad National Security, LLC. All rights reserved.
 //
 // This program was produced under U.S. Government contract 89233218CNA000001 for Los
 // Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -19,6 +19,7 @@
 //! The specific values are taken from the Fornax and Quokka code papers
 //!
 //!  mu = mH, gamma = 5/3, rho*kappa = 577 /cm
+//!  c/chat = 43.3526011561
 //!  left state:         |  right state:
 //!      T = 2.18e6 K    |   T = 7.98e6 K
 //!    rho = 5.69 g/cc   | rho = 17.1 g/cc
@@ -74,10 +75,16 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto artemis_pkg = pmb->packages.Get("artemis");
   const bool do_gas = artemis_pkg->Param<bool>("do_gas");
   const bool do_dust = artemis_pkg->Param<bool>("do_dust");
-  const bool do_radiation = artemis_pkg->Param<bool>("do_radiation");
+  const bool do_imc = artemis_pkg->Param<bool>("do_imc");
+  const bool do_moment = artemis_pkg->Param<bool>("do_moment");
   PARTHENON_REQUIRE(do_gas, "The shock problem requires gas hydrodynamics!");
   PARTHENON_REQUIRE(!(do_dust), "The shock problem does not permit dust hydrodynamics!");
   auto eos_d = pmb->packages.Get("gas")->Param<EOS>("eos_d");
+
+  Real ar = Null<Real>();
+  if (do_moment) {
+    ar = pmb->packages.Get("moments")->Param<Real>("arad");
+  }
 
   // packing and capture variables for kernel
   auto &md = pmb->meshblock_data.Get();
@@ -85,7 +92,8 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
     if (!var->IsAllocated()) pmb->AllocateSparse(var->label());
   }
   static auto desc =
-      MakePackDescriptor<gas::prim::density, gas::prim::velocity, gas::prim::sie>(
+      MakePackDescriptor<gas::prim::density, gas::prim::velocity, gas::prim::sie,
+                         rad::prim::energy, rad::prim::flux>(
           (pmb->resolved_packages).get());
   auto v = desc.GetPack(md.get());
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
@@ -112,9 +120,15 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         v(0, gas::prim::velocity(2), k, j, i) = 0.0;
         v(0, gas::prim::sie(0), k, j, i) =
             eos_d.InternalEnergyFromDensityTemperature(rho, T);
+        if (do_moment) {
+          v(0, rad::prim::energy(0), k, j, i) = ar * SQR(SQR(T));
+          v(0, rad::prim::flux(0), k, j, i) = 0.0;
+          v(0, rad::prim::flux(1), k, j, i) = 0.0;
+          v(0, rad::prim::flux(2), k, j, i) = 0.0;
+        }
       });
 
-  if (do_radiation) jaybenne::InitializeRadiation(md.get(), true);
+  if (do_imc) jaybenne::InitializeRadiation(md.get(), true);
 }
 
 //----------------------------------------------------------------------------------------
@@ -126,27 +140,43 @@ inline void ShockInnerX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse)
   auto pmb = mbd->GetBlockPointer();
 
   auto artemis_pkg = pmb->packages.Get("artemis");
+  const bool do_moment = artemis_pkg->Param<bool>("do_moment");
   auto shkp = artemis_pkg->Param<ShockParams>("shock_params");
   auto eos_d = pmb->packages.Get("gas")->Param<EOS>("eos_d");
+  Real ar = Null<Real>();
+  if (do_moment) {
+    ar = pmb->packages.Get("moments")->Param<Real>("arad");
+  }
   const auto nb = IndexRange{0, 0};
 
   static auto descriptors =
       ArtemisUtils::GetBoundaryPackDescriptorMap<gas::prim::density, gas::prim::velocity,
-                                                 gas::prim::sie>(mbd);
+                                                 gas::prim::sie, rad::prim::energy,
+                                                 rad::prim::flux>(mbd);
   auto v = descriptors[coarse].GetPack(mbd.get());
-  if (v.GetMaxNumberOfVars() > 0) {
-    pmb->par_for_bndry(
-        "ShockInnerX1", nb, IndexDomain::inner_x1, parthenon::TopologicalElement::CC,
-        coarse, false,
-        KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
-          v(0, gas::prim::density(0), k, j, i) = shkp.rhol;
-          v(0, gas::prim::velocity(0), k, j, i) = shkp.vxl;
-          v(0, gas::prim::velocity(1), k, j, i) = 0.0;
-          v(0, gas::prim::velocity(2), k, j, i) = 0.0;
-          v(0, gas::prim::sie(0), k, j, i) =
+  if (v.GetMaxNumberOfVars() == 0) return;
+
+  pmb->par_for_bndry(
+      "ShockInnerX1", nb, IndexDomain::inner_x1, parthenon::TopologicalElement::CC,
+      coarse, false,
+      KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
+        for (int n = 0; n < v.GetSize(0, gas::prim::density()); ++n) {
+          v(0, gas::prim::density(n), k, j, i) = shkp.rhol;
+          v(0, gas::prim::velocity(VI(n, 0)), k, j, i) = shkp.vxl;
+          v(0, gas::prim::velocity(VI(n, 1)), k, j, i) = 0.0;
+          v(0, gas::prim::velocity(VI(n, 2)), k, j, i) = 0.0;
+          v(0, gas::prim::sie(n), k, j, i) =
               eos_d.InternalEnergyFromDensityTemperature(shkp.rhol, shkp.tl);
-        });
-  }
+        }
+        if (do_moment) {
+          for (int n = 0; n < v.GetSize(0, rad::prim::energy()); ++n) {
+            v(0, rad::prim::energy(n), k, j, i) = ar * SQR(SQR(shkp.tl));
+            v(0, rad::prim::flux(VI(n, 0)), k, j, i) = 0.0;
+            v(0, rad::prim::flux(VI(n, 1)), k, j, i) = 0.0;
+            v(0, rad::prim::flux(VI(n, 2)), k, j, i) = 0.0;
+          }
+        }
+      });
 
   return;
 }
@@ -160,27 +190,43 @@ inline void ShockOuterX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse)
   auto pmb = mbd->GetBlockPointer();
 
   auto artemis_pkg = pmb->packages.Get("artemis");
+  const bool do_moment = artemis_pkg->Param<bool>("do_moment");
   auto shkp = artemis_pkg->Param<ShockParams>("shock_params");
   auto eos_d = pmb->packages.Get("gas")->Param<EOS>("eos_d");
+  Real ar = Null<Real>();
+  if (do_moment) {
+    ar = pmb->packages.Get("moments")->Param<Real>("arad");
+  }
   const auto nb = IndexRange{0, 0};
 
   static auto descriptors =
       ArtemisUtils::GetBoundaryPackDescriptorMap<gas::prim::density, gas::prim::velocity,
-                                                 gas::prim::sie>(mbd);
+                                                 gas::prim::sie, rad::prim::energy,
+                                                 rad::prim::flux>(mbd);
   auto v = descriptors[coarse].GetPack(mbd.get());
-  if (v.GetMaxNumberOfVars() > 0) {
-    pmb->par_for_bndry(
-        "ShockOuterX1", nb, IndexDomain::outer_x1, parthenon::TopologicalElement::CC,
-        coarse, false,
-        KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
-          v(0, gas::prim::density(0), k, j, i) = shkp.rhor;
-          v(0, gas::prim::velocity(0), k, j, i) = shkp.vxr;
-          v(0, gas::prim::velocity(1), k, j, i) = 0.0;
-          v(0, gas::prim::velocity(2), k, j, i) = 0.0;
-          v(0, gas::prim::sie(0), k, j, i) =
+  if (v.GetMaxNumberOfVars() == 0) return;
+
+  pmb->par_for_bndry(
+      "ShockOuterX1", nb, IndexDomain::outer_x1, parthenon::TopologicalElement::CC,
+      coarse, false,
+      KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
+        for (int n = 0; n < v.GetSize(0, gas::prim::density()); ++n) {
+          v(0, gas::prim::density(n), k, j, i) = shkp.rhor;
+          v(0, gas::prim::velocity(VI(n, 0)), k, j, i) = shkp.vxr;
+          v(0, gas::prim::velocity(VI(n, 1)), k, j, i) = 0.0;
+          v(0, gas::prim::velocity(VI(n, 2)), k, j, i) = 0.0;
+          v(0, gas::prim::sie(n), k, j, i) =
               eos_d.InternalEnergyFromDensityTemperature(shkp.rhor, shkp.tr);
-        });
-  }
+        }
+        if (do_moment) {
+          for (int n = 0; n < v.GetSize(0, rad::prim::energy()); ++n) {
+            v(0, rad::prim::energy(n), k, j, i) = ar * SQR(SQR(shkp.tr));
+            v(0, rad::prim::flux(VI(n, 0)), k, j, i) = 0.0;
+            v(0, rad::prim::flux(VI(n, 1)), k, j, i) = 0.0;
+            v(0, rad::prim::flux(VI(n, 2)), k, j, i) = 0.0;
+          }
+        }
+      });
 
   return;
 }

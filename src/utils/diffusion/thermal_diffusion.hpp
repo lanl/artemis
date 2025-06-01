@@ -1,5 +1,5 @@
 //========================================================================================
-// (C) (or copyright) 2024. Triad National Security, LLC. All rights reserved.
+// (C) (or copyright) 2024-2025. Triad National Security, LLC. All rights reserved.
 //
 // This program was produced under U.S. Government contract 89233218CNA000001 for Los
 // Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -27,6 +27,9 @@ using ArtemisUtils::EOS;
 
 namespace Diffusion {
 
+//----------------------------------------------------------------------------------------
+//! \fn TaskStatus ThermalFluxImpl
+//! \brief Implementation for thermal diffusion flux calculation
 template <Coordinates GEOM, Fluid FLUID_TYPE, DiffType DIFF, typename PKG,
           typename SparsePackPrim, typename SparsePackFlux>
 TaskStatus ThermalFluxImpl(MeshData<Real> *md, DiffCoeffParams dp, PKG &pkg,

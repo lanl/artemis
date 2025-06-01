@@ -1,0 +1,269 @@
+//========================================================================================
+// (C) (or copyright) 2023-2025. Triad National Security, LLC. All rights reserved.
+//
+// This program was produced under U.S. Government contract 89233218CNA000001 for Los
+// Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
+// for the U.S. Department of Energy/National Nuclear Security Administration. All rights
+// in the program are reserved by Triad National Security, LLC, and the U.S. Department
+// of Energy/National Nuclear Security Administration. The Government is granted for
+// itself and others acting on its behalf a nonexclusive, paid-up, irrevocable worldwide
+// license in this material to reproduce, prepare derivative works, distribute copies to
+// the public, perform publicly and display publicly, and to permit others to do so.
+//========================================================================================
+#ifndef PGEN_BEAM_HPP_
+#define PGEN_BEAM_HPP_
+
+// Artemis headers
+#include "artemis.hpp"
+#include "geometry/geometry.hpp"
+#include "utils/artemis_utils.hpp"
+
+using ArtemisUtils::EOS;
+namespace beam {
+
+struct BeamParams {
+  Real width;
+  Real mu;
+  Real rho;
+  Real tg;
+  Real tr;
+  Real sigma;
+  Real bump;
+};
+
+//----------------------------------------------------------------------------------------
+//! \fn void ProblemGenerator::InitBeamParams()
+//! \brief
+inline void InitBeamParams(MeshBlock *pmb, ParameterInput *pin) {
+  Params &params = pmb->packages.Get("artemis")->AllParams();
+  if (!(params.hasKey("beam_params"))) {
+    BeamParams beam_params;
+
+    beam_params.width = pin->GetOrAddReal("problem", "width", 0.05);
+    beam_params.mu = pin->GetOrAddReal("problem", "mu", 0.5);
+    beam_params.sigma = pin->GetOrAddReal("problem", "sigma", 1e-10);
+    beam_params.bump = pin->GetOrAddReal("problem", "bump", 0.0);
+
+    beam_params.rho = pin->GetOrAddReal("problem", "rho", 1.0);
+    beam_params.tg = pin->GetOrAddReal("problem", "tgas", 1.0);
+    beam_params.tr = pin->GetOrAddReal("problem", "trad", 1.0);
+    params.Add("beam_params", beam_params);
+  }
+}
+
+//----------------------------------------------------------------------------------------
+//! \fn void ProblemGenerator::BEAM_()
+//! \brief Sets initial conditions for BEAM tests
+template <Coordinates GEOM>
+inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
+  using parthenon::MakePackDescriptor;
+  const Mesh *pmesh = pmb->pmy_mesh;
+  const int ndim = pmesh->ndim;
+
+  // Determine if gas and/or dust hydrodynamics are enabled
+  auto artemis_pkg = pmb->packages.Get("artemis");
+  const bool do_gas = artemis_pkg->Param<bool>("do_gas");
+  const bool do_rad = artemis_pkg->Param<bool>("do_moment");
+  auto rad_pkg = pmb->packages.Get("moments");
+  auto gas_pkg = pmb->packages.Get("gas");
+  const auto eos = gas_pkg->Param<EOS>("eos_d");
+  const Real ar = rad_pkg->Param<Real>("arad");
+
+  // packing and capture variables for kernel
+  auto &md = pmb->meshblock_data.Get();
+  for (auto &var : md->GetVariableVector()) {
+    if (!var->IsAllocated()) pmb->AllocateSparse(var->label());
+  }
+
+  static auto desc =
+      MakePackDescriptor<gas::prim::density, gas::prim::velocity, gas::prim::sie,
+                         rad::prim::energy, rad::prim::flux>(
+          (pmb->resolved_packages).get());
+  auto v = desc.GetPack(md.get());
+  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
+  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
+  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
+
+  auto &pars = artemis_pkg->Param<BeamParams>("beam_params");
+  auto &pco = pmb->coords;
+  pmb->par_for(
+      "pgen_beam", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int k, const int j, const int i) {
+        // cell-centered coordinates
+        geometry::Coords<GEOM> coords(pco, k, j, i);
+        const auto &xv = coords.GetCellCenter();
+        // compute cell-centered conserved variables
+        if (do_gas) {
+          // put in a ball at the center
+          const Real dr2 = SQR(xv[0] - 1.0) + SQR(xv[1] - 1.0);
+          const Real dens =
+              pars.rho *
+              (1.0 + pars.bump * std::exp(-dr2 / (Fuzz<Real>() + 2.0 * SQR(pars.sigma))));
+          v(0, gas::prim::density(0), k, j, i) = dens;
+          v(0, gas::prim::velocity(0), k, j, i) = 0.0;
+          v(0, gas::prim::velocity(1), k, j, i) = 0.0;
+          v(0, gas::prim::velocity(2), k, j, i) = 0.0;
+          v(0, gas::prim::sie(0), k, j, i) =
+              eos.InternalEnergyFromDensityTemperature(dens, pars.tg);
+        }
+        if (do_rad) {
+          v(0, rad::prim::energy(0), k, j, i) = ar * SQR(SQR(pars.tg));
+          v(0, rad::prim::flux(0), k, j, i) = 0.0;
+          v(0, rad::prim::flux(1), k, j, i) = 0.0;
+          v(0, rad::prim::flux(2), k, j, i) = 0.0;
+        }
+      });
+}
+
+//----------------------------------------------------------------------------------------
+//! \fn void ProblemGenerator::BeamInnerX2()
+//! \brief
+template <Coordinates GEOM>
+inline void BeamInnerX2(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) {
+  using parthenon::MakePackDescriptor;
+  using TE = parthenon::TopologicalElement;
+  auto pmb = mbd->GetBlockPointer();
+
+  // Extract artemis package and params
+  auto artemis_pkg = pmb->packages.Get("artemis");
+  const bool do_gas = artemis_pkg->Param<bool>("do_gas");
+  const bool do_rad = artemis_pkg->Param<bool>("do_moment");
+  const auto &pars = artemis_pkg->Param<BeamParams>("beam_params");
+
+  // Extract radiation package and params
+  auto rad_pkg = pmb->packages.Get("moments");
+  const Real ar = rad_pkg->Param<Real>("arad");
+
+  // Packing
+  static auto descriptors =
+      ArtemisUtils::GetBoundaryPackDescriptorMap<gas::prim::density, gas::prim::velocity,
+                                                 gas::prim::sie, rad::prim::energy,
+                                                 rad::prim::flux>(mbd);
+  auto v = descriptors[coarse].GetPack(mbd.get());
+  if (v.GetMaxNumberOfVars() == 0) return;
+
+  // Coordinates and indexing
+  const auto &pco = (coarse) ? pmb->pmr->GetCoarseCoords() : pmb->coords;
+  const auto nb = IndexRange{0, 0};
+  const bool fine = false;
+  const auto &bounds = coarse ? pmb->c_cellbounds : pmb->cellbounds;
+  const auto &range = bounds.GetBoundsJ(IndexDomain::interior, TE::CC);
+  const int js = range.s;
+
+  pmb->par_for_bndry(
+      "BeamInnerX2", nb, IndexDomain::inner_x2, parthenon::TopologicalElement::CC, coarse,
+      fine, KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
+        // Extract coordinates
+        geometry::Coords<GEOM> coords(pco, k, j, i);
+        const Real xf = coords.bnds.x1[0];
+
+        // Gas Inner X2 BC
+        if (do_gas) {
+          for (int n = 0; n < v.GetSize(0, gas::prim::density()); ++n) {
+            v(0, gas::prim::density(n), k, j, i) = v(0, gas::prim::density(n), k, js, i);
+            v(0, gas::prim::sie(n), k, j, i) = v(0, gas::prim::sie(n), k, js, i);
+            v(0, gas::prim::velocity(VI(n, 0)), k, j, i) =
+                v(0, gas::prim::velocity(VI(n, 0)), k, js, i);
+            v(0, gas::prim::velocity(VI(n, 1)), k, j, i) =
+                v(0, gas::prim::velocity(VI(n, 1)), k, js, i);
+            v(0, gas::prim::velocity(VI(n, 2)), k, j, i) =
+                v(0, gas::prim::velocity(VI(n, 2)), k, js, i);
+          }
+        }
+
+        // Moments Inner X2 BC
+        if (do_rad) {
+          const bool bc = (xf <= pars.width);
+          const Real erad = ar * SQR(SQR(pars.tr));
+          const Real f = std::sqrt(pars.mu);
+          for (int n = 0; n < v.GetSize(0, rad::prim::energy()); ++n) {
+            v(0, rad::prim::energy(0), k, j, i) =
+                (bc) ? erad : v(0, rad::prim::energy(n), k, js, i);
+            v(0, rad::prim::flux(VI(n, 0)), k, j, i) =
+                (bc) ? f : v(0, rad::prim::flux(VI(n, 0)), k, js, i);
+            v(0, rad::prim::flux(VI(n, 1)), k, j, i) =
+                (bc) ? f : -v(0, rad::prim::flux(VI(n, 1)), k, js, i);
+            v(0, rad::prim::flux(VI(n, 2)), k, j, i) =
+                (bc) ? 0.0 : v(0, rad::prim::flux(VI(n, 2)), k, js, i);
+          }
+        }
+      });
+}
+
+//----------------------------------------------------------------------------------------
+//! \fn void ProblemGenerator::BeamInnerX1()
+//! \brief
+template <Coordinates GEOM>
+inline void BeamInnerX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) {
+  using parthenon::MakePackDescriptor;
+  using TE = parthenon::TopologicalElement;
+  auto pmb = mbd->GetBlockPointer();
+
+  // Extract artemis package and params
+  auto artemis_pkg = pmb->packages.Get("artemis");
+  const bool do_gas = artemis_pkg->Param<bool>("do_gas");
+  const bool do_rad = artemis_pkg->Param<bool>("do_moment");
+
+  // Extract moments package and params
+  auto rad_pkg = pmb->packages.Get("moments");
+  const Real ar = rad_pkg->Param<Real>("arad");
+
+  // Packing
+  static auto descriptors =
+      ArtemisUtils::GetBoundaryPackDescriptorMap<gas::prim::density, gas::prim::velocity,
+                                                 gas::prim::sie, rad::prim::energy,
+                                                 rad::prim::flux>(mbd);
+  auto v = descriptors[coarse].GetPack(mbd.get());
+  if (v.GetMaxNumberOfVars() == 0) return;
+
+  // Coordinates and indexing
+  const auto &pco = (coarse) ? pmb->pmr->GetCoarseCoords() : pmb->coords;
+  const auto nb = IndexRange{0, 0};
+  const bool fine = false;
+  const auto &bounds = coarse ? pmb->c_cellbounds : pmb->cellbounds;
+  const auto &range = bounds.GetBoundsI(IndexDomain::interior, TE::CC);
+  const int is = range.s;
+
+  auto &pars = artemis_pkg->Param<BeamParams>("beam_params");
+  pmb->par_for_bndry(
+      "BeamInnerX1", nb, IndexDomain::inner_x1, parthenon::TopologicalElement::CC, coarse,
+      fine, KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
+        // Extract coordinates
+        geometry::Coords<GEOM> coords(pco, k, j, i);
+        const Real yf = coords.bnds.x2[0];
+
+        // Gas Inner X1 BC
+        if (do_gas) {
+          for (int n = 0; n < v.GetSize(0, gas::prim::density()); ++n) {
+            v(0, gas::prim::density(0), k, j, i) = v(0, gas::prim::density(0), k, j, is);
+            v(0, gas::prim::sie(0), k, j, i) = v(0, gas::prim::sie(0), k, j, is);
+            v(0, gas::prim::velocity(VI(n, 0)), k, j, i) =
+                v(0, gas::prim::velocity(VI(n, 0)), k, j, is);
+            v(0, gas::prim::velocity(VI(n, 1)), k, j, i) =
+                v(0, gas::prim::velocity(VI(n, 1)), k, j, is);
+            v(0, gas::prim::velocity(VI(n, 2)), k, j, i) =
+                v(0, gas::prim::velocity(VI(n, 2)), k, j, is);
+          }
+        }
+
+        // Moments Inner X1 BC
+        if (do_rad) {
+          const bool bc = (yf <= pars.width);
+          const Real erad = ar * SQR(SQR(pars.tr));
+          const Real f = std::sqrt(pars.mu);
+          for (int n = 0; n < v.GetSize(0, rad::prim::energy()); ++n) {
+            v(0, rad::prim::energy(n), k, j, i) =
+                (bc) ? erad : v(0, rad::prim::energy(n), k, j, is);
+            v(0, rad::prim::flux(VI(n, 0)), k, j, i) =
+                (bc) ? f : -v(0, rad::prim::flux(VI(n, 0)), k, j, is);
+            v(0, rad::prim::flux(VI(n, 1)), k, j, i) =
+                (bc) ? f : v(0, rad::prim::flux(VI(n, 1)), k, j, is);
+            v(0, rad::prim::flux(VI(n, 2)), k, j, i) =
+                (bc) ? 0.0 : v(0, rad::prim::flux(VI(n, 2)), k, j, is);
+          }
+        }
+      });
+}
+
+} // namespace beam
+#endif // PGEN_BEAM_HPP_

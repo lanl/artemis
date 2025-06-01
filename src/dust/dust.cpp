@@ -248,13 +248,12 @@ Real EstimateTimestepMesh(MeshData<Real> *md) {
 
   // NOTE(@pdmullen): Without FARGO, dt must be additionally limited by the linear
   // advection of the shear background flow (vy0 = -q Omega x)
-  bool do_shear = false;
   Real qshear = 0.0, om0 = 0.0;
-  if (pm->packages.Get("artemis")->Param<bool>("do_rotating_frame")) {
+  const bool do_shear = pm->packages.Get("artemis")->Param<bool>("do_shear");
+  if (do_shear) {
     auto &rframe_pkg = pm->packages.Get("rotating_frame");
     qshear = rframe_pkg->Param<Real>("qshear");
     om0 = rframe_pkg->Param<Real>("omega");
-    do_shear = (qshear * om0 != 0.0);
   }
 
   static auto desc =
@@ -337,7 +336,7 @@ TaskStatus FluxSource(MeshData<Real> *md, const Real dt) {
     auto vcons = desc_cons.GetPack(md);
     SparsePack vface;
 
-    return ArtemisUtils::FluxSource(md, pkg, vprim, vcons, vface, dt);
+    return ArtemisUtils::FluxSource<Fluid::dust>(md, pkg, vprim, vcons, vface, dt);
   }
 
   return TaskStatus::complete;

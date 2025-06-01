@@ -1,5 +1,5 @@
 //========================================================================================
-// (C) (or copyright) 2024. Triad National Security, LLC. All rights reserved.
+// (C) (or copyright) 2024-2025. Triad National Security, LLC. All rights reserved.
 //
 // This program was produced under U.S. Government contract 89233218CNA000001 for Los
 // Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -22,6 +22,9 @@
 using ArtemisUtils::EOS;
 namespace Diffusion {
 
+// ...Average type for diffusion
+enum class DiffAvg { arithmetic, harmonic, null };
+// ...Diffusion type (e.g., alpha viscoscity, powerlaw, etc.)
 enum class DiffType {
   viscosity_plaw,
   viscosity_alpha,
@@ -29,8 +32,10 @@ enum class DiffType {
   thermaldiff_plaw,
   null
 };
-enum class DiffAvg { arithmetic, harmonic, null };
 
+//----------------------------------------------------------------------------------------
+//! \fn  void DiffType::ChooseDiffusion
+//! \brief Helper function in choosing diffusion type
 inline DiffType ChooseDiffusion(std::string dtype, std::string type) {
   if (dtype == "viscosity") {
     if ((type == "constant") || (type == "powerlaw"))
@@ -47,6 +52,9 @@ inline DiffType ChooseDiffusion(std::string dtype, std::string type) {
   return DiffType::null;
 }
 
+//----------------------------------------------------------------------------------------
+//! \fn  void DiffType::ChooseAveraging
+//! \brief Helper function in choosing averaging type
 inline DiffAvg ChooseAveraging(std::string choice) {
   if (choice == "arithmetic")
     return DiffAvg::arithmetic;
@@ -55,6 +63,8 @@ inline DiffAvg ChooseAveraging(std::string choice) {
   return DiffAvg::null;
 }
 
+//----------------------------------------------------------------------------------------
+//! \struct  Diffusion::DiffCoeffParams
 struct DiffCoeffParams {
   DiffType type;
   DiffAvg avg;
@@ -135,8 +145,9 @@ struct DiffCoeffParams {
   }
 };
 
-// Zone averaging function
-
+//----------------------------------------------------------------------------------------
+//! \fn  Real Diffusion::FaceAverage
+//! \brief Computes either arithmetic or harmonic mean given mu1 and mu2 inputs
 template <DiffAvg DAVG>
 KOKKOS_INLINE_FUNCTION Real FaceAverage(const Real mu1, const Real mu2) {
   if constexpr (DAVG == DiffAvg::arithmetic) {
@@ -150,6 +161,9 @@ KOKKOS_INLINE_FUNCTION Real FaceAverage(const Real mu1, const Real mu2) {
   return 0.0;
 }
 
+//----------------------------------------------------------------------------------------
+//! \class DiffusionCoeff
+//! \brief
 template <DiffType DTYP, Coordinates GEOM, Fluid FLUID_TYPE>
 class DiffusionCoeff {
  public:
@@ -167,7 +181,9 @@ class DiffusionCoeff {
   }
 };
 
-// null
+//----------------------------------------------------------------------------------------
+//! \class DiffusionCoeff
+//! \brief null returns for DiffusionCoeff class
 template <Coordinates GEOM, Fluid FLUID_TYPE>
 class DiffusionCoeff<DiffType::null, GEOM, FLUID_TYPE> {
   // Constant Kinematic Viscosity
@@ -189,7 +205,9 @@ class DiffusionCoeff<DiffType::null, GEOM, FLUID_TYPE> {
   }
 };
 
-// Viscosity
+//----------------------------------------------------------------------------------------
+//! \class DiffusionCoeff
+//! \brief Kinematic viscosity specialization
 template <Coordinates GEOM, Fluid FLUID_TYPE>
 class DiffusionCoeff<DiffType::viscosity_plaw, GEOM, FLUID_TYPE> {
   // Constant Kinematic Viscosity
@@ -235,6 +253,9 @@ class DiffusionCoeff<DiffType::viscosity_plaw, GEOM, FLUID_TYPE> {
   }
 };
 
+//----------------------------------------------------------------------------------------
+//! \class DiffusionCoeff
+//! \brief Alpha viscosity specialization
 template <Coordinates GEOM, Fluid FLUID_TYPE>
 class DiffusionCoeff<DiffType::viscosity_alpha, GEOM, FLUID_TYPE> {
   // Constant Alpha Viscosity
@@ -287,7 +308,9 @@ class DiffusionCoeff<DiffType::viscosity_alpha, GEOM, FLUID_TYPE> {
   }
 };
 
-// Conduction
+//----------------------------------------------------------------------------------------
+//! \class DiffusionCoeff
+//! \brief Conduction specialization
 template <Coordinates GEOM, Fluid FLUID_TYPE>
 class DiffusionCoeff<DiffType::conductivity_plaw, GEOM, FLUID_TYPE> {
   // Conductivity
@@ -332,6 +355,9 @@ class DiffusionCoeff<DiffType::conductivity_plaw, GEOM, FLUID_TYPE> {
   }
 };
 
+//----------------------------------------------------------------------------------------
+//! \class DiffusionCoeff
+//! \brief Thermal diffusion specialization
 template <Coordinates GEOM, Fluid FLUID_TYPE>
 class DiffusionCoeff<DiffType::thermaldiff_plaw, GEOM, FLUID_TYPE> {
   // Thermal Diffusivity

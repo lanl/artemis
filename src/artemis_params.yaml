@@ -60,7 +60,6 @@ artemis:
     _default: "1.0"
     _description: "Physical units value of temperature equal to 1 code unit"
 
-
 physics:
   _description: "Toggle on/off the available physics packages"
   gas:
@@ -95,6 +94,3 @@ physics:
     _type: "bool"
     _default: "false"
     _description: "Turn on heat conduction in the gas fluid"
-
-
-

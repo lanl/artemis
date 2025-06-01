@@ -36,6 +36,9 @@ namespace kh {
 
 static KHParams KH_params;
 
+//----------------------------------------------------------------------------------------
+//! \fn void ProblemGenerator::KH
+//! \brief
 template <Coordinates GEOM>
 inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   using parthenon::MakePackDescriptor;

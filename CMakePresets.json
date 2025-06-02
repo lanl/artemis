@@ -141,7 +141,26 @@
       "cacheVariables": {
         "CMAKE_MAKE_PROGRAM": "$env{MAKE_PROGRAM}",
         "CMAKE_BUILD_TYPE": "Release",
-        "NUM_GPU_DEVICES_PER_NODE": "4"
+        "HDF5_INCLUDE_DIR": "$env{HDF5_ROOT}/include",
+        "CMAKE_C_COMPILER": "cc",
+        "CMAKE_CXX_COMPILER": "CC",
+        "CMAKE_CXX_FLAGS": "-noopenmp -mllvm -amdgpu-function-calls=false",
+        "ARTEMIS_ENABLE_HIP": "ON",
+      	"Kokkos_ARCH_AMD_GFX90A" : "ON"
+      }
+    },
+    {
+      "name": "frontier-gpu-debug",
+      "cacheVariables": {
+        "CMAKE_MAKE_PROGRAM": "$env{MAKE_PROGRAM}",
+        "CMAKE_BUILD_TYPE": "Debug",
+        "HDF5_INCLUDE_DIR": "$env{HDF5_ROOT}/include",
+        "CMAKE_C_COMPILER": "cc",
+        "CMAKE_CXX_COMPILER": "CC",
+        "CMAKE_CXX_FLAGS": "-noopenmp -mllvm -amdgpu-function-calls=false",
+        "ARTEMIS_ENABLE_HIP": "ON",
+      	"Kokkos_ARCH_AMD_GFX90A" : "ON",
+        "Kokkos_ENABLE_DEBUG_BOUNDS_CHECK": "ON"
       }
     }
   ]

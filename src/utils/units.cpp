@@ -73,6 +73,7 @@ Units::Units(ParameterInput *pin, std::shared_ptr<StateDescriptor> pkg) {
 //----------------------------------------------------------------------------------------
 //! \class Constants
 //! \brief
+KOKKOS_FUNCTION
 Constants::Constants(Units &units) {
   if (units.GetPhysicalUnits() == PhysicalUnits::scalefree) {
     G_ = 1.;

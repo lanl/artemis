@@ -378,9 +378,8 @@ StrainTensorFace(parthenon::team_mbr_t const &member, const int b, const int n,
       flx(2, i) = 2 * dv3 / dx3 + 0.5 * (src + src_zm);
     }
 
-    // Add any strain rate due to the background shear velocity
-    // This is separately evaluated so we can use the analytic expression at the face
-    // center
+    // Add any strain rate due to the background shear velocity.
+    // Uses the analytic expression at the face center
     const auto Eb = RotatingFrame::StrainRate<GEOM, XDIR>(qshear, om0, xf);
     flx(0, i) += Eb[0];
     flx(1, i) += Eb[1];

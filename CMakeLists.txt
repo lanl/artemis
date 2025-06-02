@@ -19,6 +19,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS On)
 
 # Options
 option(ARTEMIS_ENABLE_CUDA "Enable cuda for artemis and all dependencies" OFF)
+option(ARTEMIS_ENABLE_HIP "Enable hip for artemis and all dependencies" OFF)
 option(ARTEMIS_ENABLE_HDF5 "Enable HDF5 for artemis and all dependencies" ON)
 option(ARTEMIS_ENABLE_MPI "Enable MPI for artemis and all dependencies" ON)
 option(ARTEMIS_ENABLE_OPENMP "Enable OpenMP for artemis and parthenon" OFF)
@@ -82,6 +83,14 @@ if(ARTEMIS_ENABLE_CUDA)
   set(Kokkos_ENABLE_CUDA_LAMBDA ON CACHE BOOL "" FORCE)
 endif()
 
+# HIP
+if(ARTEMIS_ENABLE_HIP)
+  set(SINGULARITY_USE_HIP ON CACHE BOOL "" FORCE)
+  set(JAYBENNE_USE_HIP ON CACHE BOOL "" FORCE)
+  set(Kokkos_ENABLE_HIP ON CACHE BOOL "" FORCE)
+  set(Kokkos_ENABLE_SERIAL ON CACHE BOOL "" FORCE)
+  set(Kokkos_ENABLE_HIP_RELOCATABLE_DEVICE_CODE ON CACHE BOOL "" FORCE)
+endif()
 # HDF5
 if(ARTEMIS_ENABLE_HDF5)
   set(HDF5_PREFER_PARALLEL ${ARTEMIS_ENABLE_MPI})

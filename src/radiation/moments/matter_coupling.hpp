@@ -329,18 +329,19 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
                 chat * dt * scat_d.RosselandMeanTotalScatteringCoefficient(dens, T);
             const Real sigf = sigp + sigs;
 
-            const Real a = g * (sigf - g2 * sigs * (1. + bdbdp));
-            const Real b = g * sigp;
-            const Real d = -g * bdf * (sigf - 2. * g2 * sigs);
+            const Real ca = g * (sigf - g2 * sigs * (1. + bdbdp));
+            const Real cb = g * sigp;
+            const Real cd = -g * bdf * (sigf - 2. * g2 * sigs);
 
-            const Real G0 = a * E - b * B + d;
+            const Real G0 = ca * E - cb * B + cd;
             const Real Fi = (et - et0) - c / chat * G0;
             const Real Fr = (E - E0) + G0;
 
             // not converged yet
-            const Real idet = 1. / (1. + a + c / chat * fleck * b);
-            Real dE = ((1. + c / chat * fleck * b) * (-Fr) + b * (-fleck * Fi)) * idet;
-            Real dB = ((c / chat * fleck * a) * (-Fr) + (1. + a) * (-fleck * Fi)) * idet;
+            const Real idet = 1. / (1. + ca + c / chat * fleck * cb);
+            Real dE = ((1. + c / chat * fleck * cb) * (-Fr) + cb * (-fleck * Fi)) * idet;
+            Real dB =
+                ((c / chat * fleck * ca) * (-Fr) + (1. + ca) * (-fleck * Fi)) * idet;
             E += dE;
             B += dB;
 

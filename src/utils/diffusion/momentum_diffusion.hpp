@@ -74,11 +74,9 @@ StrainTensorFace(parthenon::team_mbr_t const &member, const int b, const int n,
     const auto &xv = coords.GetCellCenter();
     const auto &hx = coords.GetScaleFactors();
 
-    const auto vb = RotatingFrame::BackgroundVelocity<GEOM>(qshear, om0, xv[0]);
-    const std::array<Real, 3> v{
-        vprim(b, gas::prim::velocity(VI(n, 0)), k, j, i) / hx[0] + vb[0],
-        vprim(b, gas::prim::velocity(VI(n, 1)), k, j, i) / hx[1] + vb[1],
-        vprim(b, gas::prim::velocity(VI(n, 2)), k, j, i) / hx[2] + vb[2]};
+    const std::array<Real, 3> v{vprim(b, gas::prim::velocity(VI(n, 0)), k, j, i) / hx[0],
+                                vprim(b, gas::prim::velocity(VI(n, 1)), k, j, i) / hx[1],
+                                vprim(b, gas::prim::velocity(VI(n, 2)), k, j, i) / hx[2]};
     auto xf = NewArray<Real, 3>();
     if constexpr (XDIR == X1DIR) {
       xf = coords.FaceCenX1(geometry::CellFace::lower);
@@ -379,6 +377,14 @@ StrainTensorFace(parthenon::team_mbr_t const &member, const int b, const int n,
 
       flx(2, i) = 2 * dv3 / dx3 + 0.5 * (src + src_zm);
     }
+
+    // Add any strain rate due to the background shear velocity
+    // This is separately evaluated so we can use the analytic expression at the face
+    // center
+    const auto Eb = RotatingFrame::StrainRate<GEOM, XDIR>(qshear, om0, xf);
+    flx(0, i) += Eb[0];
+    flx(1, i) += Eb[1];
+    flx(2, i) += Eb[2];
   });
 }
 

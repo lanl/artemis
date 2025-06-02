@@ -60,6 +60,25 @@ BackgroundVelocity(const Real qshear, const Real omega, const Real x1v) {
 }
 
 //----------------------------------------------------------------------------------------
+//! \fn std::array<Real, 3> RotatingFrame::StrainRate
+//! \brief Returns the strain rate in a given direction associated with the background
+template <Coordinates GEOM, parthenon::CoordinateDirection XDIR>
+KOKKOS_INLINE_FUNCTION std::array<Real, 3> StrainRate(const Real qshear, const Real omega,
+                                                      const std::array<Real, 3> &xf) {
+  // We are computing (grad(v) + grad(v)^T) (no div(v) term)
+  if constexpr (GEOM == Coordinates::cartesian) {
+    if constexpr (XDIR == X1DIR) {
+      // { T_1^1 , T_2^1 , T_3^1 }
+      return {0.0, -qshear * omega, 0.0};
+    } else if constexpr (XDIR == X2DIR) {
+      // { T_1^2 , T_2^2 , T_3^2 }
+      return {-qshear * omega, 0.0, 0.0};
+    }
+  }
+  return {0.0, 0.0, 0.0};
+}
+
+//----------------------------------------------------------------------------------------
 //! \fn std::array<Real, 3> RotatingFrame::RotationVelocity
 //! \brief Returns std::array of components of rotation velocity
 template <Coordinates GEOM>

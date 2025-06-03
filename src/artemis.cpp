@@ -92,8 +92,6 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
                     "Conduction requires the gas package, but there is not gas!");
   PARTHENON_REQUIRE(!(do_radiation) || (do_radiation && do_gas),
                     "Radiation requires the gas package, but there is not gas!");
-  PARTHENON_REQUIRE(!(do_viscosity) || !(do_shear),
-                    "Viscosity it not yet supported for shearing box!");
   PARTHENON_REQUIRE(!(do_imc && do_moment),
                     "Cannot simultaneously evolve IMC and moments radiation");
 

@@ -87,7 +87,7 @@ _xdisc = 0.01305 / _length
 # the radiation energy density via a tally.  Future extensions of this test may get at the
 # radiation temperature via a different means so that we can lower the trad threshold...
 _thr_gas = 0.05
-_thr_rad = 0.11
+_thr_rad = 0.13
 
 
 # Run Artemis

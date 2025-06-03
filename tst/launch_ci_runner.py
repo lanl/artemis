@@ -94,7 +94,11 @@ def run_tests_in_temp_dir(pr_number, head_repo, head_ref, output_dir):
             + " --log_file=darwin_log.txt"
             + " --erase_data",
         ]
-        ret = subprocess.run(test_command, check=True)
+        try:
+            ret = subprocess.run(test_command, check=True)
+            result = ret.returncode == 0
+        except:
+            result = False
 
         # Set group ownership
         subprocess.run(
@@ -115,7 +119,7 @@ def run_tests_in_temp_dir(pr_number, head_repo, head_ref, output_dir):
         )
 
         # Return true if the test script succeeded
-        return ret.returncode == 0
+        return result
 
 
 if __name__ == "__main__":
@@ -235,6 +239,16 @@ if __name__ == "__main__":
 
             # Update PR status that we have successfully submitted to SLURM job
             update_status(commit_sha, "pending", "CI SLURM job submitted...")
-        except subprocess.CalledProcessError:
+        except Exception as err:
             # Update PR status that we have failed to submit the SLURM job
-            update_status(commit_sha, "failure", "SLURM job submission failed.")
+            update_status(
+                commit_sha,
+                "failure",
+                "SLURM job submission failed with error: " + repr(err),
+            )
+        finally:
+            update_status(
+                commit_sha,
+                "failure",
+                "SLURM job submission didn't complete sucessfully",
+            )

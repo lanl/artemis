@@ -60,10 +60,10 @@ TaskStatus MatterCouplingSimpleImpl(MeshData<Real> *u0, const Real dt) {
   // Extract rotating frame quantities
   Real om0 = 0.0;
   Real qshear = 0.0;
-  if (pm->packages.Get("artemis")->Param<bool>("do_rotating_frame")) {
+  if (pm->packages.Get("artemis")->template Param<bool>("do_rotating_frame")) {
     auto &rframe_pkg = pm->packages.Get("rotating_frame");
-    qshear = rframe_pkg->Param<Real>("qshear");
-    om0 = rframe_pkg->Param<Real>("omega");
+    qshear = rframe_pkg->template Param<Real>("qshear");
+    om0 = rframe_pkg->template Param<Real>("omega");
   }
 
   // Packing and indexing
@@ -213,10 +213,10 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
   // Extract rotating frame quantities
   Real om0 = 0.0;
   Real qshear = 0.0;
-  if (pm->packages.Get("artemis")->Param<bool>("do_rotating_frame")) {
+  if (pm->packages.Get("artemis")->template Param<bool>("do_rotating_frame")) {
     auto &rframe_pkg = pm->packages.Get("rotating_frame");
-    qshear = rframe_pkg->Param<Real>("qshear");
-    om0 = rframe_pkg->Param<Real>("omega");
+    qshear = rframe_pkg->template Param<Real>("qshear");
+    om0 = rframe_pkg->template Param<Real>("omega");
   }
 
   // Packing and indexing

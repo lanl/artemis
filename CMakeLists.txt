@@ -228,8 +228,8 @@ set(JAYBENNE_HOST_VARIABLE_HEADER "src/artemis.hpp")
 set(JAYBENNE_HOST_DENSITY_VARIABLE "gas::prim::density")
 set(JAYBENNE_HOST_SPECIFIC_INTERNAL_ENERGY_VARIABLE "gas::prim::sie")
 set(JAYBENNE_HOST_UPDATE_ENERGY_VARIABLE "gas::cons::internal_energy")
-set(JAYBENNE_HOST_ABSORPTION_OPACITY_VARIABLE "gas::opac::absorption")
-set(JAYBENNE_HOST_SCATTERING_OPACITY_VARIABLE "gas::opac::scattering")
+set(JAYBENNE_HOST_ABSORPTION_OPACITY_VARIABLE "rad::opac::absorption")
+set(JAYBENNE_HOST_SCATTERING_OPACITY_VARIABLE "rad::opac::scattering")
 
 # Add jaybenne
 message(STATUS "Adding jaybenne and dependencies")

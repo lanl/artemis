@@ -71,6 +71,8 @@ set (SRC_LIST
   pgen/strat.hpp
   pgen/thermalization.hpp
 
+  radiation/radiation.hpp
+  radiation/radiation.cpp
   radiation/imc/imc_driver.cpp
   radiation/imc/imc.hpp
   radiation/moments/moments.cpp

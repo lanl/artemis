@@ -22,6 +22,7 @@
 #include "gravity/gravity.hpp"
 #include "nbody/nbody.hpp"
 #include "radiation/moments/moments.hpp"
+#include "radiation/radiation.hpp"
 #include "rotating_frame/rotating_frame.hpp"
 #include "utils/artemis_utils.hpp"
 #include "utils/history.hpp"
@@ -132,6 +133,7 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
       auto eos_h = packages.Get("gas")->Param<EOS>("eos_h");
       auto opacity_h = packages.Get("gas")->Param<MeanOpacity>("opacity_h");
       auto scattering_h = packages.Get("gas")->Param<MeanScattering>("scattering_h");
+      packages.Add(rad::InitializeRadDataFields(pin.get()));
       packages.Add(jaybenne::Initialize(pin.get(), opacity_h, scattering_h, eos_h,
                                         "radiation/imc"));
       PARTHENON_REQUIRE(coords == Coordinates::cartesian,

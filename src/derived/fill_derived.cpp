@@ -18,12 +18,9 @@
 #include "radiation/moments/moments.hpp"
 #include "utils/artemis_utils.hpp"
 #include "utils/eos/eos.hpp"
-#include "utils/opacity/opacity.hpp"
 
 using ArtemisUtils::EOS;
 using ArtemisUtils::VI;
-using ArtemisUtils::MeanOpacity;
-using ArtemisUtils::MeanScattering;
 
 namespace ArtemisDerived {
 //----------------------------------------------------------------------------------------
@@ -33,7 +30,6 @@ namespace ArtemisDerived {
 template <Coordinates GEOM>
 TaskStatus SetAuxillaryFields(MeshData<Real> *md) {
   using parthenon::MakePackDescriptor;
-  using TE = parthenon::TopologicalElement;
   auto pm = md->GetParentPointer();
   auto &resolved_pkgs = pm->resolved_packages;
 
@@ -77,9 +73,6 @@ TaskStatus SetAuxillaryFields(MeshData<Real> *md) {
           u_u = (ufloor)*utmp + (!ufloor) * uflr;
         }
       });
-
-
-
   return TaskStatus::complete;
 }
 
@@ -90,7 +83,6 @@ TaskStatus SetAuxillaryFields(MeshData<Real> *md) {
 template <Coordinates GEOM>
 void ConsToPrim(MeshData<Real> *md) {
   using parthenon::MakePackDescriptor;
-  using TE = parthenon::TopologicalElement;
   auto pm = md->GetParentPointer();
   auto &resolved_pkgs = pm->resolved_packages;
 
@@ -217,7 +209,6 @@ void ConsToPrim(MeshData<Real> *md) {
 template <typename T, Coordinates GEOM>
 void PrimToCons(T *md) {
   using parthenon::MakePackDescriptor;
-  using TE = parthenon::TopologicalElement;
   auto pm = md->GetParentPointer();
   auto &resolved_pkgs = pm->resolved_packages;
 
@@ -232,18 +223,11 @@ void PrimToCons(T *md) {
   Real dflr_gas = Null<Real>();
   Real sieflr_gas = Null<Real>();
   EOS eos_d;
-  MeanOpacity mopacity_d;
-  MeanScattering mscattering_d;
   if (do_gas) {
     auto &gas_pkg = pm->packages.Get("gas");
     dflr_gas = gas_pkg->template Param<Real>("dfloor");
     sieflr_gas = gas_pkg->template Param<Real>("siefloor");
     eos_d = gas_pkg->template Param<EOS>("eos_d");
-    // opacity types
-    if (do_imc) {
-      mopacity_d = gas_pkg->template Param<MeanOpacity>("mopacity_d");
-      mscattering_d = gas_pkg->template Param<MeanScattering>("mscattering_d");
-    }
   }
 
   // Extract dust parameters
@@ -266,7 +250,6 @@ void PrimToCons(T *md) {
       MakePackDescriptor<gas::cons::density, gas::cons::momentum, gas::cons::total_energy,
                          gas::cons::internal_energy, gas::prim::density,
                          gas::prim::velocity, gas::prim::pressure, gas::prim::sie,
-                         gas::opac::absorption, gas::opac::scattering,
                          dust::cons::density, dust::cons::momentum, dust::prim::density,
                          dust::prim::velocity, rad::cons::energy, rad::cons::flux,
                          rad::prim::energy, rad::prim::flux, rad::prim::pressure>(
@@ -319,15 +302,6 @@ void PrimToCons(T *md) {
             const Real ke = 0.5 * w_d * (SQR(vel1) + SQR(vel2) + SQR(vel3));
             Real &u_e = vmesh(b, gas::cons::total_energy(n), k, j, i);
             u_e = u_u + ke;
-
-            // Sync opacity (TODO: do_rad)
-            if (do_imc) {
-              Real &aa = vmesh(b, gas::opac::absorption(), k, j, i);
-              Real &ss = vmesh(b, gas::opac::scattering(), k, j, i);
-              const Real temp = eos_d.TemperatureFromDensityInternalEnergy(w_d, w_s);
-              aa = mopacity_d.AbsorptionCoefficient(w_d, temp);
-              ss = mscattering_d.RosselandMeanTotalScatteringCoefficient(w_d, temp);
-            }
           }
         }
 

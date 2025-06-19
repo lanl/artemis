@@ -329,13 +329,6 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   m.SetSparseThresholds(0.0, 0.0, 0.0);
   gas->AddSparsePool<gas::prim::sie>(m, control_field, fluidids);
 
-  // Absorption and scattering opacity
-  m = Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy});
-  ArtemisUtils::EnrollArtemisRefinementOps(m, coords);
-  m.SetSparseThresholds(0.0, 0.0, 0.0);
-  gas->AddSparsePool<gas::opac::absorption>(m, control_field, fluidids);
-  gas->AddSparsePool<gas::opac::scattering>(m, control_field, fluidids);
-
   // Normal face Velocity for PdV evaluation of internal energy
   m = Metadata({Metadata::Face, Metadata::Derived, Metadata::OneCopy, Metadata::Sparse});
   m.SetSparseThresholds(0.0, 0.0, 0.0);

@@ -47,6 +47,8 @@ TaskCollection LinearAdvectionStep(Mesh *pmesh, const SimTime &tm,
 TaskStatus UpwindAdvection(MeshData<Real> *u0, MeshData<Real> *u1, const int stage,
                            parthenon::LowStorageIntegrator *integrator);
 
+Real EstimateTimeStep(parthenon::Mesh *pmesh);
+
 //----------------------------------------------------------------------------------------
 //! \fn std::array<Real, 3> RotatingFrame::BackgroundVelocity
 //! \brief Returns signed shear velocity
@@ -203,15 +205,14 @@ KOKKOS_INLINE_FUNCTION void Upwind(const V1 &v0, const V1 &v1, const Real g0,
   const int joff = r_stencil - l_stencil;
 
   // reconstruct and advance
+  auto uup = NewArray<Real, 6>();
+  auto uu = NewArray<Real, 6>();
+  auto uum = NewArray<Real, 6>();
   for (int n = 0; n < nu; ++n) {
-    auto uup = NewArray<Real, 6>();
     UpwindReconstruct<FLUID_TYPE, UDIR>(v0, uup, b, n, k, jstart + joff, i);
-    auto uu = NewArray<Real, 6>();
     UpwindReconstruct<FLUID_TYPE, UDIR>(v0, uu, b, n, k, jstart, i);
-    auto uum = NewArray<Real, 6>();
     for (int j = jb.s; j < jb.e; ++j) {
       const int jswp = l_stencil * j + r_stencil * (jb.e - (j - jb.s));
-      auto uum = NewArray<Real, 6>();
       UpwindReconstruct<FLUID_TYPE, UDIR>(v0, uum, b, n, k, jswp - joff, i);
       UpwindAdvance<FLUID_TYPE, UDIR>(v0, v1, g0, g1, uup, uu, wdt, b, n, k, jswp, i);
       uup = uu;

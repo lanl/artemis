@@ -50,7 +50,7 @@ class ArtemisDriver : public EvolutionDriver {
   TaskCollection PostStepTasks();
 
  protected:
-  IntegratorPtr_t integrator, nbody_integrator, rad_integrator;
+  IntegratorPtr_t integrator, nbody_integrator, rad_integrator, shear_integrator;
   StateDescriptor *artemis_pkg;
   bool do_gas, do_dust, do_moment, do_imc;
   bool do_gravity, do_nbody, do_rotating_frame, do_shear;

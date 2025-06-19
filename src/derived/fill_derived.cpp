@@ -18,9 +18,12 @@
 #include "radiation/moments/moments.hpp"
 #include "utils/artemis_utils.hpp"
 #include "utils/eos/eos.hpp"
+#include "utils/opacity/opacity.hpp"
 
 using ArtemisUtils::EOS;
 using ArtemisUtils::VI;
+using ArtemisUtils::MeanOpacity;
+using ArtemisUtils::MeanScattering;
 
 namespace ArtemisDerived {
 //----------------------------------------------------------------------------------------
@@ -74,6 +77,9 @@ TaskStatus SetAuxillaryFields(MeshData<Real> *md) {
           u_u = (ufloor)*utmp + (!ufloor) * uflr;
         }
       });
+
+
+
   return TaskStatus::complete;
 }
 
@@ -220,16 +226,24 @@ void PrimToCons(T *md) {
   const bool do_gas = artemis_pkg->template Param<bool>("do_gas");
   const bool do_dust = artemis_pkg->template Param<bool>("do_dust");
   const bool do_rad = artemis_pkg->template Param<bool>("do_moment");
+  const bool do_imc = artemis_pkg->template Param<bool>("do_imc");
 
   // Extract gas parameters
   Real dflr_gas = Null<Real>();
   Real sieflr_gas = Null<Real>();
   EOS eos_d;
+  MeanOpacity mopacity_d;
+  MeanScattering mscattering_d;
   if (do_gas) {
     auto &gas_pkg = pm->packages.Get("gas");
     dflr_gas = gas_pkg->template Param<Real>("dfloor");
     sieflr_gas = gas_pkg->template Param<Real>("siefloor");
     eos_d = gas_pkg->template Param<EOS>("eos_d");
+    // opacity types
+    if (do_imc) {
+      mopacity_d = gas_pkg->template Param<MeanOpacity>("mopacity_d");
+      mscattering_d = gas_pkg->template Param<MeanScattering>("mscattering_d");
+    }
   }
 
   // Extract dust parameters
@@ -252,6 +266,7 @@ void PrimToCons(T *md) {
       MakePackDescriptor<gas::cons::density, gas::cons::momentum, gas::cons::total_energy,
                          gas::cons::internal_energy, gas::prim::density,
                          gas::prim::velocity, gas::prim::pressure, gas::prim::sie,
+                         gas::opac::absorption, gas::opac::scattering,
                          dust::cons::density, dust::cons::momentum, dust::prim::density,
                          dust::prim::velocity, rad::cons::energy, rad::cons::flux,
                          rad::prim::energy, rad::prim::flux, rad::prim::pressure>(
@@ -304,6 +319,15 @@ void PrimToCons(T *md) {
             const Real ke = 0.5 * w_d * (SQR(vel1) + SQR(vel2) + SQR(vel3));
             Real &u_e = vmesh(b, gas::cons::total_energy(n), k, j, i);
             u_e = u_u + ke;
+
+            // Sync opacity (TODO: do_rad)
+            if (do_imc) {
+              Real &aa = vmesh(b, gas::opac::absorption(), k, j, i);
+              Real &ss = vmesh(b, gas::opac::scattering(), k, j, i);
+              const Real temp = eos_d.TemperatureFromDensityInternalEnergy(w_d, w_s);
+              aa = mopacity_d.AbsorptionCoefficient(w_d, temp);
+              ss = mscattering_d.RosselandMeanTotalScatteringCoefficient(w_d, temp);
+            }
           }
         }
 

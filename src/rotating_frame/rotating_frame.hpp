@@ -47,6 +47,8 @@ TaskCollection LinearAdvectionStep(Mesh *pmesh, const SimTime &tm,
 TaskStatus UpwindAdvection(MeshData<Real> *u0, MeshData<Real> *u1, const int stage,
                            parthenon::LowStorageIntegrator *integrator);
 
+Real EstimateTimeStep(parthenon::Mesh *pmesh);
+
 struct ReconInfo {
   std::array<Real, 3> grad;
   std::array<Real, 3> xc;

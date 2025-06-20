@@ -36,6 +36,11 @@ namespace RotatingFrame {
 //! Declarations
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
 
+template <Coordinates GEOM>
+Real EstimateTimestepMesh(MeshData<Real> *md);
+
+Real EstimateTimestep(parthenon::Mesh *pmesh, const Real dt_ratio);
+
 TaskStatus RotatingFrameForce(MeshData<Real> *md, const Real time, const Real dt);
 
 TaskListStatus Advect(Mesh *pmesh, const SimTime &tm,
@@ -46,8 +51,6 @@ TaskCollection LinearAdvectionStep(Mesh *pmesh, const SimTime &tm,
 
 TaskStatus UpwindAdvection(MeshData<Real> *u0, MeshData<Real> *u1, const int stage,
                            parthenon::LowStorageIntegrator *integrator);
-
-Real EstimateTimeStep(parthenon::Mesh *pmesh);
 
 //----------------------------------------------------------------------------------------
 //! \fn std::array<Real, 3> RotatingFrame::BackgroundVelocity

@@ -40,10 +40,10 @@ TaskCollection MomentsTasks(Mesh *pmesh, const SimTime &tm,
                             parthenon::LowStorageIntegrator *integrator);
 
 //----------------------------------------------------------------------------------------
-//! \fn Real Radiation::EstimateTimeStep
+//! \fn Real Radiation::EstimateTimestep
 //! \brief Not enrolled in parthenon's determination for global dt
 template <Coordinates GEOM>
-Real EstimateTimeStep(parthenon::Mesh *pmesh) {
+Real EstimateTimestep(parthenon::Mesh *pmesh) {
   auto &radiation_pkg = pmesh->packages.Get("moments");
   auto &params = radiation_pkg->AllParams();
 

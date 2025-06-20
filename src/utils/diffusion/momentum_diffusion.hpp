@@ -628,11 +628,11 @@ TaskStatus MomentumFluxImpl(MeshData<Real> *md, DiffCoeffParams dp, PKG &pkg,
   auto eos_d = pkg->template Param<EOS>("eos_d");
 
   Real qshear = 0.0, om0 = 0.0;
-  const bool do_shear = pm->packages.Get("artemis")->Param<bool>("do_shear");
+  const bool do_shear = pm->packages.Get("artemis")->template Param<bool>("do_shear");
   if (do_shear) {
     auto &rframe_pkg = pm->packages.Get("rotating_frame");
-    qshear = rframe_pkg->Param<Real>("qshear");
-    om0 = rframe_pkg->Param<Real>("omega");
+    qshear = rframe_pkg->template Param<Real>("qshear");
+    om0 = rframe_pkg->template Param<Real>("omega");
   }
 
   const int scr_level = pkg->template Param<int>("scr_level");

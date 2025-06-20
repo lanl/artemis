@@ -29,7 +29,8 @@ namespace IMC {
 //! \brief Executes thermal IMC transport (Jaybenne) and syncs updated fields
 template <Coordinates GEOM>
 TaskListStatus JaybenneIMC(Mesh *pmesh, const Real time, const Real dt) {
-  auto status = rad::UpdateRadDataFields(pmesh).Execute();
+  auto status = Radiation::UpdateRadiationFields(pmesh).Execute();
+  if (status != TaskListStatus::complete) return status;
   status = jaybenne::RadiationStep(pmesh, time, dt).Execute();
   if (status != TaskListStatus::complete) return status;
   status = ArtemisDerived::SyncFields<GEOM>(pmesh, time, dt).Execute();

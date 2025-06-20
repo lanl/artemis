@@ -18,7 +18,7 @@
 #include "utils/integrators/artemis_integrator.hpp"
 #include "utils/units.hpp"
 
-namespace Radiation {
+namespace Moments {
 
 //----------------------------------------------------------------------------------------
 //! \fn TaskListStatus MomentsDriver
@@ -27,7 +27,7 @@ template <Coordinates GEOM>
 TaskListStatus MomentsDriver(Mesh *pmesh, const SimTime &tm,
                              parthenon::LowStorageIntegrator *integrator) {
   // Craft a series of **equal** substeps that sum to the unsplit step
-  const Real dtlimit = Radiation::EstimateTimeStep<GEOM>(pmesh);
+  const Real dtlimit = Moments::EstimateTimeStep<GEOM>(pmesh);
   const int nsteps = static_cast<int>(std::ceil(integrator->dt / dtlimit));
   integrator->dt = integrator->dt / nsteps;
 
@@ -95,7 +95,7 @@ TaskCollection MomentsTasks(Mesh *pmesh, const SimTime &tm,
       auto start_flx_recv = tl.AddTask(none, parthenon::StartReceiveFluxCorrections, u0m);
 
       // Compute radiation fluxes
-      auto rad_flx = tl.AddTask(none, Radiation::CalculateFluxes, u0m.get());
+      auto rad_flx = tl.AddTask(none, Moments::CalculateFluxes, u0m.get());
 
       // Communicate and set fluxes
       auto send_flx = tl.AddTask(
@@ -110,12 +110,11 @@ TaskCollection MomentsTasks(Mesh *pmesh, const SimTime &tm,
                                 u1.get(), g0, g1, 0.0);
 
       // Apply "coordinate source terms"
-      auto coord_src =
-          tl.AddTask(rupdate | cupdate, Radiation::FluxSource, u0m.get(), bdt);
+      auto coord_src = tl.AddTask(rupdate | cupdate, Moments::FluxSource, u0m.get(), bdt);
 
       // Apply matter-coupling step
       auto coupling =
-          tl.AddTask(coord_src, Radiation::MatterCoupling<GEOM>, u0c.get(), bdt);
+          tl.AddTask(coord_src, Moments::MatterCoupling<GEOM>, u0c.get(), bdt);
 
       // Set auxillary fields
       auto set_aux =
@@ -155,4 +154,4 @@ template TaskCollection MomentsTasks<G::spherical2D>(M *pm, const ST &t, LSI *ii
 template TaskCollection MomentsTasks<G::spherical3D>(M *pm, const ST &t, LSI *ii);
 template TaskCollection MomentsTasks<G::axisymmetric>(M *pm, const ST &t, LSI *ii);
 
-} // namespace Radiation
+} // namespace Moments

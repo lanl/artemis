@@ -128,18 +128,19 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   if (do_cooling) packages.Add(Gas::Cooling::Initialize(pin.get()));
   if (do_drag) packages.Add(Drag::Initialize(pin.get()));
   if (do_radiation) {
-    // swap between native artemis radiation and jaybenne imc
+    // Top-level radiation package
+    packages.Add(Radiation::Initialize(pin.get(), constants, do_imc));
+    // Select between Jaybenne IMC or Moments
     if (do_imc) {
       auto eos_h = packages.Get("gas")->Param<EOS>("eos_h");
       auto opacity_h = packages.Get("gas")->Param<MeanOpacity>("opacity_h");
       auto scattering_h = packages.Get("gas")->Param<MeanScattering>("scattering_h");
-      packages.Add(rad::InitializeRadDataFields(pin.get()));
       packages.Add(jaybenne::Initialize(pin.get(), opacity_h, scattering_h, eos_h,
                                         "radiation/imc"));
       PARTHENON_REQUIRE(coords == Coordinates::cartesian,
                         "Jaybenne currently supports only Cartesian coordinates!");
     } else if (do_moment) {
-      packages.Add(Radiation::Initialize(pin.get(), constants));
+      packages.Add(Moments::Initialize(pin.get(), constants));
     } else {
       PARTHENON_FAIL("Unknown radiation model!");
     }

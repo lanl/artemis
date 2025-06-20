@@ -191,7 +191,7 @@ void ConsToPrim(MeshData<Real> *md) {
             const Real hfx1 = vmesh(b, rad::cons::flux(VI(n, 0)), k, j, i) / conv[0];
             const Real hfx2 = vmesh(b, rad::cons::flux(VI(n, 1)), k, j, i) / conv[1];
             const Real hfx3 = vmesh(b, rad::cons::flux(VI(n, 2)), k, j, i) / conv[2];
-            const auto fx = Radiation::NormalizeFlux(hfx1, hfx2, hfx3);
+            const auto fx = Moments::NormalizeFlux(hfx1, hfx2, hfx3);
             vmesh(b, rad::cons::flux(VI(n, 0)), k, j, i) = fx[0] * conv[0];
             vmesh(b, rad::cons::flux(VI(n, 1)), k, j, i) = fx[1] * conv[1];
             vmesh(b, rad::cons::flux(VI(n, 2)), k, j, i) = fx[2] * conv[2];
@@ -342,7 +342,7 @@ void PrimToCons(T *md) {
             const Real fx1 = vmesh(b, rad::prim::flux(VI(n, 0)), k, j, i);
             const Real fx2 = vmesh(b, rad::prim::flux(VI(n, 1)), k, j, i);
             const Real fx3 = vmesh(b, rad::prim::flux(VI(n, 2)), k, j, i);
-            const auto fx = Radiation::NormalizeFlux(fx1, fx2, fx3);
+            const auto fx = Moments::NormalizeFlux(fx1, fx2, fx3);
             vmesh(b, rad::cons::flux(VI(n, 0)), k, j, i) = fx[0] * conv[0];
             vmesh(b, rad::cons::flux(VI(n, 1)), k, j, i) = fx[1] * conv[1];
             vmesh(b, rad::cons::flux(VI(n, 2)), k, j, i) = fx[2] * conv[2];

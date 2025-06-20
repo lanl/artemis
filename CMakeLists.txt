@@ -23,7 +23,7 @@ option(ARTEMIS_ENABLE_HIP "Enable hip for artemis and all dependencies" OFF)
 option(ARTEMIS_ENABLE_HDF5 "Enable HDF5 for artemis and all dependencies" ON)
 option(ARTEMIS_ENABLE_MPI "Enable MPI for artemis and all dependencies" ON)
 option(ARTEMIS_ENABLE_OPENMP "Enable OpenMP for artemis and parthenon" OFF)
-option(ARTEMIS_ENABLE_COMPILE_TIMING "Enable timing of compilation of artemis" ON)
+option(ARTEMIS_ENABLE_COMPILE_TIMING "Enable timing of compilation of artemis" OFF)
 option(ARTEMIS_ENABLE_ASAN "Enable AddressSanitizer to detect memory errors" OFF)
 option(ARTEMIS_PORTABLE_RESTART "Enable portable data types for REBOUND restarts" ON)
 

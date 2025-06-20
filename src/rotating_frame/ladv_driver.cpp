@@ -100,9 +100,9 @@ TaskStatus UpwindAdvection(MeshData<Real> *u0, MeshData<Real> *u1, const int sta
   const Real om0 = rframe_pkg->template Param<Real>("omega");
 
   // Extract integrator weights
-  const Real g0 = integrator->gam0[stage - 1];
-  const Real g1 = integrator->gam1[stage - 1];
   const Real bdt = integrator->beta[stage - 1] * integrator->dt;
+  const Real dwdt = -qshear * om0 * bdt;
+  const int threed = u0->GetNDim() == 3;
 
   // Packing and indexing
   static auto desc =
@@ -116,24 +116,21 @@ TaskStatus UpwindAdvection(MeshData<Real> *u0, MeshData<Real> *u1, const int sta
   IndexRange jb = u0->GetBoundsJ(IndexDomain::interior);
   IndexRange kb = u0->GetBoundsK(IndexDomain::interior);
 
-  parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "UpwindAdvection", parthenon::DevExecSpace(), 0,
-      u0->NumBlocks() - 1, kb.s, kb.e, ib.s, ib.e,
-      KOKKOS_LAMBDA(const int &b, const int &k, const int &i) {
-        geometry::Coords<Coordinates::cartesian> coords(v0.GetCoordinates(b), 0, 0, i);
-        const Real idx2 = 1.0 / (coords.bnds.x2[1] - coords.bnds.x2[0]);
-        const Real x1v = 0.5 * (coords.bnds.x1[1] + coords.bnds.x1[0]);
-        const auto ww = BackgroundVelocity<Coordinates::cartesian>(qshear, om0, x1v);
-        const Real wbdt = ww[1] * idx2 * bdt;
-
-        if (ww[1] >= 0.0) {
-          if (do_gas) Upwind<Fluid::gas, Upwind::l>(v0, v1, g0, g1, wbdt, b, k, jb, i);
-          if (do_dust) Upwind<Fluid::dust, Upwind::l>(v0, v1, g0, g1, wbdt, b, k, jb, i);
-        } else {
-          if (do_gas) Upwind<Fluid::gas, Upwind::r>(v0, v1, g0, g1, wbdt, b, k, jb, i);
-          if (do_dust) Upwind<Fluid::dust, Upwind::r>(v0, v1, g0, g1, wbdt, b, k, jb, i);
-        }
-      });
+  if (dwdt >= 0.0) {
+    parthenon::par_for(
+        DEFAULT_LOOP_PATTERN, "UpwindAdvection", parthenon::DevExecSpace(), 0,
+        u0->NumBlocks() - 1, kb.s, kb.e, ib.s, ib.e,
+        KOKKOS_LAMBDA(const int &b, const int &k, const int &i) {
+          Upwind<Upwind::l>(v0, threed, dwdt, b, k, jb, i);
+        });
+  } else {
+    parthenon::par_for(
+        DEFAULT_LOOP_PATTERN, "UpwindAdvection", parthenon::DevExecSpace(), 0,
+        u0->NumBlocks() - 1, kb.s, kb.e, ib.s, ib.e,
+        KOKKOS_LAMBDA(const int &b, const int &k, const int &i) {
+          Upwind<Upwind::r>(v0, threed, dwdt, b, k, jb, i);
+        });
+  }
 
   return TaskStatus::complete;
 }

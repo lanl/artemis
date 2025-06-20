@@ -47,6 +47,34 @@ TaskCollection LinearAdvectionStep(Mesh *pmesh, const SimTime &tm,
 TaskStatus UpwindAdvection(MeshData<Real> *u0, MeshData<Real> *u1, const int stage,
                            parthenon::LowStorageIntegrator *integrator);
 
+struct ReconInfo {
+  std::array<Real, 3> grad;
+  std::array<Real, 3> xc;
+  std::array<Real, 3> dx;
+  geometry::BBox bnds;
+  Real q;
+
+  KOKKOS_FUNCTION
+  ReconInfo() = default;
+  template <typename V1>
+  KOKKOS_INLINE_FUNCTION ReconInfo(const V1 &v0, const int b, const int n, const int k,
+                                   const int j, const int i) {
+    fill(v0, b, n, k, j, i);
+  }
+
+  template <typename V1>
+  KOKKOS_INLINE_FUNCTION void fill(const V1 &v0, const int b, const int n, const int k,
+                                   const int j, const int i) {
+    geometry::Coords<Coordinates::cartesian> coords(v0.GetCoordinates(b), k, j, i);
+    dx = coords.GetCellWidths();
+    xc = coords.GetCellCenter();
+    bnds = coords.bnds;
+
+    q = v0(b, n, k, j, i);
+    grad = {0.};
+  }
+};
+
 //----------------------------------------------------------------------------------------
 //! \fn std::array<Real, 3> RotatingFrame::BackgroundVelocity
 //! \brief Returns signed shear velocity
@@ -98,50 +126,78 @@ KOKKOS_INLINE_FUNCTION std::array<Real, 3> RotationVelocity(const std::array<Rea
 //----------------------------------------------------------------------------------------
 //! \fn  UpwindAdvance
 //! \brief
-template <Fluid FLUID_TYPE, Upwind UDIR, typename V1, typename V2>
-KOKKOS_INLINE_FUNCTION void UpwindAdvance(const V1 &v0, const V1 &v1, const Real g0,
-                                          const Real g1, const V2 &qp, const V2 &q,
-                                          const Real wdt, const int b, const int n,
-                                          const int k, const int j, const int i) {
-  Real fac = Null<Real>();
-  if constexpr (UDIR == Upwind::l) fac = wdt;
-  if constexpr (UDIR == Upwind::r) fac = -wdt;
+template <Upwind UDIR, typename V1>
+KOKKOS_INLINE_FUNCTION void
+UpwindAdvance(const V1 &v0, const ReconInfo &rp, const ReconInfo &r, const Real dwdt,
+              const int threed, const int b, const int n, const int k, const int j,
+              const int jp, const int i) {
+  Real fac = std::abs(dwdt);
+  Real y0 = r.bnds.x2[(UDIR == Upwind::r)];
 
-  if constexpr (FLUID_TYPE == Fluid::gas) {
-    Real &u0_dn = v0(b, gas::cons::density(n), k, j, i);
-    Real &u0_m1 = v0(b, gas::cons::momentum(VI(n, 0)), k, j, i);
-    Real &u0_m2 = v0(b, gas::cons::momentum(VI(n, 1)), k, j, i);
-    Real &u0_m3 = v0(b, gas::cons::momentum(VI(n, 2)), k, j, i);
-    Real &u0_et = v0(b, gas::cons::total_energy(n), k, j, i);
-    Real &u0_ei = v0(b, gas::cons::internal_energy(n), k, j, i);
-    const Real &u1_dn = v1(b, gas::cons::density(n), k, j, i);
-    const Real &u1_m1 = v1(b, gas::cons::momentum(VI(n, 0)), k, j, i);
-    const Real &u1_m2 = v1(b, gas::cons::momentum(VI(n, 1)), k, j, i);
-    const Real &u1_m3 = v1(b, gas::cons::momentum(VI(n, 2)), k, j, i);
-    const Real &u1_et = v1(b, gas::cons::total_energy(n), k, j, i);
-    const Real &u1_ei = v1(b, gas::cons::internal_energy(n), k, j, i);
+  const Real dz = (threed) ? r.dx[2] : 1.0;
+  const Real I0 = dwdt * r.xc[0] * r.dx[0] * dz;
+  const Real dxcub =
+      r.dx[0] / 3. *
+      (SQR(r.bnds.x1[0]) + r.bnds.x1[0] * r.bnds.x1[1] + SQR(r.bnds.x1[1]));
 
-    u0_dn = g0 * u0_dn + g1 * u1_dn + fac * (qp[0] - q[0]);
-    u0_m1 = g0 * u0_m1 + g1 * u1_m1 + fac * (qp[1] - q[1]);
-    u0_m2 = g0 * u0_m2 + g1 * u1_m2 + fac * (qp[2] - q[2]);
-    u0_m3 = g0 * u0_m3 + g1 * u1_m3 + fac * (qp[3] - q[3]);
-    u0_et = g0 * u0_et + g1 * u1_et + fac * (qp[4] - q[4]);
-    u0_ei = g0 * u0_ei + g1 * u1_ei + fac * (qp[5] - q[5]);
-  } else if constexpr (FLUID_TYPE == Fluid::dust) {
-    Real &u0_dn = v0(b, dust::cons::density(n), k, j, i);
-    Real &u0_m1 = v0(b, dust::cons::momentum(VI(n, 0)), k, j, i);
-    Real &u0_m2 = v0(b, dust::cons::momentum(VI(n, 1)), k, j, i);
-    Real &u0_m3 = v0(b, dust::cons::momentum(VI(n, 2)), k, j, i);
-    const Real &u1_dn = v1(b, dust::cons::density(n), k, j, i);
-    const Real &u1_m1 = v1(b, dust::cons::momentum(VI(n, 0)), k, j, i);
-    const Real &u1_m2 = v1(b, dust::cons::momentum(VI(n, 1)), k, j, i);
-    const Real &u1_m3 = v1(b, dust::cons::momentum(VI(n, 2)), k, j, i);
+  const std::array<Real, 3> I1{fac * dxcub * dz,
+                               0.5 * SQR(fac) * dxcub + y0 * fac * r.xc[0] * r.dx[0] * dz,
+                               threed * dz * I0};
 
-    u0_dn = g0 * u0_dn + g1 * u1_dn + fac * (qp[0] - q[0]);
-    u0_m1 = g0 * u0_m1 + g1 * u1_m1 + fac * (qp[1] - q[1]);
-    u0_m2 = g0 * u0_m2 + g1 * u1_m2 + fac * (qp[2] - q[2]);
-    u0_m3 = g0 * u0_m3 + g1 * u1_m3 + fac * (qp[3] - q[3]);
-  }
+  Real dq =
+      (rp.q - ArtemisUtils::VDot(rp.grad, rp.xc)) * I0 + ArtemisUtils::VDot(rp.grad, I1);
+
+  // ?
+  v0(b, n, k, j, i) += dq;
+  v0(b, n, k, jp, i) -= dq;
+
+  // v0(b,n,k,j,i) = ....;
+
+  // I0 = qO*xc * dx*dz*dt
+  // Ix = qO*dt*dz* d(x^3/3)
+  // Iy = (y0*q0*dt)
+  //
+
+  // Ix = xc*dx*vp*dt + qO*dt*d(x^3/3)
+  // Iy = (y0 + 0.5*vp*dt)*dx*vp*dt + y0 + 0.5*qO*dt* (qO*dt*d(x^3/3))
+
+  // I
+
+  // if constexpr (FLUID_TYPE == Fluid::gas) {
+  //   Real &u0_dn = v0(b, gas::cons::density(n), k, j, i);
+  //   Real &u0_m1 = v0(b, gas::cons::momentum(VI(n, 0)), k, j, i);
+  //   Real &u0_m2 = v0(b, gas::cons::momentum(VI(n, 1)), k, j, i);
+  //   Real &u0_m3 = v0(b, gas::cons::momentum(VI(n, 2)), k, j, i);
+  //   Real &u0_et = v0(b, gas::cons::total_energy(n), k, j, i);
+  //   Real &u0_ei = v0(b, gas::cons::internal_energy(n), k, j, i);
+  //   const Real &u1_dn = v1(b, gas::cons::density(n), k, j, i);
+  //   const Real &u1_m1 = v1(b, gas::cons::momentum(VI(n, 0)), k, j, i);
+  //   const Real &u1_m2 = v1(b, gas::cons::momentum(VI(n, 1)), k, j, i);
+  //   const Real &u1_m3 = v1(b, gas::cons::momentum(VI(n, 2)), k, j, i);
+  //   const Real &u1_et = v1(b, gas::cons::total_energy(n), k, j, i);
+  //   const Real &u1_ei = v1(b, gas::cons::internal_energy(n), k, j, i);
+
+  //   u0_dn = g0 * u0_dn + g1 * u1_dn + fac * (qp[0] - q[0]);
+  //   u0_m1 = g0 * u0_m1 + g1 * u1_m1 + fac * (qp[1] - q[1]);
+  //   u0_m2 = g0 * u0_m2 + g1 * u1_m2 + fac * (qp[2] - q[2]);
+  //   u0_m3 = g0 * u0_m3 + g1 * u1_m3 + fac * (qp[3] - q[3]);
+  //   u0_et = g0 * u0_et + g1 * u1_et + fac * (qp[4] - q[4]);
+  //   u0_ei = g0 * u0_ei + g1 * u1_ei + fac * (qp[5] - q[5]);
+  // } else if constexpr (FLUID_TYPE == Fluid::dust) {
+  //   Real &u0_dn = v0(b, dust::cons::density(n), k, j, i);
+  //   Real &u0_m1 = v0(b, dust::cons::momentum(VI(n, 0)), k, j, i);
+  //   Real &u0_m2 = v0(b, dust::cons::momentum(VI(n, 1)), k, j, i);
+  //   Real &u0_m3 = v0(b, dust::cons::momentum(VI(n, 2)), k, j, i);
+  //   const Real &u1_dn = v1(b, dust::cons::density(n), k, j, i);
+  //   const Real &u1_m1 = v1(b, dust::cons::momentum(VI(n, 0)), k, j, i);
+  //   const Real &u1_m2 = v1(b, dust::cons::momentum(VI(n, 1)), k, j, i);
+  //   const Real &u1_m3 = v1(b, dust::cons::momentum(VI(n, 2)), k, j, i);
+
+  //   u0_dn = g0 * u0_dn + g1 * u1_dn + fac * (qp[0] - q[0]);
+  //   u0_m1 = g0 * u0_m1 + g1 * u1_m1 + fac * (qp[1] - q[1]);
+  //   u0_m2 = g0 * u0_m2 + g1 * u1_m2 + fac * (qp[2] - q[2]);
+  //   u0_m3 = g0 * u0_m3 + g1 * u1_m3 + fac * (qp[3] - q[3]);
+  // }
 }
 
 //----------------------------------------------------------------------------------------
@@ -150,50 +206,48 @@ KOKKOS_INLINE_FUNCTION void UpwindAdvance(const V1 &v0, const V1 &v1, const Real
 //! NOTE(@pdmullen): Donor cell reconstruction *could* nestle into the stencil of the
 //! Upwind function, but higher order reconstruction (e.g., PPM) is incompatible... Do we
 //! want to support all reconstruction options?
-template <Upwind UDIR, typename VA, typename V1, typename V2>
-KOKKOS_INLINE_FUNCTION void ReconSingle(const V1 &q, V2 &arr, const int idx, const int b,
-                                        const int n, const int k, const int j,
-                                        const int i) {
-  Real wl = Null<Real>(), wr = Null<Real>();
-  PLM(q(b, VA(n), k, j - 1, i), q(b, VA(n), k, j, i), q(b, VA(n), k, j + 1, i), wl, wr);
-  if constexpr (UDIR == Upwind::l) arr[idx] = wl;
-  if constexpr (UDIR == Upwind::r) arr[idx] = wr;
-}
+// template <Upwind UDIR, typename VA, typename V1, typename V2>
+// KOKKOS_INLINE_FUNCTION void ReconSingle(const V1 &q, V2 &arr, const int idx, const int
+// b,
+//                                         const int n, const int k, const int j,
+//                                         const int i) {
+//   Real wl = Null<Real>(), wr = Null<Real>();
+//   PLM(q(b, VA(n), k, j - 1, i), q(b, VA(n), k, j, i), q(b, VA(n), k, j + 1, i), wl,
+//   wr); arr[idx] = (wr - wl) * 0.5;
+//   // if constexpr (UDIR == Upwind::l) arr[idx] = wl;
+//   // if constexpr (UDIR == Upwind::r) arr[idx] = wr;
+// }
 
 //----------------------------------------------------------------------------------------
 //! \fn  UpwindReconstruct
 //! \brief
-template <Fluid FLUID_TYPE, Upwind UDIR, typename V1, typename V2>
-KOKKOS_INLINE_FUNCTION void UpwindReconstruct(const V1 &vmesh, V2 &arr, const int b,
-                                              const int n, const int k, const int j,
-                                              const int i) {
-  if constexpr (FLUID_TYPE == Fluid::gas) {
-    ReconSingle<UDIR, gas::cons::density>(vmesh, arr, 0, b, n, k, j, i);
-    ReconSingle<UDIR, gas::cons::momentum>(vmesh, arr, 1, b, VI(n, 0), k, j, i);
-    ReconSingle<UDIR, gas::cons::momentum>(vmesh, arr, 2, b, VI(n, 1), k, j, i);
-    ReconSingle<UDIR, gas::cons::momentum>(vmesh, arr, 3, b, VI(n, 2), k, j, i);
-    ReconSingle<UDIR, gas::cons::total_energy>(vmesh, arr, 4, b, n, k, j, i);
-    ReconSingle<UDIR, gas::cons::internal_energy>(vmesh, arr, 5, b, n, k, j, i);
-  } else if constexpr (FLUID_TYPE == Fluid::dust) {
-    ReconSingle<UDIR, dust::cons::density>(vmesh, arr, 0, b, n, k, j, i);
-    ReconSingle<UDIR, dust::cons::momentum>(vmesh, arr, 1, b, VI(n, 0), k, j, i);
-    ReconSingle<UDIR, dust::cons::momentum>(vmesh, arr, 2, b, VI(n, 1), k, j, i);
-    ReconSingle<UDIR, dust::cons::momentum>(vmesh, arr, 3, b, VI(n, 2), k, j, i);
-  }
+template <typename V1>
+KOKKOS_INLINE_FUNCTION std::array<Real, 3>
+UpwindReconstruct(const V1 &q, const std::array<Real, 3> &dx, const int threed,
+                  const int b, const int n, const int k, const int j, const int i) {
+
+  // TODO: Replace with PPM
+  std::array<Real, 3> dqdx{0.0, 0.0, 0.0};
+  Real wl = Null<Real>(), wr = Null<Real>();
+
+  PLM(q(b, n, k, j, i - 1), q(b, n, k, j, i), q(b, n, k, j, i + 1), wl, wr);
+  dqdx[0] = (wr - wl) / (2.0 * dx[0]);
+
+  PLM(q(b, n, k, j - 1, i), q(b, n, k, j, i), q(b, n, k, j + 1, i), wl, wr);
+  dqdx[1] = (wr - wl) / (2.0 * dx[1]);
+
+  PLM(q(b, n, k - threed, j, i), q(b, n, k, j, i), q(b, n, k + threed, j, i), wl, wr);
+  dqdx[2] = (wr - wl) / (2.0 * dx[2]);
+
+  return dqdx;
 }
 
 //----------------------------------------------------------------------------------------
 //! \fn  Upwind
 //! \brief
-template <Fluid FLUID_TYPE, Upwind UDIR, typename V1>
-KOKKOS_INLINE_FUNCTION void Upwind(const V1 &v0, const V1 &v1, const Real g0,
-                                   const Real g1, const Real wdt, const int b,
-                                   const int k, IndexRange jb, const int i) {
-  // fluid indexing
-  int nu = Null<int>();
-  if constexpr (FLUID_TYPE == Fluid::gas) nu = v0.GetSize(b, gas::cons::density());
-  if constexpr (FLUID_TYPE == Fluid::dust) nu = v0.GetSize(b, dust::cons::density());
-
+template <Upwind UDIR, typename V1>
+KOKKOS_INLINE_FUNCTION void Upwind(const V1 &v0, const int threed, const Real dwdt,
+                                   const int b, const int k, IndexRange jb, const int i) {
   // upwinding direction
   bool l_stencil = false, r_stencil = false;
   if constexpr (UDIR == Upwind::l) l_stencil = true;
@@ -203,21 +257,28 @@ KOKKOS_INLINE_FUNCTION void Upwind(const V1 &v0, const V1 &v1, const Real g0,
   const int joff = r_stencil - l_stencil;
 
   // reconstruct and advance
-  for (int n = 0; n < nu; ++n) {
-    auto uup = NewArray<Real, 6>();
-    UpwindReconstruct<FLUID_TYPE, UDIR>(v0, uup, b, n, k, jstart + joff, i);
-    auto uu = NewArray<Real, 6>();
-    UpwindReconstruct<FLUID_TYPE, UDIR>(v0, uu, b, n, k, jstart, i);
-    auto uum = NewArray<Real, 6>();
+  // TODO:
+  // This reconstructs the conservatives. An alternative is to hold the density in a
+  // separate register and divide the conservatives.
+  for (int n = v0.GetLowerBound(b); n <= v0.GetUpperBound(b); ++n) {
+    ReconInfo rp(v0, b, n, k, jstart + joff, i);
+    ReconInfo rc(v0, b, n, k, jstart, i);
+    ReconInfo rm;
+    rp.grad = UpwindReconstruct(v0, rp.dx, threed, b, n, k, jstart + joff, i);
+    const auto qp = v0(b, n, k, jstart + joff, i);
+    rc.grad = UpwindReconstruct(v0, rc.dx, threed, b, n, k, jstart, i);
+    const auto qc = v0(b, n, k, jstart, i);
     for (int j = jb.s; j < jb.e; ++j) {
       const int jswp = l_stencil * j + r_stencil * (jb.e - (j - jb.s));
-      auto uum = NewArray<Real, 6>();
-      UpwindReconstruct<FLUID_TYPE, UDIR>(v0, uum, b, n, k, jswp - joff, i);
-      UpwindAdvance<FLUID_TYPE, UDIR>(v0, v1, g0, g1, uup, uu, wdt, b, n, k, jswp, i);
-      uup = uu;
-      uu = uum;
+      rm.fill(v0, b, n, k, jswp - joff, i);
+      rm.grad = UpwindReconstruct(v0, rm.dx, threed, b, n, k, jswp - joff, i);
+
+      UpwindAdvance<UDIR>(v0, rp, rc, dwdt, threed, b, n, k, jswp, jswp + joff, i);
+
+      rp = rc;
+      rc = rm;
     }
-    UpwindAdvance<FLUID_TYPE, UDIR>(v0, v1, g0, g1, uup, uu, wdt, b, n, k, jend, i);
+    UpwindAdvance<UDIR>(v0, rp, rc, dwdt, threed, b, n, k, jend, jend + joff, i);
   }
 }
 

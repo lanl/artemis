@@ -15,6 +15,7 @@
 #include "rotating_frame.hpp"
 #include "artemis.hpp"
 #include "rotating_frame_impl.hpp"
+#include "utils/artemis_utils.hpp"
 
 namespace RotatingFrame {
 
@@ -37,6 +38,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     PARTHENON_REQUIRE(parthenon::Globals::nghost >= 2,
                       "Rotating frame advection step requires at least 2 ghost cells.");
   }
+
+  params.Add("reconstruction", ArtemisUtils::ChooseReconMethod(pin->GetOrAddString(
+                                   "rotating_frame", "reconstruct", "ppm")));
 
   params.Add("omega", omega);
   params.Add("qshear", qshear);

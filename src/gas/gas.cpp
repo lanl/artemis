@@ -61,25 +61,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   // Reconstruction algorithm
   ReconstructionMethod recon_method = ReconstructionMethod::null;
   const std::string recon = pin->GetOrAddString("gas", "reconstruct", "plm");
-  if (recon.compare("pcm") == 0) {
-    PARTHENON_REQUIRE(parthenon::Globals::nghost >= 1,
-                      "PCM requires at least 1 ghost cell.");
-    recon_method = ReconstructionMethod::pcm;
-  } else if (recon.compare("plm") == 0) {
-    PARTHENON_REQUIRE(parthenon::Globals::nghost >= 2,
-                      "PLM requires at least 2 ghost cells.");
-    recon_method = ReconstructionMethod::plm;
-  } else if (recon.compare("ppm") == 0) {
-    PARTHENON_REQUIRE(parthenon::Globals::nghost >= 3,
-                      "PPM requires at least 3 ghost cells.");
-    if (coords != Coordinates::cartesian) {
-      PARTHENON_WARN("Artemis' PPM implementation does not contain geometric corrections "
-                     "for curvilinear coordinates.");
-    }
-    recon_method = ReconstructionMethod::ppm;
-  } else {
-    PARTHENON_FAIL("Reconstruction method not recognized.");
-  }
+  recon_method = ArtemisUtils::ChooseReconMethod(recon);
   params.Add("recon", recon_method);
 
   // Riemann solver

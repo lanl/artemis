@@ -44,7 +44,7 @@ TaskListStatus Advect(Mesh *pmesh, const SimTime &tm,
 TaskCollection LinearAdvectionStep(Mesh *pmesh, const SimTime &tm,
                                    parthenon::LowStorageIntegrator *integrator);
 
-TaskStatus UpwindAdvection(MeshData<Real> *u0, MeshData<Real> *u1, const int stage,
+TaskStatus UpwindAdvection(MeshData<Real> *u0, const int stage,
                            parthenon::LowStorageIntegrator *integrator);
 
 Real EstimateTimeStep(parthenon::Mesh *pmesh);
@@ -55,6 +55,7 @@ struct ReconInfo {
   std::array<Real, 3> dx;
   geometry::BBox bnds;
   Real q;
+  Real vol;
 
   KOKKOS_FUNCTION
   ReconInfo() = default;
@@ -70,6 +71,7 @@ struct ReconInfo {
     geometry::Coords<Coordinates::cartesian> coords(v0.GetCoordinates(b), k, j, i);
     dx = coords.GetCellWidths();
     xc = coords.GetCellCenter();
+    vol = coords.Volume();
     bnds = coords.bnds;
 
     q = v0(b, n, k, j, i);
@@ -126,18 +128,18 @@ KOKKOS_INLINE_FUNCTION std::array<Real, 3> RotationVelocity(const std::array<Rea
 }
 
 //----------------------------------------------------------------------------------------
-//! \fn  UpwindAdvance
+//! \fn  RemapUpdate
 //! \brief
 template <Upwind UDIR, typename V1>
 KOKKOS_INLINE_FUNCTION void
-UpwindAdvance(const V1 &v0, const ReconInfo &rp, const ReconInfo &r, const Real dwdt,
-              const int threed, const int b, const int n, const int k, const int j,
-              const int jp, const int i) {
+RemapUpdate(const V1 &v0, const ReconInfo &rp, const ReconInfo &r, const Real dwdt,
+            const int threed, const int b, const int n, const int k, const int j,
+            const int jp, const int i) {
   Real fac = std::abs(dwdt);
   Real y0 = r.bnds.x2[(UDIR == Upwind::r)];
 
   const Real dz = (threed) ? r.dx[2] : 1.0;
-  const Real I0 = dwdt * r.xc[0] * r.dx[0] * dz;
+  const Real I0 = std::abs(dwdt) * r.xc[0] * r.dx[0] * dz;
   const Real dxcub =
       r.dx[0] / 3. *
       (SQR(r.bnds.x1[0]) + r.bnds.x1[0] * r.bnds.x1[1] + SQR(r.bnds.x1[1]));
@@ -149,141 +151,86 @@ UpwindAdvance(const V1 &v0, const ReconInfo &rp, const ReconInfo &r, const Real 
   Real dq =
       (rp.q - ArtemisUtils::VDot(rp.grad, rp.xc)) * I0 + ArtemisUtils::VDot(rp.grad, I1);
 
-  // ?
-  v0(b, n, k, j, i) += dq;
-  v0(b, n, k, jp, i) -= dq;
+  const Real drho = dq / r.vol;
+  const Real drhop = dq / rp.vol;
 
-  // v0(b,n,k,j,i) = ....;
-
-  // I0 = qO*xc * dx*dz*dt
-  // Ix = qO*dt*dz* d(x^3/3)
-  // Iy = (y0*q0*dt)
-  //
-
-  // Ix = xc*dx*vp*dt + qO*dt*d(x^3/3)
-  // Iy = (y0 + 0.5*vp*dt)*dx*vp*dt + y0 + 0.5*qO*dt* (qO*dt*d(x^3/3))
-
-  // I
-
-  // if constexpr (FLUID_TYPE == Fluid::gas) {
-  //   Real &u0_dn = v0(b, gas::cons::density(n), k, j, i);
-  //   Real &u0_m1 = v0(b, gas::cons::momentum(VI(n, 0)), k, j, i);
-  //   Real &u0_m2 = v0(b, gas::cons::momentum(VI(n, 1)), k, j, i);
-  //   Real &u0_m3 = v0(b, gas::cons::momentum(VI(n, 2)), k, j, i);
-  //   Real &u0_et = v0(b, gas::cons::total_energy(n), k, j, i);
-  //   Real &u0_ei = v0(b, gas::cons::internal_energy(n), k, j, i);
-  //   const Real &u1_dn = v1(b, gas::cons::density(n), k, j, i);
-  //   const Real &u1_m1 = v1(b, gas::cons::momentum(VI(n, 0)), k, j, i);
-  //   const Real &u1_m2 = v1(b, gas::cons::momentum(VI(n, 1)), k, j, i);
-  //   const Real &u1_m3 = v1(b, gas::cons::momentum(VI(n, 2)), k, j, i);
-  //   const Real &u1_et = v1(b, gas::cons::total_energy(n), k, j, i);
-  //   const Real &u1_ei = v1(b, gas::cons::internal_energy(n), k, j, i);
-
-  //   u0_dn = g0 * u0_dn + g1 * u1_dn + fac * (qp[0] - q[0]);
-  //   u0_m1 = g0 * u0_m1 + g1 * u1_m1 + fac * (qp[1] - q[1]);
-  //   u0_m2 = g0 * u0_m2 + g1 * u1_m2 + fac * (qp[2] - q[2]);
-  //   u0_m3 = g0 * u0_m3 + g1 * u1_m3 + fac * (qp[3] - q[3]);
-  //   u0_et = g0 * u0_et + g1 * u1_et + fac * (qp[4] - q[4]);
-  //   u0_ei = g0 * u0_ei + g1 * u1_ei + fac * (qp[5] - q[5]);
-  // } else if constexpr (FLUID_TYPE == Fluid::dust) {
-  //   Real &u0_dn = v0(b, dust::cons::density(n), k, j, i);
-  //   Real &u0_m1 = v0(b, dust::cons::momentum(VI(n, 0)), k, j, i);
-  //   Real &u0_m2 = v0(b, dust::cons::momentum(VI(n, 1)), k, j, i);
-  //   Real &u0_m3 = v0(b, dust::cons::momentum(VI(n, 2)), k, j, i);
-  //   const Real &u1_dn = v1(b, dust::cons::density(n), k, j, i);
-  //   const Real &u1_m1 = v1(b, dust::cons::momentum(VI(n, 0)), k, j, i);
-  //   const Real &u1_m2 = v1(b, dust::cons::momentum(VI(n, 1)), k, j, i);
-  //   const Real &u1_m3 = v1(b, dust::cons::momentum(VI(n, 2)), k, j, i);
-
-  //   u0_dn = g0 * u0_dn + g1 * u1_dn + fac * (qp[0] - q[0]);
-  //   u0_m1 = g0 * u0_m1 + g1 * u1_m1 + fac * (qp[1] - q[1]);
-  //   u0_m2 = g0 * u0_m2 + g1 * u1_m2 + fac * (qp[2] - q[2]);
-  //   u0_m3 = g0 * u0_m3 + g1 * u1_m3 + fac * (qp[3] - q[3]);
-  // }
+  v0(b, n, k, j, i) += dq / r.vol;
+  v0(b, n, k, jp, i) -= dq / rp.vol;
 }
 
 //----------------------------------------------------------------------------------------
-//! \fn  ReconSingle
-//! \brief Invoke PLM reconstruction for linear advection
-//! NOTE(@pdmullen): Donor cell reconstruction *could* nestle into the stencil of the
-//! Upwind function, but higher order reconstruction (e.g., PPM) is incompatible... Do we
-//! want to support all reconstruction options?
-// template <Upwind UDIR, typename VA, typename V1, typename V2>
-// KOKKOS_INLINE_FUNCTION void ReconSingle(const V1 &q, V2 &arr, const int idx, const int
-// b,
-//                                         const int n, const int k, const int j,
-//                                         const int i) {
-//   Real wl = Null<Real>(), wr = Null<Real>();
-//   PLM(q(b, VA(n), k, j - 1, i), q(b, VA(n), k, j, i), q(b, VA(n), k, j + 1, i), wl,
-//   wr); arr[idx] = (wr - wl) * 0.5;
-//   // if constexpr (UDIR == Upwind::l) arr[idx] = wl;
-//   // if constexpr (UDIR == Upwind::r) arr[idx] = wr;
-// }
-
-//----------------------------------------------------------------------------------------
-//! \fn  UpwindReconstruct
+//! \fn  RemapCons
 //! \brief
-template <typename V1>
-KOKKOS_INLINE_FUNCTION std::array<Real, 3>
-UpwindReconstruct(const V1 &q, const std::array<Real, 3> &dx, const int threed,
-                  const int b, const int n, const int k, const int j, const int i) {
+template <Upwind UDIR, ReconstructionMethod R, typename V1>
+KOKKOS_INLINE_FUNCTION void RemapCons(const V1 &v0, const int multid, const int threed,
+                                      const Real dwdt, const int b, const int k,
+                                      IndexRange jb, const int i) {
 
-  // TODO: Replace with PPM
-  std::array<Real, 3> dqdx{0.0, 0.0, 0.0};
-  Real wl = Null<Real>(), wr = Null<Real>();
-
-  PLM(q(b, n, k, j, i - 1), q(b, n, k, j, i), q(b, n, k, j, i + 1), wl, wr);
-  dqdx[0] = (wr - wl) / (2.0 * dx[0]);
-
-  PLM(q(b, n, k, j - 1, i), q(b, n, k, j, i), q(b, n, k, j + 1, i), wl, wr);
-  dqdx[1] = (wr - wl) / (2.0 * dx[1]);
-
-  PLM(q(b, n, k - threed, j, i), q(b, n, k, j, i), q(b, n, k + threed, j, i), wl, wr);
-  dqdx[2] = (wr - wl) / (2.0 * dx[2]);
-
-  return dqdx;
-}
-
-//----------------------------------------------------------------------------------------
-//! \fn  Upwind
-//! \brief
-template <Upwind UDIR, typename V1>
-KOKKOS_INLINE_FUNCTION void Upwind(const V1 &v0, const int threed, const Real dwdt,
-                                   const int b, const int k, IndexRange jb, const int i) {
-  // upwinding direction
-  bool l_stencil = false, r_stencil = false;
-  if constexpr (UDIR == Upwind::l) l_stencil = true;
-  if constexpr (UDIR == Upwind::r) r_stencil = true;
-  const int jstart = l_stencil * jb.s + r_stencil * jb.e;
-  const int jend = l_stencil * jb.e + r_stencil * jb.s;
-  const int joff = r_stencil - l_stencil;
+  int jstart = jb.e, jend = jb.s, joff = 1;
+  if constexpr (UDIR == Upwind::l) {
+    jstart = jb.s;
+    jend = jb.e;
+    joff = -1;
+  }
 
   // reconstruct and advance
   // TODO:
   // This reconstructs the conservatives. An alternative is to hold the density in a
-  // separate register and divide the conservatives.
+  // separate register and divide the mass-weighted conservatives.
+  ArtemisUtils::ReconGradient<R> recon;
   for (int n = v0.GetLowerBound(b); n <= v0.GetUpperBound(b); ++n) {
-    ReconInfo rp(v0, b, n, k, jstart + joff, i);
+    ReconInfo ru(v0, b, n, k, jstart + joff, i);
     ReconInfo rc(v0, b, n, k, jstart, i);
-    ReconInfo rm;
-    rp.grad = UpwindReconstruct(v0, rp.dx, threed, b, n, k, jstart + joff, i);
-    const auto qp = v0(b, n, k, jstart + joff, i);
-    rc.grad = UpwindReconstruct(v0, rc.dx, threed, b, n, k, jstart, i);
+    ReconInfo rd;
+    ru.grad = recon(v0, ru.dx, multid, threed, b, n, k, jstart + joff, i);
+    const auto qu = v0(b, n, k, jstart + joff, i);
+    rc.grad = recon(v0, rc.dx, multid, threed, b, n, k, jstart, i);
     const auto qc = v0(b, n, k, jstart, i);
-    for (int j = jb.s; j < jb.e; ++j) {
-      const int jswp = l_stencil * j + r_stencil * (jb.e - (j - jb.s));
-      rm.fill(v0, b, n, k, jswp - joff, i);
-      rm.grad = UpwindReconstruct(v0, rm.dx, threed, b, n, k, jswp - joff, i);
-
-      UpwindAdvance<UDIR>(v0, rp, rc, dwdt, threed, b, n, k, jswp, jswp + joff, i);
-
-      rp = rc;
-      rc = rm;
+    if constexpr (UDIR == Upwind::r) {
+      for (int j = jb.e; j >= jb.s - 1; j--) {
+        const int ju = j + joff;
+        const int jd = j - joff;
+        if (jd > jb.s - 1) {
+          rd.fill(v0, b, n, k, jd, i);
+          rd.grad = recon(v0, rd.dx, multid, threed, b, n, k, jd, i);
+        }
+        RemapUpdate<UDIR>(v0, ru, rc, dwdt, threed, b, n, k, j, ju, i);
+        ru = rc;
+        rc = rd;
+      }
+    } else if constexpr (UDIR == Upwind::l) {
+      for (int j = jb.s; j <= jb.e + 1; j++) {
+        const int ju = j + joff;
+        const int jd = j - joff;
+        if (j < jb.e + 1) {
+          rd.fill(v0, b, n, k, j - joff, i);
+          rd.grad = recon(v0, rd.dx, multid, threed, b, n, k, jd, i);
+        }
+        RemapUpdate<UDIR>(v0, ru, rc, dwdt, threed, b, n, k, j, ju, i);
+        ru = rc;
+        rc = rd;
+      }
     }
-    UpwindAdvance<UDIR>(v0, rp, rc, dwdt, threed, b, n, k, jend, jend + joff, i);
   }
 }
 
+template <Upwind UDIR, ReconstructionMethod R, typename V1>
+TaskStatus UpwindAdvectionImpl(MeshData<Real> *u0, const V1 &v0, const Real dwdt) {
+
+  const int multid = u0->GetNDim() >= 2;
+  PARTHENON_REQUIRE(multid, "Upwind Advection does not work in 1D");
+  const int threed = u0->GetNDim() == 3;
+  IndexRange ib = u0->GetBoundsI(IndexDomain::interior);
+  IndexRange jb = u0->GetBoundsJ(IndexDomain::interior);
+  IndexRange kb = u0->GetBoundsK(IndexDomain::interior);
+  parthenon::par_for(
+      DEFAULT_LOOP_PATTERN, "UpwindAdvection", parthenon::DevExecSpace(), 0,
+      u0->NumBlocks() - 1, kb.s, kb.e, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int &b, const int &k, const int &i) {
+        RemapCons<UDIR, R>(v0, multid, threed, dwdt, b, k, jb, i);
+      });
+  return TaskStatus::complete;
+}
 } // namespace RotatingFrame
 
 #endif // ROTATING_FRAME_ROTATING_FRAME_HPP_

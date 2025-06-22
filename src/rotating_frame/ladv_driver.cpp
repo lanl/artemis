@@ -78,7 +78,7 @@ TaskListStatus Advect(Mesh *pmesh, const SimTime &tm,
     if (status != TaskListStatus::complete) return status;
   }
 
-  return LinearAdvectionStep(pmesh, tm, integrator).Execute();
+  return TaskListStatus::complete;
 }
 
 //----------------------------------------------------------------------------------------
@@ -99,21 +99,18 @@ TaskCollection LinearAdvectionStep(Mesh *pmesh, const SimTime &tm,
   for (int i = 0; i < num_partitions; i++) {
     auto &tl = init_region[i];
     auto &u0 = pmesh->mesh_data.GetOrAdd("u0", i);
-    auto &u1 = pmesh->mesh_data.GetOrAdd("u1", i);
-    tl.AddTask(none, ArtemisUtils::DeepCopyConservedData, u1.get(), u0.get());
+    // tl.AddTask(none, ArtemisUtils::DeepCopyConservedData, u1.get(), u0.get());
   }
 
   // Operator split linear advection
-  for (int stage = 1; stage <= integrator->nstages; stage++) {
+  for (int stage = 1; stage <= 1; stage++) {
     TaskRegion &tr = tc.AddRegion(num_partitions);
     for (int i = 0; i < num_partitions; i++) {
       auto &tl = tr[i];
       auto &u0 = pmesh->mesh_data.GetOrAdd("u0", i);
-      auto &u1 = pmesh->mesh_data.GetOrAdd("u1", i);
 
       auto start_recv = tl.AddTask(none, parthenon::StartReceiveBoundBufs<any>, u0);
-      auto update =
-          tl.AddTask(start_recv, UpwindAdvection, u0.get(), u1.get(), stage, integrator);
+      auto update = tl.AddTask(start_recv, UpwindAdvection, u0.get(), stage, integrator);
       auto set_aux = tl.AddTask(
           update, ArtemisDerived::SetAuxillaryFields<Coordinates::cartesian>, u0.get());
       auto c2p = tl.AddTask(set_aux, PreCommFillDerived<MeshData<Real>>, u0.get());
@@ -128,7 +125,7 @@ TaskCollection LinearAdvectionStep(Mesh *pmesh, const SimTime &tm,
 //----------------------------------------------------------------------------------------
 //! \fn  TaskStatus RotatingFrame::UpwindAdvection
 //! \brief
-TaskStatus UpwindAdvection(MeshData<Real> *u0, MeshData<Real> *u1, const int stage,
+TaskStatus UpwindAdvection(MeshData<Real> *u0, const int stage,
                            parthenon::LowStorageIntegrator *integrator) {
   using parthenon::MakePackDescriptor;
   auto pm = u0->GetParentPointer();
@@ -143,11 +140,12 @@ TaskStatus UpwindAdvection(MeshData<Real> *u0, MeshData<Real> *u1, const int sta
   auto &rframe_pkg = pm->packages.Get("rotating_frame");
   const Real qshear = rframe_pkg->template Param<Real>("qshear");
   const Real om0 = rframe_pkg->template Param<Real>("omega");
+  const ReconstructionMethod recon =
+      rframe_pkg->template Param<ReconstructionMethod>("reconstruction");
 
   // Extract integrator weights
   const Real bdt = integrator->beta[stage - 1] * integrator->dt;
   const Real dwdt = -qshear * om0 * bdt;
-  const int threed = u0->GetNDim() == 3;
 
   // Packing and indexing
   static auto desc =
@@ -155,26 +153,33 @@ TaskStatus UpwindAdvection(MeshData<Real> *u0, MeshData<Real> *u1, const int sta
                          gas::cons::internal_energy, dust::cons::density,
                          dust::cons::momentum>(resolved_pkgs.get());
   auto v0 = desc.GetPack(u0);
-  auto v1 = desc.GetPack(u1);
-  const int nblocks = u0->NumBlocks();
-  IndexRange ib = u0->GetBoundsI(IndexDomain::interior);
-  IndexRange jb = u0->GetBoundsJ(IndexDomain::interior);
-  IndexRange kb = u0->GetBoundsK(IndexDomain::interior);
 
-  if (dwdt >= 0.0) {
-    parthenon::par_for(
-        DEFAULT_LOOP_PATTERN, "UpwindAdvection", parthenon::DevExecSpace(), 0,
-        u0->NumBlocks() - 1, kb.s, kb.e, ib.s, ib.e,
-        KOKKOS_LAMBDA(const int &b, const int &k, const int &i) {
-          Upwind<Upwind::l>(v0, threed, dwdt, b, k, jb, i);
-        });
+  if (dwdt == 0.0) return TaskStatus::complete;
+
+  if (dwdt > 0.0) {
+    if (recon == ReconstructionMethod::pcm) {
+      return UpwindAdvectionImpl<Upwind::l, ReconstructionMethod::pcm>(u0, v0, dwdt);
+    }
+    if (recon == ReconstructionMethod::plm) {
+      return UpwindAdvectionImpl<Upwind::l, ReconstructionMethod::plm>(u0, v0, dwdt);
+    }
+    if (recon == ReconstructionMethod::ppm) {
+      return UpwindAdvectionImpl<Upwind::l, ReconstructionMethod::ppm>(u0, v0, dwdt);
+    } else {
+      PARTHENON_FAIL("Unsupported reconstruction method in rotating_frame");
+    }
   } else {
-    parthenon::par_for(
-        DEFAULT_LOOP_PATTERN, "UpwindAdvection", parthenon::DevExecSpace(), 0,
-        u0->NumBlocks() - 1, kb.s, kb.e, ib.s, ib.e,
-        KOKKOS_LAMBDA(const int &b, const int &k, const int &i) {
-          Upwind<Upwind::r>(v0, threed, dwdt, b, k, jb, i);
-        });
+    if (recon == ReconstructionMethod::pcm) {
+      return UpwindAdvectionImpl<Upwind::r, ReconstructionMethod::pcm>(u0, v0, dwdt);
+    }
+    if (recon == ReconstructionMethod::plm) {
+      return UpwindAdvectionImpl<Upwind::r, ReconstructionMethod::plm>(u0, v0, dwdt);
+    }
+    if (recon == ReconstructionMethod::ppm) {
+      return UpwindAdvectionImpl<Upwind::r, ReconstructionMethod::ppm>(u0, v0, dwdt);
+    } else {
+      PARTHENON_FAIL("Unsupported reconstruction method in rotating_frame");
+    }
   }
 
   return TaskStatus::complete;

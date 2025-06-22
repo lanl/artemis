@@ -71,7 +71,6 @@ ArtemisDriver<GEOM>::ArtemisDriver(ParameterInput *pin, ApplicationInput *app_in
   do_moment = artemis_pkg->template Param<bool>("do_moment");
 
   // Linear advection integrator
-  // NOTE(@pdmullen): Hardcoded to rk2 until replaced with exact remap
   if (do_shear) {
     shear_integrator = std::make_unique<Integrator_t>("rk1");
   }

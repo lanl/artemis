@@ -40,7 +40,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   }
 
   params.Add("reconstruction", ArtemisUtils::ChooseReconMethod(pin->GetOrAddString(
-                                   "rotating_frame", "reconstruct", "ppm")));
+                                   "rotating_frame", "reconstruct", "plm")));
 
   params.Add("omega", omega);
   params.Add("qshear", qshear);

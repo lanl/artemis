@@ -32,7 +32,7 @@ integrator = rk2    # time integration algorithm
 ncycle_out = 100    # interval for stdout summary info
 
 <parthenon/mesh>
-# nghost = 2
+nghost = 3
 # refinement = adaptive
 # numlevel = 4
 
@@ -86,6 +86,7 @@ z = 0.0
 <rotating_frame>
 omega = 1.0
 qshear = 1.5
+reconstruct = ppm
 
 <problem>
 rho0 = 1.0

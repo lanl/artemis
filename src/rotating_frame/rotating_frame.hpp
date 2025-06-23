@@ -57,7 +57,6 @@ struct ReconInfo {
   Real q;
   Real vol;
 
-  KOKKOS_FUNCTION
   ReconInfo() = default;
   template <typename V1>
   KOKKOS_INLINE_FUNCTION ReconInfo(const V1 &v0, const int b, const int n, const int k,

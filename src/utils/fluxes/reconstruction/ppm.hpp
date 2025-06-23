@@ -131,8 +131,8 @@ template <>
 struct ReconGradient<ReconstructionMethod::ppm> {
   template <typename V>
   KOKKOS_INLINE_FUNCTION std::array<Real, 3>
-  operator()(const V &q, const std::array<Real, 3> &dx, const int multid,
-             const int threed, const int b, const int n, const int k, const int j,
+  operator()(const V &q, const std::array<Real, 3> &dx, const int multi_d,
+             const int three_d, const int b, const int n, const int k, const int j,
              const int i) const {
     std::array<Real, 3> dqdx{0.0, 0.0, 0.0};
     Real wl = Null<Real>(), wr = Null<Real>();
@@ -142,13 +142,13 @@ struct ReconGradient<ReconstructionMethod::ppm> {
     dqdx[0] = (wr - wl) / (2.0 * dx[0]);
 
     wl = Null<Real>(), wr = Null<Real>();
-    PPM4(q(b, n, k, j - 2 * multid, i), q(b, n, k, j - multid, i), q(b, n, k, j, i),
-         q(b, n, k, j + multid, i), q(b, n, k, j + 2 * multid, i), wl, wr);
+    PPM4(q(b, n, k, j - 2 * multi_d, i), q(b, n, k, j - multi_d, i), q(b, n, k, j, i),
+         q(b, n, k, j + multi_d, i), q(b, n, k, j + 2 * multi_d, i), wl, wr);
     dqdx[1] = (wr - wl) / (2.0 * dx[1]);
 
     wl = Null<Real>(), wr = Null<Real>();
-    PPM4(q(b, n, k - threed, j, i), q(b, n, k - 2 * threed, j, i), q(b, n, k, j, i),
-         q(b, n, k + threed, j, i), q(b, n, k + 2 * threed, j, i), wl, wr);
+    PPM4(q(b, n, k - three_d, j, i), q(b, n, k - 2 * three_d, j, i), q(b, n, k, j, i),
+         q(b, n, k + three_d, j, i), q(b, n, k + 2 * three_d, j, i), wl, wr);
     dqdx[2] = (wr - wl) / (2.0 * dx[2]);
 
     return dqdx;

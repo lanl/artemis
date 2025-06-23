@@ -29,36 +29,12 @@ using namespace parthenon::package::prelude;
 namespace RotatingFrame {
 
 //----------------------------------------------------------------------------------------
-//! \fn Real RotatingFrame::EstimateTimeStep
-//! \brief Not enrolled in parthenon's determination for global dt
-Real EstimateTimeStep(parthenon::Mesh *pmesh) {
-  // Extract rotating frame params
-  auto &rframe_pkg = pmesh->packages.Get("rotating_frame");
-  const Real om0 = rframe_pkg->Param<Real>("omega");
-  const Real qshear = rframe_pkg->Param<Real>("qshear");
-
-  // Compute linear advection timestep to sub-cycle
-  Real min_dt = Big<Real>();
-  for (auto const &pmb : pmesh->block_list) {
-    const auto &reg = pmb->block_size;
-    const auto wp = BackgroundVelocity<Coordinates::cartesian>(qshear, om0, reg.xmax_[0]);
-    const auto wm = BackgroundVelocity<Coordinates::cartesian>(qshear, om0, reg.xmin_[0]);
-    const Real dx2 = (reg.xmax_[1] - reg.xmin_[1]) / reg.nx_[1];
-    min_dt = std::min(min_dt, dx2 / std::max(std::abs(wp[1]), std::abs(wm[1])));
-  }
-#ifdef MPI_PARALLEL
-  PARTHENON_MPI_CHECK(MPI_Allreduce(MPI_IN_PLACE, &min_dt, 1, MPI_PARTHENON_REAL, MPI_MIN,
-                                    MPI_COMM_WORLD));
-#endif
-  return 0.8 * min_dt;
-}
-
-//----------------------------------------------------------------------------------------
 //! \fn TaskListStatus RotatingFrame::Advect
 //! \brief Executes linear advection term for orbital advection
 TaskListStatus Advect(Mesh *pmesh, const SimTime &tm) {
   // Craft a series of **equal** subsetps that sum to the unsplit step
-  const Real dtlimit = EstimateTimeStep(pmesh);
+
+  const Real dtlimit = EstimateTimestep(pmesh, 1.0);
   const int nsteps = static_cast<int>(std::ceil(tm.dt / dtlimit));
   const Real scdt = tm.dt / nsteps;
 

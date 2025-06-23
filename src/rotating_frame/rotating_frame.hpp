@@ -36,6 +36,11 @@ namespace RotatingFrame {
 //! Declarations
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
 
+template <Coordinates GEOM>
+Real EstimateTimestepMesh(MeshData<Real> *md);
+
+Real EstimateTimestep(parthenon::Mesh *pmesh, const Real dt_ratio);
+
 TaskStatus RotatingFrameForce(MeshData<Real> *md, const Real time, const Real dt);
 
 TaskListStatus Advect(Mesh *pmesh, const SimTime &tm);
@@ -43,8 +48,6 @@ TaskListStatus Advect(Mesh *pmesh, const SimTime &tm);
 TaskCollection LinearAdvectionStep(Mesh *pmesh, const SimTime &tm, const Real scdt);
 
 TaskStatus UpwindAdvection(MeshData<Real> *u0, const Real scdt);
-
-Real EstimateTimeStep(parthenon::Mesh *pmesh);
 
 struct ReconInfo {
   std::array<Real, 3> grad;
@@ -198,8 +201,8 @@ KOKKOS_INLINE_FUNCTION void RemapCons(const V1 &v0, const int multi_d, const int
       for (int j = jb.s; j <= jb.e + 1; j++) {
         const int ju = j + joff;
         const int jd = j - joff;
-        if (j < jb.e + 1) {
-          rd.fill(v0, b, n, k, j - joff, i);
+        if (jd < jb.e + 1) {
+          rd.fill(v0, b, n, k, jd, i);
           rd.grad = recon(v0, rd.dx, multi_d, three_d, b, n, k, jd, i);
         }
         RemapUpdate<UDIR>(v0, ru, rc, dwdt, three_d, b, n, k, j, ju, i);

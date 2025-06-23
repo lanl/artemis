@@ -78,10 +78,10 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const int ndim = ProblemDimension(pin);
 
   PARTHENON_REQUIRE(ndim > 1, "RT problem requires ndim >= 2");
-  const bool threed = (ndim == 3);
+  const bool three_d = (ndim == 3);
   Real gx = 0.0;
   Real zmin = Null<Real>(), zmax = Null<Real>();
-  if (threed) {
+  if (three_d) {
     zmin = pin->GetReal("parthenon/mesh", "x3min");
     zmax = pin->GetReal("parthenon/mesh", "x3max");
     if (do_grav) gx = grav_pkg->Param<Real>("gx3");
@@ -98,9 +98,9 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         const auto bbox = geometry::BBox(pco, k, j, i);
         const Real xc = 0.5 * (bbox.x1[0] + bbox.x1[1]);
         const Real zc =
-            (threed) ? 0.5 * (bbox.x3[0] + bbox.x3[1]) : 0.5 * (bbox.x2[0] + bbox.x2[1]);
+            (three_d) ? 0.5 * (bbox.x3[0] + bbox.x3[1]) : 0.5 * (bbox.x2[0] + bbox.x2[1]);
         const int upper = (zc >= 0.0);
-        const int ix = (threed) ? 2 : 1;
+        const int ix = (three_d) ? 2 : 1;
         const Real dens = (upper) ? pars.rho1 : pars.rho0;
         const Real z0 = (upper) ? pars.y0 : zmin;
 

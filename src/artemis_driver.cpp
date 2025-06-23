@@ -70,11 +70,6 @@ ArtemisDriver<GEOM>::ArtemisDriver(ParameterInput *pin, ApplicationInput *app_in
   do_imc = artemis_pkg->template Param<bool>("do_imc");
   do_moment = artemis_pkg->template Param<bool>("do_moment");
 
-  // Linear advection integrator
-  if (do_shear) {
-    shear_integrator = std::make_unique<Integrator_t>("rk1");
-  }
-
   // Moments integrator
   if (do_moment) {
     auto rad_int = pin->GetOrAddString("radiation/moment", "integrator", "rk2");
@@ -125,7 +120,7 @@ TaskListStatus ArtemisDriver<GEOM>::Step() {
   if (status != TaskListStatus::complete) return status;
 
   // Operator split, background linear advection (for shearing box)
-  if (do_shear) status = RotatingFrame::Advect(pmesh, tm, shear_integrator.get());
+  if (do_shear) status = RotatingFrame::Advect(pmesh, tm);
   if (status != TaskListStatus::complete) return status;
 
   // Operator split, IMC/DDMC radiation with Jaybenne
@@ -153,7 +148,6 @@ void ArtemisDriver<GEOM>::PreStepTasks() {
   // set the integration timestep
   integrator->dt = tm.dt;
   if (do_nbody) nbody_integrator->dt = tm.dt;
-  if (do_shear) shear_integrator->dt = tm.dt;
   if (do_moment) rad_integrator->dt = tm.dt;
 
   // Extract Base MeshData Registers

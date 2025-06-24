@@ -196,7 +196,7 @@ KOKKOS_INLINE_FUNCTION void RemapCons(const V1 &v0, const int multi_d, const int
     // Execute remapping "sweep"
     for (int j = jstart; compare(j, jend); j -= joff) {
       const int jd = j - joff;
-      if (compare(jd, jend)) { // TODO(ADM): ... + (UDIR == Upwind::r)? to match earlier?
+      if (compare(jd, jend)) {
         rd.fill(v0, b, n, k, jd, i);
         rd.grad = recon(v0, rd.dx, multi_d, three_d, b, n, k, jd, i);
       }

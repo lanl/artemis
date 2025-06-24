@@ -135,11 +135,8 @@ RemapUpdate(const V1 &v0, const ReconInfo &rp, const ReconInfo &r, const Real vb
             const Real dwdt, const int three_d, const int b, const int n, const int k,
             const int j, const int jp, const int i) {
 
-  PARTHENON_REQUIRE(std::abs(dwdt * r.bnds.x1[0]) <= r.dx[1], "TIMESTEP TOO LARGE");
-  PARTHENON_REQUIRE(std::abs(dwdt * r.bnds.x1[1]) <= r.dx[1], "TIMESTEP TOO LARGE");
-
   // Upwind::r is vb < 0
-  const Real fac = dwdt; // std::abs(dwdt);
+  const Real fac = dwdt;
   const Real flip = (vb < 0.0) ? -1 : 1;
   Real y0 = r.bnds.x2[(vb < 0.0)];
 
@@ -156,9 +153,6 @@ RemapUpdate(const V1 &v0, const ReconInfo &rp, const ReconInfo &r, const Real vb
 
   Real dq =
       (rp.q - ArtemisUtils::VDot(rp.grad, rp.xc)) * I0 + ArtemisUtils::VDot(rp.grad, I1);
-
-  const Real drho = dq / r.vol;
-  const Real drhop = dq / rp.vol;
 
   v0(b, n, k, j, i) += dq / r.vol;
   v0(b, n, k, jp, i) -= dq / rp.vol;

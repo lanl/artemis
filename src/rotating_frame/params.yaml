@@ -10,3 +10,24 @@ rotating_frame:
     _type: Real
     _default: 0.0
     _description: "Shear rate of the shearing box. Set to -1.5 for Keplerian shear."
+  reconstruct:
+    _type: string
+    _default: plm
+    _description: "Reconstruction algorithm for remap."
+    pcm:
+      _type: opt
+      _description: "Piecewise Constant"
+    plm:
+      _type: opt
+      _description: "Piecewise Linear"
+    ppm:
+      _type: opt
+      _description: "Piecewise Parabolic"
+    cfl:
+      _type: Real
+      _default: 0.8
+      _description:  "CFL number used for remap subcycling"
+    dt_ratio:
+      _type: Real
+      _default: 10.0
+      _description:  "Multiple of dt_advect taken in remap subcycler"

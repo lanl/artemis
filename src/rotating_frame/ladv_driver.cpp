@@ -116,32 +116,16 @@ TaskStatus UpwindAdvection(MeshData<Real> *u0, const Real scdt) {
                          dust::cons::momentum>(resolved_pkgs.get());
   auto v0 = desc.GetPack(u0);
 
-  if (dwdt > 0.0) {
-    if (recon == ReconstructionMethod::pcm) {
-      return UpwindAdvectionImpl<Upwind::l, ReconstructionMethod::pcm>(u0, v0, dwdt);
-    }
-    if (recon == ReconstructionMethod::plm) {
-      return UpwindAdvectionImpl<Upwind::l, ReconstructionMethod::plm>(u0, v0, dwdt);
-    }
-    if (recon == ReconstructionMethod::ppm) {
-      return UpwindAdvectionImpl<Upwind::l, ReconstructionMethod::ppm>(u0, v0, dwdt);
-    } else {
-      PARTHENON_FAIL("Unsupported reconstruction method in rotating_frame");
-    }
-  } else if (dwdt < 0.0) {
-    if (recon == ReconstructionMethod::pcm) {
-      return UpwindAdvectionImpl<Upwind::r, ReconstructionMethod::pcm>(u0, v0, dwdt);
-    }
-    if (recon == ReconstructionMethod::plm) {
-      return UpwindAdvectionImpl<Upwind::r, ReconstructionMethod::plm>(u0, v0, dwdt);
-    }
-    if (recon == ReconstructionMethod::ppm) {
-      return UpwindAdvectionImpl<Upwind::r, ReconstructionMethod::ppm>(u0, v0, dwdt);
-    } else {
-      PARTHENON_FAIL("Unsupported reconstruction method in rotating_frame");
-    }
-  } else { // dwdt == 0.0
-    return TaskStatus::complete;
+  if (recon == ReconstructionMethod::pcm) {
+    return UpwindAdvectionImpl<ReconstructionMethod::pcm>(u0, v0, dwdt);
+  }
+  if (recon == ReconstructionMethod::plm) {
+    return UpwindAdvectionImpl<ReconstructionMethod::plm>(u0, v0, dwdt);
+  }
+  if (recon == ReconstructionMethod::ppm) {
+    return UpwindAdvectionImpl<ReconstructionMethod::ppm>(u0, v0, dwdt);
+  } else {
+    PARTHENON_FAIL("Unsupported reconstruction method in rotating_frame");
   }
 
   return TaskStatus::complete;

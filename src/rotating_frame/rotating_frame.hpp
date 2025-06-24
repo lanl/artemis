@@ -129,23 +129,30 @@ KOKKOS_INLINE_FUNCTION std::array<Real, 3> RotationVelocity(const std::array<Rea
 //----------------------------------------------------------------------------------------
 //! \fn  RemapUpdate
 //! \brief
-template <Upwind UDIR, typename V1>
+template <typename V1>
 KOKKOS_INLINE_FUNCTION void
-RemapUpdate(const V1 &v0, const ReconInfo &rp, const ReconInfo &r, const Real dwdt,
-            const int three_d, const int b, const int n, const int k, const int j,
-            const int jp, const int i) {
-  Real fac = std::abs(dwdt);
-  Real y0 = r.bnds.x2[(UDIR == Upwind::r)];
+RemapUpdate(const V1 &v0, const ReconInfo &rp, const ReconInfo &r, const Real vb,
+            const Real dwdt, const int three_d, const int b, const int n, const int k,
+            const int j, const int jp, const int i) {
 
-  const Real dz = (three_d) ? r.dx[2] : 1.0;
-  const Real I0 = std::abs(dwdt) * r.xc[0] * r.dx[0] * dz;
+  PARTHENON_REQUIRE(std::abs(dwdt * r.bnds.x1[0]) <= r.dx[1], "TIMESTEP TOO LARGE");
+  PARTHENON_REQUIRE(std::abs(dwdt * r.bnds.x1[1]) <= r.dx[1], "TIMESTEP TOO LARGE");
+
+  // Upwind::r is vb < 0
+  const Real fac = dwdt; // std::abs(dwdt);
+  const Real flip = (vb < 0.0) ? -1 : 1;
+  Real y0 = r.bnds.x2[(vb < 0.0)];
+
+  const Real dz = r.dx[2];
+  const Real I0 = flip * dwdt * r.xc[0] * r.dx[0] * dz;
   const Real dxcub =
       r.dx[0] / 3. *
       (SQR(r.bnds.x1[0]) + r.bnds.x1[0] * r.bnds.x1[1] + SQR(r.bnds.x1[1]));
 
-  const std::array<Real, 3> I1{fac * dxcub * dz,
-                               0.5 * SQR(fac) * dxcub + y0 * fac * r.xc[0] * r.dx[0] * dz,
-                               three_d * dz * I0};
+  const std::array<Real, 3> I1{
+      flip * fac * dxcub * dz,
+      flip * (0.5 * SQR(fac) * dxcub * dz + y0 * dwdt * r.xc[0] * r.dx[0] * dz),
+      three_d * flip * dz * I0};
 
   Real dq =
       (rp.q - ArtemisUtils::VDot(rp.grad, rp.xc)) * I0 + ArtemisUtils::VDot(rp.grad, I1);
@@ -165,6 +172,8 @@ KOKKOS_INLINE_FUNCTION void RemapCons(const V1 &v0, const int multi_d, const int
                                       const Real dwdt, const int b, const int k,
                                       IndexRange jb, const int i) {
 
+  const geometry::Coords<Coordinates::cartesian> coords(v0.GetCoordinates(b), k, jb.s, i);
+  const Real vb = dwdt * (coords.bnds.x1[0] + coords.bnds.x1[1]) * 0.5;
   int jstart = jb.e, jend = jb.s, joff = 1;
   if constexpr (UDIR == Upwind::l) {
     jstart = jb.s;
@@ -179,6 +188,7 @@ KOKKOS_INLINE_FUNCTION void RemapCons(const V1 &v0, const int multi_d, const int
   for (int n = v0.GetLowerBound(b); n <= v0.GetUpperBound(b); ++n) {
     ReconInfo ru(v0, b, n, k, jstart + joff, i);
     ReconInfo rc(v0, b, n, k, jstart, i);
+
     ReconInfo rd;
     ru.grad = recon(v0, ru.dx, multi_d, three_d, b, n, k, jstart + joff, i);
     const auto qu = v0(b, n, k, jstart + joff, i);
@@ -192,7 +202,7 @@ KOKKOS_INLINE_FUNCTION void RemapCons(const V1 &v0, const int multi_d, const int
           rd.fill(v0, b, n, k, jd, i);
           rd.grad = recon(v0, rd.dx, multi_d, three_d, b, n, k, jd, i);
         }
-        RemapUpdate<UDIR>(v0, ru, rc, dwdt, three_d, b, n, k, j, ju, i);
+        RemapUpdate(v0, ru, rc, vb, dwdt, threed, b, n, k, j, ju, i);
         ru = rc;
         rc = rd;
       }
@@ -200,11 +210,11 @@ KOKKOS_INLINE_FUNCTION void RemapCons(const V1 &v0, const int multi_d, const int
       for (int j = jb.s; j <= jb.e + 1; j++) {
         const int ju = j + joff;
         const int jd = j - joff;
-        if (jd < jb.e + 1) {
-          rd.fill(v0, b, n, k, jd, i);
+        if (jd <= jb.e + 1) {
+          rd.fill(v0, b, n, k, j - joff, i);
           rd.grad = recon(v0, rd.dx, multi_d, three_d, b, n, k, jd, i);
         }
-        RemapUpdate<UDIR>(v0, ru, rc, dwdt, three_d, b, n, k, j, ju, i);
+        RemapUpdate(v0, ru, rc, vb, dwdt, three_d, b, n, k, j, ju, i);
         ru = rc;
         rc = rd;
       }
@@ -215,7 +225,7 @@ KOKKOS_INLINE_FUNCTION void RemapCons(const V1 &v0, const int multi_d, const int
 //----------------------------------------------------------------------------------------
 //! \fn  UpwindAdvectionImpl
 //! \brief
-template <Upwind UDIR, ReconstructionMethod R, typename V1>
+template <ReconstructionMethod R, typename V1>
 TaskStatus UpwindAdvectionImpl(MeshData<Real> *u0, const V1 &v0, const Real dwdt) {
   const int multi_d = u0->GetNDim() >= 2;
   PARTHENON_REQUIRE(multi_d, "Upwind Advection does not work in 1D");
@@ -228,7 +238,14 @@ TaskStatus UpwindAdvectionImpl(MeshData<Real> *u0, const V1 &v0, const Real dwdt
       DEFAULT_LOOP_PATTERN, "UpwindAdvection", parthenon::DevExecSpace(), 0,
       u0->NumBlocks() - 1, kb.s, kb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int &b, const int &k, const int &i) {
-        RemapCons<UDIR, R>(v0, multi_d, three_d, dwdt, b, k, jb, i);
+        const geometry::Coords<Coordinates::cartesian> coords(v0.GetCoordinates(b), k,
+                                                              jb.s, i);
+        const Real vb = dwdt * 0.5 * (coords.bnds.x1[0] + coords.bnds.x1[1]);
+        if (vb < 0.0) {
+          RemapCons<Upwind::r, R>(v0, multi_d, three_d, dwdt, b, k, jb, i);
+        } else if (vb > 0.0) {
+          RemapCons<Upwind::l, R>(v0, multi_d, three_d, dwdt, b, k, jb, i);
+        }
       });
   return TaskStatus::complete;
 }

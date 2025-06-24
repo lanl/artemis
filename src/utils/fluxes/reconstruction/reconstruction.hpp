@@ -34,8 +34,8 @@ template <ReconstructionMethod R>
 struct ReconGradient {
   template <typename V>
   KOKKOS_INLINE_FUNCTION std::array<Real, 3>
-  operator()(const V &q, const std::array<Real, 3> &dx, const int multid,
-             const int threed, const int b, const int n, const int k, const int j,
+  operator()(const V &q, const std::array<Real, 3> &dx, const int multi_d,
+             const int three_d, const int b, const int n, const int k, const int j,
              const int i) const {
     PARTHENON_FAIL("No default implementation!");
   }

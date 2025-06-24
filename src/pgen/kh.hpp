@@ -79,7 +79,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const int ndim = ProblemDimension(pin);
 
   PARTHENON_REQUIRE(ndim > 1, "KH problem requires ndim >= 2");
-  const bool threed = (ndim == 3);
+  const bool three_d = (ndim == 3);
 
   // setup uniform ambient medium
   pmb->par_for(
@@ -88,7 +88,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         const auto bbox = geometry::BBox(pco, k, j, i);
         const Real xc = 0.5 * (bbox.x1[0] + bbox.x1[1]);
         const Real zc =
-            (threed) ? 0.5 * (bbox.x3[0] + bbox.x3[1]) : 0.5 * (bbox.x2[0] + bbox.x2[1]);
+            (three_d) ? 0.5 * (bbox.x3[0] + bbox.x3[1]) : 0.5 * (bbox.x2[0] + bbox.x2[1]);
 
         const Real dens = 1.0 + 0.5 * (pars.rho1 / pars.rho0 - 1.0) *
                                     (std::tanh((zc - pars.y1) / pars.a) -
@@ -102,8 +102,8 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         v(0, gas::prim::density(0), k, j, i) = dens;
         v(0, gas::prim::sie(0), k, j, i) = pars.pres0 / (dens * gm1);
         v(0, gas::prim::velocity(0), k, j, i) = vx;
-        v(0, gas::prim::velocity(1), k, j, i) = (!threed) * vz;
-        v(0, gas::prim::velocity(2), k, j, i) = threed * vz;
+        v(0, gas::prim::velocity(1), k, j, i) = (!three_d) * vz;
+        v(0, gas::prim::velocity(2), k, j, i) = three_d * vz;
       });
 }
 

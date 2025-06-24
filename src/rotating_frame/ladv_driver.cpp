@@ -33,7 +33,6 @@ namespace RotatingFrame {
 //! \brief Executes linear advection term for orbital advection
 TaskListStatus Advect(Mesh *pmesh, const SimTime &tm) {
   // Craft a series of **equal** subsetps that sum to the unsplit step
-
   const Real dtlimit = EstimateTimestep(pmesh, 1.0);
   const int nsteps = static_cast<int>(std::ceil(tm.dt / dtlimit));
   const Real scdt = tm.dt / nsteps;
@@ -116,13 +115,12 @@ TaskStatus UpwindAdvection(MeshData<Real> *u0, const Real scdt) {
                          dust::cons::momentum>(resolved_pkgs.get());
   auto v0 = desc.GetPack(u0);
 
+  // Call upwind advection routines with requested recon
   if (recon == ReconstructionMethod::pcm) {
     return UpwindAdvectionImpl<ReconstructionMethod::pcm>(u0, v0, dwdt);
-  }
-  if (recon == ReconstructionMethod::plm) {
+  } else if (recon == ReconstructionMethod::plm) {
     return UpwindAdvectionImpl<ReconstructionMethod::plm>(u0, v0, dwdt);
-  }
-  if (recon == ReconstructionMethod::ppm) {
+  } else if (recon == ReconstructionMethod::ppm) {
     return UpwindAdvectionImpl<ReconstructionMethod::ppm>(u0, v0, dwdt);
   } else {
     PARTHENON_FAIL("Unsupported reconstruction method in rotating_frame");

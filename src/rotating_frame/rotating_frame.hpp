@@ -135,7 +135,7 @@ RemapUpdate(const V1 &v0, const ReconInfo &rp, const ReconInfo &r, const Real vb
             const Real dwdt, const int three_d, const int b, const int n, const int k,
             const int j, const int jp, const int i) {
   // Check sensibility of timestep
-  PARTHENON_REQUIRE((std::abs(dwdt * r.bnds.x1[0]) <= r.dx[1]) ||
+  PARTHENON_REQUIRE((std::abs(dwdt * r.bnds.x1[0]) <= r.dx[1]) &&
                         (std::abs(dwdt * r.bnds.x1[1]) <= r.dx[1]),
                     "Linear advection remap timestep too large!");
 

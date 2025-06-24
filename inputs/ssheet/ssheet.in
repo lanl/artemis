@@ -26,23 +26,23 @@ file_type = hdf5  # HDF5 data dump
 dt        = 6.28  # time increment between outputs
 
 <parthenon/time>
-nlim       = 5     # cycle limit
+nlim       = -1     # cycle limit
 tlim       = 100.0  # time limit
 integrator = rk2    # time integration algorithm
-ncycle_out = 1    # interval for stdout summary info
+ncycle_out = 100    # interval for stdout summary info
 
 <parthenon/mesh>
-nghost = 3
+# nghost = 2
 # refinement = adaptive
 # numlevel = 4
 
-nx1    = 32     # Number of zones in X1-direction
+nx1    = 128     # Number of zones in X1-direction
 x1min  = -1.0    # minimum value of X1
 x1max  = 1.0     # maximum value of X1
-ix1_bc = reflecting #extrap  # Inner-X1 boundary condition flag
-ox1_bc = reflecting #extrap  # Outer-X1 boundary condition flag
+ix1_bc = extrap  # Inner-X1 boundary condition flag
+ox1_bc = extrap  # Outer-X1 boundary condition flag
 
-nx2    = 32     # Number of zones in X2-direction
+nx2    = 128     # Number of zones in X2-direction
 x2min  = -1.0    # minimum value of X2
 x2max  = 1.0     # maximum value of X2
 ix2_bc = inflow  # Inner-X2 boundary condition flag
@@ -86,7 +86,6 @@ z = 0.0
 <rotating_frame>
 omega = 1.0
 qshear = 1.5
-reconstruct = ppm #ppm
 
 <problem>
 rho0 = 1.0

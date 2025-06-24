@@ -202,7 +202,7 @@ KOKKOS_INLINE_FUNCTION void RemapCons(const V1 &v0, const int multi_d, const int
           rd.fill(v0, b, n, k, jd, i);
           rd.grad = recon(v0, rd.dx, multi_d, three_d, b, n, k, jd, i);
         }
-        RemapUpdate(v0, ru, rc, vb, dwdt, threed, b, n, k, j, ju, i);
+        RemapUpdate(v0, ru, rc, vb, dwdt, three_d, b, n, k, j, ju, i);
         ru = rc;
         rc = rd;
       }

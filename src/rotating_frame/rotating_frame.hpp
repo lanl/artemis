@@ -213,7 +213,7 @@ KOKKOS_INLINE_FUNCTION void RemapCons(const V1 &v0, const int multi_d, const int
 template <ReconstructionMethod R, typename V1>
 TaskStatus LagrangeRemapImpl(MeshData<Real> *u0, const V1 &v0, const Real dwdt) {
   const int multi_d = u0->GetNDim() >= 2;
-  PARTHENON_REQUIRE(multi_d, "Upwind Advection does not work in 1D");
+  PARTHENON_REQUIRE(multi_d, "Linear advection does not work in 1D");
   const int three_d = u0->GetNDim() == 3;
 
   IndexRange ib = u0->GetBoundsI(IndexDomain::interior);

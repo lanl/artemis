@@ -47,7 +47,7 @@ TaskListStatus Advect(Mesh *pmesh, const SimTime &tm);
 
 TaskCollection LinearAdvectionStep(Mesh *pmesh, const SimTime &tm, const Real scdt);
 
-TaskStatus UpwindAdvection(MeshData<Real> *u0, const Real scdt);
+TaskStatus LagrangeRemap(MeshData<Real> *u0, const Real scdt);
 
 struct ReconInfo {
   std::array<Real, 3> grad;
@@ -208,10 +208,10 @@ KOKKOS_INLINE_FUNCTION void RemapCons(const V1 &v0, const int multi_d, const int
 }
 
 //----------------------------------------------------------------------------------------
-//! \fn  UpwindAdvectionImpl
+//! \fn  LagrangeRemapImpl
 //! \brief
 template <ReconstructionMethod R, typename V1>
-TaskStatus UpwindAdvectionImpl(MeshData<Real> *u0, const V1 &v0, const Real dwdt) {
+TaskStatus LagrangeRemapImpl(MeshData<Real> *u0, const V1 &v0, const Real dwdt) {
   const int multi_d = u0->GetNDim() >= 2;
   PARTHENON_REQUIRE(multi_d, "Upwind Advection does not work in 1D");
   const int three_d = u0->GetNDim() == 3;
@@ -220,7 +220,7 @@ TaskStatus UpwindAdvectionImpl(MeshData<Real> *u0, const V1 &v0, const Real dwdt
   IndexRange jb = u0->GetBoundsJ(IndexDomain::interior);
   IndexRange kb = u0->GetBoundsK(IndexDomain::interior);
   parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "UpwindAdvection", parthenon::DevExecSpace(), 0,
+      DEFAULT_LOOP_PATTERN, "LagrangeRemap", parthenon::DevExecSpace(), 0,
       u0->NumBlocks() - 1, kb.s, kb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int &b, const int &k, const int &i) {
         geometry::Coords<Coordinates::cartesian> coords(v0.GetCoordinates(b), k, jb.s, i);

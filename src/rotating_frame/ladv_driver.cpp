@@ -74,7 +74,7 @@ TaskCollection LinearAdvectionStep(Mesh *pmesh, const SimTime &tm, const Real sc
     auto &u0 = pmesh->mesh_data.GetOrAdd("u0", i);
 
     auto start_recv = tl.AddTask(none, parthenon::StartReceiveBoundBufs<any>, u0);
-    auto update = tl.AddTask(start_recv, UpwindAdvection, u0.get(), scdt);
+    auto update = tl.AddTask(start_recv, LagrangeRemap, u0.get(), scdt);
     auto set_aux = tl.AddTask(
         update, ArtemisDerived::SetAuxillaryFields<Coordinates::cartesian>, u0.get());
     auto c2p = tl.AddTask(set_aux, PreCommFillDerived<MeshData<Real>>, u0.get());
@@ -86,9 +86,9 @@ TaskCollection LinearAdvectionStep(Mesh *pmesh, const SimTime &tm, const Real sc
 }
 
 //----------------------------------------------------------------------------------------
-//! \fn  TaskStatus RotatingFrame::UpwindAdvection
+//! \fn  TaskStatus RotatingFrame::LagrangeRemap
 //! \brief
-TaskStatus UpwindAdvection(MeshData<Real> *u0, const Real scdt) {
+TaskStatus LagrangeRemap(MeshData<Real> *u0, const Real scdt) {
   using parthenon::MakePackDescriptor;
   auto pm = u0->GetParentPointer();
   auto &resolved_pkgs = pm->resolved_packages;
@@ -117,11 +117,11 @@ TaskStatus UpwindAdvection(MeshData<Real> *u0, const Real scdt) {
 
   // Call upwind advection routines with requested recon
   if (recon == ReconstructionMethod::pcm) {
-    return UpwindAdvectionImpl<ReconstructionMethod::pcm>(u0, v0, dwdt);
+    return LagrangeRemapImpl<ReconstructionMethod::pcm>(u0, v0, dwdt);
   } else if (recon == ReconstructionMethod::plm) {
-    return UpwindAdvectionImpl<ReconstructionMethod::plm>(u0, v0, dwdt);
+    return LagrangeRemapImpl<ReconstructionMethod::plm>(u0, v0, dwdt);
   } else if (recon == ReconstructionMethod::ppm) {
-    return UpwindAdvectionImpl<ReconstructionMethod::ppm>(u0, v0, dwdt);
+    return LagrangeRemapImpl<ReconstructionMethod::ppm>(u0, v0, dwdt);
   } else {
     PARTHENON_FAIL("Unsupported reconstruction method in rotating_frame");
   }

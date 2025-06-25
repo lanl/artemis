@@ -48,8 +48,10 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("dt_ratio", dt_ratio);
 
   // Reconstruction algorithm for remap
-  params.Add("reconstruction", ArtemisUtils::ChooseReconMethod(pin->GetOrAddString(
-                                   "rotating_frame", "reconstruct", "plm")));
+  ReconstructionMethod recon_method = ReconstructionMethod::null;
+  const std::string recon = pin->GetOrAddString("rotating_frame", "reconstruct", "plm");
+  recon_method = ArtemisUtils::ChooseReconMethod(recon);
+  params.Add("recon", recon_method);
 
   // Coordinates
   const int ndim = ProblemDimension(pin);

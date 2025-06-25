@@ -102,8 +102,7 @@ TaskStatus UpwindAdvection(MeshData<Real> *u0, const Real scdt) {
   auto &rframe_pkg = pm->packages.Get("rotating_frame");
   const Real qshear = rframe_pkg->template Param<Real>("qshear");
   const Real om0 = rframe_pkg->template Param<Real>("omega");
-  const ReconstructionMethod recon =
-      rframe_pkg->template Param<ReconstructionMethod>("reconstruction");
+  const auto recon = rframe_pkg->template Param<ReconstructionMethod>("recon");
 
   // Extract integrator weights
   const Real dwdt = -qshear * om0 * scdt;

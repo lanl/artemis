@@ -42,14 +42,16 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("qshear", qshear);
 
   // Linear advection timestep controls
-  const Real cfl = pin->GetOrAddReal("rotating_frame", "cfl", 0.8);
-  const Real dt_ratio = pin->GetOrAddReal("rotating_frame", "dt_ratio", 10.0);
+  const Real cfl = pin->GetOrAddReal("rotating_frame", "cfl", 0.9);
+  const Real dt_ratio = pin->GetOrAddReal("rotating_frame", "dt_ratio", 100.0);
   params.Add("cfl", cfl);
   params.Add("dt_ratio", dt_ratio);
 
   // Reconstruction algorithm for remap
-  params.Add("reconstruction", ArtemisUtils::ChooseReconMethod(pin->GetOrAddString(
-                                   "rotating_frame", "reconstruct", "plm")));
+  ReconstructionMethod recon_method = ReconstructionMethod::null;
+  const std::string recon = pin->GetOrAddString("rotating_frame", "reconstruct", "plm");
+  recon_method = ArtemisUtils::ChooseReconMethod(recon);
+  params.Add("recon", recon_method);
 
   // Coordinates
   const int ndim = ProblemDimension(pin);

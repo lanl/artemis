@@ -195,6 +195,9 @@ KOKKOS_INLINE_FUNCTION void RemapCons(const V1 &v0, const int multi_d, const int
     const auto qu = v0(b, n, k, jstart + joff, i);
     rc.grad = recon(v0, rc.dx, multi_d, three_d, b, n, k, jstart, i);
     const auto qc = v0(b, n, k, jstart, i);
+    // Correct the gradients due to the skew
+    ru.grad[1] += dwdt * ru.grad[0];
+    rc.grad[1] += dwdt * rc.grad[0];
 
     // Execute remapping "sweep"
     for (int j = jstart; compare(j, jend); j -= joff) {
@@ -203,6 +206,7 @@ KOKKOS_INLINE_FUNCTION void RemapCons(const V1 &v0, const int multi_d, const int
         rd.fill(v0, b, n, k, jd, i);
         rd.xc[1] += dwdt * rd.xc[0];
         rd.grad = recon(v0, rd.dx, multi_d, three_d, b, n, k, jd, i);
+        rd.grad[1] += dwdt * rd.grad[0];
       }
       RemapUpdate(v0, ru, rc, vb, dwdt, three_d, b, n, k, j, j + joff, i);
       ru = rc;

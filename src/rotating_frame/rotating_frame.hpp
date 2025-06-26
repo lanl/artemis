@@ -188,6 +188,9 @@ KOKKOS_INLINE_FUNCTION void RemapCons(const V1 &v0, const int multi_d, const int
   for (int n = v0.GetLowerBound(b); n <= v0.GetUpperBound(b); ++n) {
     ru.fill(v0, b, n, k, jstart + joff, i);
     rc.fill(v0, b, n, k, jstart, i);
+    // Correct the centroid of the cell due to the motion
+    ru.xc[1] += dwdt * ru.xc[0];
+    rc.xc[1] += dwdt * rc.xc[0];
     ru.grad = recon(v0, ru.dx, multi_d, three_d, b, n, k, jstart + joff, i);
     const auto qu = v0(b, n, k, jstart + joff, i);
     rc.grad = recon(v0, rc.dx, multi_d, three_d, b, n, k, jstart, i);
@@ -198,6 +201,7 @@ KOKKOS_INLINE_FUNCTION void RemapCons(const V1 &v0, const int multi_d, const int
       const int jd = j - joff;
       if (compare(jd, jend)) {
         rd.fill(v0, b, n, k, jd, i);
+        rd.xc[1] += dwdt * rd.xc[0];
         rd.grad = recon(v0, rd.dx, multi_d, three_d, b, n, k, jd, i);
       }
       RemapUpdate(v0, ru, rc, vb, dwdt, three_d, b, n, k, j, j + joff, i);

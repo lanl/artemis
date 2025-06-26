@@ -31,17 +31,17 @@ using ArtemisUtils::MeanOpacity;
 using ArtemisUtils::MeanScattering;
 using ArtemisUtils::VI;
 
-namespace Radiation {
+namespace Moments {
 //----------------------------------------------------------------------------------------
-//! \fn  StateDescriptor Radiation::Initialize
-//! \brief Adds intialization function for radiation hydrodynamics package
+//! \fn  StateDescriptor Moments::Initialize
+//! \brief Adds intialization function for moments package
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
                                             ArtemisUtils::Constants &constants) {
-  auto radiation = std::make_shared<StateDescriptor>("moments");
-  Params &params = radiation->AllParams();
+  auto moments = std::make_shared<StateDescriptor>("moments");
+  Params &params = moments->AllParams();
 
   // Metadata flags
-  auto MetadataMoments = radiation->GetMetadataFlag();
+  auto MetadataMoments = moments->GetMetadataFlag();
   auto MetadataOperatorSplit = Metadata::GetUserFlag("OperatorSplit");
 
   // Closure type
@@ -106,13 +106,14 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   params.Add("full_coupling",
              pin->GetOrAddBoolean("radiation/moment", "full_coupling", true));
 
-  // We stuff some constants into params so that can be used in post-processing
+  // Radiation constants (including chat for Moments)
+  // NOTE(@pdmullen): These are also stored in top level radiation package...
   const Real light = constants.GetCCode();
   params.Add("c", light);
-  const Real creduc = pin->GetOrAddReal("radiation/moment", "creduc", 1.0);
-  params.Add("chat", light / creduc);
   const Real arad = constants.GetARCode();
   params.Add("arad", arad);
+  const Real creduc = pin->GetOrAddReal("radiation/moment", "creduc", 1.0);
+  params.Add("chat", light / creduc);
 
   // Floors
   const Real efloor = pin->GetOrAddReal("radiation/moment", "efloor", 1.0e-20);
@@ -151,7 +152,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
                          MetadataOperatorSplit});
   ArtemisUtils::EnrollArtemisRefinementOps(m, coords);
   m.SetSparseThresholds(0.0, 0.0, 0.0);
-  radiation->AddSparsePool<rad::cons::energy>(m, control_field, fluidids);
+  moments->AddSparsePool<rad::cons::energy>(m, control_field, fluidids);
 
   // Conserved Flux
   m = Metadata({Metadata::Cell, Metadata::Vector, Metadata::Conserved,
@@ -160,7 +161,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
                std::vector<int>({3}));
   ArtemisUtils::EnrollArtemisRefinementOps(m, coords);
   m.SetSparseThresholds(0.0, 0.0, 0.0);
-  radiation->AddSparsePool<rad::cons::flux>(m, control_field, fluidids);
+  moments->AddSparsePool<rad::cons::flux>(m, control_field, fluidids);
 
   // Primitive Energy Density
   m = Metadata({Metadata::Cell, Metadata::Derived, Metadata::Intensive, Metadata::OneCopy,
@@ -168,7 +169,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
                 MetadataOperatorSplit});
   ArtemisUtils::EnrollArtemisRefinementOps(m, coords);
   m.SetSparseThresholds(0.0, 0.0, 0.0);
-  radiation->AddSparsePool<rad::prim::energy>(m, control_field, fluidids);
+  moments->AddSparsePool<rad::prim::energy>(m, control_field, fluidids);
 
   // Primitive Pressure (and associated Riemann pressures)
   m = Metadata({Metadata::Cell, Metadata::Derived, Metadata::Intensive, Metadata::OneCopy,
@@ -176,7 +177,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
                 MetadataOperatorSplit});
   ArtemisUtils::EnrollArtemisRefinementOps(m, coords);
   m.SetSparseThresholds(0.0, 0.0, 0.0);
-  radiation->AddSparsePool<rad::prim::pressure>(m, control_field, fluidids);
+  moments->AddSparsePool<rad::prim::pressure>(m, control_field, fluidids);
 
   // Primitive Reduced Flux
   m = Metadata({Metadata::Cell, Metadata::Vector, Metadata::Derived, Metadata::Intensive,
@@ -185,7 +186,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
                std::vector<int>({3}));
   ArtemisUtils::EnrollArtemisRefinementOps(m, coords);
   m.SetSparseThresholds(0.0, 0.0, 0.0);
-  radiation->AddSparsePool<rad::prim::flux>(m, control_field, fluidids);
+  moments->AddSparsePool<rad::prim::flux>(m, control_field, fluidids);
 
   // Radiation refinement criterion
   const std::string refine_field =
@@ -217,42 +218,42 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
       // Cartesian
       if (coords == G::cartesian) {
         if (ref_dens) {
-          radiation->CheckRefinementBlock = ScalarFirstDerivative<pdens, G::cartesian>;
+          moments->CheckRefinementBlock = ScalarFirstDerivative<pdens, G::cartesian>;
         } else if (ref_pres) {
-          radiation->CheckRefinementBlock = ScalarFirstDerivative<ppres, G::cartesian>;
+          moments->CheckRefinementBlock = ScalarFirstDerivative<ppres, G::cartesian>;
         }
         // Spherical
       } else if (coords == G::spherical1D) {
         if (ref_dens) {
-          radiation->CheckRefinementBlock = ScalarFirstDerivative<pdens, G::spherical1D>;
+          moments->CheckRefinementBlock = ScalarFirstDerivative<pdens, G::spherical1D>;
         } else if (ref_pres) {
-          radiation->CheckRefinementBlock = ScalarFirstDerivative<ppres, G::spherical1D>;
+          moments->CheckRefinementBlock = ScalarFirstDerivative<ppres, G::spherical1D>;
         }
       } else if (coords == G::spherical2D) {
         if (ref_dens) {
-          radiation->CheckRefinementBlock = ScalarFirstDerivative<pdens, G::spherical2D>;
+          moments->CheckRefinementBlock = ScalarFirstDerivative<pdens, G::spherical2D>;
         } else if (ref_pres) {
-          radiation->CheckRefinementBlock = ScalarFirstDerivative<ppres, G::spherical2D>;
+          moments->CheckRefinementBlock = ScalarFirstDerivative<ppres, G::spherical2D>;
         }
       } else if (coords == G::spherical3D) {
         if (ref_dens) {
-          radiation->CheckRefinementBlock = ScalarFirstDerivative<pdens, G::spherical3D>;
+          moments->CheckRefinementBlock = ScalarFirstDerivative<pdens, G::spherical3D>;
         } else if (ref_pres) {
-          radiation->CheckRefinementBlock = ScalarFirstDerivative<ppres, G::spherical3D>;
+          moments->CheckRefinementBlock = ScalarFirstDerivative<ppres, G::spherical3D>;
         }
         // Cylindrical
       } else if (coords == G::cylindrical) {
         if (ref_dens) {
-          radiation->CheckRefinementBlock = ScalarFirstDerivative<pdens, G::cylindrical>;
+          moments->CheckRefinementBlock = ScalarFirstDerivative<pdens, G::cylindrical>;
         } else if (ref_pres) {
-          radiation->CheckRefinementBlock = ScalarFirstDerivative<ppres, G::cylindrical>;
+          moments->CheckRefinementBlock = ScalarFirstDerivative<ppres, G::cylindrical>;
         }
         // Axisymmetric
       } else if (coords == G::axisymmetric) {
         if (ref_dens) {
-          radiation->CheckRefinementBlock = ScalarFirstDerivative<pdens, G::axisymmetric>;
+          moments->CheckRefinementBlock = ScalarFirstDerivative<pdens, G::axisymmetric>;
         } else if (ref_pres) {
-          radiation->CheckRefinementBlock = ScalarFirstDerivative<ppres, G::axisymmetric>;
+          moments->CheckRefinementBlock = ScalarFirstDerivative<ppres, G::axisymmetric>;
         }
       }
     } else if (ref_mag) {
@@ -262,19 +263,19 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
       params.Add("refine_thr", rthr);
       params.Add("deref_thr", dthr);
       if (ref_dens) {
-        radiation->CheckRefinementBlock = ScalarMagnitude<rad::prim::energy>;
+        moments->CheckRefinementBlock = ScalarMagnitude<rad::prim::energy>;
       } else if (ref_pres) {
-        radiation->CheckRefinementBlock = ScalarMagnitude<rad::prim::pressure>;
+        moments->CheckRefinementBlock = ScalarMagnitude<rad::prim::pressure>;
       }
     }
   }
 
-  return radiation;
+  return moments;
 }
 
 //----------------------------------------------------------------------------------------
-//! \fn  TaskStatus Radiation::CalculateFluxes
-//! \brief Evaluates advective fluxes for radiation evolution
+//! \fn  TaskStatus Moments::CalculateFluxes
+//! \brief Evaluates advective fluxes for moments evolution
 TaskStatus CalculateFluxes(MeshData<Real> *md) {
   auto pm = md->GetParentPointer();
   auto &resolved_pkgs = pm->resolved_packages;
@@ -305,8 +306,8 @@ TaskStatus CalculateFluxes(MeshData<Real> *md) {
 }
 
 //----------------------------------------------------------------------------------------
-//! \fn  TaskStatus Radiation::FluxSource
-//! \brief Evaluates coordinate terms from advective fluxes for radiation evolution
+//! \fn  TaskStatus Moments::FluxSource
+//! \brief Evaluates coordinate terms from advective fluxes for moments evolution
 TaskStatus FluxSource(MeshData<Real> *md, const Real dt) {
   auto pm = md->GetParentPointer();
   auto &resolved_pkgs = pm->resolved_packages;
@@ -348,9 +349,9 @@ TaskStatus MatterCoupling(MeshData<Real> *u0, const Real dt) {
   if (!(do_gas)) return TaskStatus::complete;
 
   // Extract moments package and params
-  auto &radiation_pkg = pm->packages.Get("moments");
-  auto closure_type = radiation_pkg->template Param<Closure>("closure_type");
-  auto full_coupling = radiation_pkg->template Param<bool>("full_coupling");
+  auto &moments_pkg = pm->packages.Get("moments");
+  auto closure_type = moments_pkg->template Param<Closure>("closure_type");
+  auto full_coupling = moments_pkg->template Param<bool>("full_coupling");
 
   // Call MatterCoupling with appropriate GEOM, Fluid, and Closure type given coupling
   if (closure_type == Closure::m1) {
@@ -380,4 +381,4 @@ template TaskStatus MatterCoupling<G::spherical1D>(MD *u0, const Real dt);
 template TaskStatus MatterCoupling<G::spherical2D>(MD *u0, const Real dt);
 template TaskStatus MatterCoupling<G::spherical3D>(MD *u0, const Real dt);
 
-} // namespace Radiation
+} // namespace Moments

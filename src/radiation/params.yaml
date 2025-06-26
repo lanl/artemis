@@ -149,8 +149,3 @@ radiation:
       _type: bool
       _description: "Radiation affects host fluid fields."
       _default: true
-
-
-
-
-

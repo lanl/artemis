@@ -128,7 +128,7 @@ TaskListStatus ArtemisDriver<GEOM>::Step() {
   if (status != TaskListStatus::complete) return status;
 
   // Operator split, moments subcyling (M1 or P1)
-  if (do_moment) status = Radiation::MomentsDriver<GEOM>(pmesh, tm, rad_integrator.get());
+  if (do_moment) status = Moments::MomentsDriver<GEOM>(pmesh, tm, rad_integrator.get());
   if (status != TaskListStatus::complete) return status;
 
   // Compute new dt, (de)refine, and handle sparse (if enabled)

@@ -79,6 +79,10 @@ ARTEMIS_VARIABLE(rad.prim, energy);
 ARTEMIS_VARIABLE(rad.prim, pressure);
 ARTEMIS_VARIABLE(rad.prim, flux);
 } // namespace prim
+namespace opac {
+ARTEMIS_VARIABLE(rad.opac, absorption);
+ARTEMIS_VARIABLE(rad.opac, scattering);
+} // namespace opac
 } // namespace rad
 
 #undef ARTEMIS_VARIABLE

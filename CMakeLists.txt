@@ -23,7 +23,7 @@ option(ARTEMIS_ENABLE_HIP "Enable hip for artemis and all dependencies" OFF)
 option(ARTEMIS_ENABLE_HDF5 "Enable HDF5 for artemis and all dependencies" ON)
 option(ARTEMIS_ENABLE_MPI "Enable MPI for artemis and all dependencies" ON)
 option(ARTEMIS_ENABLE_OPENMP "Enable OpenMP for artemis and parthenon" OFF)
-option(ARTEMIS_ENABLE_COMPILE_TIMING "Enable timing of compilation of artemis" ON)
+option(ARTEMIS_ENABLE_COMPILE_TIMING "Enable timing of compilation of artemis" OFF)
 option(ARTEMIS_ENABLE_ASAN "Enable AddressSanitizer to detect memory errors" OFF)
 option(ARTEMIS_PORTABLE_RESTART "Enable portable data types for REBOUND restarts" ON)
 
@@ -228,6 +228,8 @@ set(JAYBENNE_HOST_VARIABLE_HEADER "src/artemis.hpp")
 set(JAYBENNE_HOST_DENSITY_VARIABLE "gas::prim::density")
 set(JAYBENNE_HOST_SPECIFIC_INTERNAL_ENERGY_VARIABLE "gas::prim::sie")
 set(JAYBENNE_HOST_UPDATE_ENERGY_VARIABLE "gas::cons::internal_energy")
+set(JAYBENNE_HOST_ABSORPTION_OPACITY_VARIABLE "rad::opac::absorption")
+set(JAYBENNE_HOST_SCATTERING_OPACITY_VARIABLE "rad::opac::scattering")
 
 # Add jaybenne
 message(STATUS "Adding jaybenne and dependencies")

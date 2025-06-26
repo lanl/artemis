@@ -30,7 +30,6 @@ namespace ArtemisDerived {
 template <Coordinates GEOM>
 TaskStatus SetAuxillaryFields(MeshData<Real> *md) {
   using parthenon::MakePackDescriptor;
-  using TE = parthenon::TopologicalElement;
   auto pm = md->GetParentPointer();
   auto &resolved_pkgs = pm->resolved_packages;
 
@@ -84,7 +83,6 @@ TaskStatus SetAuxillaryFields(MeshData<Real> *md) {
 template <Coordinates GEOM>
 void ConsToPrim(MeshData<Real> *md) {
   using parthenon::MakePackDescriptor;
-  using TE = parthenon::TopologicalElement;
   auto pm = md->GetParentPointer();
   auto &resolved_pkgs = pm->resolved_packages;
 
@@ -193,7 +191,7 @@ void ConsToPrim(MeshData<Real> *md) {
             const Real hfx1 = vmesh(b, rad::cons::flux(VI(n, 0)), k, j, i) / conv[0];
             const Real hfx2 = vmesh(b, rad::cons::flux(VI(n, 1)), k, j, i) / conv[1];
             const Real hfx3 = vmesh(b, rad::cons::flux(VI(n, 2)), k, j, i) / conv[2];
-            const auto fx = Radiation::NormalizeFlux(hfx1, hfx2, hfx3);
+            const auto fx = Moments::NormalizeFlux(hfx1, hfx2, hfx3);
             vmesh(b, rad::cons::flux(VI(n, 0)), k, j, i) = fx[0] * conv[0];
             vmesh(b, rad::cons::flux(VI(n, 1)), k, j, i) = fx[1] * conv[1];
             vmesh(b, rad::cons::flux(VI(n, 2)), k, j, i) = fx[2] * conv[2];
@@ -211,7 +209,6 @@ void ConsToPrim(MeshData<Real> *md) {
 template <typename T, Coordinates GEOM>
 void PrimToCons(T *md) {
   using parthenon::MakePackDescriptor;
-  using TE = parthenon::TopologicalElement;
   auto pm = md->GetParentPointer();
   auto &resolved_pkgs = pm->resolved_packages;
 
@@ -220,6 +217,7 @@ void PrimToCons(T *md) {
   const bool do_gas = artemis_pkg->template Param<bool>("do_gas");
   const bool do_dust = artemis_pkg->template Param<bool>("do_dust");
   const bool do_rad = artemis_pkg->template Param<bool>("do_moment");
+  const bool do_imc = artemis_pkg->template Param<bool>("do_imc");
 
   // Extract gas parameters
   Real dflr_gas = Null<Real>();
@@ -344,7 +342,7 @@ void PrimToCons(T *md) {
             const Real fx1 = vmesh(b, rad::prim::flux(VI(n, 0)), k, j, i);
             const Real fx2 = vmesh(b, rad::prim::flux(VI(n, 1)), k, j, i);
             const Real fx3 = vmesh(b, rad::prim::flux(VI(n, 2)), k, j, i);
-            const auto fx = Radiation::NormalizeFlux(fx1, fx2, fx3);
+            const auto fx = Moments::NormalizeFlux(fx1, fx2, fx3);
             vmesh(b, rad::cons::flux(VI(n, 0)), k, j, i) = fx[0] * conv[0];
             vmesh(b, rad::cons::flux(VI(n, 1)), k, j, i) = fx[1] * conv[1];
             vmesh(b, rad::cons::flux(VI(n, 2)), k, j, i) = fx[2] * conv[2];

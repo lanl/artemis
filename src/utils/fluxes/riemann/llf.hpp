@@ -223,10 +223,10 @@ struct RiemannSolver<RSolver::llf, FLUID_TYPE, CTYPE,
             fr = std::min(1.0, fr);
 
             // Wave speeds
-            const Real chil = Radiation::EddingtonFactor<CTYPE>(fl);
-            const Real chir = Radiation::EddingtonFactor<CTYPE>(fr);
-            const auto [sla, slb] = Radiation::WaveSpeed<CTYPE>(nlx, fl);
-            const auto [sra, srb] = Radiation::WaveSpeed<CTYPE>(nrx, fr);
+            const Real chil = Moments::EddingtonFactor<CTYPE>(fl);
+            const Real chir = Moments::EddingtonFactor<CTYPE>(fr);
+            const auto [sla, slb] = Moments::WaveSpeed<CTYPE>(nlx, fl);
+            const auto [sra, srb] = Moments::WaveSpeed<CTYPE>(nrx, fr);
             const Real sl = std::min(sla, slb);
             const Real sr = std::max(sra, srb);
 

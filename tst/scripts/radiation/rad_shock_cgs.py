@@ -73,7 +73,7 @@ def analyze():
         os.path.join(artemis.get_data_dir(), "{}.out1.final.phdf".format(_file_id)), "r"
     ) as f:
         cv = f["Params"].attrs["gas/cv"]
-        ar = f["Params"].attrs["moments/arad"]
+        ar = f["Params"].attrs["radiation/arad"]
         xm = f["Locations/x"][...].ravel()
         xc = 0.5 * (xm[:-1] + xm[1:])
         sie = f["gas.prim.sie_0"][...].ravel()

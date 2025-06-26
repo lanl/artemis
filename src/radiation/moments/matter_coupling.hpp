@@ -26,10 +26,10 @@ using ArtemisUtils::MeanOpacity;
 using ArtemisUtils::MeanScattering;
 using ArtemisUtils::VI;
 
-namespace Radiation {
+namespace Moments {
 
 //----------------------------------------------------------------------------------------
-//! \fn TaskStatus Radiation::MatterCouplingSimpleImpl
+//! \fn TaskStatus Moments::MatterCouplingSimpleImpl
 //! \brief Implementation for simple radiation-matter coupling source
 template <Coordinates GEOM, Closure CLOSURE>
 TaskStatus MatterCouplingSimpleImpl(MeshData<Real> *u0, const Real dt) {
@@ -47,15 +47,15 @@ TaskStatus MatterCouplingSimpleImpl(MeshData<Real> *u0, const Real dt) {
   auto dflr = gas_pkg->template Param<Real>("dfloor");
   auto de_switch = gas_pkg->template Param<Real>("de_switch");
 
-  // Extract radiation package and params
-  auto &rad_pkg = pm->packages.Get("moments");
-  const auto chat = rad_pkg->template Param<Real>("chat");
-  const auto c = rad_pkg->template Param<Real>("c");
-  const auto arad = rad_pkg->template Param<Real>("arad");
-  const auto outer_max = rad_pkg->template Param<int>("outer_iteration_max");
-  const auto inner_max = rad_pkg->template Param<int>("inner_iteration_max");
-  const auto outer_tol = rad_pkg->template Param<Real>("outer_iteration_tol");
-  const auto inner_tol = rad_pkg->template Param<Real>("inner_iteration_tol");
+  // Extract radiation and moments package and params
+  auto &moments_pkg = pm->packages.Get("moments");
+  const auto chat = moments_pkg->template Param<Real>("chat");
+  const auto c = moments_pkg->template Param<Real>("c");
+  const auto arad = moments_pkg->template Param<Real>("arad");
+  const auto outer_max = moments_pkg->template Param<int>("outer_iteration_max");
+  const auto inner_max = moments_pkg->template Param<int>("inner_iteration_max");
+  const auto outer_tol = moments_pkg->template Param<Real>("outer_iteration_tol");
+  const auto inner_tol = moments_pkg->template Param<Real>("inner_iteration_tol");
 
   // Extract rotating frame quantities
   Real om0 = 0.0;
@@ -80,7 +80,7 @@ TaskStatus MatterCouplingSimpleImpl(MeshData<Real> *u0, const Real dt) {
   // Prepare scratch pad memory
   // const int ncells1 = ib.e - ib.s + 1 + 2 * parthenon::Globals::nghost;
   // int scr_size = ScratchPad1D<Real>::shmem_size(ncells1) * 12;
-  // const int scr_level = rad_pkg->template Param<int>("scr_level");
+  // const int scr_level = moments_pkg->template Param<int>("scr_level");
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "MatterCoupling", DevExecSpace(), 0, u0->NumBlocks() - 1,
       kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
@@ -182,7 +182,7 @@ TaskStatus MatterCouplingSimpleImpl(MeshData<Real> *u0, const Real dt) {
 }
 
 //----------------------------------------------------------------------------------------
-//! \fn TaskStatus Radiation::MatterCouplingSimpleImpl
+//! \fn TaskStatus Moments::MatterCouplingSimpleImpl
 //! \brief Implementation for "full" radiation-matter coupling source
 template <Coordinates GEOM, Closure CLOSURE>
 TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
@@ -201,14 +201,14 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
   auto de_switch = gas_pkg->template Param<Real>("de_switch");
 
   // Extract radiation package and params
-  auto &rad_pkg = pm->packages.Get("moments");
-  const auto chat = rad_pkg->template Param<Real>("chat");
-  const auto c = rad_pkg->template Param<Real>("c");
-  const auto arad = rad_pkg->template Param<Real>("arad");
-  const auto outer_max = rad_pkg->template Param<int>("outer_iteration_max");
-  const auto inner_max = rad_pkg->template Param<int>("inner_iteration_max");
-  const auto outer_tol = rad_pkg->template Param<Real>("outer_iteration_tol");
-  const auto inner_tol = rad_pkg->template Param<Real>("inner_iteration_tol");
+  auto &moments_pkg = pm->packages.Get("moments");
+  const auto chat = moments_pkg->template Param<Real>("chat");
+  const auto c = moments_pkg->template Param<Real>("c");
+  const auto arad = moments_pkg->template Param<Real>("arad");
+  const auto outer_max = moments_pkg->template Param<int>("outer_iteration_max");
+  const auto inner_max = moments_pkg->template Param<int>("inner_iteration_max");
+  const auto outer_tol = moments_pkg->template Param<Real>("outer_iteration_tol");
+  const auto inner_tol = moments_pkg->template Param<Real>("inner_iteration_tol");
 
   // Extract rotating frame quantities
   Real om0 = 0.0;
@@ -234,7 +234,7 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
   // Prepare scratch pad memory
   // const int ncells1 = ib.e - ib.s + 1 + 2 * parthenon::Globals::nghost;
   // int scr_size = ScratchPad1D<Real>::shmem_size(ncells1) * 12;
-  // const int scr_level = rad_pkg->template Param<int>("scr_level");
+  // const int scr_level = moments_pkg->template Param<int>("scr_level");
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "MatterCoupling", DevExecSpace(), 0, u0->NumBlocks() - 1,
       kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
@@ -421,6 +421,6 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
   return TaskStatus::complete;
 }
 
-} // namespace Radiation
+} // namespace Moments
 
-#endif //  RADIATION_MOMENTS_MATTER_COUPLING_HPP_
+#endif // RADIATION_MOMENTS_MATTER_COUPLING_HPP_

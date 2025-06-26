@@ -377,7 +377,7 @@ TaskStatus FluxSourceImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, CONS vcons, FAC
               const Real &fy = vp_(b, IVY, k, j, i);
               const Real &fz = vp_(b, IVZ, k, j, i);
               const Real ff = std::sqrt(SQR(fx) + SQR(fy) + SQR(fz));
-              const Real chi = Radiation::EddingtonFactor<C>(ff);
+              const Real chi = Moments::EddingtonFactor<C>(ff);
               wdt *= (3.0 * chi - 1.0) * hcchat_ / (ff + Fuzz<Real>());
             }
 

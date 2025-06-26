@@ -18,7 +18,7 @@
 #include "utils/integrators/artemis_integrator.hpp"
 #include "utils/units.hpp"
 
-namespace Radiation {
+namespace Moments {
 
 //----------------------------------------------------------------------------------------
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
@@ -40,12 +40,12 @@ TaskCollection MomentsTasks(Mesh *pmesh, const SimTime &tm,
                             parthenon::LowStorageIntegrator *integrator);
 
 //----------------------------------------------------------------------------------------
-//! \fn Real Radiation::EstimateTimestep
+//! \fn Real Moments::EstimateTimeStep
 //! \brief Not enrolled in parthenon's determination for global dt
 template <Coordinates GEOM>
-Real EstimateTimestep(parthenon::Mesh *pmesh) {
-  auto &radiation_pkg = pmesh->packages.Get("moments");
-  auto &params = radiation_pkg->AllParams();
+Real EstimateTimeStep(parthenon::Mesh *pmesh) {
+  auto &moments_pkg = pmesh->packages.Get("moments");
+  auto &params = moments_pkg->AllParams();
 
   Real dxmin = Big<Real>();
   if constexpr (geometry::is_cartesian<GEOM>()) {
@@ -71,7 +71,7 @@ Real EstimateTimestep(parthenon::Mesh *pmesh) {
       // Compute minimum dx
       Real min_dx = Big<Real>();
       parthenon::par_reduce(
-          parthenon::loop_pattern_mdrange_tag, "Radiation::EstimateTimestepMesh",
+          parthenon::loop_pattern_mdrange_tag, "Moments::EstimateTimestepMesh",
           DevExecSpace(), 0, md->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
           KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, Real &ldx_m) {
             // Extract coordinates
@@ -97,7 +97,7 @@ Real EstimateTimestep(parthenon::Mesh *pmesh) {
 }
 
 //----------------------------------------------------------------------------------------
-//! \fn Real Radiation::EddingtonFactor
+//! \fn Real Moments::EddingtonFactor
 //! \brief Computes Eddington factor given closure model
 template <Closure CTYP>
 KOKKOS_INLINE_FUNCTION Real EddingtonFactor(const Real f) {
@@ -113,7 +113,7 @@ KOKKOS_INLINE_FUNCTION Real EddingtonFactor(const Real f) {
 }
 
 //----------------------------------------------------------------------------------------
-//! \fn std::array<Real, 6> Radiation::EddingtonTensor
+//! \fn std::array<Real, 6> Moments::EddingtonTensor
 //! \brief Computes entries of Eddington tensor given closure model
 template <Closure CTYP>
 KOKKOS_INLINE_FUNCTION std::array<Real, 6>
@@ -139,7 +139,7 @@ EddingtonTensor(const std::array<Real, 3> fred) {
 }
 
 //----------------------------------------------------------------------------------------
-//! \fn std::tuple<Real, Real> Radiation::WaveSpeed
+//! \fn std::tuple<Real, Real> Moments::WaveSpeed
 //! \brief Computes wavespeed given closure model
 template <Closure CTYP>
 KOKKOS_INLINE_FUNCTION std::tuple<Real, Real> WaveSpeed(const Real mu, const Real f) {
@@ -160,7 +160,7 @@ KOKKOS_INLINE_FUNCTION std::tuple<Real, Real> WaveSpeed(const Real mu, const Rea
 }
 
 //----------------------------------------------------------------------------------------
-//! \fn std::array<Real, 3> Radiation::NormalizeFlux
+//! \fn std::array<Real, 3> Moments::NormalizeFlux
 //! \brief Normalize radiation flux
 KOKKOS_INLINE_FUNCTION
 std::array<Real, 3> NormalizeFlux(const Real fx1, const Real fx2, const Real fx3) {
@@ -174,7 +174,7 @@ std::array<Real, 3> NormalizeFlux(const Real fx1, const Real fx2, const Real fx3
 }
 
 //----------------------------------------------------------------------------------------
-//! \fn Real Radiation::FleckFactor
+//! \fn Real Moments::FleckFactor
 //! \brief Returns Fleck factor dB/dE
 KOKKOS_INLINE_FUNCTION
 Real FleckFactor(const Real ar, const Real T, const Real cv) {
@@ -182,7 +182,7 @@ Real FleckFactor(const Real ar, const Real T, const Real cv) {
 }
 
 //----------------------------------------------------------------------------------------
-//! \fn std::array<Real, 3> Radiation::SolveRadFlux
+//! \fn std::array<Real, 3> Moments::SolveRadFlux
 //! \brief
 //!
 //!   Invert this matrix:
@@ -211,6 +211,6 @@ std::array<Real, 3> SolveRadFlux(const Real a, const Real b,
               idet};
 }
 
-} // namespace Radiation
+} // namespace Moments
 
 #endif // RADIATION_MOMENTS_MOMENTS_HPP_

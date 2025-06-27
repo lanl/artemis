@@ -285,8 +285,9 @@ TaskStatus FluxSourceImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, CONS vcons, FAC
 
         // Get the rotational velocity
         std::array<Real, 3> rfv{0.0};
+        [[maybe_unused]] Real omf_ = omf;
         if constexpr (F != Fluid::radiation) {
-          rfv = RotatingFrame::RotationVelocity<G>(coords.GetCellCenter(), omf);
+          rfv = RotatingFrame::RotationVelocity<G>(coords.GetCellCenter(), omf_);
         }
 
         // Timestep weighted by dx

@@ -31,15 +31,33 @@ namespace RotatingFrame {
 //----------------------------------------------------------------------------------------
 //! \fn TaskListStatus RotatingFrame::Advect
 //! \brief Executes linear advection term for orbital advection
-TaskListStatus Advect(Mesh *pmesh, const SimTime &tm,
-                      parthenon::LowStorageIntegrator *integrator) {
-  return LinearAdvectionStep(pmesh, tm, integrator).Execute();
+TaskListStatus Advect(Mesh *pmesh, const SimTime &tm) {
+  // Craft a series of **equal** subsetps that sum to the unsplit step
+  const Real dtlimit = EstimateTimestep(pmesh, 1.0);
+  const int nsteps = static_cast<int>(std::ceil(tm.dt / dtlimit));
+  const Real scdt = tm.dt / nsteps;
+
+  // Report number of substeps
+  if (tm.ncycle % tm.ncycle_out == 0) {
+    if (Globals::my_rank == 0) {
+      std::cout << "(Linear Advection) "
+                << "Executing " << nsteps << " substeps"
+                << " with dt=" << scdt << std::endl;
+    }
+  }
+
+  // Execute LinearAdvectionStep over substeps
+  for (int step = 1; step <= nsteps; step++) {
+    auto status = LinearAdvectionStep(pmesh, tm, scdt).Execute();
+    if (status != TaskListStatus::complete) return status;
+  }
+
+  return TaskListStatus::complete;
 }
 
 //----------------------------------------------------------------------------------------
 //! \fn  TaskCollection LinearAdvectionStep
-TaskCollection LinearAdvectionStep(Mesh *pmesh, const SimTime &tm,
-                                   parthenon::LowStorageIntegrator *integrator) {
+TaskCollection LinearAdvectionStep(Mesh *pmesh, const SimTime &tm, const Real scdt) {
   TaskCollection tc;
   if (!(pmesh->ndim >= 2)) return tc;
 
@@ -49,42 +67,28 @@ TaskCollection LinearAdvectionStep(Mesh *pmesh, const SimTime &tm,
   const auto any = parthenon::BoundaryType::any;
   const int num_partitions = pmesh->DefaultNumPartitions();
 
-  // Deep copy u0 into u1 for integrator logic
-  auto &init_region = tc.AddRegion(num_partitions);
-  for (int i = 0; i < num_partitions; i++) {
-    auto &tl = init_region[i];
-    auto &u0 = pmesh->mesh_data.GetOrAdd("u0", i);
-    auto &u1 = pmesh->mesh_data.GetOrAdd("u1", i);
-    tl.AddTask(none, ArtemisUtils::DeepCopyConservedData, u1.get(), u0.get());
-  }
-
   // Operator split linear advection
-  for (int stage = 1; stage <= integrator->nstages; stage++) {
-    TaskRegion &tr = tc.AddRegion(num_partitions);
-    for (int i = 0; i < num_partitions; i++) {
-      auto &tl = tr[i];
-      auto &u0 = pmesh->mesh_data.GetOrAdd("u0", i);
-      auto &u1 = pmesh->mesh_data.GetOrAdd("u1", i);
+  TaskRegion &tr = tc.AddRegion(num_partitions);
+  for (int i = 0; i < num_partitions; i++) {
+    auto &tl = tr[i];
+    auto &u0 = pmesh->mesh_data.GetOrAdd("u0", i);
 
-      auto start_recv = tl.AddTask(none, parthenon::StartReceiveBoundBufs<any>, u0);
-      auto update =
-          tl.AddTask(start_recv, UpwindAdvection, u0.get(), u1.get(), stage, integrator);
-      auto set_aux = tl.AddTask(
-          update, ArtemisDerived::SetAuxillaryFields<Coordinates::cartesian>, u0.get());
-      auto c2p = tl.AddTask(set_aux, PreCommFillDerived<MeshData<Real>>, u0.get());
-      auto bcs = parthenon::AddBoundaryExchangeTasks(c2p, tl, u0, pmesh->multilevel);
-      auto p2c = tl.AddTask(bcs, FillDerived<MeshData<Real>>, u0.get());
-    }
+    auto start_recv = tl.AddTask(none, parthenon::StartReceiveBoundBufs<any>, u0);
+    auto update = tl.AddTask(start_recv, LagrangeRemap, u0.get(), scdt);
+    auto set_aux = tl.AddTask(
+        update, ArtemisDerived::SetAuxillaryFields<Coordinates::cartesian>, u0.get());
+    auto c2p = tl.AddTask(set_aux, PreCommFillDerived<MeshData<Real>>, u0.get());
+    auto bcs = parthenon::AddBoundaryExchangeTasks(c2p, tl, u0, pmesh->multilevel);
+    auto p2c = tl.AddTask(bcs, FillDerived<MeshData<Real>>, u0.get());
   }
 
   return tc;
 }
 
 //----------------------------------------------------------------------------------------
-//! \fn  TaskStatus RotatingFrame::UpwindAdvection
+//! \fn  TaskStatus RotatingFrame::LagrangeRemap
 //! \brief
-TaskStatus UpwindAdvection(MeshData<Real> *u0, MeshData<Real> *u1, const int stage,
-                           parthenon::LowStorageIntegrator *integrator) {
+TaskStatus LagrangeRemap(MeshData<Real> *u0, const Real scdt) {
   using parthenon::MakePackDescriptor;
   auto pm = u0->GetParentPointer();
   auto &resolved_pkgs = pm->resolved_packages;
@@ -98,11 +102,10 @@ TaskStatus UpwindAdvection(MeshData<Real> *u0, MeshData<Real> *u1, const int sta
   auto &rframe_pkg = pm->packages.Get("rotating_frame");
   const Real qshear = rframe_pkg->template Param<Real>("qshear");
   const Real om0 = rframe_pkg->template Param<Real>("omega");
+  const auto recon = rframe_pkg->template Param<ReconstructionMethod>("recon");
 
   // Extract integrator weights
-  const Real g0 = integrator->gam0[stage - 1];
-  const Real g1 = integrator->gam1[stage - 1];
-  const Real bdt = integrator->beta[stage - 1] * integrator->dt;
+  const Real dwdt = -qshear * om0 * scdt;
 
   // Packing and indexing
   static auto desc =
@@ -110,30 +113,17 @@ TaskStatus UpwindAdvection(MeshData<Real> *u0, MeshData<Real> *u1, const int sta
                          gas::cons::internal_energy, dust::cons::density,
                          dust::cons::momentum>(resolved_pkgs.get());
   auto v0 = desc.GetPack(u0);
-  auto v1 = desc.GetPack(u1);
-  const int nblocks = u0->NumBlocks();
-  IndexRange ib = u0->GetBoundsI(IndexDomain::interior);
-  IndexRange jb = u0->GetBoundsJ(IndexDomain::interior);
-  IndexRange kb = u0->GetBoundsK(IndexDomain::interior);
 
-  parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "UpwindAdvection", parthenon::DevExecSpace(), 0,
-      u0->NumBlocks() - 1, kb.s, kb.e, ib.s, ib.e,
-      KOKKOS_LAMBDA(const int &b, const int &k, const int &i) {
-        geometry::Coords<Coordinates::cartesian> coords(v0.GetCoordinates(b), 0, 0, i);
-        const Real idx2 = 1.0 / (coords.bnds.x2[1] - coords.bnds.x2[0]);
-        const Real x1v = 0.5 * (coords.bnds.x1[1] + coords.bnds.x1[0]);
-        const auto ww = BackgroundVelocity<Coordinates::cartesian>(qshear, om0, x1v);
-        const Real wbdt = ww[1] * idx2 * bdt;
-
-        if (ww[1] >= 0.0) {
-          if (do_gas) Upwind<Fluid::gas, Upwind::l>(v0, v1, g0, g1, wbdt, b, k, jb, i);
-          if (do_dust) Upwind<Fluid::dust, Upwind::l>(v0, v1, g0, g1, wbdt, b, k, jb, i);
-        } else {
-          if (do_gas) Upwind<Fluid::gas, Upwind::r>(v0, v1, g0, g1, wbdt, b, k, jb, i);
-          if (do_dust) Upwind<Fluid::dust, Upwind::r>(v0, v1, g0, g1, wbdt, b, k, jb, i);
-        }
-      });
+  // Call upwind advection routines with requested recon
+  if (recon == ReconstructionMethod::pcm) {
+    return LagrangeRemapImpl<ReconstructionMethod::pcm>(u0, v0, dwdt);
+  } else if (recon == ReconstructionMethod::plm) {
+    return LagrangeRemapImpl<ReconstructionMethod::plm>(u0, v0, dwdt);
+  } else if (recon == ReconstructionMethod::ppm) {
+    return LagrangeRemapImpl<ReconstructionMethod::ppm>(u0, v0, dwdt);
+  } else {
+    PARTHENON_FAIL("Unsupported reconstruction method in rotating_frame");
+  }
 
   return TaskStatus::complete;
 }

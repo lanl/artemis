@@ -80,7 +80,7 @@ set (SRC_LIST
   radiation/moments/moments_driver.cpp
   radiation/moments/matter_coupling.hpp
 
-  rotating_frame/ladv_driver.cpp
+  rotating_frame/advection_driver.cpp
   rotating_frame/rotating_frame.cpp
   rotating_frame/rotating_frame_impl.hpp
   rotating_frame/rotating_frame.hpp

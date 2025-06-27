@@ -19,6 +19,8 @@
 #include "utils/refinement/restriction.hpp"
 
 namespace ArtemisUtils {
+
+ReconstructionMethod ChooseReconMethod(std::string recon);
 //----------------------------------------------------------------------------------------
 //! \fn int ArtemisUtils::VI
 //! \brief Returns vector index associated with species n for vector element
@@ -236,6 +238,7 @@ Real CutCell2D(const std::array<Real, 4> &x, const std::array<Real, 4> &y,
   }
   return vol_inside / vol;
 }
+
 } // namespace ArtemisUtils
 
 #endif // UTILS_ARTEMIS_UTILS_HPP_

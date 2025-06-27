@@ -127,6 +127,34 @@ struct Reconstruction<ReconstructionMethod::ppm, X3DIR, GEOM> {
   }
 };
 
+template <>
+struct ReconGradient<ReconstructionMethod::ppm> {
+  template <typename V>
+  KOKKOS_INLINE_FUNCTION std::array<Real, 3>
+  operator()(const V &q, const std::array<Real, 3> &dx, const int multi_d,
+             const int three_d, const int b, const int n, const int k, const int j,
+             const int i) const {
+    std::array<Real, 3> dqdx{0.0, 0.0, 0.0};
+    Real wl = Null<Real>(), wr = Null<Real>();
+
+    PPM4(q(b, n, k, j, i - 2), q(b, n, k, j, i - 1), q(b, n, k, j, i),
+         q(b, n, k, j, i + 1), q(b, n, k, j, i + 2), wl, wr);
+    dqdx[0] = (wr - wl) / (2.0 * dx[0]);
+
+    wl = Null<Real>(), wr = Null<Real>();
+    PPM4(q(b, n, k, j - 2 * multi_d, i), q(b, n, k, j - multi_d, i), q(b, n, k, j, i),
+         q(b, n, k, j + multi_d, i), q(b, n, k, j + 2 * multi_d, i), wl, wr);
+    dqdx[1] = (wr - wl) / (2.0 * dx[1]);
+
+    wl = Null<Real>(), wr = Null<Real>();
+    PPM4(q(b, n, k - three_d, j, i), q(b, n, k - 2 * three_d, j, i), q(b, n, k, j, i),
+         q(b, n, k + three_d, j, i), q(b, n, k + 2 * three_d, j, i), wl, wr);
+    dqdx[2] = (wr - wl) / (2.0 * dx[2]);
+
+    return dqdx;
+  }
+};
+
 } // namespace ArtemisUtils
 
 #endif // UTILS_FLUXES_RECONSTRUCTION_PPM_HPP_

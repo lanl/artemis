@@ -52,25 +52,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   // Reconstruction algorithm
   ReconstructionMethod recon_method = ReconstructionMethod::null;
   const std::string recon = pin->GetOrAddString("dust", "reconstruct", "plm");
-  if (recon.compare("pcm") == 0) {
-    PARTHENON_REQUIRE(parthenon::Globals::nghost >= 1,
-                      "PCM requires at least 1 ghost cell.");
-    recon_method = ReconstructionMethod::pcm;
-  } else if (recon.compare("plm") == 0) {
-    PARTHENON_REQUIRE(parthenon::Globals::nghost >= 2,
-                      "PLM requires at least 2 ghost cells.");
-    recon_method = ReconstructionMethod::plm;
-  } else if (recon.compare("ppm") == 0) {
-    PARTHENON_REQUIRE(parthenon::Globals::nghost >= 3,
-                      "PPM requires at least 3 ghost cells.");
-    if (coords != Coordinates::cartesian) {
-      PARTHENON_WARN("Artemis' PPM implementation does not contain geometric corrections "
-                     "for curvilinear coordinates.");
-    }
-    recon_method = ReconstructionMethod::ppm;
-  } else {
-    PARTHENON_FAIL("Reconstruction method not recognized.");
-  }
+  recon_method = ArtemisUtils::ChooseReconMethod(recon);
   params.Add("recon", recon_method);
 
   // Riemann solver
@@ -246,16 +228,6 @@ Real EstimateTimestepMesh(MeshData<Real> *md) {
   auto &dust_pkg = pm->packages.Get("dust");
   auto &params = dust_pkg->AllParams();
 
-  // NOTE(@pdmullen): Without FARGO, dt must be additionally limited by the linear
-  // advection of the shear background flow (vy0 = -q Omega x)
-  Real qshear = 0.0, om0 = 0.0;
-  const bool do_shear = pm->packages.Get("artemis")->template Param<bool>("do_shear");
-  if (do_shear) {
-    auto &rframe_pkg = pm->packages.Get("rotating_frame");
-    qshear = rframe_pkg->template Param<Real>("qshear");
-    om0 = rframe_pkg->template Param<Real>("omega");
-  }
-
   static auto desc =
       MakePackDescriptor<dust::prim::density, dust::prim::velocity>(resolved_pkgs.get());
   auto vmesh = desc.GetPack(md);
@@ -279,11 +251,6 @@ Real EstimateTimestepMesh(MeshData<Real> *md) {
             denom += std::abs(vmesh(b, dust::prim::velocity(VI(n, d)), k, j, i)) / dx[d];
           }
           ldt = std::min(ldt, 1.0 / denom);
-        }
-
-        if (do_shear) {
-          const auto ww = BackgroundVelocity<GEOM>(qshear, om0, coords.x1v());
-          ldt = std::min(ldt, dx[1] / std::abs(ww[1]));
         }
       },
       Kokkos::Min<Real>(min_dt));

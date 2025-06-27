@@ -70,7 +70,7 @@ ArtemisDriver<GEOM>::ArtemisDriver(ParameterInput *pin, ApplicationInput *app_in
   do_imc = artemis_pkg->template Param<bool>("do_imc");
   do_moment = artemis_pkg->template Param<bool>("do_moment");
 
-  // Moments integrator and initialization
+  // Moments integrator
   if (do_moment) {
     auto rad_int = pin->GetOrAddString("radiation/moment", "integrator", "rk2");
     PARTHENON_REQUIRE(((rad_int == "rk1") || (rad_int == "rk2") || (rad_int == "rk3")),
@@ -120,7 +120,7 @@ TaskListStatus ArtemisDriver<GEOM>::Step() {
   if (status != TaskListStatus::complete) return status;
 
   // Operator split, background linear advection (for shearing box)
-  if (do_shear) status = RotatingFrame::Advect(pmesh, tm, integrator.get());
+  if (do_shear) status = RotatingFrame::Advect(pmesh, tm);
   if (status != TaskListStatus::complete) return status;
 
   // Operator split, IMC/DDMC radiation with Jaybenne

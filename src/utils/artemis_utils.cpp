@@ -152,4 +152,23 @@ std::vector<std::vector<Real>> loadtxt(std::string fname) {
   ifs.close();
   return table;
 }
+
+ReconstructionMethod ChooseReconMethod(std::string recon) {
+  if (recon.compare("pcm") == 0) {
+    PARTHENON_REQUIRE(parthenon::Globals::nghost >= 1,
+                      "PCM requires at least 1 ghost cell.");
+    return ReconstructionMethod::pcm;
+  } else if (recon.compare("plm") == 0) {
+    PARTHENON_REQUIRE(parthenon::Globals::nghost >= 2,
+                      "PLM requires at least 2 ghost cells.");
+    return ReconstructionMethod::plm;
+  } else if (recon.compare("ppm") == 0) {
+    PARTHENON_REQUIRE(parthenon::Globals::nghost >= 3,
+                      "PPM requires at least 3 ghost cells.");
+    return ReconstructionMethod::ppm;
+  }
+  PARTHENON_FAIL("Reconstruction method not recognized.");
+  return ReconstructionMethod::pcm;
+}
+
 } // namespace ArtemisUtils

@@ -86,6 +86,20 @@ struct Reconstruction<ReconstructionMethod::pcm, X3DIR, GEOM> {
   }
 };
 
+template <>
+struct ReconGradient<ReconstructionMethod::pcm> {
+  template <typename V>
+  KOKKOS_INLINE_FUNCTION std::array<Real, 3>
+  operator()(const V &q, const std::array<Real, 3> &dx, const int multi_d,
+             const int three_d, const int b, const int n, const int k, const int j,
+             const int i) const {
+    return std::array<Real, 3>{
+        (q(b, n, k, j, i + 1) - q(b, n, k, j, i - 1)) / (2.0 * dx[0]),
+        (q(b, n, k, j + multi_d, i) - q(b, n, k, j - multi_d, i)) / (2.0 * dx[1]),
+        (q(b, n, k + three_d, j, i) - q(b, n, k - three_d, j, i)) / (2.0 * dx[2])};
+  }
+};
+
 } // namespace ArtemisUtils
 
 #endif // UTILS_FLUXES_RECONSTRUCTION_PCM_HPP_

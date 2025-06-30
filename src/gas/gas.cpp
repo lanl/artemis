@@ -698,7 +698,7 @@ TaskStatus DepositEnergy(MeshData<Real> *md, const Real dt) {
 
   // Set opacities
   parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "DeposityEnergy", parthenon::DevExecSpace(), 0,
+      DEFAULT_LOOP_PATTERN, "DepositEnergy", parthenon::DevExecSpace(), 0,
       md->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
         for (int n = 0; n < v0.GetSize(b, gas::cons::total_energy()); n++) {

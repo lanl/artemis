@@ -95,16 +95,17 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin, Params &dustPar
   }
 
   ParArray1D<Real> dust_size("dsize", nm);
-  auto h_sizes = dust_size.GetHostMirror();
 
-  auto hsizes = dustPars.template Get<ParArray1D<Real>>("h_sizes");
   // convert back to CGS unit
   const Real length0 = units.GetLengthCodeToPhysical();
-  for (int i = 0; i < nm; i++) {
-    h_sizes(i) = hsizes(i) * length0;
-  }
 
-  dust_size.DeepCopy(h_sizes);
+  // using device
+  auto sizes = dustPars.template Get<ParArray1D<Real>>("sizes");
+  parthenon::par_for(
+      parthenon::loop_pattern_flatrange_tag, "code2phys", parthenon::DevExecSpace(), 0,
+      nm - 1, KOKKOS_LAMBDA(const int i) { dust_size(i) = sizes(i) * length0; });
+
+  auto h_sizes = dust_size.GetHostMirrorAndCopy();
 
   const Real cond = 3.0 / (1.0 - nm) * std::log(h_sizes(0) / h_sizes(nm - 1));
   if (std::exp(cond) > std::sqrt(2.0)) {

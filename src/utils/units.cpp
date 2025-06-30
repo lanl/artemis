@@ -16,6 +16,7 @@
 namespace ArtemisUtils {
 
 constexpr Real Msolar = 1.988416e33;
+constexpr Real Rsolar = 6.957e10;
 constexpr Real AU = 1.495978707e13;
 constexpr Real Year = 31536000;
 constexpr Real parsec = 3.0857e18;
@@ -87,6 +88,7 @@ Constants::Constants(Units &units) {
     AU_ = 1.;
     pc_ = 1.;
     Year_ = 1.;
+    Rsolar_ = 1.;
   } else if (units.GetPhysicalUnits() == PhysicalUnits::cgs) {
     parthenon::constants::PhysicalConstants<parthenon::constants::CGS> pc;
     G_ = pc.gravitational_constant;
@@ -102,6 +104,7 @@ Constants::Constants(Units &units) {
     Mjup_ = Mjup;
     pc_ = parsec;
     Year_ = Year;
+    Rsolar_ = Rsolar;
   } else {
     PARTHENON_FAIL("Unknown unit system");
   }
@@ -126,6 +129,7 @@ Constants::Constants(Units &units) {
   Mjup_code_ = Mjup_ / mass;
   pc_code_ = pc_ / length;
   Year_code_ = Year_ / time;
+  Rsolar_code_ = Rsolar_ / length;
 }
 
 } // namespace ArtemisUtils

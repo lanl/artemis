@@ -269,7 +269,6 @@ Real CutCell2D(const std::array<Real, 4> &x, const std::array<Real, 4> &y,
     vol_inside += ((clipi + clipj) <= 1) * contrib(x1, y1, x2, y2);
   }
   return vol_inside / vol;
->>>>>>> origin/develop
 }
 
 } // namespace ArtemisUtils

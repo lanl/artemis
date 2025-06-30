@@ -67,10 +67,9 @@ ArtemisDriver<GEOM>::ArtemisDriver(ParameterInput *pin, ApplicationInput *app_in
   do_conduction = artemis_pkg->template Param<bool>("do_conduction");
   do_nbody = artemis_pkg->template Param<bool>("do_nbody");
   do_diffusion = do_viscosity || do_conduction;
-  do_radiation = artemis_pkg->template Param<bool>("do_radiation");
-  do_coagulation = artemis_pkg->template Param<bool>("do_coagulation");
   do_imc = artemis_pkg->template Param<bool>("do_imc");
   do_moment = artemis_pkg->template Param<bool>("do_moment");
+  do_coagulation = artemis_pkg->template Param<bool>("do_coagulation");
 
   // Moments integrator
   if (do_moment) {

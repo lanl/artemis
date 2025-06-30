@@ -53,6 +53,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   params.Add("max_iterations",
              pin->GetOrAddInteger("radiation/raytrace", "max_iterations", 1000));
 
+  params.Add("efloor", pin->GetOrAddReal("radiation/raytrace", "efloor", 1e-10));
   params.Add("x1min", pin->GetReal("parthenon/mesh", "x1min"));
   params.Add("x1max", pin->GetReal("parthenon/mesh", "x1max"));
   params.Add("x2min", pin->GetReal("parthenon/mesh", "x2min"));

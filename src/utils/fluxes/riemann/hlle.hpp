@@ -273,22 +273,22 @@ struct RiemannSolver<RSolver::hlle, FLUID_TYPE, CTYPE,
             fr = std::min(1.0, fr);
 
             // Wave speeds
-            const Real chil = Moments::EddingtonFactor<CTYPE>(fl);
-            const Real chir = Moments::EddingtonFactor<CTYPE>(fr);
+            const Real chil = Moments::ThriceEddingtonFactor<CTYPE>(fl);
+            const Real chir = Moments::ThriceEddingtonFactor<CTYPE>(fr);
             const auto [sla, slb] = Moments::WaveSpeed<CTYPE>(nlx, fl);
             const auto [sra, srb] = Moments::WaveSpeed<CTYPE>(nrx, fr);
             const Real sl = std::min(sla, slb);
             const Real sr = std::max(sra, srb);
 
             // Scales
-            const Real pscalel = chat * c * 0.5 * (1.0 - chil);
-            const Real pscaler = chat * c * 0.5 * (1.0 - chir);
+            const Real pscalel = chat * c * (3.0 - chil) / 6.0;
+            const Real pscaler = chat * c * (3.0 - chir) / 6.0;
             const Real wl_ipr = pscalel * wl_idn;
             const Real wr_ipr = pscaler * wr_idn;
             const Real norml = fl * fl;
             const Real normr = fr * fr;
-            const Real scalel = c * 0.5 * (3. * chil - 1.);
-            const Real scaler = c * 0.5 * (3. * chir - 1.);
+            const Real scalel = c * 0.5 * (chil - 1.);
+            const Real scaler = c * 0.5 * (chir - 1.);
 
             // following min/max set to TINY_NUMBER to fix bug found in converging
             // supersonic flow

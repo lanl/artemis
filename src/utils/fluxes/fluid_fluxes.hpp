@@ -284,7 +284,11 @@ TaskStatus FluxSourceImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, CONS vcons, FAC
         const auto dh3 = (x3dep) ? coords.GetConnX3() : NewArray<Real, 3>(0.0);
 
         // Get the rotational velocity
-        const auto rfv = RotatingFrame::RotationVelocity<G>(coords.GetCellCenter(), omf);
+        std::array<Real, 3> rfv{0.0};
+        [[maybe_unused]] Real omf_ = omf;
+        if constexpr (F != Fluid::radiation) {
+          rfv = RotatingFrame::RotationVelocity<G>(coords.GetCellCenter(), omf_);
+        }
 
         // Timestep weighted by dx
         geometry::BBox bnds = coords.bnds;
@@ -377,8 +381,8 @@ TaskStatus FluxSourceImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, CONS vcons, FAC
               const Real &fy = vp_(b, IVY, k, j, i);
               const Real &fz = vp_(b, IVZ, k, j, i);
               const Real ff = std::sqrt(SQR(fx) + SQR(fy) + SQR(fz));
-              const Real chi = Moments::EddingtonFactor<C>(ff);
-              wdt *= (3.0 * chi - 1.0) * hcchat_ / (ff + Fuzz<Real>());
+              const Real chi = Moments::ThriceEddingtonFactor<C>(ff);
+              wdt *= ((chi - 1.) / (ff + Fuzz<Real>())) * hcchat_;
             }
 
             // Update momenta

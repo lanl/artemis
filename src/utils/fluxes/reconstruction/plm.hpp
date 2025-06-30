@@ -1,5 +1,5 @@
 //========================================================================================
-// (C) (or copyright) 2023-2024. Triad National Security, LLC. All rights reserved.
+// (C) (or copyright) 2023-2025. Triad National Security, LLC. All rights reserved.
 //
 // This program was produced under U.S. Government contract 89233218CNA000001 for Los
 // Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -21,7 +21,7 @@
 #include "artemis.hpp"
 
 // NOTE(PDMM): The following is taken directly from the open-source AthenaK software, and
-// adapted for Parthenon/Artemis by PDMM
+// adapted for Parthenon/Artemis by PDM
 
 namespace ArtemisUtils {
 //----------------------------------------------------------------------------------------
@@ -48,8 +48,7 @@ void PLM(const Real &q_im1, const Real &q_i, const Real &q_ip1, Real &ql_ip1,
 
 //----------------------------------------------------------------------------------------
 //! \fn ArtemisUtils::PLM_G()
-//! \brief General PLM routine for non-uniform or non-Cartesian geometries. See Mignone
-//! (2013).
+//! \brief PLM routine for non-uniform/non-Cartesian geometries. See Mignone (2013).
 KOKKOS_INLINE_FUNCTION
 void PLM_G(const Real &q_im1, const Real &q_i, const Real &q_ip1, Real &ql_ip1,
            Real &qr_i, const Real x_im1, const Real x_i, const Real x_ip1,
@@ -76,13 +75,12 @@ void PLM_G(const Real &q_im1, const Real &q_i, const Real &q_ip1, Real &ql_ip1,
 //! \class ArtemisUtils::Reconstruction<RSolver::plm, X1DIR, ...>
 //! \brief The piecewise linear reconstruction method in the X1 direction
 template <Coordinates GEOM>
-class Reconstruction<ReconstructionMethod::plm, X1DIR, GEOM> {
- public:
+struct Reconstruction<ReconstructionMethod::plm, X1DIR, GEOM> {
   template <typename V>
-  KOKKOS_INLINE_FUNCTION void apply(parthenon::team_mbr_t const &member, const int b,
-                                    const int k, const int j, const int il, const int iu,
-                                    const V &q, parthenon::ScratchPad2D<Real> &ql,
-                                    parthenon::ScratchPad2D<Real> &qr) const {
+  KOKKOS_INLINE_FUNCTION void
+  operator()(parthenon::team_mbr_t const &member, const int b, const int k, const int j,
+             const int il, const int iu, const V &q, parthenon::ScratchPad2D<Real> &ql,
+             parthenon::ScratchPad2D<Real> &qr) const {
     auto &pco = q.GetCoordinates(b);
     for (int n = q.GetLowerBound(b); n <= q.GetUpperBound(b); ++n) {
       parthenon::par_for_inner(
@@ -110,13 +108,13 @@ class Reconstruction<ReconstructionMethod::plm, X1DIR, GEOM> {
 //! \class ArtemisUtils::Reconstruction<RSolver::plm, X2DIR, ...>
 //! \brief The piecewise linear reconstruction method in the X2 direction
 template <Coordinates GEOM>
-class Reconstruction<ReconstructionMethod::plm, X2DIR, GEOM> {
- public:
+struct Reconstruction<ReconstructionMethod::plm, X2DIR, GEOM> {
   template <typename V>
-  KOKKOS_INLINE_FUNCTION void apply(parthenon::team_mbr_t const &member, const int b,
-                                    const int k, const int j, const int il, const int iu,
-                                    const V &q, parthenon::ScratchPad2D<Real> &ql_jp1,
-                                    parthenon::ScratchPad2D<Real> &qr_j) const {
+  KOKKOS_INLINE_FUNCTION void operator()(parthenon::team_mbr_t const &member, const int b,
+                                         const int k, const int j, const int il,
+                                         const int iu, const V &q,
+                                         parthenon::ScratchPad2D<Real> &ql_jp1,
+                                         parthenon::ScratchPad2D<Real> &qr_j) const {
     auto &pco = q.GetCoordinates(b);
     for (int n = q.GetLowerBound(b); n <= q.GetUpperBound(b); ++n) {
       parthenon::par_for_inner(
@@ -144,13 +142,13 @@ class Reconstruction<ReconstructionMethod::plm, X2DIR, GEOM> {
 //! \class ArtemisUtils::Reconstruction<RSolver::plm, X3DIR, ...>
 //! \brief The piecewise linear reconstruction method in the X3 direction
 template <Coordinates GEOM>
-class Reconstruction<ReconstructionMethod::plm, X3DIR, GEOM> {
- public:
+struct Reconstruction<ReconstructionMethod::plm, X3DIR, GEOM> {
   template <typename V>
-  KOKKOS_INLINE_FUNCTION void apply(parthenon::team_mbr_t const &member, const int b,
-                                    const int k, const int j, const int il, const int iu,
-                                    const V &q, parthenon::ScratchPad2D<Real> &ql_kp1,
-                                    parthenon::ScratchPad2D<Real> &qr_k) const {
+  KOKKOS_INLINE_FUNCTION void operator()(parthenon::team_mbr_t const &member, const int b,
+                                         const int k, const int j, const int il,
+                                         const int iu, const V &q,
+                                         parthenon::ScratchPad2D<Real> &ql_kp1,
+                                         parthenon::ScratchPad2D<Real> &qr_k) const {
     auto &pco = q.GetCoordinates(b);
     for (int n = q.GetLowerBound(b); n <= q.GetUpperBound(b); ++n) {
       parthenon::par_for_inner(
@@ -171,6 +169,31 @@ class Reconstruction<ReconstructionMethod::plm, X3DIR, GEOM> {
             }
           });
     }
+  }
+};
+
+template <>
+struct ReconGradient<ReconstructionMethod::plm> {
+  template <typename V>
+  KOKKOS_INLINE_FUNCTION std::array<Real, 3>
+  operator()(const V &q, const std::array<Real, 3> &dx, const int multi_d,
+             const int three_d, const int b, const int n, const int k, const int j,
+             const int i) const {
+    std::array<Real, 3> dqdx{0.0, 0.0, 0.0};
+    Real wl = Null<Real>(), wr = Null<Real>();
+
+    PLM(q(b, n, k, j, i - 1), q(b, n, k, j, i), q(b, n, k, j, i + 1), wl, wr);
+    dqdx[0] = (wr - wl) / (2.0 * dx[0]);
+
+    wl = Null<Real>(), wr = Null<Real>();
+    PLM(q(b, n, k, j - multi_d, i), q(b, n, k, j, i), q(b, n, k, j + multi_d, i), wl, wr);
+    dqdx[1] = (wr - wl) / (2.0 * dx[1]);
+
+    wl = Null<Real>(), wr = Null<Real>();
+    PLM(q(b, n, k - three_d, j, i), q(b, n, k, j, i), q(b, n, k + three_d, j, i), wl, wr);
+    dqdx[2] = (wr - wl) / (2.0 * dx[2]);
+
+    return dqdx;
   }
 };
 

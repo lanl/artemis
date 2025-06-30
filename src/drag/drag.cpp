@@ -1,5 +1,5 @@
 //========================================================================================
-// (C) (or copyright) 2023-2024. Triad National Security, LLC. All rights reserved.
+// (C) (or copyright) 2023-2025. Triad National Security, LLC. All rights reserved.
 //
 // This program was produced under U.S. Government contract 89233218CNA000001 for Los
 // Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -32,9 +32,6 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   // We damp in the X* (* = 1,2,3) direction between
   //          x*min <= x* <= inner_x*, at the rate inner_x*_rate
   // and   outer_x* <= x* <=    x*max, at the rate outer_x*_rate
-  const Coupling type = ChooseDrag(pin->GetString("drag", "type"));
-  params.Add("type", type);
-
   params.Add("x1min", pin->GetReal("parthenon/mesh", "x1min"));
   params.Add("x2min", pin->GetReal("parthenon/mesh", "x2min"));
   params.Add("x3min", pin->GetReal("parthenon/mesh", "x3min"));
@@ -42,9 +39,13 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("x2max", pin->GetReal("parthenon/mesh", "x2max"));
   params.Add("x3max", pin->GetReal("parthenon/mesh", "x3max"));
 
+  // Coupling type for drag
   const bool do_gas = pin->GetOrAddBoolean("physics", "gas", true);
   const bool do_dust = pin->GetOrAddBoolean("physics", "dust", false);
+  const Coupling type = ChooseDrag(pin->GetString("drag", "type"));
+  params.Add("type", type);
 
+  // Coupling::self
   if (do_gas) {
     if (type == Coupling::self) {
       PARTHENON_REQUIRE(
@@ -74,6 +75,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     params.Add("dust_self_drag", SelfDragParams());
   }
 
+  // Coupling::simple_dust
   if (type == Coupling::simple_dust) {
     PARTHENON_REQUIRE(do_gas && do_dust,
                       "drag type simple_dust requires do_gas = do_dust = true");
@@ -88,24 +90,27 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   return drag;
 }
 
+//----------------------------------------------------------------------------------------
+//! \fn  TaskStatus Drag::DragSource
+//! \brief Calls source terms for drag
 template <Coordinates GEOM>
 TaskStatus DragSource(MeshData<Real> *md, const Real time, const Real dt) {
   using parthenon::MakePackDescriptor;
   auto pm = md->GetParentPointer();
 
+  // Extract artemis parameters
   auto &artemis_pkg = pm->packages.Get("artemis");
   const bool do_gas = artemis_pkg->template Param<bool>("do_gas");
   const bool do_dust = artemis_pkg->template Param<bool>("do_gas");
 
+  // Extract drag parameters
   auto &drag_pkg = pm->packages.Get("drag");
   const Coupling ctype = drag_pkg->template Param<Coupling>("type");
-  // not this contains do_viscosity
-
   const auto gas_self_par = drag_pkg->template Param<SelfDragParams>("gas_self_drag");
   const auto dust_self_par = drag_pkg->template Param<SelfDragParams>("dust_self_drag");
 
+  // Call coupling implementation functions based off of coupling type
   if (ctype == Coupling::self) {
-    // Just self coupling
     if (do_gas && gas_self_par.damp_to_visc) {
       auto &gas_pkg = pm->packages.Get("gas");
       const auto &dp = gas_pkg->template Param<Diffusion::DiffCoeffParams>("visc_params");
@@ -126,7 +131,6 @@ TaskStatus DragSource(MeshData<Real> *md, const Real time, const Real dt) {
           md, time, dt, dp, eos_d, gas_self_par, dust_self_par);
     }
   } else if (ctype == Coupling::simple_dust) {
-    // dust couples to gas
     auto &gas_pkg = pm->packages.Get("gas");
     auto &dust_pkg = pm->packages.Get("dust");
     const auto &eos_d = gas_pkg->template Param<EOS>("eos_d");
@@ -175,13 +179,13 @@ TaskStatus DragSource(MeshData<Real> *md, const Real time, const Real dt) {
 
 //----------------------------------------------------------------------------------------
 //! template instantiations
-typedef Coordinates C;
+typedef Coordinates G;
 typedef MeshData<Real> MD;
-template TaskStatus DragSource<C::cartesian>(MD *md, const Real tt, const Real dt);
-template TaskStatus DragSource<C::cylindrical>(MD *md, const Real tt, const Real dt);
-template TaskStatus DragSource<C::spherical1D>(MD *md, const Real tt, const Real dt);
-template TaskStatus DragSource<C::spherical2D>(MD *md, const Real tt, const Real dt);
-template TaskStatus DragSource<C::spherical3D>(MD *md, const Real tt, const Real dt);
-template TaskStatus DragSource<C::axisymmetric>(MD *md, const Real tt, const Real dt);
+template TaskStatus DragSource<G::cartesian>(MD *md, const Real tt, const Real dt);
+template TaskStatus DragSource<G::cylindrical>(MD *md, const Real tt, const Real dt);
+template TaskStatus DragSource<G::spherical1D>(MD *md, const Real tt, const Real dt);
+template TaskStatus DragSource<G::spherical2D>(MD *md, const Real tt, const Real dt);
+template TaskStatus DragSource<G::spherical3D>(MD *md, const Real tt, const Real dt);
+template TaskStatus DragSource<G::axisymmetric>(MD *md, const Real tt, const Real dt);
 
 } // namespace Drag

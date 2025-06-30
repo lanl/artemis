@@ -1,5 +1,5 @@
 //========================================================================================
-// (C) (or copyright) 2023-2024. Triad National Security, LLC. All rights reserved.
+// (C) (or copyright) 2023-2025. Triad National Security, LLC. All rights reserved.
 //
 // This program was produced under U.S. Government contract 89233218CNA000001 for Los
 // Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -22,6 +22,8 @@
 #include "geometry/geometry.hpp"
 #include "gravity/gravity.hpp"
 #include "nbody/nbody.hpp"
+#include "radiation/moments/moments.hpp"
+#include "radiation/radiation.hpp"
 #include "rotating_frame/rotating_frame.hpp"
 #include "utils/artemis_utils.hpp"
 #include "utils/history.hpp"
@@ -47,6 +49,7 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   // Store selected pgen name
   artemis->AddParam("pgen_name", pin->GetString("artemis", "problem"));
   artemis->AddParam("job_name", pin->GetString("parthenon/job", "problem_id"));
+  artemis->AddParam("integrator", pin->GetString("parthenon/time", "integrator"));
   std::array<int, 3> nx{pin->GetInteger("parthenon/mesh", "nx1"),
                         pin->GetInteger("parthenon/mesh", "nx2"),
                         pin->GetInteger("parthenon/mesh", "nx3")};
@@ -62,6 +65,10 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   artemis->AddParam("units", units);
   artemis->AddParam("constants", constants);
 
+  // Add optionally enrollable operator split Metadata flag
+  parthenon::MetadataFlag MetadataOperatorSplit =
+      parthenon::Metadata::AddUserFlag("OperatorSplit");
+
   // Determine input file specified physics
   const bool do_gas = pin->GetOrAddBoolean("physics", "gas", true);
   const bool do_dust = pin->GetOrAddBoolean("physics", "dust", false);
@@ -74,6 +81,26 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   const bool do_conduction = pin->GetOrAddBoolean("physics", "conduction", false);
   const bool do_radiation = pin->GetOrAddBoolean("physics", "radiation", false);
   const bool do_coagulation = pin->GetOrAddBoolean("physics", "coagulation", false);
+
+  // Determine input file specified algorithms
+  const bool do_imc = do_radiation && pin->DoesBlockExist("radiation/imc");
+  const bool do_moment = do_radiation && pin->DoesBlockExist("radiation/moment");
+  const bool do_shear =
+      do_rotating_frame ? (pin->GetOrAddReal("rotating_frame", "qshear", 0) > 0) : false;
+
+  // Check configuration selection compatibility
+  PARTHENON_REQUIRE(!(do_cooling) || (do_cooling && do_gas),
+                    "Cooling requires the gas package, but there is not gas!");
+  PARTHENON_REQUIRE(!(do_viscosity) || (do_viscosity && do_gas),
+                    "Viscosity requires the gas package, but there is not gas!");
+  PARTHENON_REQUIRE(!(do_conduction) || (do_conduction && do_gas),
+                    "Conduction requires the gas package, but there is not gas!");
+  PARTHENON_REQUIRE(!(do_radiation) || (do_radiation && do_gas),
+                    "Radiation requires the gas package, but there is not gas!");
+  PARTHENON_REQUIRE(!(do_imc && do_moment),
+                    "Cannot simultaneously evolve IMC and moments radiation");
+
+  // Store configuration choices in params
   artemis->AddParam("do_gas", do_gas);
   artemis->AddParam("do_dust", do_dust);
   artemis->AddParam("do_gravity", do_gravity);
@@ -96,6 +123,9 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
                     "Radiation requires the gas package, but there is not gas!");
   PARTHENON_REQUIRE(!(do_coagulation) || (do_coagulation && do_dust),
                     "Coagulation requires the dust package, but there is not dust!");
+  artemis->AddParam("do_imc", do_imc);
+  artemis->AddParam("do_moment", do_moment);
+  artemis->AddParam("do_shear", do_shear);
 
   // Set coordinate system
   const int ndim = ProblemDimension(pin.get());
@@ -117,44 +147,50 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
     packages.Add(Dust::Coagulation::Initialize(pin.get(), dustPars, units, constants));
   }
   if (do_radiation) {
-    auto eos_h = packages.Get("gas")->Param<EOS>("eos_h");
-    auto opacity_h = packages.Get("gas")->Param<Opacity>("opacity_h");
-    auto scattering_h = packages.Get("gas")->Param<Scattering>("scattering_h");
-    packages.Add(jaybenne::Initialize(pin.get(), opacity_h, scattering_h, eos_h));
-    PARTHENON_REQUIRE(coords == Coordinates::cartesian,
-                      "Jaybenne currently supports only Cartesian coordinates!");
+    // Top-level radiation package
+    packages.Add(Radiation::Initialize(pin.get(), constants, do_imc));
+    // Select between Jaybenne IMC or Moments
+    if (do_imc) {
+      auto eos_h = packages.Get("gas")->Param<EOS>("eos_h");
+      auto opacity_h = packages.Get("gas")->Param<MeanOpacity>("opacity_h");
+      auto scattering_h = packages.Get("gas")->Param<MeanScattering>("scattering_h");
+      packages.Add(jaybenne::Initialize(pin.get(), opacity_h, scattering_h, eos_h,
+                                        "radiation/imc"));
+      PARTHENON_REQUIRE(coords == Coordinates::cartesian,
+                        "Jaybenne currently supports only Cartesian coordinates!");
+    } else if (do_moment) {
+      packages.Add(Moments::Initialize(pin.get(), constants));
+    } else {
+      PARTHENON_FAIL("Unknown radiation model!");
+    }
   }
 
   // Assign geometry-specific FillDerived functions
   if (do_gas || do_dust) {
-    typedef Coordinates C;
+    typedef Coordinates G;
     typedef MeshData<Real> MD;
-    if (coords == C::cartesian) {
-      artemis->PreCommFillDerivedMesh = ArtemisDerived::ConsToPrim<C::cartesian>;
-      artemis->PreFillDerivedMesh = ArtemisDerived::PrimToCons<MD, C::cartesian>;
-    } else if (coords == C::spherical1D) {
-      artemis->PreCommFillDerivedMesh = ArtemisDerived::ConsToPrim<C::spherical1D>;
-      artemis->PreFillDerivedMesh = ArtemisDerived::PrimToCons<MD, C::spherical1D>;
-    } else if (coords == C::spherical2D) {
-      artemis->PreCommFillDerivedMesh = ArtemisDerived::ConsToPrim<C::spherical2D>;
-      artemis->PreFillDerivedMesh = ArtemisDerived::PrimToCons<MD, C::spherical2D>;
-    } else if (coords == C::spherical3D) {
-      artemis->PreCommFillDerivedMesh = ArtemisDerived::ConsToPrim<C::spherical3D>;
-      artemis->PreFillDerivedMesh = ArtemisDerived::PrimToCons<MD, C::spherical3D>;
-    } else if (coords == C::cylindrical) {
-      artemis->PreCommFillDerivedMesh = ArtemisDerived::ConsToPrim<C::cylindrical>;
-      artemis->PreFillDerivedMesh = ArtemisDerived::PrimToCons<MD, C::cylindrical>;
-    } else if (coords == C::axisymmetric) {
-      artemis->PreCommFillDerivedMesh = ArtemisDerived::ConsToPrim<C::axisymmetric>;
-      artemis->PreFillDerivedMesh = ArtemisDerived::PrimToCons<MD, C::axisymmetric>;
+    if (coords == G::cartesian) {
+      artemis->PreCommFillDerivedMesh = ArtemisDerived::ConsToPrim<G::cartesian>;
+      artemis->PreFillDerivedMesh = ArtemisDerived::PrimToCons<MD, G::cartesian>;
+    } else if (coords == G::spherical1D) {
+      artemis->PreCommFillDerivedMesh = ArtemisDerived::ConsToPrim<G::spherical1D>;
+      artemis->PreFillDerivedMesh = ArtemisDerived::PrimToCons<MD, G::spherical1D>;
+    } else if (coords == G::spherical2D) {
+      artemis->PreCommFillDerivedMesh = ArtemisDerived::ConsToPrim<G::spherical2D>;
+      artemis->PreFillDerivedMesh = ArtemisDerived::PrimToCons<MD, G::spherical2D>;
+    } else if (coords == G::spherical3D) {
+      artemis->PreCommFillDerivedMesh = ArtemisDerived::ConsToPrim<G::spherical3D>;
+      artemis->PreFillDerivedMesh = ArtemisDerived::PrimToCons<MD, G::spherical3D>;
+    } else if (coords == G::cylindrical) {
+      artemis->PreCommFillDerivedMesh = ArtemisDerived::ConsToPrim<G::cylindrical>;
+      artemis->PreFillDerivedMesh = ArtemisDerived::PrimToCons<MD, G::cylindrical>;
+    } else if (coords == G::axisymmetric) {
+      artemis->PreCommFillDerivedMesh = ArtemisDerived::ConsToPrim<G::axisymmetric>;
+      artemis->PreFillDerivedMesh = ArtemisDerived::PrimToCons<MD, G::axisymmetric>;
     } else {
       PARTHENON_FAIL("Invalid artemis/coordinate system!");
     }
   }
-
-  // Add optionally enrollable operator split Metadata flag
-  parthenon::MetadataFlag MetadataOperatorSplit =
-      parthenon::Metadata::AddUserFlag("OperatorSplit");
 
   // Add in user-defined AMR criterion callback
   const bool amr_user = pin->GetOrAddBoolean("artemis", "amr_user", false);

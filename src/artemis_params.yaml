@@ -33,7 +33,7 @@ artemis:
     cgs:
       _type: opt
       _description: "CGS unit system"
-  unit_specifier:
+  unit_conversion:
     _type: "string"
     _default: "base"
     _description: "How to provide unit conversions between code and physical units"
@@ -59,7 +59,6 @@ artemis:
     _type: "Real"
     _default: "1.0"
     _description: "Physical units value of temperature equal to 1 code unit"
-
 
 physics:
   _description: "Toggle on/off the available physics packages"
@@ -95,6 +94,3 @@ physics:
     _type: "bool"
     _default: "false"
     _description: "Turn on heat conduction in the gas fluid"
-
-
-

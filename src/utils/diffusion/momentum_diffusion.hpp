@@ -1,5 +1,5 @@
 //========================================================================================
-// (C) (or copyright) 2023-2024. Triad National Security, LLC. All rights reserved.
+// (C) (or copyright) 2023-2025. Triad National Security, LLC. All rights reserved.
 //
 // This program was produced under U.S. Government contract 89233218CNA000001 for Los
 // Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -17,6 +17,7 @@
 #include "artemis.hpp"
 #include "diffusion_coeff.hpp"
 #include "geometry/geometry.hpp"
+#include "rotating_frame/rotating_frame.hpp"
 #include "utils/artemis_utils.hpp"
 #include "utils/eos/eos.hpp"
 
@@ -25,13 +26,16 @@ using ArtemisUtils::VI;
 
 namespace Diffusion {
 
+//----------------------------------------------------------------------------------------
+//! \fn void StrainTensorFace
+//! \brief Computes strain rate tensor
 template <Coordinates GEOM, Fluid FLUID_TYPE, parthenon::CoordinateDirection XDIR,
           typename SparsePack>
 KOKKOS_INLINE_FUNCTION void
 StrainTensorFace(parthenon::team_mbr_t const &member, const int b, const int n,
-                 const int k, const int j, const int il, const int iu, const int multid,
-                 const int threed, const SparsePack &vprim,
-                 const parthenon::ScratchPad2D<Real> &flx) {
+                 const int k, const int j, const int il, const int iu, const int multi_d,
+                 const int three_d, const Real qshear, const Real om0,
+                 const SparsePack &vprim, const parthenon::ScratchPad2D<Real> &flx) {
   // Fill the flx array with the strain tensor on the specified face
   //
   //
@@ -69,9 +73,10 @@ StrainTensorFace(parthenon::team_mbr_t const &member, const int b, const int n,
     //  T_j^i = dv^i/dxj + hj^2/hi^2 dv^j/dxi  + v^k dhi/dxk / hi \delta_j^i
     const auto &xv = coords.GetCellCenter();
     const auto &hx = coords.GetScaleFactors();
-    const Real v[3] = {vprim(b, gas::prim::velocity(VI(n, 0)), k, j, i) / hx[0],
-                       vprim(b, gas::prim::velocity(VI(n, 1)), k, j, i) / hx[1],
-                       vprim(b, gas::prim::velocity(VI(n, 2)), k, j, i) / hx[2]};
+
+    const std::array<Real, 3> v{vprim(b, gas::prim::velocity(VI(n, 0)), k, j, i) / hx[0],
+                                vprim(b, gas::prim::velocity(VI(n, 1)), k, j, i) / hx[1],
+                                vprim(b, gas::prim::velocity(VI(n, 2)), k, j, i) / hx[2]};
     auto xf = NewArray<Real, 3>();
     if constexpr (XDIR == X1DIR) {
       xf = coords.FaceCenX1(geometry::CellFace::lower);
@@ -80,8 +85,9 @@ StrainTensorFace(parthenon::team_mbr_t const &member, const int b, const int n,
     } else if constexpr (XDIR == X3DIR) {
       xf = coords.FaceCenX3(geometry::CellFace::lower);
     }
-    Real hxf[3] = {coords.hx1(xf[0], xf[1], xf[2]), coords.hx2(xf[0], xf[1], xf[2]),
-                   coords.hx3(xf[0], xf[1], xf[2])};
+    const std::array<Real, 3> hxf{coords.hx1(xf[0], xf[1], xf[2]),
+                                  coords.hx2(xf[0], xf[1], xf[2]),
+                                  coords.hx3(xf[0], xf[1], xf[2])};
 
     if constexpr (XDIR == X1DIR) {
       // T_*^1  flx = { T_1^1 , T_2^1 , T_3^1 }
@@ -91,15 +97,15 @@ StrainTensorFace(parthenon::team_mbr_t const &member, const int b, const int n,
       //      zm , zp, xmzm, xmzp
 
       geometry::Coords<GEOM> coords_xm(pco, k, j, i - 1);
-      geometry::Coords<GEOM> coords_xmym(pco, k, j - multid, i - 1);
-      geometry::Coords<GEOM> coords_xmyp(pco, k, j + multid, i - 1);
-      geometry::Coords<GEOM> coords_ym(pco, k, j - multid, i);
-      geometry::Coords<GEOM> coords_yp(pco, k, j + multid, i);
+      geometry::Coords<GEOM> coords_xmym(pco, k, j - multi_d, i - 1);
+      geometry::Coords<GEOM> coords_xmyp(pco, k, j + multi_d, i - 1);
+      geometry::Coords<GEOM> coords_ym(pco, k, j - multi_d, i);
+      geometry::Coords<GEOM> coords_yp(pco, k, j + multi_d, i);
 
-      geometry::Coords<GEOM> coords_xmzm(pco, k - threed, j, i - 1);
-      geometry::Coords<GEOM> coords_xmzp(pco, k + threed, j, i - 1);
-      geometry::Coords<GEOM> coords_zm(pco, k - threed, j, i);
-      geometry::Coords<GEOM> coords_zp(pco, k + threed, j, i);
+      geometry::Coords<GEOM> coords_xmzm(pco, k - three_d, j, i - 1);
+      geometry::Coords<GEOM> coords_xmzp(pco, k + three_d, j, i - 1);
+      geometry::Coords<GEOM> coords_zm(pco, k - three_d, j, i);
+      geometry::Coords<GEOM> coords_zp(pco, k + three_d, j, i);
 
       const auto &xv_xm = coords_xm.GetCellCenter();
 
@@ -125,11 +131,11 @@ StrainTensorFace(parthenon::team_mbr_t const &member, const int b, const int n,
       const auto &hx_xmzm = coords_xmzm.GetScaleFactors();
       const auto &hx_xmzp = coords_xmzp.GetScaleFactors();
 
-      const Real dx1 = coords.Distance(xv, xv_xm);
-      const Real dx2 = multid ? coords.Distance(xv_ym, xv_yp) : Fuzz<Real>();
-      const Real dx2_xm = multid ? coords.Distance(xv_xmym, xv_xmyp) : Fuzz<Real>();
-      const Real dx3 = threed ? coords.Distance(xv_zm, xv_zp) : Fuzz<Real>();
-      const Real dx3_xm = threed ? coords.Distance(xv_xmzm, xv_xmzp) : Fuzz<Real>();
+      const Real dx1 = xv[0] - xv_xm[0];
+      const Real dx2 = multi_d ? (xv_yp[1] - xv_ym[1]) : Fuzz<Real>();
+      const Real dx2_xm = multi_d ? (xv_xmyp[1] - xv_xmym[1]) : Fuzz<Real>();
+      const Real dx3 = three_d ? (xv_zp[2] - xv_zm[2]) : Fuzz<Real>();
+      const Real dx3_xm = three_d ? (xv_xmzp[2] - xv_xmzm[2]) : Fuzz<Real>();
 
       // T_1^1  = 2 dv^1/dx1 +  v^k dh1/xk / h1
       const Real dv1 =
@@ -154,14 +160,14 @@ StrainTensorFace(parthenon::team_mbr_t const &member, const int b, const int n,
           v[1] - vprim(b, gas::prim::velocity(VI(n, 1)), k, j, i - 1) / hx_xm[1];
 
       const Real dv12 =
-          vprim(b, gas::prim::velocity(VI(n, 0)), k, j + multid, i) / hx_yp[0] -
-          vprim(b, gas::prim::velocity(VI(n, 0)), k, j - multid, i) / hx_ym[0];
+          vprim(b, gas::prim::velocity(VI(n, 0)), k, j + multi_d, i) / hx_yp[0] -
+          vprim(b, gas::prim::velocity(VI(n, 0)), k, j - multi_d, i) / hx_ym[0];
 
       const Real dv12_xm =
-          vprim(b, gas::prim::velocity(VI(n, 0)), k, j + multid, i - 1) / hx_xmyp[0] -
-          vprim(b, gas::prim::velocity(VI(n, 0)), k, j - multid, i - 1) / hx_xmym[0];
+          vprim(b, gas::prim::velocity(VI(n, 0)), k, j + multi_d, i - 1) / hx_xmyp[0] -
+          vprim(b, gas::prim::velocity(VI(n, 0)), k, j - multi_d, i - 1) / hx_xmym[0];
 
-      flx(1, i) = multid * 0.5 * (dv12 / dx2 + dv12_xm / dx2_xm) +
+      flx(1, i) = multi_d * 0.5 * (dv12 / dx2 + dv12_xm / dx2_xm) +
                   SQR(hxf[1] / hxf[0]) * dv2 / dx1;
 
       // T_3^1  = dv^1/dx3 +  h3^2/h1^2 dv^3/dx1
@@ -169,14 +175,14 @@ StrainTensorFace(parthenon::team_mbr_t const &member, const int b, const int n,
           v[2] - vprim(b, gas::prim::velocity(VI(n, 2)), k, j, i - 1) / hx_xm[2];
 
       const Real dv13 =
-          vprim(b, gas::prim::velocity(VI(n, 0)), k + threed, j, i) / hx_zp[0] -
-          vprim(b, gas::prim::velocity(VI(n, 0)), k - threed, j, i) / hx_zm[0];
+          vprim(b, gas::prim::velocity(VI(n, 0)), k + three_d, j, i) / hx_zp[0] -
+          vprim(b, gas::prim::velocity(VI(n, 0)), k - three_d, j, i) / hx_zm[0];
 
       const Real dv13_xm =
-          vprim(b, gas::prim::velocity(VI(n, 0)), k + threed, j, i - 1) / hx_xmzp[0] -
-          vprim(b, gas::prim::velocity(VI(n, 0)), k - threed, j, i - 1) / hx_xmzm[0];
+          vprim(b, gas::prim::velocity(VI(n, 0)), k + three_d, j, i - 1) / hx_xmzp[0] -
+          vprim(b, gas::prim::velocity(VI(n, 0)), k - three_d, j, i - 1) / hx_xmzm[0];
 
-      flx(2, i) = threed * 0.5 * (dv13 / dx3 + dv13_xm / dx3_xm) +
+      flx(2, i) = three_d * 0.5 * (dv13 / dx3 + dv13_xm / dx3_xm) +
                   SQR(hxf[2] / hxf[0]) * dv3 / dx1;
 
     } else if constexpr (XDIR == X2DIR) {
@@ -193,10 +199,10 @@ StrainTensorFace(parthenon::team_mbr_t const &member, const int b, const int n,
 
       geometry::Coords<GEOM> coords_ym(pco, k, j - 1, i);
 
-      geometry::Coords<GEOM> coords_zp(pco, k + threed, j, i);
-      geometry::Coords<GEOM> coords_zm(pco, k - threed, j, i);
-      geometry::Coords<GEOM> coords_ymzp(pco, k + threed, j - 1, i);
-      geometry::Coords<GEOM> coords_ymzm(pco, k - threed, j - 1, i);
+      geometry::Coords<GEOM> coords_zp(pco, k + three_d, j, i);
+      geometry::Coords<GEOM> coords_zm(pco, k - three_d, j, i);
+      geometry::Coords<GEOM> coords_ymzp(pco, k + three_d, j - 1, i);
+      geometry::Coords<GEOM> coords_ymzm(pco, k - three_d, j - 1, i);
 
       const auto &xv_xm = coords_xm.GetCellCenter();
       const auto &xv_xp = coords_xp.GetCellCenter();
@@ -222,11 +228,11 @@ StrainTensorFace(parthenon::team_mbr_t const &member, const int b, const int n,
       const auto &hx_ymzm = coords_ymzm.GetScaleFactors();
       const auto &hx_ymzp = coords_ymzp.GetScaleFactors();
 
-      const Real dx1 = coords.Distance(xv_xm, xv_xp);
-      const Real dx1_ym = coords.Distance(xv_xmym, xv_xpym);
-      const Real dx2 = coords.Distance(xv, xv_ym);
-      const Real dx3 = threed ? coords.Distance(xv_zm, xv_zp) : Fuzz<Real>();
-      const Real dx3_ym = threed ? coords.Distance(xv_ymzm, xv_ymzp) : Fuzz<Real>();
+      const Real dx1 = xv_xp[0] - xv_xm[0];
+      const Real dx1_ym = xv_xpym[0] - xv_xmym[0];
+      const Real dx2 = xv[1] - xv_ym[1];
+      const Real dx3 = three_d ? (xv_zp[2] - xv_zm[2]) : Fuzz<Real>();
+      const Real dx3_ym = three_d ? (xv_ymzp[2] - xv_ymzm[2]) : Fuzz<Real>();
 
       // T_1^2 = dv^2/dx1 + h1^2/h2^2 dv^1/dx2
 
@@ -268,14 +274,14 @@ StrainTensorFace(parthenon::team_mbr_t const &member, const int b, const int n,
           v[2] - vprim(b, gas::prim::velocity(VI(n, 2)), k, j - 1, i) / hx_ym[2];
 
       const Real dv23 =
-          vprim(b, gas::prim::velocity(VI(n, 1)), k + threed, j, i) / hx_zp[1] -
-          vprim(b, gas::prim::velocity(VI(n, 1)), k - threed, j, i) / hx_zm[1];
+          vprim(b, gas::prim::velocity(VI(n, 1)), k + three_d, j, i) / hx_zp[1] -
+          vprim(b, gas::prim::velocity(VI(n, 1)), k - three_d, j, i) / hx_zm[1];
 
       const Real dv23_ym =
-          vprim(b, gas::prim::velocity(VI(n, 1)), k + threed, j - 1, i) / hx_ymzp[1] -
-          vprim(b, gas::prim::velocity(VI(n, 1)), k - threed, j - 1, i) / hx_ymzm[1];
+          vprim(b, gas::prim::velocity(VI(n, 1)), k + three_d, j - 1, i) / hx_ymzp[1] -
+          vprim(b, gas::prim::velocity(VI(n, 1)), k - three_d, j - 1, i) / hx_ymzm[1];
 
-      flx(2, i) = threed * 0.5 * (dv23 / dx3 + dv23_ym / dx3_ym) +
+      flx(2, i) = three_d * 0.5 * (dv23 / dx3 + dv23_ym / dx3_ym) +
                   SQR(hxf[2] / hxf[1]) * dv3 / dx2;
 
     } else if constexpr (XDIR == X3DIR) {
@@ -317,11 +323,11 @@ StrainTensorFace(parthenon::team_mbr_t const &member, const int b, const int n,
 
       const auto &hx_zm = coords_zm.GetScaleFactors();
 
-      const Real dx1 = coords.Distance(xv_xm, xv_xp);
-      const Real dx1_zm = coords.Distance(xv_xmzm, xv_xpzm);
-      const Real dx2 = coords.Distance(xv_ym, xv_yp);
-      const Real dx2_zm = coords.Distance(xv_ymzm, xv_ypzm);
-      const Real dx3 = coords.Distance(xv, xv_zm);
+      const Real dx1 = xv_xp[0] - xv_xm[0];
+      const Real dx1_zm = xv_xpzm[0] - xv_xmzm[0];
+      const Real dx2 = xv_yp[1] - xv_ym[1];
+      const Real dx2_zm = xv_ypzm[1] - xv_ymzm[1];
+      const Real dx3 = xv[2] - xv_zm[2];
 
       // T_1^3 = dv^3/dx1 + h1^2/h3^2 dv^1/dx3
 
@@ -371,15 +377,25 @@ StrainTensorFace(parthenon::team_mbr_t const &member, const int b, const int n,
 
       flx(2, i) = 2 * dv3 / dx3 + 0.5 * (src + src_zm);
     }
+
+    // Add any strain rate due to the background shear velocity.
+    // Uses the analytic expression at the face center
+    const auto Eb = RotatingFrame::StrainRate<GEOM, XDIR>(qshear, om0, xf);
+    flx(0, i) += Eb[0];
+    flx(1, i) += Eb[1];
+    flx(2, i) += Eb[2];
   });
 }
 
+//----------------------------------------------------------------------------------------
+//! \fn void StressTensorFaceX1
+//! \brief Stress Ttensor X1-Face
 template <Coordinates GEOM, Fluid FLUID_TYPE, typename SparsePackPrim,
           typename SparsePackFlux>
 KOKKOS_INLINE_FUNCTION void StressTensorFaceX1(
     DiffCoeffParams dp, parthenon::team_mbr_t const &member, const int b, const int n,
-    const int k, const int j, const int il, const int iu, const int multid,
-    const int threed, const int nspecies, const SparsePackPrim &p,
+    const int k, const int j, const int il, const int iu, const int multi_d,
+    const int three_d, const int nspecies, const SparsePackPrim &p,
     const SparsePackFlux &qf, const parthenon::ScratchPad1D<Real> &divu,
     const parthenon::ScratchPad1D<Real> &mu, const parthenon::ScratchPad2D<Real> &flx) {
   // Fill the flx array with the stress tensor on the specified face
@@ -431,12 +447,15 @@ KOKKOS_INLINE_FUNCTION void StressTensorFaceX1(
   });
 }
 
+//----------------------------------------------------------------------------------------
+//! \fn void StressTensorFaceX2
+//! \brief Stress Ttensor X2-Face
 template <Coordinates GEOM, Fluid FLUID_TYPE, typename SparsePackPrim,
           typename SparsePackFlux>
 KOKKOS_INLINE_FUNCTION void StressTensorFaceX2(
     DiffCoeffParams dp, parthenon::team_mbr_t const &member, const int b, const int n,
-    const int k, const int j, const int il, const int iu, const int multid,
-    const int threed, const int nspecies, const SparsePackPrim &p,
+    const int k, const int j, const int il, const int iu, const int multi_d,
+    const int three_d, const int nspecies, const SparsePackPrim &p,
     const SparsePackFlux &qf, const parthenon::ScratchPad1D<Real> &divu_jm1,
     const parthenon::ScratchPad1D<Real> &divu,
     const parthenon::ScratchPad1D<Real> &mu_jm1, const parthenon::ScratchPad1D<Real> &mu,
@@ -490,12 +509,15 @@ KOKKOS_INLINE_FUNCTION void StressTensorFaceX2(
   });
 }
 
+//----------------------------------------------------------------------------------------
+//! \fn void StressTensorFaceX3
+//! \brief Stress Ttensor X3-Face
 template <Coordinates GEOM, Fluid FLUID_TYPE, typename SparsePackPrim,
           typename SparsePackFlux>
 KOKKOS_INLINE_FUNCTION void StressTensorFaceX3(
     DiffCoeffParams dp, parthenon::team_mbr_t const &member, const int b, const int n,
-    const int k, const int j, const int il, const int iu, const int multid,
-    const int threed, const int nspecies, const SparsePackPrim &p,
+    const int k, const int j, const int il, const int iu, const int multi_d,
+    const int three_d, const int nspecies, const SparsePackPrim &p,
     const SparsePackFlux &qf, const parthenon::ScratchPad1D<Real> &divu_km1,
     const parthenon::ScratchPad1D<Real> &divu,
     const parthenon::ScratchPad1D<Real> &mu_km1, const parthenon::ScratchPad1D<Real> &mu,
@@ -549,11 +571,14 @@ KOKKOS_INLINE_FUNCTION void StressTensorFaceX3(
   });
 }
 
+//----------------------------------------------------------------------------------------
+//! \fn void VelocityDivergence
+//! \brief Computes velocity divergence
 template <Coordinates GEOM, Fluid FLUID_TYPE, typename SparsePackPrim>
 KOKKOS_INLINE_FUNCTION void
 VelocityDivergence(parthenon::team_mbr_t const &member, const int b, const int n,
-                   const int k, const int j, const int il, const int iu, const int multid,
-                   const int threed, const SparsePackPrim &q,
+                   const int k, const int j, const int il, const int iu,
+                   const int multi_d, const int three_d, const SparsePackPrim &q,
                    const parthenon::ScratchPad1D<Real> &divu) {
   // Fill the flx array with the stress tensor on the specified face
 
@@ -565,29 +590,32 @@ VelocityDivergence(parthenon::team_mbr_t const &member, const int b, const int n
 
     const Real vol = coords.Volume();
     const auto area_x1 = coords.GetFaceAreaX1();
-    const auto area_x2 = (multid) ? coords.GetFaceAreaX2() : NewArray<Real, 2>(0.0);
-    const auto area_x3 = (threed) ? coords.GetFaceAreaX3() : NewArray<Real, 2>(0.0);
+    const auto area_x2 = (multi_d) ? coords.GetFaceAreaX2() : NewArray<Real, 2>(0.0);
+    const auto area_x3 = (three_d) ? coords.GetFaceAreaX3() : NewArray<Real, 2>(0.0);
 
     const Real divv = area_x1[1] * (q(b, gas::prim::velocity(3 * n + 0), k, j, i) +
                                     q(b, gas::prim::velocity(3 * n + 0), k, j, i + 1)) -
                       area_x1[0] * (q(b, gas::prim::velocity(3 * n + 0), k, j, i) +
                                     q(b, gas::prim::velocity(3 * n + 0), k, j, i - 1)) +
-                      multid * area_x2[1] *
+                      multi_d * area_x2[1] *
                           (q(b, gas::prim::velocity(3 * n + 1), k, j, i) +
-                           q(b, gas::prim::velocity(3 * n + 1), k, j + multid, i)) -
-                      multid * area_x2[0] *
+                           q(b, gas::prim::velocity(3 * n + 1), k, j + multi_d, i)) -
+                      multi_d * area_x2[0] *
                           (q(b, gas::prim::velocity(3 * n + 1), k, j, i) +
-                           q(b, gas::prim::velocity(3 * n + 1), k, j - multid, i)) +
-                      threed * area_x3[1] *
+                           q(b, gas::prim::velocity(3 * n + 1), k, j - multi_d, i)) +
+                      three_d * area_x3[1] *
                           (q(b, gas::prim::velocity(3 * n + 2), k, j, i) +
-                           q(b, gas::prim::velocity(3 * n + 2), k + threed, j, i)) -
-                      threed * area_x3[0] *
+                           q(b, gas::prim::velocity(3 * n + 2), k + three_d, j, i)) -
+                      three_d * area_x3[0] *
                           (q(b, gas::prim::velocity(3 * n + 2), k, j, i) +
-                           q(b, gas::prim::velocity(3 * n + 2), k - threed, j, i));
+                           q(b, gas::prim::velocity(3 * n + 2), k - three_d, j, i));
     divu(i) = divv / (2.0 * vol);
   });
 }
 
+//----------------------------------------------------------------------------------------
+//! \fn TaskStatus MomentumFluxImpl
+//! \brief Implementation for momentum flux calculation
 template <Coordinates GEOM, Fluid FLUID_TYPE, DiffType DIFF, typename PKG,
           typename SparsePackPrim, typename SparsePackFlux>
 TaskStatus MomentumFluxImpl(MeshData<Real> *md, DiffCoeffParams dp, PKG &pkg,
@@ -598,6 +626,14 @@ TaskStatus MomentumFluxImpl(MeshData<Real> *md, DiffCoeffParams dp, PKG &pkg,
 
   auto pm = md->GetParentPointer();
   auto eos_d = pkg->template Param<EOS>("eos_d");
+
+  Real qshear = 0.0, om0 = 0.0;
+  const bool do_shear = pm->packages.Get("artemis")->template Param<bool>("do_shear");
+  if (do_shear) {
+    auto &rframe_pkg = pm->packages.Get("rotating_frame");
+    qshear = rframe_pkg->template Param<Real>("qshear");
+    om0 = rframe_pkg->template Param<Real>("omega");
+  }
 
   const int scr_level = pkg->template Param<int>("scr_level");
 
@@ -628,7 +664,7 @@ TaskStatus MomentumFluxImpl(MeshData<Real> *md, DiffCoeffParams dp, PKG &pkg,
 
           // 1. Compute the strain tensor at i-1/2
           StrainTensorFace<GEOM, FLUID_TYPE, X1DIR>(mbr, b, n, k, j, il, iu, multi_d,
-                                                    three_d, vprim, flx);
+                                                    three_d, qshear, om0, vprim, flx);
 
           // 2. Compute div(u) on this pencil
           VelocityDivergence<GEOM, FLUID_TYPE>(mbr, b, n, k, j, il - 1, iu, multi_d,
@@ -679,7 +715,7 @@ TaskStatus MomentumFluxImpl(MeshData<Real> *md, DiffCoeffParams dp, PKG &pkg,
               }
               // 1. Compute the momentum fluxes at j+1/2
               StrainTensorFace<GEOM, FLUID_TYPE, X2DIR>(mbr, b, n, k, j, il, iu, multi_d,
-                                                        three_d, vprim, flx);
+                                                        three_d, qshear, om0, vprim, flx);
               // 2. Compute div(u) on this pencil
               VelocityDivergence<GEOM, FLUID_TYPE>(mbr, b, n, k, j, il, iu, multi_d,
                                                    three_d, vprim, divu_jm1);
@@ -732,7 +768,7 @@ TaskStatus MomentumFluxImpl(MeshData<Real> *md, DiffCoeffParams dp, PKG &pkg,
               }
               // 1. Compute the momentum fluxes at k-1/2
               StrainTensorFace<GEOM, FLUID_TYPE, X3DIR>(mbr, b, n, k, j, il, iu, multi_d,
-                                                        three_d, vprim, flx);
+                                                        three_d, qshear, om0, vprim, flx);
               // 2. Compute div(u) on this pencil
               VelocityDivergence<GEOM, FLUID_TYPE>(mbr, b, n, k, j, il, iu, multi_d,
                                                    three_d, vprim, divu_km1);

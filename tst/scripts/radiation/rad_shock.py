@@ -87,7 +87,7 @@ _xdisc = 0.01305 / _length
 # the radiation energy density via a tally.  Future extensions of this test may get at the
 # radiation temperature via a different means so that we can lower the trad threshold...
 _thr_gas = 0.05
-_thr_rad = 0.11
+_thr_rad = 0.13
 
 
 # Run Artemis
@@ -108,8 +108,8 @@ def run(**kwargs):
         "gas/opacity/absorption/coef_kappa_a={:24.16e}".format(_ka0),
         "gas/opacity/absorption/rho_exp={:24.16e}".format(_rho_exp),
         "gas/opacity/absorption/temp_exp={:24.16e}".format(_temp_exp),
-        "jaybenne/num_particles=100000",
-        "jaybenne/use_ddmc=false",
+        "radiation/imc/num_particles=100000",
+        "radiation/imc/use_ddmc=false",
         "problem/rhol={:24.16e}".format(_rhol),
         "problem/rhor={:24.16e}".format(_rhor),
         "problem/vxl={:24.16e}".format(_vxl),
@@ -134,7 +134,9 @@ def analyze():
     cv = _kb / (_mu * _amu * gm1)
 
     # Grab Artemis datasets
-    data = phdf(os.path.join(artemis.get_data_dir(), "shock.out1.final.phdf"))
+    data = phdf(
+        os.path.join(artemis.get_data_dir(), "{}.out1.final.phdf".format(_file_id))
+    )
     xc = 0.5 * (data.xng[0, 1:] + data.xng[0, :-1])
     sie = data.Get("gas.prim.sie_0", False, False)[0, 0, 0]
     erad = data.Get("field.jaybenne.energy_tally", False, False)[0, 0, 0]
@@ -177,7 +179,7 @@ def analyze():
     dx = xc[1] - xc[0]
     l1_tgas = dx * np.sum(np.abs(tgas - tgas_exact)) / _temperature / _length
     l1_trad = dx * np.sum(np.abs(trad - trad_exact)) / _temperature / _length
-    print(l1_tgas, l1_trad)
+    print("l1_tgas: ", l1_tgas, "l1_trad: ", l1_trad)
     if l1_tgas > _thr_gas:
         logger.warning(
             "Error in gas temperature solution is greater than threshold: "

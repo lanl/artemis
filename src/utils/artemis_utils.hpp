@@ -1,5 +1,5 @@
 //========================================================================================
-// (C) (or copyright) 2023-2024. Triad National Security, LLC. All rights reserved.
+// (C) (or copyright) 2023-2025. Triad National Security, LLC. All rights reserved.
 //
 // This program was produced under U.S. Government contract 89233218CNA000001 for Los
 // Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -19,6 +19,8 @@
 #include "utils/refinement/restriction.hpp"
 
 namespace ArtemisUtils {
+
+ReconstructionMethod ChooseReconMethod(std::string recon);
 //----------------------------------------------------------------------------------------
 //! \fn int ArtemisUtils::VI
 //! \brief Returns vector index associated with species n for vector element
@@ -34,47 +36,49 @@ KOKKOS_FORCEINLINE_FUNCTION Real VDot(const V1 &a, const V2 &b) {
 }
 
 //----------------------------------------------------------------------------------------
-//! \fn Real ArtemisUtils::GetSpecificInternalEnergy(vmesh, const int b, const int n,
+//! \fn Real ArtemisUtils::DualEnergySIE(vmesh, const int b, const int n,
 //!              const int k, const int j, const int i, const Real de_switch,
 //!              const Real dflr, const Real sieflr, const Real hx[3])
 //! \brief Returns appropriate specific internal energy variable based on de_switch
 template <typename T>
-KOKKOS_FORCEINLINE_FUNCTION Real
-GetSpecificInternalEnergy(T &vmesh, const int b, const int n, const int k, const int j,
-                          const int i, const Real de_switch, const Real dflr,
-                          const Real sieflr, const std::array<Real, 3> &hx) {
+KOKKOS_FORCEINLINE_FUNCTION Real DualEnergySIE(T &vmesh, const int b, const int n,
+                                               const int k, const int j, const int i,
+                                               const Real de_switch, const Real dflr,
+                                               const Real sieflr,
+                                               const std::array<Real, 3> &hx) {
   // Calculate kinetic energy
   const Real u_d = std::max(vmesh(b, gas::cons::density(n), k, j, i), dflr);
+  const Real invd = 1.0 / u_d;
   const Real &rv1 = vmesh(b, gas::cons::momentum(VI(n, 0)), k, j, i) / hx[0];
   const Real &rv2 = vmesh(b, gas::cons::momentum(VI(n, 1)), k, j, i) / hx[1];
   const Real &rv3 = vmesh(b, gas::cons::momentum(VI(n, 2)), k, j, i) / hx[2];
-  const Real ke = 0.5 * (SQR(rv1) + SQR(rv2) + SQR(rv3)) / u_d;
+  const Real ke = 0.5 * invd * (SQR(rv1) + SQR(rv2) + SQR(rv3));
 
-  // Calculate conserved representation of
-  // internal energy
-  const Real e_cons = vmesh(b, gas::cons::total_energy(n), k, j, i);
-  const Real ue_cons = e_cons - ke;
-  const Real sie = (ue_cons > de_switch * e_cons)
-                       ? ue_cons / u_d
-                       : vmesh(b, gas::cons::internal_energy(n), k, j, i) / u_d;
+  // Calculate conserved representation of internal energy
+  const Real u_e = vmesh(b, gas::cons::total_energy(n), k, j, i);
+  const Real ut_sie = invd * (u_e - ke);
+  const bool dual_switch = (ut_sie > invd * de_switch * u_e);
+  const Real uu_sie = invd * vmesh(b, gas::cons::internal_energy(n), k, j, i);
+  const Real sie = (dual_switch)*ut_sie + (!dual_switch) * uu_sie;
 
   return std::max(sie, sieflr);
 }
 
 //----------------------------------------------------------------------------------------
-//! \fn Real ArtemisUtils::GetSpecificInternalEnergy(vmesh, const int b, const int n,
+//! \fn Real ArtemisUtils::DualEnergySIE(vmesh, const int b, const int n,
 //!              const int k, const int j, const int i, const Real de_switch,
 //!              const Real dflr, const Real sieflr)
 //! \brief Returns appropriate specific internal energy variable based on de_switch
 template <Coordinates GEOM, typename T>
-KOKKOS_FORCEINLINE_FUNCTION Real GetSpecificInternalEnergy(
-    T &vmesh, const int b, const int n, const int k, const int j, const int i,
-    const Real de_switch, const Real dflr, const Real sieflr) {
+KOKKOS_FORCEINLINE_FUNCTION Real DualEnergySIE(T &vmesh, const int b, const int n,
+                                               const int k, const int j, const int i,
+                                               const Real de_switch, const Real dflr,
+                                               const Real sieflr) {
   // Get scale factors
   geometry::Coords<GEOM> coords(vmesh.GetCoordinates(b), k, j, i);
   const auto &hx = coords.GetScaleFactors();
 
-  return GetSpecificInternalEnergy(vmesh, b, n, k, j, i, de_switch, dflr, sieflr, hx);
+  return DualEnergySIE(vmesh, b, n, k, j, i, de_switch, dflr, sieflr, hx);
 }
 
 //----------------------------------------------------------------------------------------
@@ -139,6 +143,8 @@ struct array_type {
   }
 };
 
+//----------------------------------------------------------------------------------------
+//! struct for special summation ops for arrays in e.g., linear wave regression
 template <class T, class Space, int N>
 struct SumMyArray {
  public:
@@ -213,6 +219,57 @@ inline void par_for_outer(OuterLoopPatternTeams, const std::string &name,
         j += jl;
         function(team_member, n, k, j, i);
       });
+}
+
+//----------------------------------------------------------------------------------------
+//! \fn  std::vector<std::vector<Real>> NBody::loadtxt
+//! \brief Cuts a 2D rectangle with the given plane
+//!        The volume is computed using the divergence theorem, V = \int div(x) dV
+KOKKOS_INLINE_FUNCTION
+Real CutCell2D(const std::array<Real, 4> &x, const std::array<Real, 4> &y,
+               const std::array<Real, 2> &xc, const std::array<Real, 2> &nx) {
+  // Cuts a 2D rectangle with the given plane
+  // The volume is computed using the divergence theorem, V = \int div(x) dV
+
+  auto plane_distance = [&xc, &nx](const Real px, const Real py) {
+    return nx[0] * (px - xc[0]) + nx[1] * (py - xc[1]);
+  };
+  const Real x0 = x[0];
+  const Real y0 = y[0];
+  auto contrib = [&x0, &y0](const Real xi, const Real yi, const Real xj, const Real yj) {
+    return 0.5 * ((xi - x0) * (yj - y0) - (xj - x0) * (yi - y0));
+  };
+  Real vol_inside = 0.0;
+  Real vol = 0.0;
+
+  // Loop through the edges of the quad
+  for (int i = 0; i < 4; i++) {
+    const int j = (i + 1) % 4;
+    vol += contrib(x[i], y[i], x[j], y[j]);
+
+    // distance to the plane
+    const Real di = plane_distance(x[i], y[i]);
+    const Real dj = plane_distance(x[j], y[j]);
+
+    // are we removing the point
+    const int clipi = (di < 0.0);
+    const int clipj = (dj < 0.0);
+
+    // intersection point
+    const Real xp =
+        (std::abs(di) * x[j] + std::abs(dj) * x[i]) / (std::abs(di) + std::abs(dj));
+    const Real yp =
+        (std::abs(di) * y[j] + std::abs(dj) * y[i]) / (std::abs(di) + std::abs(dj));
+
+    const Real x1 = (clipi) ? xp : x[i];
+    const Real y1 = (clipi) ? yp : y[i];
+    const Real x2 = (clipj) ? xp : x[j];
+    const Real y2 = (clipj) ? yp : y[j];
+
+    vol_inside += ((clipi + clipj) <= 1) * contrib(x1, y1, x2, y2);
+  }
+  return vol_inside / vol;
+>>>>>>> origin/develop
 }
 
 } // namespace ArtemisUtils

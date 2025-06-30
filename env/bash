@@ -21,7 +21,7 @@ export MAKE_PROGRAM=${MAKE_PROGRAM:-make}
 
 #  Identify partitions based on  SLURM_JOB_PARTITION and HOSTNAME variables
 PARTITION="unknown"
-if [[ $HOSTNAME == ch-fe*  ||  $SLURM_CLUSTER_NAME == "chicoma" ]]; then
+if [[ $HOSTNAME == ch-fe*  ||  $CLUSTER == "chicoma" ]]; then
     if [[ $SLURM_JOB_PARTITION == *gpu* ]]; then
         PARTITION="chicoma-gpu"
     else
@@ -33,6 +33,8 @@ elif [[ "$HOST" =~ ^ve-rfe[1-7]$ || "$HOST" =~ ^ve-fe[1-7]$ ]]; then
     elif [[ $SLURM_GPUS_ON_NODE == 0 || ("$HOST" =~ ^ve-rfe[4-7]$ || "$HOST" =~ ^ve-fe[4-7]$) ]]; then
         PARTITION="venado-gg"
     fi
+elif [[ $LMOD_SYSTEM_NAME == frontier ]]; then
+    PARTITION="frontier-gpu"	
 else # Catch-all for Darwin
     if [[ $HOSTNAME == darwin-fe* ]]; then
         echo "Currently on darwin frontend node; formatting is supported but not compilation"
@@ -78,9 +80,23 @@ elif [[ $PARTITION == "chicoma-cpu" ]]; then
     module swap PrgEnv-cray PrgEnv-gnu
     module load cray-hdf5-parallel
     module load cray-python/3.11.5
+    module load gcc-native/12.3
+    module load cray-mpich/8.1.28.1
     source /usr/projects/jovian/dependencies/python/chicoma-cpu/bin/activate
     module load cmake
     export ARTEMIS_SUITE=chicoma-cpu
+    echo "...setup SUCCEEDED"
+elif [[ $PARTITION == "frontier-gpu" ]]; then
+    module load PrgEnv-amd
+    module load craype-accel-amd-gfx90a
+    module load cray-hdf5-parallel
+    export MPICH_GPU_SUPPORT_ENABLED=1
+    export MPICH_GPU_MANAGED_MEMORY_SUPPORT_ENABLED=1
+    module load cray-python/3.11.5
+    source $JOVIAN_DIR/dependencies/python/frontier-gpu/bin/activate
+    module load cmake
+    export ARTEMIS_SUITE=frontier-gpu
+    export HDF5_USE_FILE_LOCKING='FALSE'
     echo "...setup SUCCEEDED"
 elif [[ $PARTITION == "darwin-fe" ]]; then
     module load clang/12.0.1

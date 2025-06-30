@@ -69,13 +69,12 @@ void PPM4(const Real &q_im2, const Real &q_im1, const Real &q_i, const Real &q_i
 //! \class ArtemisUtils::Reconstruction<RSolver::ppm, X1DIR, ...>
 //! \brief The piecewise parabolic reconstruction method in the X1 direction
 template <Coordinates GEOM>
-class Reconstruction<ReconstructionMethod::ppm, X1DIR, GEOM> {
- public:
+struct Reconstruction<ReconstructionMethod::ppm, X1DIR, GEOM> {
   template <typename V>
-  KOKKOS_INLINE_FUNCTION void apply(parthenon::team_mbr_t const &member, const int b,
-                                    const int k, const int j, const int il, const int iu,
-                                    const V &q, parthenon::ScratchPad2D<Real> &ql,
-                                    parthenon::ScratchPad2D<Real> &qr) const {
+  KOKKOS_INLINE_FUNCTION void
+  operator()(parthenon::team_mbr_t const &member, const int b, const int k, const int j,
+             const int il, const int iu, const V &q, parthenon::ScratchPad2D<Real> &ql,
+             parthenon::ScratchPad2D<Real> &qr) const {
     for (int n = q.GetLowerBound(b); n <= q.GetUpperBound(b); ++n) {
       parthenon::par_for_inner(
           DEFAULT_INNER_LOOP_PATTERN, member, il, iu, [&](const int i) {
@@ -90,13 +89,13 @@ class Reconstruction<ReconstructionMethod::ppm, X1DIR, GEOM> {
 //! \class ArtemisUtils::Reconstruction<RSolver::ppm, X2DIR, ...>
 //! \brief The piecewise parabolic reconstruction method in the X2 direction
 template <Coordinates GEOM>
-class Reconstruction<ReconstructionMethod::ppm, X2DIR, GEOM> {
- public:
+struct Reconstruction<ReconstructionMethod::ppm, X2DIR, GEOM> {
   template <typename V>
-  KOKKOS_INLINE_FUNCTION void apply(parthenon::team_mbr_t const &member, const int b,
-                                    const int k, const int j, const int il, const int iu,
-                                    const V &q, parthenon::ScratchPad2D<Real> &ql_jp1,
-                                    parthenon::ScratchPad2D<Real> &qr_j) const {
+  KOKKOS_INLINE_FUNCTION void operator()(parthenon::team_mbr_t const &member, const int b,
+                                         const int k, const int j, const int il,
+                                         const int iu, const V &q,
+                                         parthenon::ScratchPad2D<Real> &ql_jp1,
+                                         parthenon::ScratchPad2D<Real> &qr_j) const {
     for (int n = q.GetLowerBound(b); n <= q.GetUpperBound(b); ++n) {
       parthenon::par_for_inner(
           DEFAULT_INNER_LOOP_PATTERN, member, il, iu, [&](const int i) {
@@ -111,13 +110,13 @@ class Reconstruction<ReconstructionMethod::ppm, X2DIR, GEOM> {
 //! \class ArtemisUtils::Reconstruction<RSolver::ppm, X3DIR, ...>
 //! \brief The piecewise parabolic reconstruction method in the X3 direction
 template <Coordinates GEOM>
-class Reconstruction<ReconstructionMethod::ppm, X3DIR, GEOM> {
- public:
+struct Reconstruction<ReconstructionMethod::ppm, X3DIR, GEOM> {
   template <typename V>
-  KOKKOS_INLINE_FUNCTION void apply(parthenon::team_mbr_t const &member, const int b,
-                                    const int k, const int j, const int il, const int iu,
-                                    const V &q, parthenon::ScratchPad2D<Real> &ql_kp1,
-                                    parthenon::ScratchPad2D<Real> &qr_k) const {
+  KOKKOS_INLINE_FUNCTION void operator()(parthenon::team_mbr_t const &member, const int b,
+                                         const int k, const int j, const int il,
+                                         const int iu, const V &q,
+                                         parthenon::ScratchPad2D<Real> &ql_kp1,
+                                         parthenon::ScratchPad2D<Real> &qr_k) const {
     for (int n = q.GetLowerBound(b); n <= q.GetUpperBound(b); ++n) {
       parthenon::par_for_inner(
           DEFAULT_INNER_LOOP_PATTERN, member, il, iu, [&](const int i) {
@@ -125,6 +124,34 @@ class Reconstruction<ReconstructionMethod::ppm, X3DIR, GEOM> {
                  q(b, n, k + 1, j, i), q(b, n, k + 2, j, i), ql_kp1(n, i), qr_k(n, i));
           });
     }
+  }
+};
+
+template <>
+struct ReconGradient<ReconstructionMethod::ppm> {
+  template <typename V>
+  KOKKOS_INLINE_FUNCTION std::array<Real, 3>
+  operator()(const V &q, const std::array<Real, 3> &dx, const int multi_d,
+             const int three_d, const int b, const int n, const int k, const int j,
+             const int i) const {
+    std::array<Real, 3> dqdx{0.0, 0.0, 0.0};
+    Real wl = Null<Real>(), wr = Null<Real>();
+
+    PPM4(q(b, n, k, j, i - 2), q(b, n, k, j, i - 1), q(b, n, k, j, i),
+         q(b, n, k, j, i + 1), q(b, n, k, j, i + 2), wl, wr);
+    dqdx[0] = (wr - wl) / (2.0 * dx[0]);
+
+    wl = Null<Real>(), wr = Null<Real>();
+    PPM4(q(b, n, k, j - 2 * multi_d, i), q(b, n, k, j - multi_d, i), q(b, n, k, j, i),
+         q(b, n, k, j + multi_d, i), q(b, n, k, j + 2 * multi_d, i), wl, wr);
+    dqdx[1] = (wr - wl) / (2.0 * dx[1]);
+
+    wl = Null<Real>(), wr = Null<Real>();
+    PPM4(q(b, n, k - three_d, j, i), q(b, n, k - 2 * three_d, j, i), q(b, n, k, j, i),
+         q(b, n, k + three_d, j, i), q(b, n, k + 2 * three_d, j, i), wl, wr);
+    dqdx[2] = (wr - wl) / (2.0 * dx[2]);
+
+    return dqdx;
   }
 };
 

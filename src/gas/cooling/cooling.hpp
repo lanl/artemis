@@ -1,5 +1,5 @@
 //========================================================================================
-// (C) (or copyright) 2023-2024. Triad National Security, LLC. All rights reserved.
+// (C) (or copyright) 2023-2025. Triad National Security, LLC. All rights reserved.
 //
 // This program was produced under U.S. Government contract 89233218CNA000001 for Los
 // Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -25,17 +25,12 @@ using namespace parthenon::package::prelude;
 namespace Gas {
 namespace Cooling {
 
+// ...Cooling type
 enum class CoolingType { beta, null };
+// ...Reference temperature type
 enum class TempRefType { powerlaw, nbody, null };
 
-std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
-
-template <Coordinates GEOM, TempRefType T>
-TaskStatus BetaCooling(MeshData<Real> *md, const Real time, const Real dt);
-
-template <Coordinates GEOM>
-TaskStatus CoolingSource(MeshData<Real> *md, const Real time, const Real dt);
-
+// Temperature parameters
 struct TempParams {
   Real tcyl;
   Real tsph;
@@ -44,6 +39,9 @@ struct TempParams {
   Real tfloor;
 };
 
+//----------------------------------------------------------------------------------------
+//! \fn  Real Cooling::TemperatureProfile
+//! \brief Returns powerlaw temperature profile if applicable
 template <Coordinates GEOM, TempRefType T>
 KOKKOS_INLINE_FUNCTION Real TemperatureProfile(geometry::Coords<GEOM> &coords, Real t,
                                                const std::array<Real, 3> &xv,
@@ -56,6 +54,15 @@ KOKKOS_INLINE_FUNCTION Real TemperatureProfile(geometry::Coords<GEOM> &coords, R
   }
   return 0.0;
 }
+
+//----------------------------------------------------------------------------------------
+std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
+
+template <Coordinates GEOM, TempRefType T>
+TaskStatus BetaCooling(MeshData<Real> *md, const Real time, const Real dt);
+
+template <Coordinates GEOM>
+TaskStatus CoolingSource(MeshData<Real> *md, const Real time, const Real dt);
 
 } // namespace Cooling
 } // namespace Gas

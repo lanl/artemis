@@ -1,5 +1,5 @@
 //========================================================================================
-// (C) (or copyright) 2024. Triad National Security, LLC. All rights reserved.
+// (C) (or copyright) 2024-2025. Triad National Security, LLC. All rights reserved.
 //
 // This program was produced under U.S. Government contract 89233218CNA000001 for Los
 // Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -14,6 +14,8 @@
 #define UTILS_OPACITY_OPACITY_HPP_
 
 // Singularity-opac includes
+#include <singularity-opac/photons/mean_opacity_photons.hpp>
+#include <singularity-opac/photons/mean_s_opacity_photons.hpp>
 #include <singularity-opac/photons/opac_photons.hpp>
 #include <singularity-opac/photons/s_opac_photons.hpp>
 
@@ -29,6 +31,14 @@ using Opacity = singularity::photons::impl::Variant<
 using Scattering = singularity::photons::impl::S_Variant<
     singularity::photons::NonCGSUnitsS<singularity::photons::GrayS>,
     singularity::photons::NonCGSUnitsS<singularity::photons::ThomsonS>>;
+
+// Reduced variant for mean absorption opacities
+using MeanOpacity =
+    singularity::photons::MeanNonCGSUnits<singularity::photons::MeanOpacityBase>;
+
+// Reduced variant for mean scattering opacities
+using MeanScattering =
+    singularity::photons::MeanNonCGSUnitsS<singularity::photons::MeanSOpacityCGS>;
 
 } // namespace ArtemisUtils
 

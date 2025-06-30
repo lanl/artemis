@@ -1,5 +1,5 @@
 //========================================================================================
-// (C) (or copyright) 2023-2024. Triad National Security, LLC. All rights reserved.
+// (C) (or copyright) 2023-2025. Triad National Security, LLC. All rights reserved.
 //
 // This program was produced under U.S. Government contract 89233218CNA000001 for Los
 // Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -44,22 +44,26 @@ TaskStatus BetaCooling(MeshData<Real> *md, const Real time, const Real dt) {
   auto pm = md->GetParentPointer();
   auto &resolved_pkgs = pm->resolved_packages;
 
+  // Extract gas package and params
   auto &gas_pkg = pm->packages.Get("gas");
   const auto &eos_d = gas_pkg->template Param<EOS>("eos_d");
   const auto de_switch = gas_pkg->template Param<Real>("de_switch");
   const auto dflr_gas = gas_pkg->template Param<Real>("dfloor");
   const auto sieflr_gas = gas_pkg->template Param<Real>("siefloor");
 
+  // Extract gravity params
   Real gm = Null<Real>();
   const bool do_gravity = pm->packages.Get("artemis")->template Param<bool>("do_gravity");
   if (do_gravity) gm = pm->packages.Get("gravity")->template Param<Real>("gm");
 
+  // Extract cooling package and  params
   auto &cooling_pkg = pm->packages.Get("cooling");
   const Real beta0 = cooling_pkg->template Param<Real>("beta0");
   const Real beta_min = cooling_pkg->template Param<Real>("beta_min");
   const Real escale = cooling_pkg->template Param<Real>("escale");
   TempParams tpars = cooling_pkg->template Param<TempParams>("tpars");
 
+  // Packing and indexing
   static auto desc = MakePackDescriptor<gas::cons::momentum, gas::cons::total_energy,
                                         gas::cons::internal_energy, gas::cons::density>(
       resolved_pkgs.get());
@@ -68,6 +72,7 @@ TaskStatus BetaCooling(MeshData<Real> *md, const Real time, const Real dt) {
   const auto jb = md->GetBoundsJ(IndexDomain::interior);
   const auto kb = md->GetBoundsK(IndexDomain::interior);
 
+  // Extract NBody particles (if applicable)
   [[maybe_unused]] ParArray1D<NBody::Particle> particles;
   [[maybe_unused]] int npart = 0;
   if constexpr (TTYP == TempRefType::nbody) {
@@ -83,7 +88,6 @@ TaskStatus BetaCooling(MeshData<Real> *md, const Real time, const Real dt) {
         // Extract coordinates
         geometry::Coords<GEOM> coords(vmesh.GetCoordinates(b), k, j, i);
         const auto &xv = coords.GetCellCenter();
-
         const auto &xcyl = coords.ConvertToCyl(xv);
         const Real rsph2 = xcyl[0] * xcyl[0] + xcyl[2] * xcyl[2];
 
@@ -91,7 +95,7 @@ TaskStatus BetaCooling(MeshData<Real> *md, const Real time, const Real dt) {
         Real ir1 = 1.0 / std::sqrt(rsph2);
         Real T0 = TemperatureProfile<GEOM, TTYP>(coords, time, xv, tpars);
 
-        // capture these since they are first captured in the following constexpr
+        // Capture these since they are first captured in the following constexpr
         [[maybe_unused]] auto &particles_ = particles;
         [[maybe_unused]] auto &npart_ = npart;
         [[maybe_unused]] auto &gm_ = gm;
@@ -102,16 +106,15 @@ TaskStatus BetaCooling(MeshData<Real> *md, const Real time, const Real dt) {
         const Real efac = (T0 > 0.) ? std::exp(-escale * xcyl[2] * xcyl[2] / T0) : 1.;
         const Real beta = beta_min + beta0 * efac;
         const Real omdt = dt * std::sqrt(gm * ir1 * ir1 * ir1);
-        for (int n = 0; n < vmesh.GetSize(b, gas::cons::density()); ++n) {
 
-          // Get the specific internal energy
+        // Update total and internal energies
+        for (int n = 0; n < vmesh.GetSize(b, gas::cons::density()); ++n) {
           Real &etot = vmesh(b, gas::cons::total_energy(n), k, j, i);
           Real &eint = vmesh(b, gas::cons::internal_energy(n), k, j, i);
-
-          const Real sie = ArtemisUtils::GetSpecificInternalEnergy<GEOM>(
+          const Real sie = ArtemisUtils::DualEnergySIE<GEOM>(
               vmesh, b, n, k, j, i, dflr_gas, sieflr_gas, de_switch);
 
-          // Compute the energy change from the temperature change.
+          // Compute the energy change from the temperature change
           const Real &dens = vmesh(b, gas::cons::density(n), k, j, i);
           const Real cv = eos_d.SpecificHeatFromDensityInternalEnergy(dens, sie);
           const Real Tn = eos_d.TemperatureFromDensityInternalEnergy(dens, sie);
@@ -127,36 +130,34 @@ TaskStatus BetaCooling(MeshData<Real> *md, const Real time, const Real dt) {
 
 //----------------------------------------------------------------------------------------
 //! template instantiations
-template TaskStatus BetaCooling<Coordinates::cartesian, TempRefType::powerlaw>(
-    MeshData<Real> *md, const Real time, const Real dt);
-template TaskStatus
-BetaCooling<Coordinates::cartesian, TempRefType::nbody>(MeshData<Real> *md,
-                                                        const Real time, const Real dt);
-template TaskStatus BetaCooling<Coordinates::cylindrical, TempRefType::powerlaw>(
-    MeshData<Real> *md, const Real time, const Real dt);
-template TaskStatus
-BetaCooling<Coordinates::cylindrical, TempRefType::nbody>(MeshData<Real> *md,
-                                                          const Real time, const Real dt);
-template TaskStatus BetaCooling<Coordinates::spherical3D, TempRefType::powerlaw>(
-    MeshData<Real> *md, const Real time, const Real dt);
-template TaskStatus
-BetaCooling<Coordinates::spherical3D, TempRefType::nbody>(MeshData<Real> *md,
-                                                          const Real time, const Real dt);
-template TaskStatus BetaCooling<Coordinates::spherical1D, TempRefType::powerlaw>(
-    MeshData<Real> *md, const Real time, const Real dt);
-template TaskStatus
-BetaCooling<Coordinates::spherical1D, TempRefType::nbody>(MeshData<Real> *md,
-                                                          const Real time, const Real dt);
-
-template TaskStatus BetaCooling<Coordinates::spherical2D, TempRefType::powerlaw>(
-    MeshData<Real> *md, const Real time, const Real dt);
-template TaskStatus
-BetaCooling<Coordinates::spherical2D, TempRefType::nbody>(MeshData<Real> *md,
-                                                          const Real time, const Real dt);
-template TaskStatus BetaCooling<Coordinates::axisymmetric, TempRefType::powerlaw>(
-    MeshData<Real> *md, const Real time, const Real dt);
-template TaskStatus BetaCooling<Coordinates::axisymmetric, TempRefType::nbody>(
-    MeshData<Real> *md, const Real time, const Real dt);
+typedef Coordinates G;
+typedef TempRefType TRT;
+// clang-format off
+template TaskStatus BetaCooling<G::cartesian, TRT::powerlaw>(
+    MeshData<Real> *md, const Real t, const Real dt);
+template TaskStatus BetaCooling<G::cartesian, TRT::nbody>(
+    MeshData<Real> *md, const Real t, const Real dt);
+template TaskStatus BetaCooling<G::cylindrical, TRT::powerlaw>(
+    MeshData<Real> *md, const Real t, const Real dt);
+template TaskStatus BetaCooling<G::cylindrical, TRT::nbody>(
+    MeshData<Real> *md, const Real t, const Real dt);
+template TaskStatus BetaCooling<G::spherical3D, TRT::powerlaw>(
+    MeshData<Real> *md, const Real t, const Real dt);
+template TaskStatus BetaCooling<G::spherical3D, TRT::nbody>(
+    MeshData<Real> *md, const Real t, const Real dt);
+template TaskStatus BetaCooling<G::spherical1D, TRT::powerlaw>(
+    MeshData<Real> *md, const Real t, const Real dt);
+template TaskStatus BetaCooling<G::spherical1D, TRT::nbody>(
+    MeshData<Real> *md, const Real t, const Real dt);
+template TaskStatus BetaCooling<G::spherical2D, TRT::powerlaw>(
+    MeshData<Real> *md, const Real t, const Real dt);
+template TaskStatus BetaCooling<G::spherical2D, TRT::nbody>(
+    MeshData<Real> *md, const Real t, const Real dt);
+template TaskStatus BetaCooling<G::axisymmetric, TRT::powerlaw>(
+    MeshData<Real> *md, const Real t, const Real dt);
+template TaskStatus BetaCooling<G::axisymmetric, TRT::nbody>(
+    MeshData<Real> *md, const Real t, const Real dt);
+// clang-format on
 
 } // namespace Cooling
 } // namespace Gas

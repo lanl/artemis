@@ -1,5 +1,5 @@
 //========================================================================================
-// (C) (or copyright) 2023-2024. Triad National Security, LLC. All rights reserved.
+// (C) (or copyright) 2023-2025. Triad National Security, LLC. All rights reserved.
 //
 // This program was produced under U.S. Government contract 89233218CNA000001 for Los
 // Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -24,46 +24,42 @@ using ArtemisUtils::VI;
 
 namespace Diffusion {
 
+//----------------------------------------------------------------------------------------
+//! \fn TaskStatus ZeroDiffusionImpl
+//! \brief Zeroes diffusion fluxes
 template <typename SparsePackFlux>
 TaskStatus ZeroDiffusionImpl(MeshData<Real> *md, SparsePackFlux vf) {
+  auto pm = md->GetParentPointer();
+  const auto multi_d = (pm->ndim > 1);
+  const auto three_d = (pm->ndim > 2);
 
   IndexRange ib = md->GetBoundsI(IndexDomain::interior);
   IndexRange jb = md->GetBoundsJ(IndexDomain::interior);
   IndexRange kb = md->GetBoundsK(IndexDomain::interior);
 
-  auto pm = md->GetParentPointer();
-  const auto multi_d = (pm->ndim > 1);
-  const auto three_d = (pm->ndim > 2);
-
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, PARTHENON_AUTO_LABEL, parthenon::DevExecSpace(), 0,
       md->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
+        const bool end1 = (i == ib.e);
+        const bool end2 = (multi_d && (j == jb.e));
+        const bool end3 = (three_d && (k == kb.e));
         for (int n = vf.GetLowerBound(b); n <= vf.GetUpperBound(b); ++n) {
           vf(b, TE::F1, n, k, j, i) = 0.0;
           vf(b, TE::F2, n, k, j, i) = 0.0;
           vf(b, TE::F3, n, k, j, i) = 0.0;
-        }
-        if (i == ib.e) {
-          for (int n = vf.GetLowerBound(b); n <= vf.GetUpperBound(b); ++n) {
-            vf(b, TE::F1, n, k, j, ib.e + 1) = 0.0;
-          }
-        }
-        if ((j == jb.e) && (multi_d)) {
-          for (int n = vf.GetLowerBound(b); n <= vf.GetUpperBound(b); ++n) {
-            vf(b, TE::F2, n, k, jb.e + 1, i) = 0.0;
-          }
-        }
-        if ((k == kb.e) && (three_d)) {
-          for (int n = vf.GetLowerBound(b); n <= vf.GetUpperBound(b); ++n) {
-            vf(b, TE::F3, n, kb.e + 1, j, i) = 0.0;
-          }
+          vf(b, TE::F1, n, k, j, i + end1) = 0.0;
+          vf(b, TE::F2, n, k, j + end2, i) = 0.0;
+          vf(b, TE::F3, n, k + end3, j, i) = 0.0;
         }
       });
 
   return TaskStatus::complete;
 }
 
+//----------------------------------------------------------------------------------------
+//! \fn Real EstimateTimestep
+//! \brief Computes diffusion limited timestep
 template <Coordinates GEOM, Fluid FLUID_TYPE, DiffType DIFF, typename PKG,
           typename SparsePackPrim>
 Real EstimateTimestep(MeshData<Real> *md, DiffCoeffParams &dp, PKG &pkg, const EOS &eos,
@@ -108,6 +104,9 @@ Real EstimateTimestep(MeshData<Real> *md, DiffCoeffParams &dp, PKG &pkg, const E
   return min_dt / (2.0 * ndim);
 }
 
+//----------------------------------------------------------------------------------------
+//! \fn TaskStatus DiffusionUpdateImpl
+//! \brief Supplies update for diffusion physics
 template <Coordinates GEOM, Fluid FLUID_TYPE, typename PKG, typename SparsePackCons,
           typename SparsePackPrim, typename SparsePackFlux>
 TaskStatus DiffusionUpdateImpl(MeshData<Real> *md, PKG &pkg, SparsePackCons v0,

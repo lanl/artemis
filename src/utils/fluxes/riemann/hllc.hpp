@@ -1,5 +1,5 @@
 //========================================================================================
-// (C) (or copyright) 2023-2024. Triad National Security, LLC. All rights reserved.
+// (C) (or copyright) 2023-2025. Triad National Security, LLC. All rights reserved.
 //
 // This program was produced under U.S. Government contract 89233218CNA000001 for Los
 // Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -42,15 +42,17 @@ namespace ArtemisUtils {
 //----------------------------------------------------------------------------------------
 //! \class ArtemisUtils::RiemannSolver<RSolver::hllc, ...>
 //! \brief The HLLC Riemann solver for ideal gas hydrodynamics
-template <Fluid FLUID_TYPE>
-class RiemannSolver<RSolver::hllc, FLUID_TYPE> {
- public:
+template <Fluid FLUID_TYPE, Closure CTYPE>
+struct RiemannSolver<RSolver::hllc, FLUID_TYPE, CTYPE,
+                     std::enable_if_t<FLUID_TYPE == Fluid::gas>> {
   template <typename V1, typename V2, typename V3>
-  KOKKOS_INLINE_FUNCTION void
-  solve(const EOS &eos, parthenon::team_mbr_t const &member, const int b, const int k,
-        const int j, const int il, const int iu, const int dir,
-        const parthenon::ScratchPad2D<Real> &wl, const parthenon::ScratchPad2D<Real> &wr,
-        const V1 &p, const V2 &q, const V3 &vf) const {
+  KOKKOS_INLINE_FUNCTION void operator()(const EOS &eos, const Real c, const Real chat,
+                                         parthenon::team_mbr_t const &member, const int b,
+                                         const int k, const int j, const int il,
+                                         const int iu, const int dir,
+                                         const parthenon::ScratchPad2D<Real> &wl,
+                                         const parthenon::ScratchPad2D<Real> &wr,
+                                         const V1 &p, const V2 &q, const V3 &vf) const {
     using TE = parthenon::TopologicalElement;
     // Check sensibility of flux direction
     PARTHENON_REQUIRE(dir > 0 && dir <= 3, "Invalid flux direction!");
@@ -59,8 +61,8 @@ class RiemannSolver<RSolver::hllc, FLUID_TYPE> {
     // TODO(BRR) temporary
     const Real gm1 = eos.GruneisenParamFromDensityTemperature(Null<Real>(), Null<Real>());
 
-    // Obtain number of species (energy equation required for HLLC)
-    const int nspecies = p.GetMaxNumberOfVars() / 6;
+    // Obtain number of species
+    const int nspecies = q.GetSize(b, gas::cons::density());
 
     for (int n = 0; n < nspecies; ++n) {
       const int IDN = n;

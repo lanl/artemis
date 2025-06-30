@@ -1,5 +1,5 @@
 //========================================================================================
-// (C) (or copyright) 2024. Triad National Security, LLC. All rights reserved.
+// (C) (or copyright) 2024-2025. Triad National Security, LLC. All rights reserved.
 //
 // This program was produced under U.S. Government contract 89233218CNA000001 for Los
 // Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -22,6 +22,9 @@ constexpr Real parsec = 3.0857e18;
 constexpr Real Rjup = 6.991100e6;
 constexpr Real Mjup = 1.8982e30;
 
+//----------------------------------------------------------------------------------------
+//! \class Units
+//! \brief
 Units::Units(ParameterInput *pin, std::shared_ptr<StateDescriptor> pkg) {
   std::string physical_units_str =
       pin->GetOrAddString("artemis", "physical_units", "scalefree");
@@ -67,6 +70,10 @@ Units::Units(ParameterInput *pin, std::shared_ptr<StateDescriptor> pkg) {
   pkg->AddParam("mass", mass_);
 }
 
+//----------------------------------------------------------------------------------------
+//! \class Constants
+//! \brief
+KOKKOS_FUNCTION
 Constants::Constants(Units &units) {
   if (units.GetPhysicalUnits() == PhysicalUnits::scalefree) {
     G_ = 1.;

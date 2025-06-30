@@ -19,13 +19,17 @@
 
 // Artemis includes
 #include "advection.hpp"
+#include "beam.hpp"
 #include "blast.hpp"
 #include "conduction.hpp"
 #include "constant.hpp"
 #include "disk.hpp"
 #include "dust_coagulation.hpp"
 #include "gaussian_bump.hpp"
+#include "kh.hpp"
 #include "linear_wave.hpp"
+#include "lw.hpp"
+#include "rt.hpp"
 #include "shock.hpp"
 #include "strat.hpp"
 #include "thermalization.hpp"
@@ -41,6 +45,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   std::string name = pin->GetString("artemis", "problem");
   if (name == "advection") {
     advection::ProblemGenerator<T>(pmb, pin);
+  } else if (name == "beam") {
+    beam::ProblemGenerator<T>(pmb, pin);
   } else if (name == "blast") {
     blast::ProblemGenerator<T>(pmb, pin);
   } else if (name == "conduction") {
@@ -53,6 +59,12 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
     gaussian_bump::ProblemGenerator<T>(pmb, pin);
   } else if (name == "linear_wave") {
     linear_wave::ProblemGenerator<T>(pmb, pin);
+  } else if (name == "lw") {
+    lw::ProblemGenerator<T>(pmb, pin);
+  } else if (name == "kh") {
+    kh::ProblemGenerator<T>(pmb, pin);
+  } else if (name == "rt") {
+    rt::ProblemGenerator<T>(pmb, pin);
   } else if (name == "shock") {
     shock::ProblemGenerator<T>(pmb, pin);
   } else if (name == "strat") {

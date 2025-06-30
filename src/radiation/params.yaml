@@ -1,0 +1,151 @@
+---
+radiation:
+  _description: "Radiation models."
+  moment:
+    _description: "Moment-based radiation model."
+    _type: node
+    integrator:
+      _type: string
+      _description: "Radiation RK IMEX integrator"
+      _default: "rk2"
+    closure:
+      _type: string
+      _description: "Closure model for the radiation pressure. M1 or P1"
+      _default: "m1"
+    reconstruct:
+      _type: string
+      _description: "Reconstruction method"
+      _default: "plm"
+      pcm:
+        _type: opt
+        _description: "Piecewise Constant"
+      plm:
+        _type: opt
+        _description: "Piecewise Linear"
+      ppm:
+        _type: opt
+        _description: "Piecewise Parabolic"
+    riemann:
+      _type: string
+      _description: "Riemann solver"
+      _default: "hlle"
+      llf:
+        _type: opt
+        _description: "LLF"
+      hlle:
+        _type: opt
+        _description: "HLLE"
+    cfl:
+      _type: Real
+      _description: "CFL number for radiation"
+      _default: 0.8
+    full_coupling:
+      _type: bool
+      _description: "If set to true, this will do a full outer iteration of momentum exchange with the material. If set to false, artemis will take one outer iteration of momentum coupling."
+      _default: true
+    creduc:
+      _type: Real
+      _description: "Speed of light reduction factor, c_hat = c / creduc."
+      _default: 1
+    efloor:
+      _type: Real
+      _description: "Radiation energy density floor."
+      _default: 1e-20
+      _units: "erg cm^-3"
+    nspecies:
+      _type: int
+      _description: "Number of frequency groups."
+      _default: 1
+    outer_iteration_max:
+      _type: int
+      _description: "Maximum number of iterations to take for the outer momentum coupling solve"
+      _default: 100
+    inner_iteration_max:
+      _type: int
+      _description: "Maximum number of iterations to take for the inner energy solve"
+      _default: 400
+    outer_iteration_tol:
+      _type: Real
+      _description: "Outer momentum coupling relative tolerance"
+      _default: 1e-10
+    inner_iteration_tol:
+      _type: Real
+      _description: "Inner energy coupling relative tolerance"
+      _default: 1e-10
+    scr_level:
+      _type: int
+      _description: "Scratch level for radiation"
+      _default: 0
+    refine_field:
+      _type: string
+      _default: "none"
+      _description: "Which field to refine on. Options are none, density, and pressure"
+    refine_type:
+      _type: string
+      _description: "What property of the field to refine on. Options are gradient or magnitude"
+    refine_thr:
+      _type: Real
+      _description: "Threshold for refinement"
+    deref_thr:
+      _type: Real
+      _description: "Threshold for derefinement"
+  imc:
+    _description: "IMC radiation model from the Jaybenne library"
+    _type: node
+    num_particles:
+      _type: int
+      _description: "Number of particles."
+    dt:
+      _type: Real
+      _description: "Jaybenne enforced timestep limitation (fixed)."
+      _default: "std::numeric_limits<Real>::max()"
+    min_swarm_occupancy:
+      _type: Real
+      _description: "Minimum swarm occupancy (0<=x<=1) below which defrag is triggered."
+      _default: 0.0
+    numin:
+      _type: Real
+      _description: "Minimum photon frequency (currently unused for gray IMC)."
+      _default: "std::numeric_limits<Real>::min()"
+    numax:
+      _type: Real
+      _description: "Maximum photon frequency (currently unused for gray IMC)."
+      _default: "std::numeric_limits<Real>::max()"
+    unique_rank_seeds:
+      _type: bool
+      _description: "Invoke different seeds for each MPI rank."
+      _default: "true"
+    seed:
+      _type: int
+      _description: "RNG seed (for rank=0 when unique_rank_seeds=true)."
+      _default: 123
+    max_transport_iterations:
+      _type: int
+      _description: "Maximum number of iterations for transport."
+      _default: 10000
+    use_ddmc:
+      _type: bool
+      _description: "Enables DDMC."
+      _default: "false"
+    tau_ddmc:
+      _type: Real
+      _description: "Optical depth threshold for DDMC."
+      _default: 5.0
+    source_strategy:
+      _type: string
+      _description: "Method of sourcing for particles."
+      _default: "uniform"
+      uniform:
+        _type: opt
+        _description: "Uniform sampling/sourcing."
+      energy:
+        _type: opt
+        _description: "Energy-based sampling/sourcing."
+    do_emission:
+      _type: bool
+      _description: "Enables thermal emission physics."
+      _default: true
+    do_feedback:
+      _type: bool
+      _description: "Radiation affects host fluid fields."
+      _default: true

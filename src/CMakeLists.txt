@@ -1,5 +1,5 @@
 # ========================================================================================
-#  (C) (or copyright) 2023-2024. Triad National Security, LLC. All rights reserved.
+#  (C) (or copyright) 2023-2025. Triad National Security, LLC. All rights reserved.
 #
 #  This program was produced under U.S. Government contract 89233218CNA000001 for Los
 #  Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -18,12 +18,11 @@ set (SRC_LIST
   artemis.cpp
   artemis.hpp
 
-  drag/drag.cpp
-  drag/drag.hpp
-
-
   derived/fill_derived.cpp
   derived/fill_derived.hpp
+
+  drag/drag.cpp
+  drag/drag.hpp
 
   dust/dust.cpp
   dust/dust.hpp
@@ -48,10 +47,6 @@ set (SRC_LIST
   gravity/uniform.cpp
   gravity/gravity.hpp
 
-  rotating_frame/rotating_frame.cpp
-  rotating_frame/rotating_frame_impl.hpp
-  rotating_frame/rotating_frame.hpp
-
   nbody/nbody.cpp
   nbody/nbody.hpp
   nbody/nbody_advance.cpp
@@ -62,19 +57,35 @@ set (SRC_LIST
   nbody/particle_base.hpp
 
   pgen/advection.hpp
+  pgen/beam.hpp
   pgen/blast.hpp
   pgen/conduction.hpp
   pgen/constant.hpp
   pgen/disk.hpp
   pgen/gaussian_bump.hpp
+  pgen/kh.hpp
   pgen/linear_wave.hpp
+  pgen/lw.hpp
   pgen/pgen.hpp
   pgen/problem_modifier.hpp
+  pgen/rt.hpp
   pgen/shock.hpp
   pgen/strat.hpp
   pgen/thermalization.hpp
 
+  radiation/radiation.cpp
+  radiation/radiation.hpp
+  radiation/imc/imc_driver.cpp
   radiation/imc/imc.hpp
+  radiation/moments/moments.cpp
+  radiation/moments/moments.hpp
+  radiation/moments/moments_driver.cpp
+  radiation/moments/matter_coupling.hpp
+
+  rotating_frame/advection_driver.cpp
+  rotating_frame/rotating_frame.cpp
+  rotating_frame/rotating_frame_impl.hpp
+  rotating_frame/rotating_frame.hpp
 
   utils/artemis_utils.cpp
   utils/artemis_utils.hpp
@@ -107,6 +118,10 @@ set (SRC_LIST
   utils/refinement/prolongation.hpp
   utils/refinement/restriction.hpp
 )
+
+if (ARTEMIS_PORTABLE_RESTART)
+  add_compile_definitions(PORTABLE_RESTART)
+endif()
 
 # Generate library
 add_library(artemislib ${SRC_LIST})

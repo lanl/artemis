@@ -1,5 +1,5 @@
 //========================================================================================
-// (C) (or copyright) 2023-2024. Triad National Security, LLC. All rights reserved.
+// (C) (or copyright) 2023-2025. Triad National Security, LLC. All rights reserved.
 //
 // This program was produced under U.S. Government contract 89233218CNA000001 for Los
 // Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -23,6 +23,7 @@
 #include "dust/coagulation/coagulation.hpp"
 #include "dust/dust.hpp"
 #include "geometry/geometry.hpp"
+#include "rotating_frame/rotating_frame.hpp"
 #include "utils/artemis_utils.hpp"
 #include "utils/fluxes/fluid_fluxes.hpp"
 #include "utils/history.hpp"
@@ -53,25 +54,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   // Reconstruction algorithm
   ReconstructionMethod recon_method = ReconstructionMethod::null;
   const std::string recon = pin->GetOrAddString("dust", "reconstruct", "plm");
-  if (recon.compare("pcm") == 0) {
-    PARTHENON_REQUIRE(parthenon::Globals::nghost >= 1,
-                      "PCM requires at least 1 ghost cell.");
-    recon_method = ReconstructionMethod::pcm;
-  } else if (recon.compare("plm") == 0) {
-    PARTHENON_REQUIRE(parthenon::Globals::nghost >= 2,
-                      "PLM requires at least 2 ghost cells.");
-    recon_method = ReconstructionMethod::plm;
-  } else if (recon.compare("ppm") == 0) {
-    PARTHENON_REQUIRE(parthenon::Globals::nghost >= 3,
-                      "PPM requires at least 3 ghost cells.");
-    if (coords != Coordinates::cartesian) {
-      PARTHENON_WARN("Artemis' PPM implementation does not contain geometric corrections "
-                     "for curvilinear coordinates.");
-    }
-    recon_method = ReconstructionMethod::ppm;
-  } else {
-    PARTHENON_FAIL("Reconstruction method not recognized.");
-  }
+  recon_method = ArtemisUtils::ChooseReconMethod(recon);
   params.Add("recon", recon_method);
 
   // Riemann solver
@@ -250,6 +233,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
 template <Coordinates GEOM>
 Real EstimateTimestepMesh(MeshData<Real> *md) {
   using parthenon::MakePackDescriptor;
+  using RotatingFrame::BackgroundVelocity;
   auto pm = md->GetParentPointer();
   auto &resolved_pkgs = pm->resolved_packages;
 
@@ -333,7 +317,7 @@ TaskStatus FluxSource(MeshData<Real> *md, const Real dt) {
     auto vcons = desc_cons.GetPack(md);
     SparsePack vface;
 
-    return ArtemisUtils::FluxSource(md, pkg, vprim, vcons, vface, dt);
+    return ArtemisUtils::FluxSource<Fluid::dust>(md, pkg, vprim, vcons, vface, dt);
   }
 
   return TaskStatus::complete;

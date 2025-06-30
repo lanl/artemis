@@ -1,5 +1,5 @@
 //========================================================================================
-// (C) (or copyright) 2023-2024. Triad National Security, LLC. All rights reserved.
+// (C) (or copyright) 2023-2025. Triad National Security, LLC. All rights reserved.
 //
 // This program was produced under U.S. Government contract 89233218CNA000001 for Los
 // Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -18,6 +18,7 @@
 #include "artemis.hpp"
 #include "gas.hpp"
 #include "geometry/geometry.hpp"
+#include "rotating_frame/rotating_frame.hpp"
 #include "utils/artemis_utils.hpp"
 #include "utils/diffusion/diffusion.hpp"
 #include "utils/diffusion/diffusion_coeff.hpp"
@@ -26,6 +27,7 @@
 #include "utils/eos/eos.hpp"
 #include "utils/fluxes/fluid_fluxes.hpp"
 #include "utils/history.hpp"
+#include "utils/integrators/artemis_integrator.hpp"
 #include "utils/opacity/opacity.hpp"
 #include "utils/refinement/amr_criteria.hpp"
 #include "utils/units.hpp"
@@ -59,25 +61,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   // Reconstruction algorithm
   ReconstructionMethod recon_method = ReconstructionMethod::null;
   const std::string recon = pin->GetOrAddString("gas", "reconstruct", "plm");
-  if (recon.compare("pcm") == 0) {
-    PARTHENON_REQUIRE(parthenon::Globals::nghost >= 1,
-                      "PCM requires at least 1 ghost cell.");
-    recon_method = ReconstructionMethod::pcm;
-  } else if (recon.compare("plm") == 0) {
-    PARTHENON_REQUIRE(parthenon::Globals::nghost >= 2,
-                      "PLM requires at least 2 ghost cells.");
-    recon_method = ReconstructionMethod::plm;
-  } else if (recon.compare("ppm") == 0) {
-    PARTHENON_REQUIRE(parthenon::Globals::nghost >= 3,
-                      "PPM requires at least 3 ghost cells.");
-    if (coords != Coordinates::cartesian) {
-      PARTHENON_WARN("Artemis' PPM implementation does not contain geometric corrections "
-                     "for curvilinear coordinates.");
-    }
-    recon_method = ReconstructionMethod::ppm;
-  } else {
-    PARTHENON_FAIL("Reconstruction method not recognized.");
-  }
+  recon_method = ArtemisUtils::ChooseReconMethod(recon);
   params.Add("recon", recon_method);
 
   // Riemann solver
@@ -129,46 +113,99 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
     params.Add("adiabatic_index", gamma);
   }
 
-  // Absorption opacity model
-  // TODO(@pdmullen): This may not be the right place for this... how about dust opacity?
-  ArtemisUtils::Opacity opacity;
-  std::string opacity_model_name =
-      pin->GetOrAddString("gas/opacity/absorption", "opacity_model", "constant");
-  const Real length = units.GetLengthCodeToPhysical();
+  // Opacity models
   const Real time = units.GetTimeCodeToPhysical();
   const Real mass = units.GetMassCodeToPhysical();
+  const Real length = units.GetLengthCodeToPhysical();
   const Real temp = units.GetTemperatureCodeToPhysical();
-  if (opacity_model_name == "none") {
-    opacity = NonCGSUnits<Gray>(Gray(0.0), time, mass, length, temp);
-  } else if (opacity_model_name == "constant") {
-    const Real kappa_a = pin->GetOrAddReal("gas/opacity/absorption", "kappa_a", 0.0);
-    opacity = NonCGSUnits<Gray>(Gray(kappa_a), time, mass, length, temp);
-  } else if (opacity_model_name == "powerlaw") {
-    const Real coef_kappa_a =
-        pin->GetOrAddReal("gas/opacity/absorption", "coef_kappa_a", 0.0);
-    const Real rho_exp = pin->GetOrAddReal("gas/opacity/absorption", "rho_exp", 0.0);
-    const Real temp_exp = pin->GetOrAddReal("gas/opacity/absorption", "temp_exp", 0.0);
-    opacity = NonCGSUnits<PowerLaw>(PowerLaw(coef_kappa_a, rho_exp, temp_exp), time, mass,
-                                    length, temp);
+
+  // Absorption opacity model
+  std::string opacity_model_name =
+      pin->GetOrAddString("gas/opacity/absorption", "opacity_model", "constant");
+
+  // Mean absorption opacity (either read from table or uses model
+  ArtemisUtils::MeanOpacity opacity;
+  if (opacity_model_name == "table") {
+    std::string table_filename =
+        pin->GetString("gas/opacity/absorption", "opacity_table");
+    opacity =
+        singularity::photons::MeanNonCGSUnits<singularity::photons::MeanOpacityBase>(
+            singularity::photons::MeanOpacityBase(table_filename), time, mass, length,
+            temp);
   } else {
-    PARTHENON_FAIL("Opacity model not recognized!");
+    // Instantiate mean absorption opacity object (i.e., table)
+    const Real lRhoMin_a = pin->GetOrAddReal("gas/opacity/absorption", "lRhoMin", -1.0);
+    const Real lRhoMax_a = pin->GetOrAddReal("gas/opacity/absorption", "lRhoMax", 1.0);
+    const int NRho_a = pin->GetOrAddInteger("gas/opacity/absorption", "NRho", 2);
+    const Real lTMin_a = pin->GetOrAddReal("gas/opacity/absorption", "lTMin", -1.0);
+    const Real lTMax_a = pin->GetOrAddReal("gas/opacity/absorption", "lTMax", 1.0);
+    const int NT_a = pin->GetOrAddInteger("gas/opacity/absorption", "NT", 2);
+
+    if (opacity_model_name == "none") {
+      auto model = Gray(0.0);
+      opacity =
+          singularity::photons::MeanNonCGSUnits<singularity::photons::MeanOpacityBase>(
+              singularity::photons::MeanOpacityBase(model, lRhoMin_a, lRhoMax_a, NRho_a,
+                                                    lTMin_a, lTMax_a, NT_a),
+              time, mass, length, temp);
+    } else if (opacity_model_name == "constant") {
+      const Real kappa_a = pin->GetOrAddReal("gas/opacity/absorption", "kappa_a", 0.0);
+      auto model = Gray(kappa_a);
+      opacity =
+          singularity::photons::MeanNonCGSUnits<singularity::photons::MeanOpacityBase>(
+              singularity::photons::MeanOpacityBase(model, lRhoMin_a, lRhoMax_a, NRho_a,
+                                                    lTMin_a, lTMax_a, NT_a),
+              time, mass, length, temp);
+    } else if (opacity_model_name == "powerlaw") {
+      const Real coef_kappa_a =
+          pin->GetOrAddReal("gas/opacity/absorption", "coef_kappa_a", 0.0);
+      const Real rho_exp = pin->GetOrAddReal("gas/opacity/absorption", "rho_exp", 0.0);
+      const Real temp_exp = pin->GetOrAddReal("gas/opacity/absorption", "temp_exp", 0.0);
+      auto model = PowerLaw(coef_kappa_a, rho_exp, temp_exp);
+      opacity =
+          singularity::photons::MeanNonCGSUnits<singularity::photons::MeanOpacityBase>(
+              singularity::photons::MeanOpacityBase(model, lRhoMin_a, lRhoMax_a, NRho_a,
+                                                    lTMin_a, lTMax_a, NT_a),
+              time, mass, length, temp);
+    } else {
+      PARTHENON_FAIL("Opacity model not recognized!");
+    }
   }
   params.Add("opacity_h", opacity);
   params.Add("opacity_d", opacity.GetOnDevice());
 
   // Scattering opacity model
-  // TODO(@pdmullen): This may not be the right place for this... how about dust opacity?
-  ArtemisUtils::Scattering scattering;
   std::string scattering_model_name =
       pin->GetOrAddString("gas/opacity/scattering", "scattering_model", "none");
+
+  // Instantiate mean scattering opacity object (i.e., table)
+  const Real lRhoMin_s = pin->GetOrAddReal("gas/opacity/scattering", "lRhoMin", -1.0);
+  const Real lRhoMax_s = pin->GetOrAddReal("gas/opacity/scattering", "lRhoMax", 1.0);
+  const int NRho_s = pin->GetOrAddInteger("gas/opacity/scattering", "NRho", 2);
+  const Real lTMin_s = pin->GetOrAddReal("gas/opacity/scattering", "lTMin", -1.0);
+  const Real lTMax_s = pin->GetOrAddReal("gas/opacity/scattering", "lTMax", 1.0);
+  const int NT_s = pin->GetOrAddInteger("gas/opacity/scattering", "NT", 2);
+
+  ArtemisUtils::MeanScattering scattering;
   if (scattering_model_name == "none") {
-    scattering = NonCGSUnitsS<GrayS>(GrayS(0.0, 1.0), time, mass, length, temp);
+    auto smodel = GrayS(0.0, 1.0);
+    scattering =
+        singularity::photons::MeanNonCGSUnitsS<singularity::photons::MeanSOpacityCGS>(
+            singularity::photons::MeanSOpacityCGS(smodel, lRhoMin_s, lRhoMax_s, NRho_s,
+                                                  lTMin_s, lTMax_s, NT_s),
+            time, mass, length, temp);
   } else if (scattering_model_name == "constant") {
     const Real kappa_s = pin->GetOrAddReal("gas/opacity/scattering", "kappa_s", 0.0);
-    scattering = NonCGSUnitsS<GrayS>(GrayS(kappa_s, 1.0), time, mass, length, temp);
+    auto smodel = GrayS(kappa_s, 1.0);
+    scattering =
+        singularity::photons::MeanNonCGSUnitsS<singularity::photons::MeanSOpacityCGS>(
+            singularity::photons::MeanSOpacityCGS(smodel, lRhoMin_s, lRhoMax_s, NRho_s,
+                                                  lTMin_s, lTMax_s, NT_s),
+            time, mass, length, temp);
   } else {
     PARTHENON_FAIL("Scattering model not recognized!");
   }
+
   params.Add("scattering_h", scattering);
   params.Add("scattering_d", scattering.GetOnDevice());
 
@@ -189,10 +226,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   params.Add("do_viscosity", do_viscosity);
   const bool do_conduction = pin->GetOrAddBoolean("physics", "conduction", false);
   params.Add("do_conduction", do_conduction);
-
   const bool do_diffusion = do_viscosity || do_conduction;
   params.Add("do_diffusion", do_diffusion);
-
   if (do_viscosity) {
     Diffusion::DiffCoeffParams dp("gas/viscosity", "viscosity", pin, constants, packages);
     params.Add("visc_params", dp);
@@ -331,48 +366,48 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
       const Real thr = pin->GetReal("gas", "refine_thr");
       params.Add("refine_thr", thr);
       // Geometry specific refinement criteria
-      typedef Coordinates C;
+      typedef Coordinates G;
       typedef gas::prim::density pdens;
       typedef gas::prim::pressure ppres;
       // Cartesian
-      if (coords == C::cartesian) {
+      if (coords == G::cartesian) {
         if (ref_dens) {
-          gas->CheckRefinementBlock = ScalarFirstDerivative<pdens, C::cartesian>;
+          gas->CheckRefinementBlock = ScalarFirstDerivative<pdens, G::cartesian>;
         } else if (ref_pres) {
-          gas->CheckRefinementBlock = ScalarFirstDerivative<ppres, C::cartesian>;
+          gas->CheckRefinementBlock = ScalarFirstDerivative<ppres, G::cartesian>;
         }
         // Spherical
-      } else if (coords == C::spherical1D) {
+      } else if (coords == G::spherical1D) {
         if (ref_dens) {
-          gas->CheckRefinementBlock = ScalarFirstDerivative<pdens, C::spherical1D>;
+          gas->CheckRefinementBlock = ScalarFirstDerivative<pdens, G::spherical1D>;
         } else if (ref_pres) {
-          gas->CheckRefinementBlock = ScalarFirstDerivative<ppres, C::spherical1D>;
+          gas->CheckRefinementBlock = ScalarFirstDerivative<ppres, G::spherical1D>;
         }
-      } else if (coords == C::spherical2D) {
+      } else if (coords == G::spherical2D) {
         if (ref_dens) {
-          gas->CheckRefinementBlock = ScalarFirstDerivative<pdens, C::spherical2D>;
+          gas->CheckRefinementBlock = ScalarFirstDerivative<pdens, G::spherical2D>;
         } else if (ref_pres) {
-          gas->CheckRefinementBlock = ScalarFirstDerivative<ppres, C::spherical2D>;
+          gas->CheckRefinementBlock = ScalarFirstDerivative<ppres, G::spherical2D>;
         }
-      } else if (coords == C::spherical3D) {
+      } else if (coords == G::spherical3D) {
         if (ref_dens) {
-          gas->CheckRefinementBlock = ScalarFirstDerivative<pdens, C::spherical3D>;
+          gas->CheckRefinementBlock = ScalarFirstDerivative<pdens, G::spherical3D>;
         } else if (ref_pres) {
-          gas->CheckRefinementBlock = ScalarFirstDerivative<ppres, C::spherical3D>;
+          gas->CheckRefinementBlock = ScalarFirstDerivative<ppres, G::spherical3D>;
         }
         // Cylindrical
-      } else if (coords == C::cylindrical) {
+      } else if (coords == G::cylindrical) {
         if (ref_dens) {
-          gas->CheckRefinementBlock = ScalarFirstDerivative<pdens, C::cylindrical>;
+          gas->CheckRefinementBlock = ScalarFirstDerivative<pdens, G::cylindrical>;
         } else if (ref_pres) {
-          gas->CheckRefinementBlock = ScalarFirstDerivative<ppres, C::cylindrical>;
+          gas->CheckRefinementBlock = ScalarFirstDerivative<ppres, G::cylindrical>;
         }
         // Axisymmetric
-      } else if (coords == C::axisymmetric) {
+      } else if (coords == G::axisymmetric) {
         if (ref_dens) {
-          gas->CheckRefinementBlock = ScalarFirstDerivative<pdens, C::axisymmetric>;
+          gas->CheckRefinementBlock = ScalarFirstDerivative<pdens, G::axisymmetric>;
         } else if (ref_pres) {
-          gas->CheckRefinementBlock = ScalarFirstDerivative<ppres, C::axisymmetric>;
+          gas->CheckRefinementBlock = ScalarFirstDerivative<ppres, G::axisymmetric>;
         }
       }
     } else if (ref_mag) {
@@ -398,6 +433,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
 template <Coordinates GEOM>
 Real EstimateTimestepMesh(MeshData<Real> *md) {
   using parthenon::MakePackDescriptor;
+  using RotatingFrame::BackgroundVelocity;
   auto pm = md->GetParentPointer();
   auto &resolved_pkgs = pm->resolved_packages;
 
@@ -430,15 +466,15 @@ Real EstimateTimestepMesh(MeshData<Real> *md) {
           const Real cs = std::sqrt(bulk / dens);
           Real denom = 0.0;
           for (int d = 0; d < ndim; d++) {
-            const Real ss =
-                std::abs(vmesh(b, gas::prim::velocity(VI(n, d)), k, j, i)) + cs;
-            denom += ss / dx[d];
+            denom +=
+                (std::abs(vmesh(b, gas::prim::velocity(VI(n, d)), k, j, i)) + cs) / dx[d];
           }
           ldt = std::min(ldt, 1.0 / denom);
         }
       },
       Kokkos::Min<Real>(min_dt));
 
+  // Viscosity
   Real visc_dt = Big<Real>();
   const auto do_viscosity = params.template Get<bool>("do_viscosity");
   if (do_viscosity) {
@@ -454,6 +490,7 @@ Real EstimateTimestepMesh(MeshData<Real> *md) {
     }
   }
 
+  // Conduction
   Real cond_dt = Big<Real>();
   const auto do_conduction = params.template Get<bool>("do_conduction");
   if (do_conduction) {
@@ -522,7 +559,7 @@ TaskStatus FluxSource(MeshData<Real> *md, const Real dt) {
   auto vcons = desc_cons.GetPack(md);
   auto vface = desc_face.GetPack(md);
 
-  return ArtemisUtils::FluxSource(md, pkg, vprim, vcons, vface, dt);
+  return ArtemisUtils::FluxSource<Fluid::gas>(md, pkg, vprim, vcons, vface, dt);
 }
 
 //----------------------------------------------------------------------------------------
@@ -543,7 +580,7 @@ TaskStatus ViscousFlux(MeshData<Real> *md) {
   // Assumes this packing ordering
   static auto desc_flux =
       parthenon::MakePackDescriptor<gas::diff::momentum, gas::diff::energy>(
-          resolved_pkgs.get(), {}, {parthenon::PDOpt::WithFluxes});
+          resolved_pkgs.get());
 
   auto vprim = desc_prim.GetPack(md);
   auto vf = desc_flux.GetPack(md);
@@ -580,8 +617,8 @@ TaskStatus ThermalFlux(MeshData<Real> *md) {
           resolved_pkgs.get());
 
   // Assumes this packing ordering
-  static auto desc_flux = parthenon::MakePackDescriptor<gas::diff::energy>(
-      resolved_pkgs.get(), {}, {parthenon::PDOpt::WithFluxes});
+  static auto desc_flux =
+      parthenon::MakePackDescriptor<gas::diff::energy>(resolved_pkgs.get());
 
   auto vprim = desc_prim.GetPack(md);
   auto vf = desc_flux.GetPack(md);
@@ -612,7 +649,7 @@ TaskStatus ZeroDiffusionFlux(MeshData<Real> *md) {
   auto &resolved_pkgs = pm->resolved_packages;
   static auto desc_flux =
       parthenon::MakePackDescriptor<gas::diff::momentum, gas::diff::energy>(
-          resolved_pkgs.get(), {}, {parthenon::PDOpt::WithFluxes});
+          resolved_pkgs.get());
 
   auto vf = desc_flux.GetPack(md);
   return Diffusion::ZeroDiffusionImpl(md, vf);
@@ -703,38 +740,33 @@ void AddHistory(Coordinates coords, Params &params) {
 
 //----------------------------------------------------------------------------------------
 //! template instantiations
-template Real EstimateTimestepMesh<Coordinates::cartesian>(MeshData<Real> *md);
-template Real EstimateTimestepMesh<Coordinates::cylindrical>(MeshData<Real> *md);
-template Real EstimateTimestepMesh<Coordinates::spherical1D>(MeshData<Real> *md);
-template Real EstimateTimestepMesh<Coordinates::spherical2D>(MeshData<Real> *md);
-template Real EstimateTimestepMesh<Coordinates::spherical3D>(MeshData<Real> *md);
-template Real EstimateTimestepMesh<Coordinates::axisymmetric>(MeshData<Real> *md);
+typedef MeshData<Real> MD;
+template Real EstimateTimestepMesh<Coordinates::cartesian>(MD *md);
+template Real EstimateTimestepMesh<Coordinates::cylindrical>(MD *md);
+template Real EstimateTimestepMesh<Coordinates::spherical1D>(MD *md);
+template Real EstimateTimestepMesh<Coordinates::spherical2D>(MD *md);
+template Real EstimateTimestepMesh<Coordinates::spherical3D>(MD *md);
+template Real EstimateTimestepMesh<Coordinates::axisymmetric>(MD *md);
 
-template TaskStatus ViscousFlux<Coordinates::cartesian>(MeshData<Real> *md);
-template TaskStatus ViscousFlux<Coordinates::spherical1D>(MeshData<Real> *md);
-template TaskStatus ViscousFlux<Coordinates::spherical2D>(MeshData<Real> *md);
-template TaskStatus ViscousFlux<Coordinates::spherical3D>(MeshData<Real> *md);
-template TaskStatus ViscousFlux<Coordinates::cylindrical>(MeshData<Real> *md);
-template TaskStatus ViscousFlux<Coordinates::axisymmetric>(MeshData<Real> *md);
+template TaskStatus ViscousFlux<Coordinates::cartesian>(MD *md);
+template TaskStatus ViscousFlux<Coordinates::spherical1D>(MD *md);
+template TaskStatus ViscousFlux<Coordinates::spherical2D>(MD *md);
+template TaskStatus ViscousFlux<Coordinates::spherical3D>(MD *md);
+template TaskStatus ViscousFlux<Coordinates::cylindrical>(MD *md);
+template TaskStatus ViscousFlux<Coordinates::axisymmetric>(MD *md);
 
-template TaskStatus ThermalFlux<Coordinates::cartesian>(MeshData<Real> *md);
-template TaskStatus ThermalFlux<Coordinates::spherical1D>(MeshData<Real> *md);
-template TaskStatus ThermalFlux<Coordinates::spherical2D>(MeshData<Real> *md);
-template TaskStatus ThermalFlux<Coordinates::spherical3D>(MeshData<Real> *md);
-template TaskStatus ThermalFlux<Coordinates::cylindrical>(MeshData<Real> *md);
-template TaskStatus ThermalFlux<Coordinates::axisymmetric>(MeshData<Real> *md);
+template TaskStatus ThermalFlux<Coordinates::cartesian>(MD *md);
+template TaskStatus ThermalFlux<Coordinates::spherical1D>(MD *md);
+template TaskStatus ThermalFlux<Coordinates::spherical2D>(MD *md);
+template TaskStatus ThermalFlux<Coordinates::spherical3D>(MD *md);
+template TaskStatus ThermalFlux<Coordinates::cylindrical>(MD *md);
+template TaskStatus ThermalFlux<Coordinates::axisymmetric>(MD *md);
 
-template TaskStatus DiffusionUpdate<Coordinates::cartesian>(MeshData<Real> *md,
-                                                            const Real dt);
-template TaskStatus DiffusionUpdate<Coordinates::spherical1D>(MeshData<Real> *md,
-                                                              const Real dt);
-template TaskStatus DiffusionUpdate<Coordinates::spherical2D>(MeshData<Real> *md,
-                                                              const Real dt);
-template TaskStatus DiffusionUpdate<Coordinates::spherical3D>(MeshData<Real> *md,
-                                                              const Real dt);
-template TaskStatus DiffusionUpdate<Coordinates::cylindrical>(MeshData<Real> *md,
-                                                              const Real dt);
-template TaskStatus DiffusionUpdate<Coordinates::axisymmetric>(MeshData<Real> *md,
-                                                               const Real dt);
+template TaskStatus DiffusionUpdate<Coordinates::cartesian>(MD *md, const Real dt);
+template TaskStatus DiffusionUpdate<Coordinates::spherical1D>(MD *md, const Real dt);
+template TaskStatus DiffusionUpdate<Coordinates::spherical2D>(MD *md, const Real dt);
+template TaskStatus DiffusionUpdate<Coordinates::spherical3D>(MD *md, const Real dt);
+template TaskStatus DiffusionUpdate<Coordinates::cylindrical>(MD *md, const Real dt);
+template TaskStatus DiffusionUpdate<Coordinates::axisymmetric>(MD *md, const Real dt);
 
 } // namespace Gas

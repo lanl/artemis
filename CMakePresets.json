@@ -7,6 +7,17 @@
   },
   "configurePresets": [
     {
+      "name": "cpu-asan",
+      "cacheVariables": {
+        "CMAKE_MAKE_PROGRAM": "$env{MAKE_PROGRAM}",
+        "CMAKE_C_COMPILER": "clang",
+        "CMAKE_CXX_COMPILER": "clang++",
+        "CMAKE_BUILD_TYPE": "Debug",
+        "ARTEMIS_ENABLE_ASAN": "ON",
+        "Kokkos_ENABLE_DEBUG_BOUNDS_CHECK": "ON"
+      }
+    },
+    {
       "name": "cpu-debug",
       "cacheVariables": {
         "CMAKE_MAKE_PROGRAM": "$env{MAKE_PROGRAM}",
@@ -126,6 +137,33 @@
         "PARTHENON_DISABLE_HDF5_COMPRESSION": "ON",
         "Kokkos_ARCH_HOPPER90": "ON",
         "NUM_GPU_DEVICES_PER_NODE": "4"
+      }
+    },
+    {
+      "name": "frontier-gpu-release",
+      "cacheVariables": {
+        "CMAKE_MAKE_PROGRAM": "$env{MAKE_PROGRAM}",
+        "CMAKE_BUILD_TYPE": "Release",
+        "HDF5_INCLUDE_DIR": "$env{HDF5_ROOT}/include",
+        "CMAKE_C_COMPILER": "cc",
+        "CMAKE_CXX_COMPILER": "CC",
+        "CMAKE_CXX_FLAGS": "-noopenmp -mllvm -amdgpu-function-calls=false",
+        "ARTEMIS_ENABLE_HIP": "ON",
+      	"Kokkos_ARCH_AMD_GFX90A" : "ON"
+      }
+    },
+    {
+      "name": "frontier-gpu-debug",
+      "cacheVariables": {
+        "CMAKE_MAKE_PROGRAM": "$env{MAKE_PROGRAM}",
+        "CMAKE_BUILD_TYPE": "Debug",
+        "HDF5_INCLUDE_DIR": "$env{HDF5_ROOT}/include",
+        "CMAKE_C_COMPILER": "cc",
+        "CMAKE_CXX_COMPILER": "CC",
+        "CMAKE_CXX_FLAGS": "-noopenmp -mllvm -amdgpu-function-calls=false",
+        "ARTEMIS_ENABLE_HIP": "ON",
+      	"Kokkos_ARCH_AMD_GFX90A" : "ON",
+        "Kokkos_ENABLE_DEBUG_BOUNDS_CHECK": "ON"
       }
     }
   ]

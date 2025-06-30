@@ -1,5 +1,5 @@
 //========================================================================================
-// (C) (or copyright) 2023-2024. Triad National Security, LLC. All rights reserved.
+// (C) (or copyright) 2023-2025. Triad National Security, LLC. All rights reserved.
 //
 // This program was produced under U.S. Government contract 89233218CNA000001 for Los
 // Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -22,13 +22,20 @@ namespace ArtemisUtils {
 //! \fn void ArtemisUtils::PrintArtemisConfiguration
 //! \brief
 void PrintArtemisConfiguration(Packages_t &packages) {
+  // Generate and print splash screen
   if (parthenon::Globals::my_rank == 0) {
     Params &params = packages.Get("artemis")->AllParams();
-    std::string hfill(21, ' ');
+
+    // Extract select params
     const auto nx = params.Get<std::array<int, 3>>("prob_dim");
-    const int nd = (nx[0] > 1) + (nx[1] > 1) + (nx[2] > 1);
     const auto nb = params.Get<std::array<int, 3>>("mb_dim");
     const auto units = params.Get<Units>("units");
+    const int nd = (nx[0] > 1) + (nx[1] > 1) + (nx[2] > 1);
+
+    // NOTE(@pdmullen:) Below (and only below...), we permit line length violations so
+    // that we can better see the format of the splash screen...
+    // clang-format off
+    std::string hfill(21, ' ');
     std::string msg = "";
     if (params.Get<bool>("do_gas")) msg += "Gas\n";
     if (params.Get<bool>("do_dust")) msg += hfill + "Dust\n";
@@ -39,13 +46,14 @@ void PrintArtemisConfiguration(Packages_t &packages) {
     if (params.Get<bool>("do_viscosity")) msg += hfill + "Viscosity\n";
     if (params.Get<bool>("do_drag")) msg += hfill + "Drag\n";
     if (params.Get<bool>("do_nbody")) msg += hfill + "N-body\n";
-    if (params.Get<bool>("do_radiation")) msg += hfill + "IMC radiation\n";
-    printf("\n=======================================================\n");
+    if (params.Get<bool>("do_imc")) msg += hfill + "IMC radiation\n";
+    if (params.Get<bool>("do_moment")) msg += hfill + "Moment radiation\n";
+    printf("\n=====================================================\n");
     printf("  ARTEMIS\n");
     printf("    name:            %s\n", params.Get<std::string>("job_name").c_str());
     printf("    problem:         %s\n", params.Get<std::string>("pgen_name").c_str());
-    printf("    coordinates:     %dD %s\n", nd,
-           params.Get<std::string>("coord_sys").c_str());
+    printf("    coordinates:     %dD %s\n", nd, params.Get<std::string>("coord_sys").c_str());
+    printf("    integrator:      %s\n", params.Get<std::string>("integrator").c_str());
     printf("    MPI ranks:       %d\n", parthenon::Globals::nranks);
     printf("    dimensions:      %dx%dx%d\n", nx[0], nx[1], nx[2]);
     printf("    meshblock:       %dx%dx%d\n", nb[0], nb[1], nb[2]);
@@ -55,14 +63,12 @@ void PrintArtemisConfiguration(Packages_t &packages) {
     printf("                  [T] = %.2e\n", units.GetTimeCodeToPhysical());
     printf("                  [K] = %.2e\n", units.GetTemperatureCodeToPhysical());
     printf("    Active physics:  %s", msg.c_str());
-
     if (params.Get<bool>("do_nbody")) {
-
       auto nbody_pkg = packages.Get("nbody");
       auto particles = nbody_pkg->Param<ParArray1D<NBody::Particle>>("particles");
       auto particles_h = particles.GetHostMirrorAndCopy();
       auto npart = particles_h.size();
-      printf("      %d NBody particle(s)\n", npart);
+      printf("      %d NBody particle(s)\n", static_cast<int>(npart));
       printf("      |_\n");
       for (int n = 0; n < npart; n++) {
         auto &part = particles_h(n);
@@ -70,20 +76,18 @@ void PrintArtemisConfiguration(Packages_t &packages) {
         printf("        |            mass: %.2e\n", part.GM);
         printf("        |         coupled: %s\n", part.couple == 1 ? "yes" : "no");
         printf("        |            live: %s\n", part.live == 1 ? "yes" : "no");
-        printf("        |       softening: %s\n",
-               part.spline == 1 ? "spline" : "plummer");
+        printf("        |       softening: %s\n", part.spline == 1 ? "spline" : "plummer");
         printf("        |          radius: %.2e\n", part.rs);
         printf("        | accretion rates: gamma=%.2e\n", part.gamma);
         printf("        |                   beta=%.2e\n", part.beta);
         printf("        |          radius: %.2e\n", part.racc);
-        printf("        |        position: (%.2e,%.2e,%.2e)\n", part.pos[0], part.pos[1],
-               part.pos[2]);
-        printf("        |        velocity: (%.2e,%.2e,%.2e)\n", part.vel[0], part.vel[1],
-               part.vel[2]);
+        printf("        |        position: (%.2e,%.2e,%.2e)\n", part.pos[0], part.pos[1], part.pos[2]);
+        printf("        |        velocity: (%.2e,%.2e,%.2e)\n", part.vel[0], part.vel[1], part.vel[2]);
         printf("        -----------------------------------------------\n");
       }
     }
     printf("=======================================================\n\n");
+    // clang-format on
   }
 }
 
@@ -91,25 +95,25 @@ void PrintArtemisConfiguration(Packages_t &packages) {
 //! \fn void ArtemisUtils::EnrollArtemisRefinementOps
 //! \brief Registers custom prolongation and restriction operators on provided Metadata
 void EnrollArtemisRefinementOps(parthenon::Metadata &m, Coordinates coords) {
-  typedef Coordinates C;
-  if (coords == C::cartesian) {
-    m.RegisterRefinementOps<ArtemisUtils::ProlongateSharedMinMod<C::cartesian>,
-                            ArtemisUtils::RestrictAverage<C::cartesian>>();
-  } else if (coords == C::spherical1D) {
-    m.RegisterRefinementOps<ArtemisUtils::ProlongateSharedMinMod<C::spherical1D>,
-                            ArtemisUtils::RestrictAverage<C::spherical1D>>();
-  } else if (coords == C::spherical2D) {
-    m.RegisterRefinementOps<ArtemisUtils::ProlongateSharedMinMod<C::spherical2D>,
-                            ArtemisUtils::RestrictAverage<C::spherical2D>>();
-  } else if (coords == C::spherical3D) {
-    m.RegisterRefinementOps<ArtemisUtils::ProlongateSharedMinMod<C::spherical3D>,
-                            ArtemisUtils::RestrictAverage<C::spherical3D>>();
-  } else if (coords == C::cylindrical) {
-    m.RegisterRefinementOps<ArtemisUtils::ProlongateSharedMinMod<C::cylindrical>,
-                            ArtemisUtils::RestrictAverage<C::cylindrical>>();
-  } else if (coords == C::axisymmetric) {
-    m.RegisterRefinementOps<ArtemisUtils::ProlongateSharedMinMod<C::axisymmetric>,
-                            ArtemisUtils::RestrictAverage<C::axisymmetric>>();
+  typedef Coordinates G;
+  if (coords == G::cartesian) {
+    m.RegisterRefinementOps<ArtemisUtils::ProlongateSharedMinMod<G::cartesian>,
+                            ArtemisUtils::RestrictAverage<G::cartesian>>();
+  } else if (coords == G::spherical1D) {
+    m.RegisterRefinementOps<ArtemisUtils::ProlongateSharedMinMod<G::spherical1D>,
+                            ArtemisUtils::RestrictAverage<G::spherical1D>>();
+  } else if (coords == G::spherical2D) {
+    m.RegisterRefinementOps<ArtemisUtils::ProlongateSharedMinMod<G::spherical2D>,
+                            ArtemisUtils::RestrictAverage<G::spherical2D>>();
+  } else if (coords == G::spherical3D) {
+    m.RegisterRefinementOps<ArtemisUtils::ProlongateSharedMinMod<G::spherical3D>,
+                            ArtemisUtils::RestrictAverage<G::spherical3D>>();
+  } else if (coords == G::cylindrical) {
+    m.RegisterRefinementOps<ArtemisUtils::ProlongateSharedMinMod<G::cylindrical>,
+                            ArtemisUtils::RestrictAverage<G::cylindrical>>();
+  } else if (coords == G::axisymmetric) {
+    m.RegisterRefinementOps<ArtemisUtils::ProlongateSharedMinMod<G::axisymmetric>,
+                            ArtemisUtils::RestrictAverage<G::axisymmetric>>();
   } else {
     PARTHENON_FAIL("Invalid artemis/coordinate system!");
   }
@@ -147,6 +151,24 @@ std::vector<std::vector<Real>> loadtxt(std::string fname) {
   }
   ifs.close();
   return table;
+}
+
+ReconstructionMethod ChooseReconMethod(std::string recon) {
+  if (recon.compare("pcm") == 0) {
+    PARTHENON_REQUIRE(parthenon::Globals::nghost >= 1,
+                      "PCM requires at least 1 ghost cell.");
+    return ReconstructionMethod::pcm;
+  } else if (recon.compare("plm") == 0) {
+    PARTHENON_REQUIRE(parthenon::Globals::nghost >= 2,
+                      "PLM requires at least 2 ghost cells.");
+    return ReconstructionMethod::plm;
+  } else if (recon.compare("ppm") == 0) {
+    PARTHENON_REQUIRE(parthenon::Globals::nghost >= 3,
+                      "PPM requires at least 3 ghost cells.");
+    return ReconstructionMethod::ppm;
+  }
+  PARTHENON_FAIL("Reconstruction method not recognized.");
+  return ReconstructionMethod::pcm;
 }
 
 } // namespace ArtemisUtils

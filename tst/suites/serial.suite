@@ -21,5 +21,6 @@ ssheet/ssheet
 diffusion/alpha_disk
 drag/drag
 radiation/rad_shock
+radiation/rad_shock_cgs
 radiation/thermalization
 coagulation/coagulation

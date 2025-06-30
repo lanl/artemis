@@ -34,7 +34,7 @@ struct ParticleWeights {
   Real wght = 1.;
   Real x2min, x2max, x3min, x3max;
   ParticleWeights(const Real x2min, const Real x2max, const Real x3min, const Real x3max)
-      : x2min(x2min), x2max(x2max), x3min(x3min), x3max(x3max) {};
+      : x2min(x2min), x2max(x2max), x3min(x3min), x3max(x3max){};
 };
 
 template <Coordinates GEOM>
@@ -43,6 +43,7 @@ TaskStatus PushParticlesImpl(MeshData<Real> *md) {
   auto &resolved_pkgs = pm->resolved_packages;
   auto &rt_pkg = pm->packages.Get("raytrace");
   const auto efloor = rt_pkg->template Param<Real>("efloor");
+  const auto x1max = rt_pkg->template Param<Real>("x1max");
   // Create SparsePack
   static auto desc =
       MakePackDescriptor<rad::opac::cross_section, gas::src::energy>(resolved_pkgs.get());
@@ -58,8 +59,6 @@ TaskStatus PushParticlesImpl(MeshData<Real> *md) {
 
   // Indexing and dimensionality
   const int ndim = pm->ndim;
-  const bool multi_d = (ndim >= 2);
-  const bool three_d = (ndim == 3);
   const int &nblocks = vmesh.GetNBlocks();
   const int &nparticles_per_pack = ppack_r.GetMaxFlatIndex();
   const auto ib = md->GetBoundsI(IndexDomain::interior);
@@ -85,25 +84,33 @@ TaskStatus PushParticlesImpl(MeshData<Real> *md) {
             geometry::Coords<GEOM> coords(vmesh.GetCoordinates(b), k, j, i);
 
             // Deposit energy for this cell and decrement the photon energy
-            const auto dx = coords.GetCellWidths();
-            const Real sigma = vmesh(b, rad::opac::cross_section(), k, j, i);
-            const Real dtau = dx[0] * sigma;
+            const auto dx = coords.bnds.x1[1] - coords.bnds.x1[0];
+            const Real dtau = dx * vmesh(b, rad::opac::cross_section(), k, j, i);
             const Real efac = (dtau > 100.) ? 0.0 : std::exp(-dtau);
             const Real reduc = (dtau <= 1e-4) ? dtau - 0.5 * SQR(dtau) : (1. - efac);
             Real dE = ee * reduc;
-            Real Enew = ee * efac;
+            ee *= efac;
 
-            if (Enew < efloor) Enew = 0.0;
+            if (ee < efloor) ee = 0.0;
 
             Kokkos::atomic_add(&(vmesh(b, gas::src::energy(), k, j, i)),
                                dE / coords.Volume());
-            ee = Enew;
+
             // move the particle to the next face;
             i += 1;
             xp = coords.bnds.x1[1];
+            if (std::abs(xp - x1max) <= 1e-10) xp = x1max;
+            if ((ee == 0.0) || (xp >= x1max)) {
+              swarm_d.MarkParticleForRemoval(n);
+              break;
+            }
           }
         }
       });
+
+  for (int b = 0; b < nblocks; ++b) {
+    md->GetSwarmData(b)->Get("star")->RemoveMarkedParticles();
+  }
   return TaskStatus::complete;
 }
 
@@ -123,7 +130,7 @@ TaskStatus SourceParticlesImpl(MeshData<Real> *md, const ParticleWeights &pwght)
   const int &nblocks = vmesh.GetNBlocks();
 
   auto &rt_pkg = pm->packages.Get("raytrace");
-  const auto x1min = rt_pkg->Param<Real>("x1min");
+  const auto x1min = rt_pkg->template Param<Real>("x1min");
 
   // auto newParticlesContext = swarm->AddEmptyParticles(pwght.np2 * pwght.np3);
 
@@ -182,7 +189,7 @@ TaskStatus SourceParticlesImpl(MeshData<Real> *md, const ParticleWeights &pwght)
   //
   const int three_d = pm->ndim == 3;
   const int multi_d = pm->ndim >= 2;
-  const auto luminosity = rt_pkg->Param<Real>("luminosity");
+  const auto luminosity = rt_pkg->template Param<Real>("luminosity");
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "SourcePhotons2", parthenon::DevExecSpace(), 0, nblocks - 1,
       kb.s, kb.e, jb.s, jb.e, KOKKOS_LAMBDA(const int &b, const int &k, const int &j) {
@@ -190,7 +197,6 @@ TaskStatus SourceParticlesImpl(MeshData<Real> *md, const ParticleWeights &pwght)
         if (tot > 0) {
           geometry::Coords<GEOM> coords(vmesh.GetCoordinates(b), k, j, ib.s);
           const int nbx2 = (jb.e - jb.s) + 1;
-          const int nbx3 = (kb.e - kb.s) + 1;
           const int nper_cell = (multi_d) ? new_part_per_cell(b) : 1;
           const int ntot_cell = (three_d) ? SQR(nper_cell) : ((multi_d) ? nper_cell : 1);
           const int offset = (j - jb.s) * ntot_cell + (k - kb.s) * ntot_cell * nbx2;

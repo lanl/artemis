@@ -90,10 +90,6 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   const Real cfl_number = pin->GetOrAddReal("dust", "cfl", 0.8);
   params.Add("cfl", cfl_number);
 
-  // possible user_dt
-  const Real user_dt = pin->GetOrAddReal("dust", "user_dt", 1.0e10);
-  params.Add("user_dt", user_dt);
-
   // Floors
   const Real dfloor = pin->GetOrAddReal("dust", "dfloor", 1.0e-20);
   params.Add("dfloor", dfloor);
@@ -456,7 +452,7 @@ TaskStatus CoagulationOneStep(MeshData<Real> *md, const Real time, const Real dt
 
         const Real rad = coag.const_omega ? 1.0 : xcyl[0]; // cylindrical
 
-        const Real Omega_k = 1.0 / std::sqrt(rad) / rad;
+        const Real Omega_k = 1.0 / std::sqrt(rad) / rad; // code-unit
 
         int nCall1 = 0;
 

@@ -10,6 +10,12 @@
 // license in this material to reproduce, prepare derivative works, distribute copies to
 // the public, perform publicly and display publicly, and to permit others to do so.
 //========================================================================================
+// NOTE(@Shengtai
+// The dust coagulation code is modified from public available Dustpy package
+//          https://github.com/stammler/dustpy
+//   and from their paper (Stammler and Birnstiel (2022) ApJ 935:35)
+//          "DustPy: A Python Package for Dust Evolution in Protoplanetary Disks"
+//========================================================================================
 
 // Artemis includes
 #include "dust/coagulation/coagulation.hpp"

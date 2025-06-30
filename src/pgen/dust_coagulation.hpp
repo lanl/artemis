@@ -51,8 +51,9 @@ struct DustCoagulationVariable {
   int nDust;
   int nInit_dust;
   Real gamma, gm1;
-  Real iso_cs;
+  Real h0;
   Real d2g;
+  Real rho0;
 };
 
 } // end anonymous namespace
@@ -85,6 +86,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   dcv.nDust = pin->GetOrAddReal("dust", "nspecies", 121);
   dcv.nInit_dust = pin->GetOrAddReal("problem", "nInit_dust", 1);
   dcv.d2g = pin->GetOrAddReal("problem", "dust_to_gas", 0.01);
+  dcv.rho0 = pin->GetOrAddReal("problem", "rho0", 1.0);
 
   // using MRN distribution for the initial dust setup
   ParArray1D<Real> dust_size = dust_pkg->template Param<ParArray1D<Real>>("sizes");
@@ -94,17 +96,17 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   dcv.gamma = gas_pkg->Param<Real>("adiabatic_index");
   dcv.gm1 = dcv.gamma - 1.0;
-  dcv.iso_cs = pin->GetOrAddReal("gas", "iso_sound_speed", 1e-1);
+  dcv.h0 = pin->GetOrAddReal("problem", "h0", 0.05);
 
-  const Real gdens = 1.0;
+  const Real gdens = dcv.rho0;
   const auto mu = gas_pkg->Param<Real>("mu");
   auto &constants = artemis_pkg->Param<ArtemisUtils::Constants>("constants");
   const Real kbmu = constants.GetKBCode() / (mu * constants.GetAMUCode());
-  const Real gtemp = SQR(dcv.iso_cs) / kbmu / dcv.gamma;
+  const Real gtemp = SQR(dcv.h0) / kbmu / dcv.gamma;
   const Real gsie = eos_d.InternalEnergyFromDensityTemperature(gdens, gtemp);
   const Real pres = eos_d.PressureFromDensityTemperature(gdens, gtemp);
   if (pmb->gid == 0) {
-    std::cout << "gamma,cs,pre=" << dcv.gamma << " " << dcv.iso_cs << " "
+    std::cout << "gamma,cs,pre=" << dcv.gamma << " " << dcv.h0 << " "
               << gsie * dcv.gm1 * gdens << " " << pres << std::endl;
   }
 

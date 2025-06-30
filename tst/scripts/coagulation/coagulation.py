@@ -25,7 +25,8 @@ logger = logging.getLogger("artemis" + __name__[7:])  # set logger name
 
 _nranks = 1
 _file_id = "coag"
-_massunit = ["3.976832e28", "3.17305460032e29"]
+_rho0 = ["2e-5", "1.59577e-4"]
+_dfloor = ["2e-25", "1.59577e-24"]
 _surfden = ["true", "false"]
 _tlim = 3768.0
 
@@ -33,12 +34,13 @@ _tlim = 3768.0
 # Run Artemis
 def run(**kwargs):
     logger.debug("Runnning test " + __name__)
-    for ii, im in enumerate(_massunit):
+    for ii, im in enumerate(_rho0):
         arguments = [
-            "artemis/mass=" + im,
             "parthenon/job/problem_id=" + _file_id,
             "parthenon/time/tlim={:.8f}".format(_tlim),
             "dust/surface_density_flag=" + _surfden[ii],
+            "dust/dfloor=" + _dfloor[ii],
+            "problem/rho0=" + im,
         ]
         artemis.run(_nranks, "dust/dust_coagulation.in", arguments)
 

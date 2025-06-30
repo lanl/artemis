@@ -217,7 +217,7 @@ TaskStatus EvalOpac(MeshData<Real> *md) {
         //%%%%%%%%%%%%%%%%
         const Real temp = eos_d.TemperatureFromDensityInternalEnergy(rho, sie);
         const Real kappa = opacity_d.AbsorptionCoefficient(rho, temp, 1.0);
-        vmesh(b, rad::opac::cross_section(), k, j, i) = rho * kappa;
+        vmesh(b, rad::opac::cross_section(), k, j, i) = kappa;
       });
 
   return TaskStatus::complete;

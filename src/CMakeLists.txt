@@ -79,6 +79,8 @@ set (SRC_LIST
   radiation/moments/moments.hpp
   radiation/moments/moments_driver.cpp
   radiation/moments/matter_coupling.hpp
+  radiation/raytrace/raytrace.cpp
+  radiation/raytrace/raytrace.hpp
 
   rotating_frame/advection_driver.cpp
   rotating_frame/rotating_frame.cpp

@@ -23,6 +23,7 @@
 #include "nbody/nbody.hpp"
 #include "radiation/moments/moments.hpp"
 #include "radiation/radiation.hpp"
+#include "radiation/raytrace/raytrace.hpp"
 #include "rotating_frame/rotating_frame.hpp"
 #include "utils/artemis_utils.hpp"
 #include "utils/history.hpp"
@@ -77,6 +78,7 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   const bool do_viscosity = pin->GetOrAddBoolean("physics", "viscosity", false);
   const bool do_conduction = pin->GetOrAddBoolean("physics", "conduction", false);
   const bool do_radiation = pin->GetOrAddBoolean("physics", "radiation", false);
+  const bool do_raytrace = pin->GetOrAddBoolean("physics", "raytrace", false);
 
   // Determine input file specified algorithms
   const bool do_imc = do_radiation && pin->DoesBlockExist("radiation/imc");
@@ -111,6 +113,7 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   artemis->AddParam("do_imc", do_imc);
   artemis->AddParam("do_moment", do_moment);
   artemis->AddParam("do_shear", do_shear);
+  artemis->AddParam("do_raytrace", do_raytrace);
 
   // Set coordinate system
   const int ndim = ProblemDimension(pin.get());
@@ -145,6 +148,7 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
       PARTHENON_FAIL("Unknown radiation model!");
     }
   }
+  if (do_raytrace) packages.Add(RT::Initialize(pin.get(), units, constants));
 
   // Assign geometry-specific FillDerived functions
   if (do_gas || do_dust) {

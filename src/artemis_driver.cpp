@@ -272,7 +272,8 @@ TaskCollection ArtemisDriver<GEOM>::StepTasks() {
       }
 
       TaskID rt_src = gravity_src;
-      if (do_raytrace) {
+      // Note that radiation moments will handle this source term if active
+      if (do_raytrace && !do_moment) {
         rt_src = tl.AddTask(gravity_src, Gas::DepositEnergy, u0.get(), bdt);
       }
 

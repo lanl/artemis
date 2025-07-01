@@ -68,13 +68,14 @@ TaskStatus MatterCouplingSimpleImpl(MeshData<Real> *u0, const Real dt) {
     qshear = rframe_pkg->template Param<Real>("qshear");
     om0 = rframe_pkg->template Param<Real>("omega");
   }
+  const bool do_raytrace =
+      pm->packages.Get("artemis")->template Param<bool>("do_raytrace");
 
   // Packing and indexing
-  static auto desc =
-      parthenon::MakePackDescriptor<rad::cons::energy, rad::cons::flux,
-                                    gas::cons::density, gas::cons::momentum,
-                                    gas::cons::internal_energy, gas::cons::total_energy>(
-          resolved_pkgs.get());
+  static auto desc = parthenon::MakePackDescriptor<
+      rad::cons::energy, rad::cons::flux, gas::cons::density, gas::cons::momentum,
+      gas::cons::internal_energy, gas::cons::total_energy, gas::src::energy>(
+      resolved_pkgs.get());
   const auto v0 = desc.GetPack(u0);
   const auto ib = u0->GetBoundsI(IndexDomain::interior);
   const auto jb = u0->GetBoundsJ(IndexDomain::interior);
@@ -94,6 +95,8 @@ TaskStatus MatterCouplingSimpleImpl(MeshData<Real> *u0, const Real dt) {
 
         // U^(0) values
         const Real dens = v0(b, gas::cons::density(), k, j, i);
+        Real Q = 0.0;
+        if (do_raytrace) Q = dt * v0(b, gas::src::energy(), k, j, i);
         Real e0 = v0(b, gas::cons::internal_energy(), k, j, i);
         const auto vb =
             RotatingFrame::BackgroundVelocity<GEOM>(qshear, om0, coords.x1v());
@@ -136,7 +139,7 @@ TaskStatus MatterCouplingSimpleImpl(MeshData<Real> *u0, const Real dt) {
           const Real fleck = FleckFactor(arad, T, Cv);
 
           const Real Ri = a * (E - B);
-          const Real Fi = (e - e0) - c / chat * Ri;
+          const Real Fi = (e - e0) - c / chat * Ri - Q;
           const Real Fr = (E - Er0) + Ri;
           const Real idet = 1. / (1. + a + c / chat * fleck * a);
           Real dE = ((1. + c / chat * fleck * a) * (-Fr) + a * (-fleck * Fi)) * idet;
@@ -224,12 +227,14 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
     om0 = rframe_pkg->template Param<Real>("omega");
   }
 
+  const bool do_raytrace =
+      pm->packages.Get("artemis")->template Param<bool>("do_raytrace");
+
   // Packing and indexing
-  static auto desc =
-      parthenon::MakePackDescriptor<rad::cons::energy, rad::cons::flux,
-                                    gas::cons::density, gas::cons::momentum,
-                                    gas::cons::internal_energy, gas::cons::total_energy>(
-          resolved_pkgs.get());
+  static auto desc = parthenon::MakePackDescriptor<
+      rad::cons::energy, rad::cons::flux, gas::cons::density, gas::cons::momentum,
+      gas::cons::internal_energy, gas::cons::total_energy, gas::src::energy>(
+      resolved_pkgs.get());
 
   const auto v0 = desc.GetPack(u0);
   const auto ib = u0->GetBoundsI(IndexDomain::interior);
@@ -250,6 +255,8 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
 
         // U^(0) values
         const Real &dens = v0(b, gas::cons::density(), k, j, i);
+        Real Q = 0.0;
+        if (do_raytrace) Q = dt * v0(b, gas::src::energy(), k, j, i);
 
         // Note(AMD): There is some floating point difference between the internal energy
         // used to compute the temperature and the internal energy obtained from that
@@ -339,7 +346,7 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
             const Real cd = -g * bdf * (sigf - 2. * g2 * sigs);
 
             const Real G0 = ca * E - cb * B + cd;
-            const Real Fi = (et - et0) - c / chat * G0;
+            const Real Fi = (et - et0) - c / chat * G0 - Q;
             const Real Fr = (E - E0) + G0;
 
             // not converged yet

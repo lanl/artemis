@@ -57,6 +57,9 @@ TaskStatus MatterCouplingSimpleImpl(MeshData<Real> *u0, const Real dt) {
   const auto outer_tol = moments_pkg->template Param<Real>("outer_iteration_tol");
   const auto inner_tol = moments_pkg->template Param<Real>("inner_iteration_tol");
 
+  const auto fatal_if_unconverged =
+      moments_pkg->template Param<bool>("fatal_if_unconverged");
+
   // Extract rotating frame quantities
   Real om0 = 0.0;
   Real qshear = 0.0;
@@ -146,7 +149,7 @@ TaskStatus MatterCouplingSimpleImpl(MeshData<Real> *u0, const Real dt) {
             break;
           }
         }
-        if (inner_iter == inner_max) {
+        if ((inner_iter == inner_max) && (fatal_if_unconverged)) {
           printf("(%d,%d,%d,%d)  %lg > %lg after %d iterations\n", b, k, j, i, inner_err,
                  inner_tol, inner_max);
           PARTHENON_FAIL("Radiation matter coupling did not converge!");
@@ -209,6 +212,8 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
   const auto inner_max = moments_pkg->template Param<int>("inner_iteration_max");
   const auto outer_tol = moments_pkg->template Param<Real>("outer_iteration_tol");
   const auto inner_tol = moments_pkg->template Param<Real>("inner_iteration_tol");
+  const auto fatal_if_unconverged =
+      moments_pkg->template Param<bool>("fatal_if_unconverged");
 
   // Extract rotating frame quantities
   Real om0 = 0.0;
@@ -352,7 +357,7 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
               break;
             }
           } // inner_iter
-          if (inner_iter > inner_max) {
+          if ((inner_iter > inner_max) && (fatal_if_unconverged)) {
             printf("(%d,%d,%d,%d)  %lg > %lg after %d iterations\n", b, k, j, i,
                    inner_err, inner_tol, inner_max);
             PARTHENON_FAIL("Inner not converged");
@@ -400,7 +405,7 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
           }
 
         } // outer_iter
-        if (outer_iter > outer_max) {
+        if ((outer_iter > outer_max) && (fatal_if_unconverged)) {
           printf("(%d,%d,%d,%d)  %lg > %lg after %d iterations\n", b, k, j, i, outer_err,
                  outer_tol, outer_max);
           PARTHENON_FAIL("Outer not converged");

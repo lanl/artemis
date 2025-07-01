@@ -82,6 +82,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   const Real cfl_number = pin->GetOrAddReal("radiation/moment", "cfl", 0.8);
   params.Add("cfl", cfl_number);
 
+  params.Add("fatal_if_unconverged",
+             pin->GetOrAddBoolean("radiation/moment", "fatal_if_unconverged", true));
+
   // how to handle the matter coupling:
   // full_coupling = false only does a loop over energy couopling
   // full_coupling = true also does an outer loop over momentum coupling

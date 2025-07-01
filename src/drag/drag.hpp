@@ -175,7 +175,7 @@ TaskStatus SelfDragSourceImpl(MeshData<Real> *md, const Real time, const Real dt
   const bool do_gas = artemis_pkg->template Param<bool>("do_gas");
   const bool do_dust = artemis_pkg->template Param<bool>("do_dust");
 
-  // Extract gas parameters (if evolving gas hydrodynamics)
+  // Extract gas parameters
   Real de_switch = Null<Real>();
   Real dflr_gas = Null<Real>();
   Real sieflr_gas = Null<Real>();
@@ -184,6 +184,13 @@ TaskStatus SelfDragSourceImpl(MeshData<Real> *md, const Real time, const Real dt
     de_switch = gas_pkg->template Param<Real>("de_switch");
     dflr_gas = gas_pkg->template Param<Real>("dfloor");
     sieflr_gas = gas_pkg->template Param<Real>("siefloor");
+  }
+
+  // Extract dust parameters
+  Real dflr_dust = Null<Real>();
+  if (do_dust) {
+    auto &dust_pkg = pm->packages.Get("dust");
+    dflr_dust = dust_pkg->template Param<Real>("dfloor");
   }
 
   // Extract drag parameters
@@ -238,31 +245,45 @@ TaskStatus SelfDragSourceImpl(MeshData<Real> *md, const Real time, const Real dt
 
           // Update gas momenta and total energy
           for (int n = 0; n < vmesh.GetSize(b, gas::cons::density()); ++n) {
-            const Real &dens = vmesh(b, gas::cons::density(n), k, j, i);
-            const Real vg[3] = {
-                vmesh(b, gas::cons::momentum(VI(n, 0)), k, j, i) / (hx[0] * dens),
-                vmesh(b, gas::cons::momentum(VI(n, 1)), k, j, i) / (hx[1] * dens),
-                vmesh(b, gas::cons::momentum(VI(n, 2)), k, j, i) / (hx[2] * dens)};
+            // Extract state vector
+            Real &dens = vmesh(b, gas::cons::density(n), k, j, i);
+            Real &mom1 = vmesh(b, gas::cons::momentum(VI(n, 0)), k, j, i);
+            Real &mom2 = vmesh(b, gas::cons::momentum(VI(n, 1)), k, j, i);
+            Real &mom3 = vmesh(b, gas::cons::momentum(VI(n, 2)), k, j, i);
+            Real &etot = vmesh(b, gas::cons::total_energy(n), k, j, i);
 
-            const Real sieg = ArtemisUtils::DualEnergySIE(vmesh, b, n, k, j, i, de_switch,
-                                                          dflr_gas, sieflr_gas, hx);
+            // Apply density floor
+            const bool dfloor = (dens > dflr_gas);
+            dens = (dfloor)*dens + (!dfloor) * dflr_gas;
 
+            // Compute SIE via dual energy formalism and apply floor
+            Real sieg = ArtemisUtils::DualEnergySIE(vmesh, b, n, k, j, i, de_switch, hx);
+            const Real efloor = (sieg > sieflr_gas);
+            sieg = (efloor)*sieg + (!efloor) * sieflr_gas;
+
+            // Get diffusion coefficient
             Diffusion::DiffusionCoeff<DTYP, GEOM, Fluid::gas> dcoeff;
             const Real mu = dcoeff.Get(dp, coords, dens, sieg, eos_d);
             const Real vR = -1.5 * mu / (xcyl[0] * dens);
+            const Real vg[3] = {mom1 / (hx[0] * dens), mom2 / (hx[1] * dens),
+                                mom3 / (hx[2] * dens)};
             const Real vd[3] = {ex1[0] * vR, ex2[0] * vR, ex3[0] * vR};
 
+            // Apply update
             // Ep - E = 0.5 d ( vp^2 - v^2 )
             //  (vp-v) . (vp + v) = dv . (2v + dv) =  2 dv.v + dv.dv
             const Real dm1 = -fx1 * dens * (vg[0] - vd[0]) / (1.0 + fx1);
             const Real dm2 = -fx2 * dens * (vg[1] - vd[1]) / (1.0 + fx2);
             const Real dm3 = -fx3 * dens * (vg[2] - vd[2]) / (1.0 + fx3);
-            vmesh(b, gas::cons::momentum(VI(n, 0)), k, j, i) += hx[0] * dm1;
-            vmesh(b, gas::cons::momentum(VI(n, 1)), k, j, i) += hx[1] * dm2;
-            vmesh(b, gas::cons::momentum(VI(n, 2)), k, j, i) += hx[2] * dm3;
-            vmesh(b, gas::cons::total_energy(n), k, j, i) +=
-                dm1 * (vg[0] + 0.5 * dm1 / dens) + dm2 * (vg[1] + 0.5 * dm2 / dens) +
-                dm3 * (vg[2] + 0.5 * dm3 / dens);
+            mom1 += hx[0] * dm1;
+            mom2 += hx[1] * dm2;
+            mom3 += hx[2] * dm3;
+            etot += dm1 * (vg[0] + 0.5 * dm1 / dens) + dm2 * (vg[1] + 0.5 * dm2 / dens) +
+                    dm3 * (vg[2] + 0.5 * dm3 / dens);
+
+            // Apply total energy floor
+            const Real utmp = dens * sieflr_gas;
+            etot = std::max(etot, utmp);
           }
         }
 
@@ -289,16 +310,20 @@ TaskStatus SelfDragSourceImpl(MeshData<Real> *md, const Real time, const Real dt
 
           // Update dust momenta
           for (int n = 0; n < vmesh.GetSize(b, dust::cons::density()); ++n) {
-            const Real &dens = vmesh(b, dust::cons::density(n), k, j, i);
-            const Real mom[3] = {vmesh(b, dust::cons::momentum(VI(n, 0)), k, j, i),
-                                 vmesh(b, dust::cons::momentum(VI(n, 1)), k, j, i),
-                                 vmesh(b, dust::cons::momentum(VI(n, 2)), k, j, i)};
-            vmesh(b, dust::cons::momentum(VI(n, 0)), k, j, i) -=
-                fx1 * mom[0] / (1.0 + fx1);
-            vmesh(b, dust::cons::momentum(VI(n, 1)), k, j, i) -=
-                fx2 * mom[1] / (1.0 + fx2);
-            vmesh(b, dust::cons::momentum(VI(n, 2)), k, j, i) -=
-                fx3 * mom[2] / (1.0 + fx3);
+            // Extract state vector
+            Real &dens = vmesh(b, dust::cons::density(n), k, j, i);
+            Real &mom1 = vmesh(b, dust::cons::momentum(VI(n, 0)), k, j, i);
+            Real &mom2 = vmesh(b, dust::cons::momentum(VI(n, 1)), k, j, i);
+            Real &mom3 = vmesh(b, dust::cons::momentum(VI(n, 2)), k, j, i);
+
+            // Apply density floor
+            const bool dfloor = (dens > dflr_dust);
+            dens = (dfloor)*dens + (!dfloor) * dflr_dust;
+
+            // Apply update
+            mom1 -= fx1 * mom1 / (1.0 + fx1);
+            mom2 -= fx2 * mom2 / (1.0 + fx2);
+            mom3 -= fx3 * mom3 / (1.0 + fx3);
           }
         }
       });
@@ -342,6 +367,7 @@ TaskStatus SimpleDragSourceImpl(MeshData<Real> *md, const Real time, const Real 
   auto &dust_pkg = pm->packages.Get("dust");
   const auto &sizes = dust_pkg->template Param<ParArray1D<Real>>("sizes");
   const auto grain_density = dust_pkg->template Param<Real>("grain_density");
+  const Real dflr_dust = dust_pkg->template Param<Real>("dfloor");
 
   // Packing and indexing
   static auto desc =
@@ -397,13 +423,25 @@ TaskStatus SimpleDragSourceImpl(MeshData<Real> *md, const Real time, const Real 
                                    SQR((xv[2] - dustp.ox[2]) / (dustp.ox[2] - x3max))))};
 
         // Extract gas state vector
-        const Real &dg = vmesh(b, gas::cons::density(0), k, j, i);
-        const std::array<Real, 3> vg{
-            vmesh(b, gas::cons::momentum(VI(0, 0)), k, j, i) / (hx[0] * dg),
-            vmesh(b, gas::cons::momentum(VI(0, 1)), k, j, i) / (hx[1] * dg),
-            vmesh(b, gas::cons::momentum(VI(0, 2)), k, j, i) / (hx[2] * dg)};
-        const Real sieg = ArtemisUtils::DualEnergySIE(vmesh, b, 0, k, j, i, de_switch,
-                                                      dflr_gas, sieflr_gas, hx);
+        // NOTE(@pdmullen): Assumes single gas species
+        Real &dg = vmesh(b, gas::cons::density(0), k, j, i);
+        Real &gmom1 = vmesh(b, gas::cons::momentum(VI(0, 0)), k, j, i);
+        Real &gmom2 = vmesh(b, gas::cons::momentum(VI(0, 1)), k, j, i);
+        Real &gmom3 = vmesh(b, gas::cons::momentum(VI(0, 2)), k, j, i);
+        Real &etot = vmesh(b, gas::cons::total_energy(0), k, j, i);
+
+        // Apply density floor
+        const bool dfloor = (dg > dflr_gas);
+        dg = (dfloor)*dg + (!dfloor) * dflr_gas;
+
+        // Compute SIE via dual energy formalism and apply floor
+        Real sieg = ArtemisUtils::DualEnergySIE(vmesh, b, 0, k, j, i, de_switch, hx);
+        const Real efloor = (sieg > sieflr_gas);
+        sieg = (efloor)*sieg + (!efloor) * sieflr_gas;
+
+        // Stash gas velocity
+        const std::array<Real, 3> vg{gmom1 / (hx[0] * dg), gmom2 / (hx[1] * dg),
+                                     gmom3 / (hx[2] * dg)};
 
         // Target gas velocity
         Diffusion::DiffusionCoeff<DTYP, GEOM, Fluid::gas> dcoeff;
@@ -425,12 +463,22 @@ TaskStatus SimpleDragSourceImpl(MeshData<Real> *md, const Real time, const Real 
         std::array<Real, 3> vdt{0.0, 0.0, 0.0};
         const int nspecies = vmesh.GetSize(b, dust::cons::density());
         for (int n = 0; n < nspecies; ++n) {
+          // Extract state vector
+          Real &dens = vmesh(b, dust::cons::density(n), k, j, i);
+          Real &dmom1 = vmesh(b, dust::cons::momentum(VI(n, 0)), k, j, i);
+          Real &dmom2 = vmesh(b, dust::cons::momentum(VI(n, 1)), k, j, i);
+          Real &dmom3 = vmesh(b, dust::cons::momentum(VI(n, 2)), k, j, i);
+
+          // Apply density floor
+          const bool dfloor = (dens > dflr_dust);
+          dens = (dfloor)*dens + (!dfloor) * dflr_dust;
+
+          // Stash nth dust velocity
+          const std::array<Real, 3> vd{dmom1 / (hx[0] * dens), dmom2 / (hx[1] * dens),
+                                       dmom3 / (hx[2] * dens)};
+
+          // Coupling
           const auto id = vmesh(b, dust::cons::density(n)).sparse_id;
-          const Real &dens = vmesh(b, dust::cons::density(n), k, j, i);
-          const std::array<Real, 3> vd{
-              vmesh(b, dust::cons::momentum(VI(n, 0)), k, j, i) / (hx[0] * dens),
-              vmesh(b, dust::cons::momentum(VI(n, 1)), k, j, i) / (hx[1] * dens),
-              vmesh(b, dust::cons::momentum(VI(n, 2)), k, j, i) / (hx[2] * dens)};
           Real tc = tp.tau(id);
           [[maybe_unused]] auto &sizes_ = sizes;
           if constexpr (DRAG == DragModel::stokes) {
@@ -454,12 +502,18 @@ TaskStatus SimpleDragSourceImpl(MeshData<Real> *md, const Real time, const Real 
         fvd = {0.0, 0.0, 0.0};
         std::array<Real, 3> delta_g{0.0, 0.0, 0.0};
         for (int n = 0; n < nspecies; ++n) {
-          const auto id = vmesh(b, dust::cons::density(n)).sparse_id;
+          // Extract dust density
+          // NOTE(@pdmullen): Dust density already floored above
           const Real &dens = vmesh(b, dust::cons::density(n), k, j, i);
+
+          // Stash nth dust velocity
           const std::array<Real, 3> vd{
               vmesh(b, dust::cons::momentum(VI(n, 0)), k, j, i) / (hx[0] * dens),
               vmesh(b, dust::cons::momentum(VI(n, 1)), k, j, i) / (hx[1] * dens),
               vmesh(b, dust::cons::momentum(VI(n, 2)), k, j, i) / (hx[2] * dens)};
+
+          // Coupling
+          const auto id = vmesh(b, dust::cons::density(n)).sparse_id;
           Real tc = tp.tau(id);
           [[maybe_unused]] auto &sizes_ = sizes;
           if constexpr (DRAG == DragModel::stokes) {
@@ -488,9 +542,12 @@ TaskStatus SimpleDragSourceImpl(MeshData<Real> *md, const Real time, const Real 
           delta_g[d] -= prefac * (dg * (vg[d] - vt[d]) + fvd[d]);
           const Real vn = vg[d] + delta_g[d] / dg;
           vmesh(b, gas::cons::momentum(VI(0, d)), k, j, i) += hx[d] * delta_g[d];
-          vmesh(b, gas::cons::total_energy(0), k, j, i) +=
-              0.5 * (vg[d] + vn) * delta_g[d];
+          etot += 0.5 * (vg[d] + vn) * delta_g[d];
         }
+
+        // Apply total energy floors
+        const Real utmp = dg * sieflr_gas;
+        etot = std::max(etot, utmp);
       });
 
   return TaskStatus::complete;

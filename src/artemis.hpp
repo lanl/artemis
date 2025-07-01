@@ -95,7 +95,7 @@ using BYTE = char;
 #endif
 
 // TaskCollection function pointer for operator split tasks
-using TaskCollectionFnPtr = TaskCollection (*)(Mesh *pm, parthenon::SimTime &tm);
+using TaskCollectionFnPtr = TaskCollection (*)(Mesh *pm, const Real time, const Real dt);
 
 // Constants that enumerate...
 // ...Coordinate systems
@@ -181,7 +181,6 @@ inline int ProblemDimension(parthenon::ParameterInput *pin) {
 // Custom AMR criteria
 namespace artemis {
 extern std::function<AmrTag(MeshBlockData<Real> *mbd)> ProblemCheckRefinementBlock;
-// extern std::vector<TaskCollectionFnPtr> OperatorSplitTasks;
 } // namespace artemis
 
 #endif // ARTEMIS_ARTEMIS_HPP_

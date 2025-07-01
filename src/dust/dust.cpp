@@ -240,9 +240,6 @@ Real EstimateTimestepMesh(MeshData<Real> *md) {
   auto &dust_pkg = pm->packages.Get("dust");
   auto &params = dust_pkg->AllParams();
 
-  auto nspecies = params.template Get<int>("nspecies");
-
-  const auto cfl_number = params.template Get<Real>("cfl");
   static auto desc =
       MakePackDescriptor<dust::prim::density, dust::prim::velocity>(resolved_pkgs.get());
   auto vmesh = desc.GetPack(md);
@@ -270,7 +267,8 @@ Real EstimateTimestepMesh(MeshData<Real> *md) {
       },
       Kokkos::Min<Real>(min_dt));
 
-  return (cfl_number * min_dt);
+  const auto cfl_number = params.template Get<Real>("cfl");
+  return cfl_number * min_dt;
 }
 
 //----------------------------------------------------------------------------------------

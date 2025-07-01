@@ -34,8 +34,6 @@
 
 namespace artemis {
 
-std::vector<TaskCollectionFnPtr> OperatorSplitTasks;
-
 //----------------------------------------------------------------------------------------
 //! \fn  Packages_t Artemis::ProcessPackages
 //! \brief Process and initialize relevant packages
@@ -99,6 +97,8 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
                     "Radiation requires the gas package, but there is not gas!");
   PARTHENON_REQUIRE(!(do_imc && do_moment),
                     "Cannot simultaneously evolve IMC and moments radiation");
+  PARTHENON_REQUIRE(!(do_coagulation) || (do_coagulation && do_dust),
+                    "Coagulation requires the dust package, but there is not dust!");
 
   // Store configuration choices in params
   artemis->AddParam("do_gas", do_gas);
@@ -113,16 +113,6 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   artemis->AddParam("do_diffusion", do_conduction || do_viscosity);
   artemis->AddParam("do_radiation", do_radiation);
   artemis->AddParam("do_coagulation", do_coagulation);
-  PARTHENON_REQUIRE(!(do_cooling) || (do_cooling && do_gas),
-                    "Cooling requires the gas package, but there is not gas!");
-  PARTHENON_REQUIRE(!(do_viscosity) || (do_viscosity && do_gas),
-                    "Viscosity requires the gas package, but there is not gas!");
-  PARTHENON_REQUIRE(!(do_conduction) || (do_conduction && do_gas),
-                    "Conduction requires the gas package, but there is not gas!");
-  PARTHENON_REQUIRE(!(do_radiation) || (do_radiation && do_gas),
-                    "Radiation requires the gas package, but there is not gas!");
-  PARTHENON_REQUIRE(!(do_coagulation) || (do_coagulation && do_dust),
-                    "Coagulation requires the dust package, but there is not dust!");
   artemis->AddParam("do_imc", do_imc);
   artemis->AddParam("do_moment", do_moment);
   artemis->AddParam("do_shear", do_shear);

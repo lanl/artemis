@@ -48,8 +48,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   Real luminosity_cgs = 4 * M_PI * SQR(stellar_radius) * sb * SQR(SQR(stellar_temp));
   params.Add("luminosity", luminosity_cgs * units.GetLuminosityPhysicalToCode());
   params.Add("luminosity_cgs", luminosity_cgs);
-  params.Add("stellar_temp", stellar_temp);
-  params.Add("stellar_radius", stellar_radius);
+  params.Add("stellar_temp", stellar_temp * units.GetTemperaturePhysicalToCode());
+  params.Add("stellar_radius", stellar_radius * units.GetLengthPhysicalToCode());
   params.Add("max_iterations",
              pin->GetOrAddInteger("radiation/raytrace", "max_iterations", 1000));
 
@@ -277,19 +277,13 @@ TaskListStatus RaytraceDriver(Mesh *pmesh) {
   const auto nx3 = rt_pkg->Param<int>("nx3");
 
   // Max level to find the minimum x2 and x3 spacings
-  int max_level = 0;
-  for (auto const &pmb : pmesh->block_list) {
-    const auto &reg = pmb->block_size;
-    max_level = std::max(max_level, pmb->loc.level());
-  }
-#ifdef MPI_PARALLEL
-  PARTHENON_MPI_CHECK(
-      MPI_Allreduce(MPI_IN_PLACE, &max_level, 1, MPI_INT, MPI_MIN, MPI_COMM_WORLD));
-#endif
+  int max_level = pmesh->GetCurrentLevel();
   const int fac = 1 << max_level;
 
   // defaults to 1D
   ParticleWeights pwght(x2min, x2max, x3min, x3max);
+  pwght.mult = fac;
+  pwght.max_level = max_level;
   int reduc = 1;
   if (nx2 > 1) {
     pwght.dx2 = (x2max - x2min) / (nx2 * fac);

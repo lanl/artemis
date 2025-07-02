@@ -31,11 +31,22 @@ struct ParticleWeights {
   Real dx3 = 1.0;
   int np2 = 1;
   int np3 = 1;
-  Real wght = 1.;
+  int max_level = 0;
+  Real mult = 1.;
   Real x2min, x2max, x3min, x3max;
   ParticleWeights(const Real x2min, const Real x2max, const Real x3min, const Real x3max)
       : x2min(x2min), x2max(x2max), x3min(x3min), x3max(x3max){};
 };
+
+KOKKOS_FORCEINLINE_FUNCTION
+std::array<int, 3> GetIndices(const parthenon::Coordinates_t &pco,
+                              std::array<Real, 3> x) {
+
+  const auto xmin = pco.GetXmin();
+  return {static_cast<int>(std::floor((x[0] - xmin[0]) / pco.Dx(1))),
+          static_cast<int>(std::floor((x[1] - xmin[1]) / pco.Dx(2))),
+          static_cast<int>(std::floor((x[2] - xmin[2]) / pco.Dx(3)))};
+}
 
 template <Coordinates GEOM>
 TaskStatus PushParticlesImpl(MeshData<Real> *md) {
@@ -44,6 +55,8 @@ TaskStatus PushParticlesImpl(MeshData<Real> *md) {
   auto &rt_pkg = pm->packages.Get("raytrace");
   const auto efloor = rt_pkg->template Param<Real>("efloor");
   const auto x1max = rt_pkg->template Param<Real>("x1max");
+  const auto x1min = rt_pkg->template Param<Real>("x1min");
+  const auto rstar = rt_pkg->template Param<Real>("stellar_radius");
   // Create SparsePack
   static auto desc =
       MakePackDescriptor<rad::opac::cross_section, gas::src::energy>(resolved_pkgs.get());
@@ -59,9 +72,15 @@ TaskStatus PushParticlesImpl(MeshData<Real> *md) {
 
   // Indexing and dimensionality
   const int ndim = pm->ndim;
+  const bool multi_d = (ndim >= 2);
+  const bool three_d = (ndim == 3);
   const int &nblocks = vmesh.GetNBlocks();
   const int &nparticles_per_pack = ppack_r.GetMaxFlatIndex();
   const auto ib = md->GetBoundsI(IndexDomain::interior);
+  const auto jb = md->GetBoundsJ(IndexDomain::interior);
+  const auto kb = md->GetBoundsK(IndexDomain::interior);
+
+  const int ngh = parthenon::Globals::nghost;
 
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "TransportPhotons", DevExecSpace(), 0, nparticles_per_pack,
@@ -69,23 +88,36 @@ TaskStatus PushParticlesImpl(MeshData<Real> *md) {
         auto [b, n] = ppack_r.GetBlockParticleIndices(idx);
         const auto &swarm_d = ppack_r.GetContext(b);
         if (swarm_d.IsActive(n)) {
-          // Set ijk coorectly?
-          int &i = ppack_i(b, rad::part::ijk(0), n);
-          const int j = ppack_i(b, rad::part::ijk(1), n);
-          const int k = ppack_i(b, rad::part::ijk(2), n);
-          geometry::Coords<GEOM> coords0(vmesh.GetCoordinates(b), k, j, ib.s);
           Real &ee = ppack_r(b, rad::part::flux(), n);
           Real &xp = ppack_r(b, swarm_position::x(), n);
-          i = ib.s +
-              static_cast<int>(std::floor((xp - coords0.bnds.x1[0]) /
-                                          (coords0.bnds.x1[1] - coords0.bnds.x1[0])));
+          const Real &yp = ppack_r(b, swarm_position::y(), n);
+          const Real &zp = ppack_r(b, swarm_position::z(), n);
+          int &i = ppack_i(b, rad::part::ijk(0), n);
+          int &j = ppack_i(b, rad::part::ijk(1), n);
+          int &k = ppack_i(b, rad::part::ijk(2), n);
+          const auto &pco = vmesh.GetCoordinates(b);
+          const auto inds = GetIndices(pco, {xp, yp, zp});
+          i = ib.s + inds[0] - ngh;
+          if (multi_d) j = jb.s + inds[1] - ngh;
+          if (three_d) k = kb.s + inds[2] - ngh;
 
           while ((i <= ib.e) && (ee > 0.0)) {
-            geometry::Coords<GEOM> coords(vmesh.GetCoordinates(b), k, j, i);
+            geometry::Coords<GEOM> coords(pco, k, j, i);
 
             // Deposit energy for this cell and decrement the photon energy
             const auto dx = coords.bnds.x1[1] - coords.bnds.x1[0];
-            const Real dtau = dx * vmesh(b, rad::opac::cross_section(), k, j, i);
+            Real dtau = vmesh(b, rad::opac::cross_section(), k, j, i);
+            if (xp <= x1min + 1e-10) {
+              const Real dtau_i = dtau * (x1min - 6 * rstar);
+              const Real efac = (dtau_i > 100.) ? 0.0 : std::exp(-dtau_i);
+              ee *= efac;
+              if (ee < efloor) ee = 0.0;
+              if (ee == 0.0) {
+                //                swarm_d.MarkParticleForRemoval(n);
+                break;
+              }
+            }
+            dtau *= dx;
             const Real efac = (dtau > 100.) ? 0.0 : std::exp(-dtau);
             const Real reduc = (dtau <= 1e-4) ? dtau - 0.5 * SQR(dtau) : (1. - efac);
             Real dE = ee * reduc;
@@ -101,16 +133,16 @@ TaskStatus PushParticlesImpl(MeshData<Real> *md) {
             xp = coords.bnds.x1[1];
             if (std::abs(xp - x1max) <= 1e-10) xp = x1max;
             if ((ee == 0.0) || (xp >= x1max)) {
-              swarm_d.MarkParticleForRemoval(n);
+              //              swarm_d.MarkParticleForRemoval(n);
               break;
             }
           }
         }
       });
 
-  for (int b = 0; b < nblocks; ++b) {
-    md->GetSwarmData(b)->Get("star")->RemoveMarkedParticles();
-  }
+  // for (int b = 0; b < nblocks; ++b) {
+  //  md->GetSwarmData(b)->Get("star")->RemoveMarkedParticles();
+  //}
   return TaskStatus::complete;
 }
 
@@ -157,17 +189,14 @@ TaskStatus SourceParticlesImpl(MeshData<Real> *md, const ParticleWeights &pwght)
     const bool on_boundary = pmb->IsPhysicalBoundary(parthenon::BoundaryFace::inner_x1);
     if (on_boundary) {
       auto &particles = md->GetSwarmData(b)->Get("star");
-      const int lvl_fac = 1 << pmb->loc.level();
+      const int mult = 1 << (pwght.max_level - pmb->loc.level());
       int nbx2 = pmb->block_size.nx_[1];
-      if (nbx2 > 1) nbx2 *= lvl_fac;
+      int mult_fac = 1;
+      if (nbx2 > 1) mult_fac *= mult;
       int nbx3 = pmb->block_size.nx_[2];
-      if (nbx3 > 1) nbx3 *= lvl_fac;
-      new_parts_h(b) = nbx2 * nbx3;
-
-      //%%%%%%%%%%%%%%%%%%%%%
-      //  FIX THIS
-      //%%%%%%%%%%%%%%%%%%%%%
-      new_part_per_cell_h(b) = lvl_fac;
+      if (nbx3 > 1) mult_fac *= mult;
+      new_parts_h(b) = nbx2 * nbx3 * mult_fac;
+      new_part_per_cell_h(b) = mult;
 
       new_contexts_h(b) = particles->AddEmptyParticles(new_parts_h(b));
       nparticles += new_parts_h(b);
@@ -198,9 +227,10 @@ TaskStatus SourceParticlesImpl(MeshData<Real> *md, const ParticleWeights &pwght)
           geometry::Coords<GEOM> coords(vmesh.GetCoordinates(b), k, j, ib.s);
           const int nbx2 = (jb.e - jb.s) + 1;
           const int nper_cell = (multi_d) ? new_part_per_cell(b) : 1;
-          const int ntot_cell = (three_d) ? SQR(nper_cell) : ((multi_d) ? nper_cell : 1);
+          const int ntot_cell = (three_d) ? SQR(nper_cell) : nper_cell;
           const int offset = (j - jb.s) * ntot_cell + (k - kb.s) * ntot_cell * nbx2;
-          for (int kp = 0; kp < nper_cell; kp++) {
+          const int kpe = (three_d) ? nper_cell : 1;
+          for (int kp = 0; kp < kpe; kp++) {
             for (int jp = 0; jp < nper_cell; jp++) {
               const int np = offset + jp + nper_cell * kp;
               const int &n = new_contexts(b).GetNewParticleIndex(np);

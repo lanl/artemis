@@ -43,7 +43,6 @@ TaskStatus MatterCouplingSimpleImpl(MeshData<Real> *u0, const Real dt) {
   auto eos_d = gas_pkg->template Param<EOS>("eos_d");
   auto opac_d = gas_pkg->template Param<MeanOpacity>("opacity_d");
   auto scat_d = gas_pkg->template Param<MeanScattering>("scattering_d");
-  auto sieflr = gas_pkg->template Param<Real>("siefloor");
   auto dflr = gas_pkg->template Param<Real>("dfloor");
   auto de_switch = gas_pkg->template Param<Real>("de_switch");
 
@@ -52,6 +51,9 @@ TaskStatus MatterCouplingSimpleImpl(MeshData<Real> *u0, const Real dt) {
   const auto chat = moments_pkg->template Param<Real>("chat");
   const auto c = moments_pkg->template Param<Real>("c");
   const auto arad = moments_pkg->template Param<Real>("arad");
+  const auto tfloor = moments_pkg->template Param<Real>("tfloor");
+  const auto Bfloor = arad * SQR(SQR(tfloor));
+  const auto efloor = Bfloor;
   const auto outer_max = moments_pkg->template Param<int>("outer_iteration_max");
   const auto inner_max = moments_pkg->template Param<int>("inner_iteration_max");
   const auto outer_tol = moments_pkg->template Param<Real>("outer_iteration_tol");
@@ -145,8 +147,11 @@ TaskStatus MatterCouplingSimpleImpl(MeshData<Real> *u0, const Real dt) {
           Real dE = ((1. + c / chat * fleck * a) * (-Fr) + a * (-fleck * Fi)) * idet;
           Real dB = ((c / chat * fleck * a) * (-Fr) + (1. + a) * (-fleck * Fi)) * idet;
 
-          E += dE;
-          B += dB;
+          Real Enew = E + dE;
+          E = (Enew < efloor) ? efloor : Enew;
+          Real Bnew = B + dB;
+          B = (Bnew < Bfloor) ? Bfloor : Bnew;
+
           inner_err = std::max((std::abs(Fi) / etot), (c / chat * std::abs(Fr) / etot));
           if (inner_err <= inner_tol) {
             break;
@@ -202,7 +207,6 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
   auto eos_d = gas_pkg->template Param<EOS>("eos_d");
   auto opac_d = gas_pkg->template Param<MeanOpacity>("opacity_d");
   auto scat_d = gas_pkg->template Param<MeanScattering>("scattering_d");
-  auto sieflr = gas_pkg->template Param<Real>("siefloor");
   auto dflr = gas_pkg->template Param<Real>("dfloor");
   auto de_switch = gas_pkg->template Param<Real>("de_switch");
 
@@ -211,6 +215,9 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
   const auto chat = moments_pkg->template Param<Real>("chat");
   const auto c = moments_pkg->template Param<Real>("c");
   const auto arad = moments_pkg->template Param<Real>("arad");
+  const auto tfloor = moments_pkg->template Param<Real>("tfloor");
+  const auto Bfloor = arad * SQR(SQR(tfloor));
+  const auto efloor = Bfloor;
   const auto outer_max = moments_pkg->template Param<int>("outer_iteration_max");
   const auto inner_max = moments_pkg->template Param<int>("inner_iteration_max");
   const auto outer_tol = moments_pkg->template Param<Real>("outer_iteration_tol");
@@ -318,13 +325,18 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
           auto fedd =
               EddingtonTensor<CLOSURE>({F[0] / (c * E), F[1] / (c * E), F[2] / (c * E)});
 
-          std::array<Real, 3> bdp{
-              beta[0] * fedd[TensIdx::X11] + beta[1] * fedd[TensIdx::X12] +
-                  beta[2] * fedd[TensIdx::X13],
-              beta[0] * fedd[TensIdx::X12] + beta[1] * fedd[TensIdx::X22] +
-                  beta[2] * fedd[TensIdx::X23],
-              beta[0] * fedd[TensIdx::X13] + beta[1] * fedd[TensIdx::X23] +
-                  beta[2] * fedd[TensIdx::X33]};
+          std::array<Real, 3> bdp {
+            beta[0] * fedd[TensIdx::X11] + beta[1] * fedd[TensIdx::X12] +
+                beta[2] * fedd[TensIdx::X13],
+                Real Enew = E + dE;
+            E = (Enew < efloor) ? efloor : Enew;
+            Real Bnew = B + dB;
+            B = (Bnew < Bfloor) ? Bfloor : Bnew;
+            beta[0] * fedd[TensIdx::X12] + beta[1] * fedd[TensIdx::X22] +
+                beta[2] * fedd[TensIdx::X23],
+                beta[0] * fedd[TensIdx::X13] + beta[1] * fedd[TensIdx::X23] +
+                    beta[2] * fedd[TensIdx::X33]
+          };
           const Real bdbdp = beta[0] * bdp[0] + beta[1] * bdp[1] + beta[2] * bdp[2];
           const Real bdf = beta[0] * F[0] / c + beta[1] * F[1] / c + beta[2] * F[2] / c;
 
@@ -354,8 +366,10 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
             Real dE = ((1. + c / chat * fleck * cb) * (-Fr) + cb * (-fleck * Fi)) * idet;
             Real dB =
                 ((c / chat * fleck * ca) * (-Fr) + (1. + ca) * (-fleck * Fi)) * idet;
-            E += dE;
-            B += dB;
+            Real Enew = E + dE;
+            E = (Enew < efloor) ? efloor : Enew;
+            Real Bnew = B + dB;
+            B = (Bnew < Bfloor) ? Bfloor : Bnew;
 
             inner_err =
                 std::max((std::abs(Fi) / escale), (c / chat * std::abs(Fr) / escale));

@@ -36,6 +36,7 @@ namespace Moments {
 //! \fn  StateDescriptor Moments::Initialize
 //! \brief Adds intialization function for moments package
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
+                                            ArtemisUtils::Units &units,
                                             ArtemisUtils::Constants &constants) {
   auto moments = std::make_shared<StateDescriptor>("moments");
   Params &params = moments->AllParams();
@@ -103,6 +104,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   // Floors
   const Real efloor = pin->GetOrAddReal("radiation/moment", "efloor", 1.0e-20);
   params.Add("efloor", efloor);
+
+  const Real tfloor = pin->GetOrAddReal("radiation/moment", "tfloor_cgs", 10.); // K
+  params.Add("tfloor", tfloor * units.GetTemperaturePhysicalToCode());
 
   // Number of radiation species
   const int nspecies = pin->GetOrAddInteger("radiation/moment", "nspecies", 1);

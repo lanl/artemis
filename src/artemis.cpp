@@ -143,7 +143,7 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
       PARTHENON_REQUIRE(coords == Coordinates::cartesian,
                         "Jaybenne currently supports only Cartesian coordinates!");
     } else if (do_moment) {
-      packages.Add(Moments::Initialize(pin.get(), constants));
+      packages.Add(Moments::Initialize(pin.get(), units, constants));
     } else {
       PARTHENON_FAIL("Unknown radiation model!");
     }

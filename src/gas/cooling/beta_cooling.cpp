@@ -88,6 +88,7 @@ TaskStatus BetaCooling(MeshData<Real> *md, const Real time, const Real dt) {
         // Extract coordinates
         geometry::Coords<GEOM> coords(vmesh.GetCoordinates(b), k, j, i);
         const auto &xv = coords.GetCellCenter();
+        const auto &hx = coords.GetScaleFactors();
         const auto &xcyl = coords.ConvertToCyl(xv);
         const Real rsph2 = xcyl[0] * xcyl[0] + xcyl[2] * xcyl[2];
 
@@ -109,13 +110,21 @@ TaskStatus BetaCooling(MeshData<Real> *md, const Real time, const Real dt) {
 
         // Update total and internal energies
         for (int n = 0; n < vmesh.GetSize(b, gas::cons::density()); ++n) {
+          // Extract state vector
+          Real &dens = vmesh(b, gas::cons::density(n), k, j, i);
           Real &etot = vmesh(b, gas::cons::total_energy(n), k, j, i);
           Real &eint = vmesh(b, gas::cons::internal_energy(n), k, j, i);
-          const Real sie = ArtemisUtils::DualEnergySIE<GEOM>(
-              vmesh, b, n, k, j, i, dflr_gas, sieflr_gas, de_switch);
+
+          // Apply density floor
+          const bool dfloor = (dens > dflr_gas);
+          dens = (dfloor)*dens + (!dfloor) * dflr_gas;
+
+          // Compute SIE via dual energy formalism and apply floor
+          Real sie = ArtemisUtils::DualEnergySIE(vmesh, b, n, k, j, i, de_switch, hx);
+          const Real efloor = (sie > sieflr_gas);
+          sie = (efloor)*sie + (!efloor) * sieflr_gas;
 
           // Compute the energy change from the temperature change
-          const Real &dens = vmesh(b, gas::cons::density(n), k, j, i);
           const Real cv = eos_d.SpecificHeatFromDensityInternalEnergy(dens, sie);
           const Real Tn = eos_d.TemperatureFromDensityInternalEnergy(dens, sie);
           const Real dE = -dens * cv * omdt / (beta + omdt) * (Tn - T0);
@@ -123,6 +132,11 @@ TaskStatus BetaCooling(MeshData<Real> *md, const Real time, const Real dt) {
           // Add this energy change to the conserved fields
           etot += dE;
           eint += dE;
+
+          // Apply energy floors
+          const Real utmp = dens * sieflr_gas;
+          etot = std::max(etot, utmp);
+          eint = std::max(eint, utmp);
         }
       });
   return TaskStatus::complete;

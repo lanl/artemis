@@ -148,7 +148,7 @@ RemapUpdate(const V1 &v0, const ReconInfo &rp, const ReconInfo &r, const Real vb
   const std::array<Real, 3> I1{
       flip * fac * dxcub * dz,
       flip * (0.5 * SQR(fac) * dxcub * dz + y0 * dwdt * r.xc[0] * r.dx[0] * dz),
-      three_d * flip * dz * I0};
+      three_d * r.xc[2] * I0};
 
   const Real dq =
       (rp.q - ArtemisUtils::VDot(rp.grad, rp.xc)) * I0 + ArtemisUtils::VDot(rp.grad, I1);

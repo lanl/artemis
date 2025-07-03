@@ -42,10 +42,10 @@ KOKKOS_FORCEINLINE_FUNCTION
 std::array<int, 3> GetIndices(const parthenon::Coordinates_t &pco,
                               std::array<Real, 3> x) {
 
-  const auto xmin = pco.GetXmin();
-  return {static_cast<int>(std::floor((x[0] - xmin[0]) / pco.Dx(1))),
-          static_cast<int>(std::floor((x[1] - xmin[1]) / pco.Dx(2))),
-          static_cast<int>(std::floor((x[2] - xmin[2]) / pco.Dx(3)))};
+  return {
+      static_cast<int>(std::floor((x[0] - pco.Xf<1>(0)) / pco.CellWidth<1>(0, 0, 0))),
+      static_cast<int>(std::floor((x[1] - pco.Xf<2>(0)) / pco.CellWidth<2>(0, 0, 0))),
+      static_cast<int>(std::floor((x[2] - pco.Xf<3>(0)) / pco.CellWidth<3>(0, 0, 0)))};
 }
 
 template <Coordinates GEOM>
@@ -113,7 +113,7 @@ TaskStatus PushParticlesImpl(MeshData<Real> *md) {
               ee *= efac;
               if (ee < efloor) ee = 0.0;
               if (ee == 0.0) {
-                //                swarm_d.MarkParticleForRemoval(n);
+                swarm_d.MarkParticleForRemoval(n);
                 break;
               }
             }
@@ -133,16 +133,13 @@ TaskStatus PushParticlesImpl(MeshData<Real> *md) {
             xp = coords.bnds.x1[1];
             if (std::abs(xp - x1max) <= 1e-10) xp = x1max;
             if ((ee == 0.0) || (xp >= x1max)) {
-              //              swarm_d.MarkParticleForRemoval(n);
+              swarm_d.MarkParticleForRemoval(n);
               break;
             }
           }
         }
       });
 
-  // for (int b = 0; b < nblocks; ++b) {
-  //  md->GetSwarmData(b)->Get("star")->RemoveMarkedParticles();
-  //}
   return TaskStatus::complete;
 }
 

@@ -151,6 +151,15 @@ TaskStatus PushParticles(MeshData<Real> *md) {
   return TaskStatus::complete;
 }
 
+TaskStatus RemoveParticles(MeshData<Real> *md) {
+
+  for (int b = 0; b < md->NumBlocks(); ++b) {
+    md->GetSwarmData(b)->Get("star")->RemoveMarkedParticles();
+  }
+
+  return TaskStatus::complete;
+}
+
 TaskStatus CheckCompletion(MeshData<Real> *md) {
   // Taken from jaybenne
   auto pm = md->GetParentPointer();
@@ -162,7 +171,6 @@ TaskStatus CheckCompletion(MeshData<Real> *md) {
 
   auto &rt_pkg = pm->packages.Get("raytrace");
   auto x1max = rt_pkg->Param<Real>("x1max");
-  // TODO(BRR) do this reduction in the transport loop instead?
 
   int num_unfinished = 0;
   parthenon::par_reduce(
@@ -172,10 +180,9 @@ TaskStatus CheckCompletion(MeshData<Real> *md) {
         const auto &swarm_d = ppack_r.GetContext(b);
         if (swarm_d.IsActive(n)) {
           const Real &xp = ppack_r(b, swarm_position::x(), n);
-
-          const bool alive = ppack_r(b, rad::part::flux(), n) > 1e-10;
+          const bool alive = ppack_r(b, rad::part::flux(), n) > 0.0;
           const bool outside =
-              (xp > x1max) ||
+              (xp >= x1max) ||
               (std::abs(xp - x1max) < 10 * std::numeric_limits<Real>::epsilon());
           num_unfinished += (alive && !outside);
         }
@@ -256,6 +263,7 @@ TaskCollection RaytraceDriverTasks(Mesh *pmesh, const ParticleWeights &pwght) {
 
     auto complete = itl.AddTask(TQ::once_per_region | TQ::global_sync | TQ::completion,
                                 receive, CheckCompletion, base.get());
+    auto remove = tl.AddTask(push, RemoveParticles, base.get());
   }
   // Delete particles
 

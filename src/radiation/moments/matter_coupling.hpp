@@ -325,18 +325,13 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
           auto fedd =
               EddingtonTensor<CLOSURE>({F[0] / (c * E), F[1] / (c * E), F[2] / (c * E)});
 
-          std::array<Real, 3> bdp {
-            beta[0] * fedd[TensIdx::X11] + beta[1] * fedd[TensIdx::X12] +
-                beta[2] * fedd[TensIdx::X13],
-                Real Enew = E + dE;
-            E = (Enew < efloor) ? efloor : Enew;
-            Real Bnew = B + dB;
-            B = (Bnew < Bfloor) ? Bfloor : Bnew;
-            beta[0] * fedd[TensIdx::X12] + beta[1] * fedd[TensIdx::X22] +
-                beta[2] * fedd[TensIdx::X23],
-                beta[0] * fedd[TensIdx::X13] + beta[1] * fedd[TensIdx::X23] +
-                    beta[2] * fedd[TensIdx::X33]
-          };
+          std::array<Real, 3> bdp{
+              beta[0] * fedd[TensIdx::X11] + beta[1] * fedd[TensIdx::X12] +
+                  beta[2] * fedd[TensIdx::X13],
+              beta[0] * fedd[TensIdx::X12] + beta[1] * fedd[TensIdx::X22] +
+                  beta[2] * fedd[TensIdx::X23],
+              beta[0] * fedd[TensIdx::X13] + beta[1] * fedd[TensIdx::X23] +
+                  beta[2] * fedd[TensIdx::X33]};
           const Real bdbdp = beta[0] * bdp[0] + beta[1] * bdp[1] + beta[2] * bdp[2];
           const Real bdf = beta[0] * F[0] / c + beta[1] * F[1] / c + beta[2] * F[2] / c;
 

@@ -44,7 +44,10 @@ def get_pr_info(pr_number):
 
 
 def update_status(
-    commit_sha, state, description, context="Continuous Integration / darwin_skylake-gold"
+    commit_sha,
+    state,
+    description,
+    context="Continuous Integration / darwin_skylake-gold",
 ):
     url = f"https://api.github.com/repos/lanl/artemis/statuses/{commit_sha}"
     headers = {"Authorization": f"token {GITHUB_TOKEN}"}

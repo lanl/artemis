@@ -118,23 +118,31 @@ TaskListStatus ArtemisDriver<GEOM>::Step() {
   PreStepTasks();
   TaskListStatus status;
   // Execute explicit, unsplit physics
-  if (do_raytrace) status = RT::RaytraceDriver(pmesh);
-  if (status != TaskListStatus::complete) return status;
+  if (do_raytrace) {
+    status = RT::RaytraceDriver(pmesh);
+    if (status != TaskListStatus::complete) return status;
+  }
 
   status = StepTasks().Execute();
   if (status != TaskListStatus::complete) return status;
 
   // Operator split, background linear advection (for shearing box)
-  if (do_shear) status = RotatingFrame::Advect(pmesh, tm);
-  if (status != TaskListStatus::complete) return status;
+  if (do_shear) {
+    status = RotatingFrame::Advect(pmesh, tm);
+    if (status != TaskListStatus::complete) return status;
+  }
 
   // Operator split, IMC/DDMC radiation with Jaybenne
-  if (do_imc) status = IMC::JaybenneIMC<GEOM>(pmesh, tm.time, tm.dt);
-  if (status != TaskListStatus::complete) return status;
+  if (do_imc) {
+    status = IMC::JaybenneIMC<GEOM>(pmesh, tm.time, tm.dt);
+    if (status != TaskListStatus::complete) return status;
+  }
 
   // Operator split, moments subcyling (M1 or P1)
-  if (do_moment) status = Moments::MomentsDriver<GEOM>(pmesh, tm, rad_integrator.get());
-  if (status != TaskListStatus::complete) return status;
+  if (do_moment) {
+    status = Moments::MomentsDriver<GEOM>(pmesh, tm, rad_integrator.get());
+    if (status != TaskListStatus::complete) return status;
+  }
 
   // Compute new dt, (de)refine, and handle sparse (if enabled)
   status = PostStepTasks().Execute();

@@ -43,9 +43,7 @@ def get_pr_info(pr_number):
     return response.json()
 
 
-def update_status(
-    commit_sha, state, description, context="Continuous Integration / darwin_volta-x86"
-):
+def update_status(commit_sha, state, description, context):
     url = f"https://api.github.com/repos/lanl/artemis/statuses/{commit_sha}"
     headers = {"Authorization": f"token {GITHUB_TOKEN}"}
     data = {"state": state, "description": description, "context": context}
@@ -56,7 +54,7 @@ def update_status(
         sys.exit(1)
 
 
-def run_tests_in_temp_dir(pr_number, head_repo, head_ref, output_dir, test_cmd):
+def run_tests_in_temp_dir(pr_number, head_repo, head_ref, output_dir, test_cmd, suffix):
     current_dir = os.getcwd()
 
     # Create a temporary directory
@@ -90,7 +88,7 @@ def run_tests_in_temp_dir(pr_number, head_repo, head_ref, output_dir, test_cmd):
             + "--exe "
             + os.path.join(build_dir, "src", "artemis")
             + f" --output_dir={output_dir}"
-            + " --log_file=darwin_log_" + "suffix" + ".txt"
+            + " --log_file=darwin_log_" + suffix + ".txt"
             + " --erase_data",
     ]
 
@@ -130,15 +128,10 @@ def run_test(args, test_context, test_cmd, sbatch_cmd, suffix):
 
         # Run the tests in a temporary directory
         test_success = run_tests_in_temp_dir(
-            args.pr_number, head_repo, head_ref, args.output_dir, test_cmd
+            args.pr_number, head_repo, head_ref, args.output_dir, test_cmd, suffix
         )
 
-        # Update github PR status to indicate that gpu testing has concluded
-        if test_success:
-            update_status(commit_sha, "success", "All tests passed.", context=test_context)
-        else:
-            update_status(commit_sha, "failure", "Tests failed.", context=test_context)
-
+        return test_success
 
     else:
         # Check that we are on the right system
@@ -236,16 +229,6 @@ def run_test(args, test_context, test_cmd, sbatch_cmd, suffix):
             )
 
 
-
-
-
-
-
-
-
-
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Run CI tasks with optional Slurm submission."
@@ -275,7 +258,7 @@ if __name__ == "__main__":
     # set test specific context and commands
     gpu_context = "Continuous Integration / darwin_volta-x86"
     test_cmd_gpu = " && python3 run_tests.py gpu.suite "
-    sbatch_cmd_gpu = "--partition=volta-x86",
+    sbatch_cmd_gpu = "--partition=volta-x86"
 
 
     cpu_context = "Continuous Integration / darwin_skylake-gold"
@@ -283,6 +266,19 @@ if __name__ == "__main__":
     sbatch_cmd_cpu = "--partition=skylake-gold"
 
     # gpu tests
-    run_test(args, test_context=gpu_context, test_cmd=test_cmd_gpu, sbatch_cmd=sbatch_cmd_gpu, suffix="gpu")
+    gpu_test_success = run_test(args, test_context=gpu_context, test_cmd=test_cmd_gpu, sbatch_cmd=sbatch_cmd_gpu, suffix="gpu")
+
+    # Update github PR status to indicate that gpu testing has concluded
+    if gpu_test_success:
+        update_status(commit_sha, "success", "All tests passed.", context=gpu_context)
+    else:
+        update_status(commit_sha, "failure", "Tests failed.", context=gpu_context)
+
     # cpu_tests
-    run_test(args, test_context=cpu_context, test_cmd=test_cmd_cpu, sbatch_cmd=sbatch_cmd_cpu, suffix="cpu")
+    cpu_test_success = run_test(args, test_context=cpu_context, test_cmd=test_cmd_cpu, sbatch_cmd=sbatch_cmd_cpu, suffix="cpu")
+
+    # Update github PR status to indicate that cpu testing has concluded
+    if cpu_test_success:
+        update_status(commit_sha, "success", "All tests passed.", context=cpu_context)
+    else:
+        update_status(commit_sha, "failure", "Tests failed.", context=cpu_context)

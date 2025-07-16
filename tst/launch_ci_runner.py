@@ -79,6 +79,21 @@ def run_tests_in_temp_dir(pr_number, head_repo, head_ref, output_dir, test_cmd):
         os.chdir(os.path.join(temp_dir, "tst"))
         build_dir = os.path.join(temp_dir, "build")
 
+        test_command = [
+            "bash",
+            "-c",
+            "source ../env/bash && build_artemis -b "
+            + build_dir
+            + " -j 20 -f && cd "
+            + os.path.join(temp_dir, "tst")
+            + test_cmd
+            + "--exe "
+            + os.path.join(build_dir, "src", "artemis")
+            + f" --output_dir={output_dir}"
+            + " --log_file=darwin_log_" + "suffix" + ".txt"
+            + " --erase_data",
+    ]
+
         # Run subprocess command to compile code and launch run_tests.py
         try:
             ret = subprocess.run(test_command, check=True)
@@ -140,7 +155,7 @@ def run_test(args, test_context, test_cmd, sbatch_cmd, suffix):
         try:
             # Submit batch job with ci_runner script that will checkout and build the code and run
             # tests
-            job_name = f"artemis_ci_PR{args.pr_number}"
+            job_name = f"artemis_ci_PR{args.pr_number}_" + suffix
 
             # Clean up existing jobs for same PR
             squeue_command = f"squeue --name={shlex.quote(job_name)} --user=$(whoami) --noheader  --format=%i"
@@ -153,7 +168,7 @@ def run_test(args, test_context, test_cmd, sbatch_cmd, suffix):
             )
 
             job_ids = squeue_result.stdout.strip().split()
-            if len(job_ids) >= 2:
+            if len(job_ids) >= 1:
                 print("Canceling jobs:")
                 for job_id in job_ids:
                     print(f"  {job_id}")
@@ -176,10 +191,22 @@ def run_test(args, test_context, test_cmd, sbatch_cmd, suffix):
                 "jovian",
                 "ci",
                 f"pr_{args.pr_number}",
-                current_date_time,
-                suffix,
+                current_date_time + "_" + suffix
             )
             subprocess.run(["mkdir", "-p", output_dir], check=True)
+    
+            sbatch_command = [
+                "sbatch",
+                f"--job-name={job_name}",
+                f"--output={os.path.join(output_dir, job_name)}_%j.out",
+                f"--error={os.path.join(output_dir, job_name)}_%j.out",
+                sbatch_cmd,
+                "--time=04:00:00",
+                "--wrap",
+                f"python3 {sys.argv[0]} {args.pr_number} --submission --output_dir {output_dir}",
+            ]
+
+
             result = subprocess.run(
                 sbatch_command,
                 stdout=subprocess.PIPE,
@@ -247,59 +274,15 @@ if __name__ == "__main__":
 
     # set test specific context and commands
     gpu_context = "Continuous Integration / darwin_volta-x86"
-    test_cmd_gpu = [
-        "bash",
-        "-c",
-        "source ../env/bash && build_artemis -b "
-        + build_dir
-        + " -j 20 -f && cd "
-        + os.path.join(temp_dir, "tst")
-        + " && python3 run_tests.py gpu.suite "
-        + "--exe "
-        + os.path.join(build_dir, "src", "artemis")
-        + f" --output_dir={output_dir}"
-        + " --log_file=darwin_log.txt"
-        + " --erase_data",
-    ]
-    sbatch_cmd_gpu = [
-        "sbatch",
-        f"--job-name={job_name}",
-        f"--output={os.path.join(output_dir, job_name)}_%j.out",
-        f"--error={os.path.join(output_dir, job_name)}_%j.out",
-        "--partition=volta-x86",
-        "--time=04:00:00",
-        "--wrap",
-        f"python3 {sys.argv[0]} {args.pr_number} --submission --output_dir {output_dir}",
-    ]
+    test_cmd_gpu = " && python3 run_tests.py gpu.suite "
+    sbatch_cmd_gpu = "--partition=volta-x86",
 
 
     cpu_context = "Continuous Integration / darwin_skylake-gold"
-    test_cmd_cpu = [
-        "bash",
-        "-c",
-        "source ../env/bash && build_artemis -b "
-        + build_dir
-        + " -j 20 -f && cd "
-        + os.path.join(temp_dir, "tst")
-        + " && python3 run_tests.py regression.suite "
-        + "--exe "
-        + os.path.join(build_dir, "src", "artemis")
-        + f" --output_dir={output_dir}"
-        + " --log_file=darwin_cpu_log.txt"
-        + " --erase_data",
-    ]
-    sbatch_cmd_cpu = [
-        "sbatch",
-        f"--job-name={job_name}",
-        f"--output={os.path.join(output_dir, job_name)}_%j.out",
-        f"--error={os.path.join(output_dir, job_name)}_%j.out",
-        "--partition=skylake-gold",
-        "--time=04:00:00",
-        "--wrap",
-        f"python3 {sys.argv[0]} {args.pr_number} --submission --output_dir {output_dir}",
-    ]
+    test_cmd_cpu = " && python3 run_tests.py regression.suite "
+    sbatch_cmd_cpu = "--partition=skylake-gold"
 
     # gpu tests
-    run_test(args, test_context=gpu_context, test_cmd=test_command_gpu, sbatch_cmd=sbatch_cmd_gpu, suffix="gpu")
+    run_test(args, test_context=gpu_context, test_cmd=test_cmd_gpu, sbatch_cmd=sbatch_cmd_gpu, suffix="gpu")
     # cpu_tests
-    run_test(args, test_context=cpu_context, test_cmd=test_command_cpu, sbatch_cmd=sbatch_cmd_cpu, suffix="cpu")
+    run_test(args, test_context=cpu_context, test_cmd=test_cmd_cpu, sbatch_cmd=sbatch_cmd_cpu, suffix="cpu")

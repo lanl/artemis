@@ -140,12 +140,13 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
   auto &pco = pmb->coords;
   const auto &pars = strat_params;
+  const auto &cpars = artemis_pkg->template Param<geometry::CoordParams>("coord_params");
 
   pmb->par_for(
       "strat", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
         // Extract coordinates
-        geometry::Coords<GEOM> coords(pco, k, j, i);
+        geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
         const Real x = coords.x1v();
         const Real z = coords.x3v();
 
@@ -213,15 +214,16 @@ inline void ExtrapInnerX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
   const auto &bounds = coarse ? pmb->c_cellbounds : pmb->cellbounds;
   const auto &range = bounds.GetBoundsI(IndexDomain::interior, TE::CC);
   const int is = range.s;
+  const auto &cpars = artemis_pkg->template Param<geometry::CoordParams>("coord_params");
 
   pmb->par_for_bndry(
       "StratInnerX1", nb, IndexDomain::inner_x1, parthenon::TopologicalElement::CC,
       coarse, fine,
       KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
         // Extract coordinates
-        geometry::Coords<GEOM> coords(pco, k, j, i);
-        geometry::Coords<GEOM> coords_s(pco, k, j, is);
-        geometry::Coords<GEOM> coords_s1(pco, k, j, is + 1);
+        geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
+        geometry::Coords<GEOM> coords_s(cpars, pco, k, j, is);
+        geometry::Coords<GEOM> coords_s1(cpars, pco, k, j, is + 1);
         const Real x = coords.x1v();
         const Real x0 = coords_s.x1v();
         const Real x1 = coords_s1.x1v();
@@ -304,15 +306,16 @@ inline void ExtrapOuterX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
   const auto &bounds = coarse ? pmb->c_cellbounds : pmb->cellbounds;
   const auto &range = bounds.GetBoundsI(IndexDomain::interior, TE::CC);
   const int ie = range.e;
+  const auto &cpars = artemis_pkg->template Param<geometry::CoordParams>("coord_params");
 
   pmb->par_for_bndry(
       "StratOuterX1", nb, IndexDomain::outer_x1, parthenon::TopologicalElement::CC,
       coarse, fine,
       KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
         // Extract coordinates
-        geometry::Coords<GEOM> coords(pco, k, j, i);
-        geometry::Coords<GEOM> coords_e(pco, k, j, ie);
-        geometry::Coords<GEOM> coords_e1(pco, k, j, ie - 1);
+        geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
+        geometry::Coords<GEOM> coords_e(cpars, pco, k, j, ie);
+        geometry::Coords<GEOM> coords_e1(cpars, pco, k, j, ie - 1);
         const Real x0 = coords_e.x1v();
         const Real x1 = coords_e1.x1v();
         const Real dx = x0 - x1;
@@ -414,13 +417,14 @@ inline void ShearInnerX2(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse)
   const auto &bounds = coarse ? pmb->c_cellbounds : pmb->cellbounds;
   const auto &range = bounds.GetBoundsJ(IndexDomain::interior, TE::CC);
   const int js = range.s;
+  const auto &cpars = artemis_pkg->template Param<geometry::CoordParams>("coord_params");
 
   pmb->par_for_bndry(
       "StratInnerX2", nb, IndexDomain::inner_x2, parthenon::TopologicalElement::CC,
       coarse, fine,
       KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
         // Extract coordinates
-        geometry::Coords<GEOM> coords(pco, k, j, i);
+        geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
         const Real z = coords.x3v();
         const Real x = coords.x1v();
         const Real xf = coords.bnds.x1[0];
@@ -534,13 +538,14 @@ inline void ShearOuterX2(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse)
   const auto &bounds = coarse ? pmb->c_cellbounds : pmb->cellbounds;
   const auto &range = bounds.GetBoundsJ(IndexDomain::interior, TE::CC);
   const int je = range.e;
+  const auto &cpars = artemis_pkg->template Param<geometry::CoordParams>("coord_params");
 
   pmb->par_for_bndry(
       "StratOuterX2", nb, IndexDomain::outer_x2, parthenon::TopologicalElement::CC,
       coarse, fine,
       KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
         // Extract coordinates
-        geometry::Coords<GEOM> coords(pco, k, j, i);
+        geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
         const Real z = coords.x3v();
         const Real x = coords.x1v();
         const Real xf = coords.bnds.x1[0];
@@ -642,14 +647,15 @@ inline void ExtrapInnerX3(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
   const auto &bounds = coarse ? pmb->c_cellbounds : pmb->cellbounds;
   const auto &range = bounds.GetBoundsK(IndexDomain::interior, TE::CC);
   const int ks = range.s;
+  const auto &cpars = artemis_pkg->template Param<geometry::CoordParams>("coord_params");
 
   pmb->par_for_bndry(
       "StratInnerX3", nb, IndexDomain::inner_x3, parthenon::TopologicalElement::CC,
       coarse, fine,
       KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
         // Extract coordinates
-        geometry::Coords<GEOM> coords(pco, k, j, i);
-        geometry::Coords<GEOM> coords_s(pco, ks, j, i);
+        geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
+        geometry::Coords<GEOM> coords_s(cpars, pco, ks, j, i);
 
         const Real z = coords.x3v();
         const Real z0 = coords_s.x3v();
@@ -742,14 +748,15 @@ inline void ExtrapOuterX3(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
   const auto &bounds = coarse ? pmb->c_cellbounds : pmb->cellbounds;
   const auto &range = bounds.GetBoundsK(IndexDomain::interior, TE::CC);
   const int ke = range.e;
+  const auto &cpars = artemis_pkg->template Param<geometry::CoordParams>("coord_params");
 
   pmb->par_for_bndry(
       "StratOuterX3", nb, IndexDomain::outer_x3, parthenon::TopologicalElement::CC,
       coarse, fine,
       KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
         // Extract coordinates
-        geometry::Coords<GEOM> coords(pco, k, j, i);
-        geometry::Coords<GEOM> coords_e(pco, ke, j, i);
+        geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
+        geometry::Coords<GEOM> coords_e(cpars, pco, ke, j, i);
 
         const Real z = coords.x3v();
         const Real z0 = coords_e.x3v();

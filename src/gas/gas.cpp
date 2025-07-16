@@ -249,13 +249,15 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   const int scr_level = pin->GetOrAddInteger("gas", "scr_level", 0);
   params.Add("scr_level", scr_level);
 
+  const bool log = pin->GetOrAddString("artemis", "spacing", "uniform") == "logarithmic";
+
   // Control field for sparse gas fields
   std::string control_field = gas::cons::density::name();
 
   // Conserved Gas Density
   Metadata m = Metadata({Metadata::Cell, Metadata::Conserved, Metadata::Independent,
                          Metadata::WithFluxes, Metadata::Sparse});
-  ArtemisUtils::EnrollArtemisRefinementOps(m, coords);
+  ArtemisUtils::EnrollArtemisRefinementOps(m, coords, log);
   m.SetSparseThresholds(0.0, 0.0, 0.0);
   gas->AddSparsePool<gas::cons::density>(m, control_field, fluidids);
 
@@ -263,14 +265,14 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   m = Metadata({Metadata::Cell, Metadata::Vector, Metadata::Conserved,
                 Metadata::Independent, Metadata::WithFluxes, Metadata::Sparse},
                std::vector<int>({3}));
-  ArtemisUtils::EnrollArtemisRefinementOps(m, coords);
+  ArtemisUtils::EnrollArtemisRefinementOps(m, coords, log);
   m.SetSparseThresholds(0.0, 0.0, 0.0);
   gas->AddSparsePool<gas::cons::momentum>(m, control_field, fluidids);
 
   // Conserved Gas Total Energy
   m = Metadata({Metadata::Cell, Metadata::Conserved, Metadata::WithFluxes,
                 Metadata::Sparse, Metadata::Restart});
-  ArtemisUtils::EnrollArtemisRefinementOps(m, coords);
+  ArtemisUtils::EnrollArtemisRefinementOps(m, coords, log);
   m.SetSparseThresholds(0.0, 0.0, 0.0);
   gas->AddSparsePool<gas::cons::total_energy>(m, control_field, fluidids);
 
@@ -278,21 +280,21 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   // not actually "conserved"
   m = Metadata({Metadata::Cell, Metadata::Conserved, Metadata::Independent,
                 Metadata::Sparse, Metadata::WithFluxes});
-  ArtemisUtils::EnrollArtemisRefinementOps(m, coords);
+  ArtemisUtils::EnrollArtemisRefinementOps(m, coords, log);
   m.SetSparseThresholds(0.0, 0.0, 0.0);
   gas->AddSparsePool<gas::cons::internal_energy>(m, control_field, fluidids);
 
   // Primitive Density
   m = Metadata({Metadata::Cell, Metadata::Derived, Metadata::Intensive, Metadata::OneCopy,
                 Metadata::FillGhost, Metadata::Sparse});
-  ArtemisUtils::EnrollArtemisRefinementOps(m, coords);
+  ArtemisUtils::EnrollArtemisRefinementOps(m, coords, log);
   m.SetSparseThresholds(0.0, 0.0, 0.0);
   gas->AddSparsePool<gas::prim::density>(m, control_field, fluidids);
 
   // Primitive Pressure (and associated Riemann pressures)
   m = Metadata({Metadata::Cell, Metadata::Derived, Metadata::Intensive, Metadata::OneCopy,
                 Metadata::WithFluxes, Metadata::Sparse});
-  ArtemisUtils::EnrollArtemisRefinementOps(m, coords);
+  ArtemisUtils::EnrollArtemisRefinementOps(m, coords, log);
   m.SetSparseThresholds(0.0, 0.0, 0.0);
   gas->AddSparsePool<gas::prim::pressure>(m, control_field, fluidids);
 
@@ -300,14 +302,14 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   m = Metadata({Metadata::Cell, Metadata::Vector, Metadata::Derived, Metadata::Intensive,
                 Metadata::OneCopy, Metadata::FillGhost, Metadata::Sparse},
                std::vector<int>({3}));
-  ArtemisUtils::EnrollArtemisRefinementOps(m, coords);
+  ArtemisUtils::EnrollArtemisRefinementOps(m, coords, log);
   m.SetSparseThresholds(0.0, 0.0, 0.0);
   gas->AddSparsePool<gas::prim::velocity>(m, control_field, fluidids);
 
   // Gas specific internal energy
   m = Metadata({Metadata::Cell, Metadata::Derived, Metadata::Intensive, Metadata::OneCopy,
                 Metadata::FillGhost, Metadata::Sparse});
-  ArtemisUtils::EnrollArtemisRefinementOps(m, coords);
+  ArtemisUtils::EnrollArtemisRefinementOps(m, coords, log);
   m.SetSparseThresholds(0.0, 0.0, 0.0);
   gas->AddSparsePool<gas::prim::sie>(m, control_field, fluidids);
 
@@ -319,10 +321,10 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   if (do_diffusion) {
     m = Metadata({Metadata::Face, Metadata::Flux, Metadata::Sparse},
                  std::vector<int>({3}));
-    ArtemisUtils::EnrollArtemisRefinementOps(m, coords);
+    ArtemisUtils::EnrollArtemisRefinementOps(m, coords, log);
     gas->AddSparsePool<gas::diff::momentum>(m, control_field, fluidids);
     m = Metadata({Metadata::Face, Metadata::Flux, Metadata::Sparse});
-    ArtemisUtils::EnrollArtemisRefinementOps(m, coords);
+    ArtemisUtils::EnrollArtemisRefinementOps(m, coords, log);
     gas->AddSparsePool<gas::diff::energy>(m, control_field, fluidids);
   }
 
@@ -449,6 +451,8 @@ Real EstimateTimestepMesh(MeshData<Real> *md) {
   IndexRange jb = md->GetBoundsJ(IndexDomain::interior);
   IndexRange kb = md->GetBoundsK(IndexDomain::interior);
   const int ndim = pm->ndim;
+  const auto &cpars =
+      pm->packages.Get("artemis")->template Param<geometry::CoordParams>("coord_params");
 
   Real min_dt = Big<Real>();
   parthenon::par_reduce(
@@ -456,7 +460,7 @@ Real EstimateTimestepMesh(MeshData<Real> *md) {
       md->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, Real &ldt) {
         // Extract coordinates
-        geometry::Coords<GEOM> coords(vmesh.GetCoordinates(b), k, j, i);
+        geometry::Coords<GEOM> coords(cpars, vmesh.GetCoordinates(b), k, j, i);
         const auto &dx = coords.GetCellWidths();
 
         for (int n = 0; n < vmesh.GetSize(b, gas::prim::density()); ++n) {

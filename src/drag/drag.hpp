@@ -192,6 +192,8 @@ TaskStatus SelfDragSourceImpl(MeshData<Real> *md, const Real time, const Real dt
     auto &dust_pkg = pm->packages.Get("dust");
     dflr_dust = dust_pkg->template Param<Real>("dfloor");
   }
+  const auto &cpars =
+      pm->packages.Get("artemis")->template Param<geometry::CoordParams>("coord_params");
 
   // Extract drag parameters
   auto &drag_pkg = pm->packages.Get("drag");
@@ -217,7 +219,7 @@ TaskStatus SelfDragSourceImpl(MeshData<Real> *md, const Real time, const Real dt
       kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
         // Extract coordinates
-        geometry::Coords<GEOM> coords(vmesh.GetCoordinates(b), k, j, i);
+        geometry::Coords<GEOM> coords(cpars, vmesh.GetCoordinates(b), k, j, i);
         const auto &xv = coords.GetCellCenter();
         const auto &hx = coords.GetScaleFactors();
         const auto &[xcyl, ex1, ex2, ex3] = coords.ConvertToCylWithVec(xv);
@@ -369,6 +371,9 @@ TaskStatus SimpleDragSourceImpl(MeshData<Real> *md, const Real time, const Real 
   const auto grain_density = dust_pkg->template Param<Real>("grain_density");
   const Real dflr_dust = dust_pkg->template Param<Real>("dfloor");
 
+  const auto &cpars =
+      pm->packages.Get("artemis")->template Param<geometry::CoordParams>("coord_params");
+
   // Packing and indexing
   static auto desc =
       MakePackDescriptor<gas::cons::total_energy, gas::cons::momentum, gas::cons::density,
@@ -384,7 +389,7 @@ TaskStatus SimpleDragSourceImpl(MeshData<Real> *md, const Real time, const Real 
       md->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
         // Extract coordinates
-        geometry::Coords<GEOM> coords(vmesh.GetCoordinates(b), k, j, i);
+        geometry::Coords<GEOM> coords(cpars, vmesh.GetCoordinates(b), k, j, i);
         const auto &xv = coords.GetCellCenter();
         const auto &hx = coords.GetScaleFactors();
         const auto &[xcyl, ex1, ex2, ex3] = coords.ConvertToCylWithVec(xv);

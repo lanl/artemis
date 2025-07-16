@@ -119,6 +119,9 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   artemis->AddParam("coords", coords);
   artemis->AddParam("coord_sys", sys);
 
+  geometry::CoordParams cpars(pin.get());
+  artemis->AddParam("coord_params", cpars);
+
   // Call package initializers here
   if (do_nbody) packages.Add(NBody::Initialize(pin.get(), constants));
   if (do_gravity) packages.Add(Gravity::Initialize(pin.get(), constants, packages));

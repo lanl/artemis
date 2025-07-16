@@ -108,6 +108,8 @@ enum class Coordinates {
   axisymmetric,
   null
 };
+enum class Spacing { uniform, logarithmic };
+
 // ...Riemann solvers
 enum class RSolver { hllc, hlle, llf, null };
 // ... Upwinding (left vs right state)

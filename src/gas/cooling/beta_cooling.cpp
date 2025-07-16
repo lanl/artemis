@@ -80,13 +80,15 @@ TaskStatus BetaCooling(MeshData<Real> *md, const Real time, const Real dt) {
     particles = nbody_pkg->template Param<ParArray1D<NBody::Particle>>("particles");
     npart = static_cast<int>(particles.size());
   }
+  const auto &cpars =
+      pm->packages.Get("artemis")->template Param<geometry::CoordParams>("coord_params");
 
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "BetaCooling", parthenon::DevExecSpace(), 0,
       md->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
         // Extract coordinates
-        geometry::Coords<GEOM> coords(vmesh.GetCoordinates(b), k, j, i);
+        geometry::Coords<GEOM> coords(cpars, vmesh.GetCoordinates(b), k, j, i);
         const auto &xv = coords.GetCellCenter();
         const auto &hx = coords.GetScaleFactors();
         const auto &xcyl = coords.ConvertToCyl(xv);

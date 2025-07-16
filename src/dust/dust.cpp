@@ -162,13 +162,15 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   const int scr_level = pin->GetOrAddInteger("dust", "scr_level", 0);
   params.Add("scr_level", scr_level);
 
+  const bool log = pin->GetOrAddString("artemis", "spacing", "uniform") == "logarithmic";
+
   // Control field for sparse dust fields
   std::string control_field = dust::cons::density::name();
 
   // Conserved Dust Density
   Metadata m = Metadata({Metadata::Cell, Metadata::Conserved, Metadata::Independent,
                          Metadata::WithFluxes, Metadata::Sparse});
-  ArtemisUtils::EnrollArtemisRefinementOps(m, coords);
+  ArtemisUtils::EnrollArtemisRefinementOps(m, coords, log);
   m.SetSparseThresholds(0.0, 0.0, 0.0);
   dust->AddSparsePool<dust::cons::density>(m, control_field, dustids);
 
@@ -176,14 +178,14 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   m = Metadata({Metadata::Cell, Metadata::Vector, Metadata::Conserved,
                 Metadata::Independent, Metadata::WithFluxes, Metadata::Sparse},
                std::vector<int>({3}));
-  ArtemisUtils::EnrollArtemisRefinementOps(m, coords);
+  ArtemisUtils::EnrollArtemisRefinementOps(m, coords, log);
   m.SetSparseThresholds(0.0, 0.0, 0.0);
   dust->AddSparsePool<dust::cons::momentum>(m, control_field, dustids);
 
   // Primitive Density
   m = Metadata({Metadata::Cell, Metadata::Derived, Metadata::Intensive, Metadata::OneCopy,
                 Metadata::FillGhost, Metadata::Sparse});
-  ArtemisUtils::EnrollArtemisRefinementOps(m, coords);
+  ArtemisUtils::EnrollArtemisRefinementOps(m, coords, log);
   m.SetSparseThresholds(0.0, 0.0, 0.0);
   dust->AddSparsePool<dust::prim::density>(m, control_field, dustids);
 
@@ -191,7 +193,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   m = Metadata({Metadata::Cell, Metadata::Vector, Metadata::Derived, Metadata::Intensive,
                 Metadata::OneCopy, Metadata::FillGhost, Metadata::Sparse},
                std::vector<int>({3}));
-  ArtemisUtils::EnrollArtemisRefinementOps(m, coords);
+  ArtemisUtils::EnrollArtemisRefinementOps(m, coords, log);
   m.SetSparseThresholds(0.0, 0.0, 0.0);
   dust->AddSparsePool<dust::prim::velocity>(m, control_field, dustids);
 
@@ -236,13 +238,15 @@ Real EstimateTimestepMesh(MeshData<Real> *md) {
   IndexRange kb = md->GetBoundsK(IndexDomain::interior);
   const int ndim = pm->ndim;
 
+  const auto &cpars =
+      pm->packages.Get("artemis")->template Param<geometry::CoordParams>("coord_params");
   Real min_dt = std::numeric_limits<Real>::max();
   parthenon::par_reduce(
       parthenon::loop_pattern_mdrange_tag, "Dust::EstimateTimestepMesh", DevExecSpace(),
       0, md->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, Real &ldt) {
         // Extract coordinates
-        geometry::Coords<GEOM> coords(vmesh.GetCoordinates(b), k, j, i);
+        geometry::Coords<GEOM> coords(cpars, vmesh.GetCoordinates(b), k, j, i);
         const auto &dx = coords.GetCellWidths();
 
         for (int n = 0; n < vmesh.GetSize(b, dust::prim::density()); ++n) {

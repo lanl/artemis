@@ -25,13 +25,12 @@ namespace Gravity {
 //! \brief Process fluids, applying effects of gravitational accelerations and accretion
 template <Coordinates GEOM, typename V1>
 KOKKOS_INLINE_FUNCTION void
-NBodyGravityImpl(V1 vmesh, const NBody::Particle &pl,
-                 ArtemisUtils::array_type<Real, 7> &lforce, const int b, const int k,
-                 const int j, const int i, const bool do_gas, const bool do_dust,
-                 const Real qshear, const Real omb, const Real omf, const Real time,
-                 const Real dt) {
+NBodyGravityImpl(V1 vmesh, const geometry::Coords<GEOM> &coords,
+                 const NBody::Particle &pl, ArtemisUtils::array_type<Real, 7> &lforce,
+                 const int b, const int k, const int j, const int i, const bool do_gas,
+                 const bool do_dust, const Real qshear, const Real omb, const Real omf,
+                 const Real time, const Real dt) {
   // Extract coordinates
-  geometry::Coords<GEOM> coords(vmesh.GetCoordinates(b), k, j, i);
   const auto &x = coords.GetCellCenter();
   const auto &[xcart, ex1, ex2, ex3] = coords.ConvertToCartWithVec(x);
   const auto &hx = coords.GetScaleFactors();
@@ -190,6 +189,7 @@ TaskStatus NBodyGravity(MeshData<Real> *md, const Real time, const Real dt) {
       qshear = rf_pkg->template Param<Real>("qshear");
     }
   }
+  const auto &cpars = artemis_pkg->template Param<geometry::CoordParams>("coord_params");
 
   // Grab all the relevent nbody data
   auto particles = nbody_pkg->template Param<ParArray1D<NBody::Particle>>("particles");
@@ -216,8 +216,9 @@ TaskStatus NBodyGravity(MeshData<Real> *md, const Real time, const Real dt) {
         KOKKOS_LAMBDA(const int b, const int k, const int j, const int i,
                       ArtemisUtils::array_type<Real, 7> &lsum) {
           if (particles(n).couple) {
-            NBodyGravityImpl<GEOM>(vmesh, particles(n), lsum, b, k, j, i, do_gas, do_dust,
-                                   qshear, omb, omf, time, dt);
+            const geometry::Coords<GEOM> coords(cpars, vmesh.GetCoordinates(b), k, j, i);
+            NBodyGravityImpl<GEOM>(vmesh, coords, particles(n), lsum, b, k, j, i, do_gas,
+                                   do_dust, qshear, omb, omf, time, dt);
           }
         },
         ArtemisUtils::SumMyArray<Real, Kokkos::HostSpace, 7>(lforce));

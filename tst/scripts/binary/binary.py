@@ -47,7 +47,6 @@ def run(**kwargs):
         "parthenon/time/tlim={:.16f}".format(2.0 * np.pi),
     ]
 
-
     artemis.run(_nranks, "disk/binary_cyl.in", arguments)
 
 

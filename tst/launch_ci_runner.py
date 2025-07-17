@@ -220,14 +220,6 @@ def run_test(args, test_context, test_cmd, sbatch_cmd, suffix):
                 "SLURM job submission failed with error: " + repr(err),
                 context=test_context
             )
-        finally:
-            update_status(
-                commit_sha,
-                "failure",
-                "SLURM job submission didn't complete sucessfully",
-                context=test_context
-            )
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(

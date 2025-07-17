@@ -99,7 +99,7 @@ struct DiffCoeffParams {
                   parthenon::ParameterInput *pin,
                   const ArtemisUtils::Constants &constants, const Packages_t &packages) {
     // Read the parameter file
-    log = pin->GetOrAddString("artemis", "spacing", "uniform") == "logarithmic";
+    log = pin->GetOrAddString("artemis", "radial_spacing", "uniform") == "logarithmic";
     std::string type_ = pin->GetString(block_name, "type");
     type = ChooseDiffusion(dtype, type_);
     if (type == DiffType::null) {

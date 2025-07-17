@@ -34,7 +34,7 @@ enum class CellFace { lower = 0, upper = 1 };
 
 struct CoordParams {
   CoordParams(ParameterInput *pin) {
-    log = (pin->GetOrAddString("artemis", "spacing", "uniform") == "logarithmic");
+    log = (pin->GetOrAddString("artemis", "radial_spacing", "uniform") == "logarithmic");
   }
   KOKKOS_INLINE_FUNCTION
   CoordParams() = default;
@@ -158,7 +158,7 @@ class CoordsBase {
   BBox bnds;
   KOKKOS_INLINE_FUNCTION
   CoordsBase(const parthenon::Coordinates_t &pco, const int k, const int j, const int i)
-      : bnds(pco, k, j, i){};
+      : bnds(pco, k, j, i) {};
 
   KOKKOS_INLINE_FUNCTION
   CoordsBase(const CoordParams &cpars, const parthenon::Coordinates_t &pco, const int k,

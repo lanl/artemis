@@ -14,7 +14,7 @@
 <artemis>
 problem = disk             # name of the pgen
 coordinates = cylindrical  # coordinate system
-spacing = logarithmic
+radial_spacing = logarithmic
 
 <parthenon/job>
 problem_id = disk  # problem ID: basename of output filenames

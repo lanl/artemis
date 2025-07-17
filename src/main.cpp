@@ -29,7 +29,7 @@ parthenon::DriverStatus LaunchWorkFlow(parthenon::ParthenonManager &pman,
   // (2) Call ParthenonInit to set up the mesh and packages
   // (3) Execute driver
   std::string sys = pin->GetOrAddString("artemis", "coordinates", "cartesian");
-  std::string spacing = pin->GetOrAddString("artemis", "spacing", "uniform");
+  std::string spacing = pin->GetOrAddString("artemis", "radial_spacing", "uniform");
   if (spacing == "logarithmic") {
     PARTHENON_REQUIRE(sys != "cartesian",
                       "Cannot have logarithmic spacing with Cartesian coordinates");

@@ -162,7 +162,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   const int scr_level = pin->GetOrAddInteger("dust", "scr_level", 0);
   params.Add("scr_level", scr_level);
 
-  const bool log = pin->GetOrAddString("artemis", "spacing", "uniform") == "logarithmic";
+  const bool log =
+      pin->GetOrAddString("artemis", "radial_spacing", "uniform") == "logarithmic";
 
   // Control field for sparse dust fields
   std::string control_field = dust::cons::density::name();

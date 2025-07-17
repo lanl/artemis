@@ -249,7 +249,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   const int scr_level = pin->GetOrAddInteger("gas", "scr_level", 0);
   params.Add("scr_level", scr_level);
 
-  const bool log = pin->GetOrAddString("artemis", "spacing", "uniform") == "logarithmic";
+  const bool log =
+      pin->GetOrAddString("artemis", "radial_spacing", "uniform") == "logarithmic";
 
   // Control field for sparse gas fields
   std::string control_field = gas::cons::density::name();

@@ -125,7 +125,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   const int scr_level = pin->GetOrAddInteger("radiation/moment", "scr_level", 0);
   params.Add("scr_level", scr_level);
 
-  const bool log = pin->GetOrAddString("artemis", "spacing", "uniform") == "logarithmic";
+  const bool log =
+      pin->GetOrAddString("artemis", "radial_spacing", "uniform") == "logarithmic";
 
   // Control field for sparse radiation fields
   std::string control_field = rad::cons::energy::name();

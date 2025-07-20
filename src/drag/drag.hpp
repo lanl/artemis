@@ -192,17 +192,14 @@ TaskStatus SelfDragSourceImpl(MeshData<Real> *md, const Real time, const Real dt
     auto &dust_pkg = pm->packages.Get("dust");
     dflr_dust = dust_pkg->template Param<Real>("dfloor");
   }
-  const auto &cpars =
-      pm->packages.Get("artemis")->template Param<geometry::CoordParams>("coord_params");
+  const auto &cpars = artemis_pkg->template Param<geometry::CoordParams>("coord_params");
 
-  // Extract drag parameters
-  auto &drag_pkg = pm->packages.Get("drag");
-  const Real x1min = drag_pkg->template Param<Real>("x1min");
-  const Real x1max = drag_pkg->template Param<Real>("x1max");
-  const Real x2min = drag_pkg->template Param<Real>("x2min");
-  const Real x2max = drag_pkg->template Param<Real>("x2max");
-  const Real x3min = drag_pkg->template Param<Real>("x3min");
-  const Real x3max = drag_pkg->template Param<Real>("x3max");
+  const Real x1min = artemis_pkg->template Param<Real>("x1min");
+  const Real x1max = artemis_pkg->template Param<Real>("x1max");
+  const Real x2min = artemis_pkg->template Param<Real>("x2min");
+  const Real x2max = artemis_pkg->template Param<Real>("x2max");
+  const Real x3min = artemis_pkg->template Param<Real>("x3min");
+  const Real x3max = artemis_pkg->template Param<Real>("x3max");
 
   // Packing and indexing
   static auto desc =
@@ -349,6 +346,7 @@ TaskStatus SimpleDragSourceImpl(MeshData<Real> *md, const Real time, const Real 
   const int ndim = pm->ndim;
   const int multi_d = (ndim >= 2);
   const int three_d = (ndim == 3);
+  auto &artemis_pkg = pm->packages.Get("artemis");
 
   // Extract gas package and params
   auto &gas_pkg = pm->packages.Get("gas");
@@ -356,14 +354,12 @@ TaskStatus SimpleDragSourceImpl(MeshData<Real> *md, const Real time, const Real 
   const Real dflr_gas = gas_pkg->template Param<Real>("dfloor");
   const Real sieflr_gas = gas_pkg->template Param<Real>("siefloor");
 
-  // Extract drag package and params
-  auto &drag_pkg = pm->packages.Get("drag");
-  const Real x1min = drag_pkg->template Param<Real>("x1min");
-  const Real x1max = drag_pkg->template Param<Real>("x1max");
-  const Real x2min = drag_pkg->template Param<Real>("x2min");
-  const Real x2max = drag_pkg->template Param<Real>("x2max");
-  const Real x3min = drag_pkg->template Param<Real>("x3min");
-  const Real x3max = drag_pkg->template Param<Real>("x3max");
+  const Real x1min = artemis_pkg->template Param<Real>("x1min");
+  const Real x1max = artemis_pkg->template Param<Real>("x1max");
+  const Real x2min = artemis_pkg->template Param<Real>("x2min");
+  const Real x2max = artemis_pkg->template Param<Real>("x2max");
+  const Real x3min = artemis_pkg->template Param<Real>("x3min");
+  const Real x3max = artemis_pkg->template Param<Real>("x3max");
 
   // Extract dust package and params
   auto &dust_pkg = pm->packages.Get("dust");
@@ -371,8 +367,7 @@ TaskStatus SimpleDragSourceImpl(MeshData<Real> *md, const Real time, const Real 
   const auto grain_density = dust_pkg->template Param<Real>("grain_density");
   const Real dflr_dust = dust_pkg->template Param<Real>("dfloor");
 
-  const auto &cpars =
-      pm->packages.Get("artemis")->template Param<geometry::CoordParams>("coord_params");
+  const auto &cpars = artemis_pkg->template Param<geometry::CoordParams>("coord_params");
 
   // Packing and indexing
   static auto desc =

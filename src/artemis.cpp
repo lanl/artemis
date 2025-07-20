@@ -78,6 +78,10 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
 
   artemis->AddParam("x1min", x1min);
   artemis->AddParam("x1max", x1max);
+  artemis->AddParam("x2min", x2min);
+  artemis->AddParam("x2max", x2max);
+  artemis->AddParam("x3min", x3min);
+  artemis->AddParam("x3max", x3max);
 
   // Add optionally enrollable operator split Metadata flag
   parthenon::MetadataFlag MetadataOperatorSplit =

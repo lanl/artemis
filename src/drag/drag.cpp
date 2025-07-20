@@ -32,12 +32,12 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   // We damp in the X* (* = 1,2,3) direction between
   //          x*min <= x* <= inner_x*, at the rate inner_x*_rate
   // and   outer_x* <= x* <=    x*max, at the rate outer_x*_rate
-  params.Add("x1min", pin->GetReal("artemis/mesh", "x1min"));
-  params.Add("x2min", pin->GetReal("artemis/mesh", "x2min"));
-  params.Add("x3min", pin->GetReal("artemis/mesh", "x3min"));
-  params.Add("x1max", pin->GetReal("artemis/mesh", "x1max"));
-  params.Add("x2max", pin->GetReal("artemis/mesh", "x2max"));
-  params.Add("x3max", pin->GetReal("artemis/mesh", "x3max"));
+  params.Add("x1min", pin->GetReal("parthenon/mesh", "x1min"));
+  params.Add("x2min", pin->GetReal("parthenon/mesh", "x2min"));
+  params.Add("x3min", pin->GetReal("parthenon/mesh", "x3min"));
+  params.Add("x1max", pin->GetReal("parthenon/mesh", "x1max"));
+  params.Add("x2max", pin->GetReal("parthenon/mesh", "x2max"));
+  params.Add("x3max", pin->GetReal("parthenon/mesh", "x3max"));
 
   // Coupling type for drag
   const bool do_gas = pin->GetOrAddBoolean("physics", "gas", true);

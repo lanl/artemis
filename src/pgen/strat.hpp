@@ -69,7 +69,7 @@ inline void InitStratParams(MeshBlock *pmb, ParameterInput *pin) {
   Params &params = artemis_pkg->AllParams();
   if (!(params.hasKey("strat_params"))) {
     StratParams strat_params;
-    strat_params.three_d = pin->GetInteger("parthenon/mesh", "nx3") > 1;
+    strat_params.three_d = pin->GetInteger("artemis/mesh", "nx3") > 1;
     strat_params.q = pmb->packages.Get("rotating_frame")->Param<Real>("qshear");
     strat_params.Om0 = pmb->packages.Get("rotating_frame")->Param<Real>("omega");
     strat_params.h = pin->GetOrAddReal("problem", "h", 1.0);

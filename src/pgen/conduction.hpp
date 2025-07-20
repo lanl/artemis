@@ -85,7 +85,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   }
 
   // Problem specific params
-  const Real x1min = pin->GetReal("parthenon/mesh", "x1min");
+  const Real x1min = pin->GetReal("artemis/mesh", "x1min");
 
   // Packing and capture variables for kernel
   auto &md = pmb->meshblock_data.Get();

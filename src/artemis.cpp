@@ -65,16 +65,20 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   // Correct x1 coordinate if logarithmic
   auto x1min = pin->GetReal("parthenon/mesh", "x1min");
   auto x1max = pin->GetReal("parthenon/mesh", "x1max");
+  auto x2min = pin->GetReal("parthenon/mesh", "x2min");
+  auto x2max = pin->GetReal("parthenon/mesh", "x2max");
+  auto x3min = pin->GetReal("parthenon/mesh", "x3min");
+  auto x3max = pin->GetReal("parthenon/mesh", "x3max");
   if (pin->GetOrAddString("artemis", "radial_spacing", "uniform") == "logarithmic") {
     x1min = std::exp(x1min);
     x1max = std::exp(x1max);
   }
   pin->SetReal("artemis", "x1min", x1min);
   pin->SetReal("artemis", "x1max", x1max);
-  pin->SetReal("artemis", "x2min", pin->GetReal("parthenon/mesh", "x2min"));
-  pin->SetReal("artemis", "x2max", pin->GetReal("parthenon/mesh", "x2max"));
-  pin->SetReal("artemis", "x3min", pin->GetReal("parthenon/mesh", "x3min"));
-  pin->SetReal("artemis", "x3max", pin->GetReal("parthenon/mesh", "x3max"));
+  pin->SetReal("artemis", "x2min", x2min);
+  pin->SetReal("artemis", "x2max", x2max);
+  pin->SetReal("artemis", "x3min", x3min);
+  pin->SetReal("artemis", "x3max", x3max);
 
   artemis->AddParam("x1min", x1min);
   artemis->AddParam("x1max", x1max);

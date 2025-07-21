@@ -73,12 +73,6 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
     x1min = std::exp(x1min);
     x1max = std::exp(x1max);
   }
-  pin->SetReal("artemis", "x1min", x1min);
-  pin->SetReal("artemis", "x1max", x1max);
-  pin->SetReal("artemis", "x2min", x2min);
-  pin->SetReal("artemis", "x2max", x2max);
-  pin->SetReal("artemis", "x3min", x3min);
-  pin->SetReal("artemis", "x3max", x3max);
 
   artemis->AddParam("x1min", x1min);
   artemis->AddParam("x1max", x1max);

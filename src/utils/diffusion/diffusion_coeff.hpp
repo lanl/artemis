@@ -68,6 +68,7 @@ inline DiffAvg ChooseAveraging(std::string choice) {
 struct DiffCoeffParams {
   DiffType type;
   DiffAvg avg;
+  bool log;
 
   // Viscosity
   // -----------------
@@ -98,6 +99,7 @@ struct DiffCoeffParams {
                   parthenon::ParameterInput *pin,
                   const ArtemisUtils::Constants &constants, const Packages_t &packages) {
     // Read the parameter file
+    log = pin->GetOrAddString("artemis", "radial_spacing", "uniform") == "logarithmic";
     std::string type_ = pin->GetString(block_name, "type");
     type = ChooseDiffusion(dtype, type_);
     if (type == DiffType::null) {
@@ -175,7 +177,7 @@ class DiffusionCoeff {
     PARTHENON_FAIL("No default implementation for diffusion coefficient");
   }
   KOKKOS_INLINE_FUNCTION Real Get(const DiffCoeffParams &dp,
-                                  geometry::Coords<GEOM> coords, const Real dens,
+                                  geometry::Coords<GEOM> &coords, const Real dens,
                                   const Real sie, const EOS &eos) const {
     PARTHENON_FAIL("No default implementation for diffusion coefficient");
   }
@@ -199,7 +201,7 @@ class DiffusionCoeff<DiffType::null, GEOM, FLUID_TYPE> {
   }
 
   KOKKOS_INLINE_FUNCTION Real Get(const DiffCoeffParams &dp,
-                                  geometry::Coords<GEOM> coords, const Real dens,
+                                  geometry::Coords<GEOM> &coords, const Real dens,
                                   const Real sie, const EOS &eos) const {
     return 0.0;
   }
@@ -230,7 +232,7 @@ class DiffusionCoeff<DiffType::viscosity_plaw, GEOM, FLUID_TYPE> {
     auto pco = p.GetCoordinates(b);
     parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, member, il, iu,
                              [&](const int i) {
-                               geometry::Coords<GEOM> coords(pco, k, j, i);
+                               geometry::Coords<GEOM> coords(dp.log, pco, k, j, i);
                                const Real &dens = p(b, gas::prim::density(n), k, j, i);
                                const auto &xv = coords.GetCellCenter();
                                const auto &xs = coords.ConvertToCyl(xv);
@@ -278,7 +280,7 @@ class DiffusionCoeff<DiffType::viscosity_alpha, GEOM, FLUID_TYPE> {
     auto pco = p.GetCoordinates(b);
     parthenon::par_for_inner(
         DEFAULT_INNER_LOOP_PATTERN, member, il, iu, [&](const int i) {
-          geometry::Coords<GEOM> coords(pco, k, j, i);
+          geometry::Coords<GEOM> coords(dp.log, pco, k, j, i);
           const auto &xv = coords.GetCellCenter();
           const auto &xs = coords.ConvertToSph(xv);
           const Real Omk = dp.Omega0 * std::pow(xs[0] / dp.R0, -1.5);

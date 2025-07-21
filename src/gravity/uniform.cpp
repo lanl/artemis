@@ -40,6 +40,8 @@ TaskStatus UniformGravity(MeshData<Real> *md, const Real time, const Real dt) {
   const Real gx2 = gravity_pkg->template Param<Real>("gx2");
   const Real gx3 = gravity_pkg->template Param<Real>("gx3");
 
+  const auto &cpars = artemis_pkg->template Param<geometry::CoordParams>("coord_params");
+
   static auto desc =
       MakePackDescriptor<gas::cons::momentum, gas::cons::total_energy,
                          dust::cons::momentum, gas::prim::density, gas::prim::velocity,
@@ -54,7 +56,7 @@ TaskStatus UniformGravity(MeshData<Real> *md, const Real time, const Real dt) {
       md->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
         // Extract coordinates
-        geometry::Coords<GEOM> coords(vmesh.GetCoordinates(b), k, j, i);
+        geometry::Coords<GEOM> coords(cpars, vmesh.GetCoordinates(b), k, j, i);
         const auto &hx = coords.GetScaleFactors();
 
         if (do_gas) {

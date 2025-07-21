@@ -92,7 +92,7 @@ def analyze():
     errors = []
     for ax, g in zip(axes, _geom):
         name = "{}_{}".format(_file_id, g[:3])
-        time, x, y, z, [d, u, v, w, T] = analysis.load_level(
+        time, x, y, z, [d, u, v, w, T], _ = analysis.load_level(
             "final", dir=artemis.get_data_dir(), base="{}.out1".format(name)
         )
         xc = 0.5 * (x[1:] + x[:-1])

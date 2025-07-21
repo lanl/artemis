@@ -71,6 +71,7 @@ TaskStatus BinaryMassGravity(MeshData<Real> *md, const Real time, const Real dt)
     pos1[n] = com[n] - mu2 * rb[n];
     pos2[n] = com[n] + mu1 * rb[n];
   }
+  const auto &cpars = artemis_pkg->template Param<geometry::CoordParams>("coord_params");
 
   // Packing and indexing
   static auto desc =
@@ -91,7 +92,7 @@ TaskStatus BinaryMassGravity(MeshData<Real> *md, const Real time, const Real dt)
       md->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
         // Extract coordinate information
-        geometry::Coords<GEOM> coords(vmesh.GetCoordinates(b), k, j, i);
+        geometry::Coords<GEOM> coords(cpars, vmesh.GetCoordinates(b), k, j, i);
         const auto &dx = coords.GetCellCenter();
         const auto &[dxc1_, ex1, ex2, ex3] = coords.ConvertToCartWithVec(dx);
         auto dxc1 = dxc1_;

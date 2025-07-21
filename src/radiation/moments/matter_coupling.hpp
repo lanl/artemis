@@ -58,6 +58,8 @@ TaskStatus MatterCouplingSimpleImpl(MeshData<Real> *u0, const Real dt) {
   const auto inner_max = moments_pkg->template Param<int>("inner_iteration_max");
   const auto outer_tol = moments_pkg->template Param<Real>("outer_iteration_tol");
   const auto inner_tol = moments_pkg->template Param<Real>("inner_iteration_tol");
+  const auto &cpars =
+      pm->packages.Get("artemis")->template Param<geometry::CoordParams>("coord_params");
 
   const auto fatal_if_unconverged =
       moments_pkg->template Param<bool>("fatal_if_unconverged");
@@ -91,7 +93,7 @@ TaskStatus MatterCouplingSimpleImpl(MeshData<Real> *u0, const Real dt) {
       DEFAULT_LOOP_PATTERN, "MatterCoupling", DevExecSpace(), 0, u0->NumBlocks() - 1,
       kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
-        geometry::Coords<GEOM> coords(v0.GetCoordinates(b), k, j, i);
+        geometry::Coords<GEOM> coords(cpars, v0.GetCoordinates(b), k, j, i);
         const auto &hx = coords.GetScaleFactors();
         // y = U^(0) + dt S(y)
 
@@ -233,6 +235,8 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
     qshear = rframe_pkg->template Param<Real>("qshear");
     om0 = rframe_pkg->template Param<Real>("omega");
   }
+  const auto &cpars =
+      pm->packages.Get("artemis")->template Param<geometry::CoordParams>("coord_params");
 
   const bool do_raytrace =
       pm->packages.Get("artemis")->template Param<bool>("do_raytrace");
@@ -256,7 +260,7 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
       DEFAULT_LOOP_PATTERN, "MatterCoupling", DevExecSpace(), 0, u0->NumBlocks() - 1,
       kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
-        geometry::Coords<GEOM> coords(v0.GetCoordinates(b), k, j, i);
+        geometry::Coords<GEOM> coords(cpars, v0.GetCoordinates(b), k, j, i);
         const auto &hx = coords.GetScaleFactors();
         // y = U^(0) + dt S(y)
 

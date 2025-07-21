@@ -68,6 +68,9 @@ Real EstimateTimeStep(parthenon::Mesh *pmesh) {
       IndexRange jb = md->GetBoundsJ(IndexDomain::interior);
       IndexRange kb = md->GetBoundsK(IndexDomain::interior);
       const auto ndim = pmesh->ndim;
+      const auto &cpars =
+          pmesh->packages.Get("artemis")->template Param<geometry::CoordParams>(
+              "coord_params");
 
       // Compute minimum dx
       Real min_dx = Big<Real>();
@@ -76,7 +79,7 @@ Real EstimateTimeStep(parthenon::Mesh *pmesh) {
           DevExecSpace(), 0, md->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
           KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, Real &ldx_m) {
             // Extract coordinates
-            geometry::Coords<GEOM> coords(vmesh.GetCoordinates(b), k, j, i);
+            geometry::Coords<GEOM> coords(cpars, vmesh.GetCoordinates(b), k, j, i);
             const auto &dx = coords.GetCellWidths();
             for (int d = 0; d < ndim; d++) {
               ldx_m = std::min(ldx_m, dx[d]);

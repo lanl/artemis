@@ -192,15 +192,14 @@ TaskStatus SelfDragSourceImpl(MeshData<Real> *md, const Real time, const Real dt
     auto &dust_pkg = pm->packages.Get("dust");
     dflr_dust = dust_pkg->template Param<Real>("dfloor");
   }
+  const auto &cpars = artemis_pkg->template Param<geometry::CoordParams>("coord_params");
 
-  // Extract drag parameters
-  auto &drag_pkg = pm->packages.Get("drag");
-  const Real x1min = drag_pkg->template Param<Real>("x1min");
-  const Real x1max = drag_pkg->template Param<Real>("x1max");
-  const Real x2min = drag_pkg->template Param<Real>("x2min");
-  const Real x2max = drag_pkg->template Param<Real>("x2max");
-  const Real x3min = drag_pkg->template Param<Real>("x3min");
-  const Real x3max = drag_pkg->template Param<Real>("x3max");
+  const Real x1min = artemis_pkg->template Param<Real>("x1min");
+  const Real x1max = artemis_pkg->template Param<Real>("x1max");
+  const Real x2min = artemis_pkg->template Param<Real>("x2min");
+  const Real x2max = artemis_pkg->template Param<Real>("x2max");
+  const Real x3min = artemis_pkg->template Param<Real>("x3min");
+  const Real x3max = artemis_pkg->template Param<Real>("x3max");
 
   // Packing and indexing
   static auto desc =
@@ -217,7 +216,7 @@ TaskStatus SelfDragSourceImpl(MeshData<Real> *md, const Real time, const Real dt
       kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
         // Extract coordinates
-        geometry::Coords<GEOM> coords(vmesh.GetCoordinates(b), k, j, i);
+        geometry::Coords<GEOM> coords(cpars, vmesh.GetCoordinates(b), k, j, i);
         const auto &xv = coords.GetCellCenter();
         const auto &hx = coords.GetScaleFactors();
         const auto &[xcyl, ex1, ex2, ex3] = coords.ConvertToCylWithVec(xv);
@@ -347,6 +346,7 @@ TaskStatus SimpleDragSourceImpl(MeshData<Real> *md, const Real time, const Real 
   const int ndim = pm->ndim;
   const int multi_d = (ndim >= 2);
   const int three_d = (ndim == 3);
+  auto &artemis_pkg = pm->packages.Get("artemis");
 
   // Extract gas package and params
   auto &gas_pkg = pm->packages.Get("gas");
@@ -354,20 +354,20 @@ TaskStatus SimpleDragSourceImpl(MeshData<Real> *md, const Real time, const Real 
   const Real dflr_gas = gas_pkg->template Param<Real>("dfloor");
   const Real sieflr_gas = gas_pkg->template Param<Real>("siefloor");
 
-  // Extract drag package and params
-  auto &drag_pkg = pm->packages.Get("drag");
-  const Real x1min = drag_pkg->template Param<Real>("x1min");
-  const Real x1max = drag_pkg->template Param<Real>("x1max");
-  const Real x2min = drag_pkg->template Param<Real>("x2min");
-  const Real x2max = drag_pkg->template Param<Real>("x2max");
-  const Real x3min = drag_pkg->template Param<Real>("x3min");
-  const Real x3max = drag_pkg->template Param<Real>("x3max");
+  const Real x1min = artemis_pkg->template Param<Real>("x1min");
+  const Real x1max = artemis_pkg->template Param<Real>("x1max");
+  const Real x2min = artemis_pkg->template Param<Real>("x2min");
+  const Real x2max = artemis_pkg->template Param<Real>("x2max");
+  const Real x3min = artemis_pkg->template Param<Real>("x3min");
+  const Real x3max = artemis_pkg->template Param<Real>("x3max");
 
   // Extract dust package and params
   auto &dust_pkg = pm->packages.Get("dust");
   const auto &sizes = dust_pkg->template Param<ParArray1D<Real>>("sizes");
   const auto grain_density = dust_pkg->template Param<Real>("grain_density");
   const Real dflr_dust = dust_pkg->template Param<Real>("dfloor");
+
+  const auto &cpars = artemis_pkg->template Param<geometry::CoordParams>("coord_params");
 
   // Packing and indexing
   static auto desc =
@@ -384,7 +384,7 @@ TaskStatus SimpleDragSourceImpl(MeshData<Real> *md, const Real time, const Real 
       md->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
         // Extract coordinates
-        geometry::Coords<GEOM> coords(vmesh.GetCoordinates(b), k, j, i);
+        geometry::Coords<GEOM> coords(cpars, vmesh.GetCoordinates(b), k, j, i);
         const auto &xv = coords.GetCellCenter();
         const auto &hx = coords.GetScaleFactors();
         const auto &[xcyl, ex1, ex2, ex3] = coords.ConvertToCylWithVec(xv);

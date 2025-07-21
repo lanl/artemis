@@ -111,10 +111,13 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const bool three_d = (pm->ndim == 3);
   const Real gamma = pin->GetReal("gas", "gamma");
   const Real cv = 1.0 / (gamma - 1.);
+
+  const auto &cpars =
+      pm->packages.Get("artemis")->template Param<geometry::CoordParams>("coord_params");
   pmb->par_for(
       "constant", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        geometry::Coords<GEOM> coords(pco, k, j, i);
+        geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
         const auto &xi = coords.GetCellCenter();
 
         auto xo = NewArray<Real, 3>();

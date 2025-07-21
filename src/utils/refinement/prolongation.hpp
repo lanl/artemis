@@ -38,17 +38,17 @@ namespace ArtemisUtils {
 //!        coordinate direction. Do so for both coarse and fine grids.
 template <Coordinates C, int DIM>
 KOKKOS_FORCEINLINE_FUNCTION void
-GetGridSpacings(const Coordinates_t &coords, const Coordinates_t &coarse_coords, int k,
-                int j, int i, int fk, int fj, int fi, Real *dxm, Real *dxp, Real *dxfm,
-                Real *dxfp) {
+GetGridSpacings(const Coordinates_t &coords, const Coordinates_t &coarse_coords,
+                const bool log, int k, int j, int i, int fk, int fj, int fi, Real *dxm,
+                Real *dxp, Real *dxfm, Real *dxfp) {
   namespace gg = geometry;
   Real xm = Null<Real>(), xc = Null<Real>(), xp = Null<Real>();
   Real fxm = Null<Real>(), fxp = Null<Real>();
-  gg::Coords<C> cc(coarse_coords, k, j, i);
-  gg::Coords<C> cm(coarse_coords, k - (DIM == 3), j - (DIM == 2), i - (DIM == 1));
-  gg::Coords<C> cp(coarse_coords, k + (DIM == 3), j + (DIM == 2), i + (DIM == 1));
-  gg::Coords<C> fm(coords, fk, fj, fi);
-  gg::Coords<C> fp(coords, fk + (DIM == 3), fj + (DIM == 2), fi + (DIM == 1));
+  gg::Coords<C> cc(log, coarse_coords, k, j, i);
+  gg::Coords<C> cm(log, coarse_coords, k - (DIM == 3), j - (DIM == 2), i - (DIM == 1));
+  gg::Coords<C> cp(log, coarse_coords, k + (DIM == 3), j + (DIM == 2), i + (DIM == 1));
+  gg::Coords<C> fm(log, coords, fk, fj, fi);
+  gg::Coords<C> fp(log, coords, fk + (DIM == 3), fj + (DIM == 2), fi + (DIM == 1));
   if constexpr (DIM == 1) {
     xm = cm.x1v(), xc = cc.x1v(), xp = cp.x1v();
     fxm = fm.x1v(), fxp = fp.x1v();
@@ -79,7 +79,7 @@ Real GradMinMod(const Real fc, const Real fm, const Real fp, const Real dxm,
 //----------------------------------------------------------------------------------------
 //! \struct  ArtemisUtils::ProlongateSharedMinMod
 //! \brief
-template <Coordinates GEOM>
+template <Coordinates GEOM, bool log>
 struct ProlongateSharedMinMod {
   static constexpr bool OperationRequired(TopologicalElement fel,
                                           TopologicalElement cel) {
@@ -117,8 +117,8 @@ struct ProlongateSharedMinMod {
     [[maybe_unused]] Real gx1m = 0, gx1p = 0;
     if constexpr (INCLUDE_X1) {
       Real dx1m, dx1p;
-      ArtemisUtils::GetGridSpacings<GEOM, 1>(coords, coarse_coords, k, j, i, fk, fj, fi,
-                                             &dx1m, &dx1p, &dx1fm, &dx1fp);
+      ArtemisUtils::GetGridSpacings<GEOM, 1>(coords, coarse_coords, log, k, j, i, fk, fj,
+                                             fi, &dx1m, &dx1p, &dx1fm, &dx1fp);
 
       Real gx1c = ArtemisUtils::GradMinMod(fc, coarse(element_idx, l, m, n, k, j, i - 1),
                                            coarse(element_idx, l, m, n, k, j, i + 1),
@@ -132,8 +132,8 @@ struct ProlongateSharedMinMod {
     [[maybe_unused]] Real gx2m = 0, gx2p = 0;
     if constexpr (INCLUDE_X2) {
       Real dx2m, dx2p;
-      ArtemisUtils::GetGridSpacings<GEOM, 2>(coords, coarse_coords, k, j, i, fk, fj, fi,
-                                             &dx2m, &dx2p, &dx2fm, &dx2fp);
+      ArtemisUtils::GetGridSpacings<GEOM, 2>(coords, coarse_coords, log, k, j, i, fk, fj,
+                                             fi, &dx2m, &dx2p, &dx2fm, &dx2fp);
       Real gx2c = ArtemisUtils::GradMinMod(fc, coarse(element_idx, l, m, n, k, j - 1, i),
                                            coarse(element_idx, l, m, n, k, j + 1, i),
                                            dx2m, dx2p, gx2m, gx2p);
@@ -146,8 +146,8 @@ struct ProlongateSharedMinMod {
     [[maybe_unused]] Real gx3m = 0, gx3p = 0;
     if constexpr (INCLUDE_X3) {
       Real dx3m, dx3p;
-      ArtemisUtils::GetGridSpacings<GEOM, 3>(coords, coarse_coords, k, j, i, fk, fj, fi,
-                                             &dx3m, &dx3p, &dx3fm, &dx3fp);
+      ArtemisUtils::GetGridSpacings<GEOM, 3>(coords, coarse_coords, log, k, j, i, fk, fj,
+                                             fi, &dx3m, &dx3p, &dx3fm, &dx3fp);
       Real gx3c = ArtemisUtils::GradMinMod(fc, coarse(element_idx, l, m, n, k - 1, j, i),
                                            coarse(element_idx, l, m, n, k + 1, j, i),
                                            dx3m, dx3p, gx3m, gx3p);

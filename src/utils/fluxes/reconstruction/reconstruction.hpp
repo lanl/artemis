@@ -23,20 +23,21 @@ template <ReconstructionMethod R, CoordinateDirection DIR, Coordinates GEOM>
 struct Reconstruction {
   template <typename V>
   KOKKOS_INLINE_FUNCTION void
-  operator()(parthenon::team_mbr_t const &member, const int b, const int k, const int j,
-             const int il, const int iu, const V &q, parthenon::ScratchPad2D<Real> &ql,
+  operator()(parthenon::team_mbr_t const &member, const geometry::CoordParams &cpars,
+             const int b, const int k, const int j, const int il, const int iu,
+             const V &q, parthenon::ScratchPad2D<Real> &ql,
              parthenon::ScratchPad2D<Real> &qr) const {
     PARTHENON_FAIL("No default implementation!");
   }
 };
 
-template <ReconstructionMethod R>
+template <Coordinates GEOM, ReconstructionMethod R>
 struct ReconGradient {
   template <typename V>
   KOKKOS_INLINE_FUNCTION std::array<Real, 3>
-  operator()(const V &q, const std::array<Real, 3> &dx, const int multi_d,
-             const int three_d, const int b, const int n, const int k, const int j,
-             const int i) const {
+  operator()(const geometry::CoordParams &cpars, const V &q,
+             const std::array<Real, 3> &dx, const int multi_d, const int three_d,
+             const int b, const int n, const int k, const int j, const int i) const {
     PARTHENON_FAIL("No default implementation!");
   }
 };

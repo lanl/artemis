@@ -91,13 +91,13 @@ def analyze():
         logger.debug("Analyzing test " + __name__ + " {:d}D".format(d))
         os.makedirs(artemis.get_fig_dir(), exist_ok=True)
 
-        time, x, y, z, [dens, u, v, w, T] = analysis.load_level(
+        time, x, y, z, [dens, u, v, w, T], _ = analysis.load_level(
             "final", dir=artemis.get_data_dir(), base=base + ".out1"
         )
         xc = 0.5 * (x[1:] + x[:-1])
         yc = 0.5 * (y[1:] + y[:-1])
 
-        time0, x0, y0, z0, [dens0, u0, v0, w0, T0] = analysis.load_level(
+        time0, x0, y0, z0, [dens0, u0, v0, w0, T0], _ = analysis.load_level(
             0, dir=artemis.get_data_dir(), base=base + ".out1"
         )
 

@@ -100,11 +100,12 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   constant_params.input_system = geometry::CoordSelect(input_system, ndim);
   constant_params.system = geometry::CoordSelect(system, ndim);
 
+  const auto &cpars = artemis_pkg->template Param<geometry::CoordParams>("coord_params");
   // setup uniform ambient medium
   pmb->par_for(
       "constant", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        geometry::Coords<GEOM> coords(pco, k, j, i);
+        geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
         const auto &xi = coords.GetCellCenter();
 
         auto xo = NewArray<Real, 3>();

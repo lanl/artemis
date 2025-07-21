@@ -34,6 +34,8 @@ TaskStatus PointMassGravity(MeshData<Real> *md, const Real time, const Real dt) 
   const bool do_gas = artemis_pkg->template Param<bool>("do_gas");
   const bool do_dust = artemis_pkg->template Param<bool>("do_dust");
 
+  const auto &cpars = artemis_pkg->template Param<geometry::CoordParams>("coord_params");
+
   auto &gravity_pkg = pm->packages.Get("gravity");
   const Real gm_ = gravity_pkg->template Param<Real>("gm");
   const Real sink_rate = dt * (gravity_pkg->template Param<Real>("sink_rate"));
@@ -64,7 +66,7 @@ TaskStatus PointMassGravity(MeshData<Real> *md, const Real time, const Real dt) 
       md->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
         // Extract coordinates
-        geometry::Coords<GEOM> coords(vmesh.GetCoordinates(b), k, j, i);
+        geometry::Coords<GEOM> coords(cpars, vmesh.GetCoordinates(b), k, j, i);
         const auto &dx = coords.GetCellCenter();
         const auto &hx = coords.GetScaleFactors();
 

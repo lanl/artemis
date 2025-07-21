@@ -39,26 +39,31 @@ class Coords<Coordinates::spherical3D>
 
  public:
   KOKKOS_INLINE_FUNCTION
-  Coords(const parthenon::Coordinates_t &pco, const int k, const int j, const int i)
-      : CoordsBase<Coords<Coordinates::spherical3D>>(pco, k, j, i) {}
+  Coords(const CoordParams &cpars, const parthenon::Coordinates_t &pco, const int k,
+         const int j, const int i)
+      : CoordsBase<Coords<Coordinates::spherical3D>>(cpars, pco, k, j, i) {}
+  KOKKOS_INLINE_FUNCTION
+  Coords(const bool log, const parthenon::Coordinates_t &pco, const int k, const int j,
+         const int i)
+      : CoordsBase<Coords<Coordinates::spherical3D>>(log, pco, k, j, i) {}
   KOKKOS_INLINE_FUNCTION
   Coords() : CoordsBase<Coords<Coordinates::spherical3D>>() {}
 
-  KOKKOS_INLINE_FUNCTION bool x1dep() { return true; }
-  KOKKOS_INLINE_FUNCTION bool x2dep() { return true; }
+  KOKKOS_INLINE_FUNCTION bool x1dep() const { return true; }
+  KOKKOS_INLINE_FUNCTION bool x2dep() const { return true; }
 
-  KOKKOS_INLINE_FUNCTION Real hx2(const Real x1, const Real x2, const Real x3) {
+  KOKKOS_INLINE_FUNCTION Real hx2(const Real x1, const Real x2, const Real x3) const {
     return x1;
   }
-  KOKKOS_INLINE_FUNCTION Real hx3(const Real x1, const Real x2, const Real x3) {
+  KOKKOS_INLINE_FUNCTION Real hx3(const Real x1, const Real x2, const Real x3) const {
     return x1 * std::sin(x2);
   }
 
-  KOKKOS_INLINE_FUNCTION Real x1v() {
+  KOKKOS_INLINE_FUNCTION Real x1v() const {
     const Real dr2 = bnds.x1[0] * bnds.x1[0] + bnds.x1[1] * bnds.x1[1];
     return 0.75 * (bnds.x1[0] + bnds.x1[1]) * dr2 / (dr2 + bnds.x1[0] * bnds.x1[1]);
   }
-  KOKKOS_INLINE_FUNCTION Real x2v() {
+  KOKKOS_INLINE_FUNCTION Real x2v() const {
     // \int t * sin(t) *dt/ \int sin(t) * dt = d( sin(t) -
     // t*cos(t))/d(-cos(t))
     const Real ctm = std::cos(bnds.x2[0]);
@@ -67,8 +72,8 @@ class Coords<Coordinates::spherical3D>
     return (dst - bnds.x2[1] * ctp + bnds.x2[0] * ctm) / std::abs(ctm - ctp);
   }
 
-  KOKKOS_INLINE_FUNCTION Real hx2v() { return x1v(); }
-  KOKKOS_INLINE_FUNCTION Real hx3v() {
+  KOKKOS_INLINE_FUNCTION Real hx2v() const { return x1v(); }
+  KOKKOS_INLINE_FUNCTION Real hx3v() const {
     // \int r sin(t)  (r^2 sin(t) dr dt dp)
     // \int r^3 dr/ int r^2 dr  * \int sin^2 dt / \int sin dt
     // <r> <sin(t)>
@@ -85,7 +90,7 @@ class Coords<Coordinates::spherical3D>
     return x1v() * 0.5 * (dx2 - dsc) / std::abs(ctm - ctp);
   }
 
-  KOKKOS_INLINE_FUNCTION std::array<Real, 3> FaceCenX2(const CellFace f) {
+  KOKKOS_INLINE_FUNCTION std::array<Real, 3> FaceCenX2(const CellFace f) const {
     // <r> = d(r^3/3) / d(r^2/2)
     return {2.0 / 3.0 *
                 (bnds.x1[0] * bnds.x1[0] + bnds.x1[0] * bnds.x1[1] +
@@ -94,7 +99,7 @@ class Coords<Coordinates::spherical3D>
             bnds.x2[static_cast<int>(f)], 0.5 * (bnds.x3[0] + bnds.x3[1])};
   }
 
-  KOKKOS_INLINE_FUNCTION std::array<Real, 3> FaceCenX3(const CellFace f) {
+  KOKKOS_INLINE_FUNCTION std::array<Real, 3> FaceCenX3(const CellFace f) const {
     // <r> = d(r^3/3) / d(r^2/2)
     return {2.0 / 3.0 *
                 (bnds.x1[0] * bnds.x1[0] + bnds.x1[0] * bnds.x1[1] +
@@ -103,25 +108,25 @@ class Coords<Coordinates::spherical3D>
             0.5 * (bnds.x2[0] + bnds.x2[1]), bnds.x3[static_cast<int>(f)]};
   }
 
-  KOKKOS_INLINE_FUNCTION Real AreaX1(const Real x1f) {
+  KOKKOS_INLINE_FUNCTION Real AreaX1(const Real x1f) const {
     // \int r^2 sin(t) dp*dt = d(-cos(t)) * r^2 *dp
     const Real dx3 = bnds.x3[1] - bnds.x3[0];
     return x1f * x1f * std::abs(std::cos(bnds.x2[0]) - std::cos(bnds.x2[1])) * dx3;
   }
-  KOKKOS_INLINE_FUNCTION Real AreaX2(const Real x2f) {
+  KOKKOS_INLINE_FUNCTION Real AreaX2(const Real x2f) const {
     // \int r*sin(t)*dp*dr = d(r^2/2)*sin(t)*dp
     const Real dx1 = bnds.x1[1] - bnds.x1[0];
     const Real dx3 = bnds.x3[1] - bnds.x3[0];
     return 0.5 * (bnds.x1[1] + bnds.x1[0]) * std::sin(x2f) * dx1 * dx3;
   }
-  KOKKOS_INLINE_FUNCTION Real AreaX3(const Real x3f) {
+  KOKKOS_INLINE_FUNCTION Real AreaX3(const Real x3f) const {
     // \int r*dt*dr = d(r^2/2)*dt
     const Real dx1 = bnds.x1[1] - bnds.x1[0];
     const Real dx2 = bnds.x2[1] - bnds.x2[0];
     return 0.5 * (bnds.x1[0] + bnds.x1[1]) * dx1 * dx2;
   }
 
-  KOKKOS_INLINE_FUNCTION Real Volume() {
+  KOKKOS_INLINE_FUNCTION Real Volume() const {
     // \int r^2 sin(t) dr dt dp = d(r^3/3) d(-cos(t)) dp
     const Real dx1 = bnds.x1[1] - bnds.x1[0];
     const Real dx3 = bnds.x3[1] - bnds.x3[0];
@@ -132,20 +137,20 @@ class Coords<Coordinates::spherical3D>
     return rfac * dx1 * dx2 * dx3;
   }
 
-  KOKKOS_INLINE_FUNCTION Real dh2dx1() {
+  KOKKOS_INLINE_FUNCTION Real dh2dx1() const {
     return 3.0 / 2.0 * (bnds.x1[0] + bnds.x1[1]) /
            (bnds.x1[0] * bnds.x1[0] + bnds.x1[0] * bnds.x1[1] + bnds.x1[1] * bnds.x1[1]);
   }
-  KOKKOS_INLINE_FUNCTION Real dh3dx1() {
+  KOKKOS_INLINE_FUNCTION Real dh3dx1() const {
     return 3.0 / 2.0 * (bnds.x1[0] + bnds.x1[1]) /
            (bnds.x1[0] * bnds.x1[0] + bnds.x1[0] * bnds.x1[1] + bnds.x1[1] * bnds.x1[1]);
   }
-  KOKKOS_INLINE_FUNCTION Real dh3dx2() {
+  KOKKOS_INLINE_FUNCTION Real dh3dx2() const {
     return (std::sin(bnds.x2[1]) - std::sin(bnds.x2[0])) /
            std::abs(std::cos(bnds.x2[0]) - std::cos(bnds.x2[1]));
   }
 
-  KOKKOS_INLINE_FUNCTION Mat3x2 RFWeights() {
+  KOKKOS_INLINE_FUNCTION Mat3x2 RFWeights() const {
     // Set the flux averaging weights in the rotating frame for the angular momentum
     // \pm ( <R^2>_j^\pm - <R^2> ) where R is the cylindrical radius
 
@@ -169,14 +174,14 @@ class Coords<Coordinates::spherical3D>
   }
 
   KOKKOS_INLINE_FUNCTION std::array<Real, 3>
-  ConvertCoordsToCart(const std::array<Real, 3> &xi) {
+  ConvertCoordsToCart(const std::array<Real, 3> &xi) const {
     const Real cp = std::cos(xi[2]);
     const Real sp = std::sin(xi[2]);
     const Real ct = std::cos(xi[1]);
     const Real st = std::sin(xi[1]);
     return {xi[0] * st * cp, xi[0] * st * sp, xi[0] * ct};
   }
-  KOKKOS_INLINE_FUNCTION Mat3x3 ConvertVecToCart(const std::array<Real, 3> &xi) {
+  KOKKOS_INLINE_FUNCTION Mat3x3 ConvertVecToCart(const std::array<Real, 3> &xi) const {
     const Real cp = std::cos(xi[2]);
     const Real sp = std::sin(xi[2]);
     const Real ct = std::cos(xi[1]);
@@ -188,10 +193,10 @@ class Coords<Coordinates::spherical3D>
   }
 
   KOKKOS_INLINE_FUNCTION std::array<Real, 3>
-  ConvertCoordsToSph(const std::array<Real, 3> &xi) {
+  ConvertCoordsToSph(const std::array<Real, 3> &xi) const {
     return xi;
   }
-  KOKKOS_INLINE_FUNCTION Mat3x3 ConvertVecToSph(const std::array<Real, 3> &xi) {
+  KOKKOS_INLINE_FUNCTION Mat3x3 ConvertVecToSph(const std::array<Real, 3> &xi) const {
     std::array<Real, 3> ex1{1.0, 0.0, 0.0};
     std::array<Real, 3> ex2{0.0, 1.0, 0.0};
     std::array<Real, 3> ex3{0.0, 0.0, 1.0};
@@ -199,7 +204,7 @@ class Coords<Coordinates::spherical3D>
   }
 
   KOKKOS_INLINE_FUNCTION std::array<Real, 3>
-  ConvertCoordsToCyl(const std::array<Real, 3> &xi) {
+  ConvertCoordsToCyl(const std::array<Real, 3> &xi) const {
     // rhat = st * Rhat + ct * Zhat = (st, 0, ct)
     // that = ct * Rhat - st * Zhat = (ct, 0, -st)
     // phat = phat                  = (0, 1,0)
@@ -208,7 +213,7 @@ class Coords<Coordinates::spherical3D>
 
     return {xi[0] * st, xi[2], xi[0] * ct};
   }
-  KOKKOS_INLINE_FUNCTION Mat3x3 ConvertVecToCyl(const std::array<Real, 3> &xi) {
+  KOKKOS_INLINE_FUNCTION Mat3x3 ConvertVecToCyl(const std::array<Real, 3> &xi) const {
     // rhat = st * Rhat + ct * Zhat = (st, 0, ct)
     // that = ct * Rhat - st * Zhat = (ct, 0, -st)
     // phat = phat                  = (0, 1,0)
@@ -221,12 +226,12 @@ class Coords<Coordinates::spherical3D>
   }
 
   KOKKOS_INLINE_FUNCTION std::array<Real, 3>
-  ConvertCoordsToAxi(const std::array<Real, 3> &xi) {
+  ConvertCoordsToAxi(const std::array<Real, 3> &xi) const {
     const Real ct = std::cos(xi[1]);
     const Real st = std::sin(xi[1]);
     return {xi[0] * st, xi[0] * ct, xi[2]};
   }
-  KOKKOS_INLINE_FUNCTION Mat3x3 ConvertVecToAxi(const std::array<Real, 3> &xi) {
+  KOKKOS_INLINE_FUNCTION Mat3x3 ConvertVecToAxi(const std::array<Real, 3> &xi) const {
     const Real ct = std::cos(xi[1]);
     const Real st = std::sin(xi[1]);
     std::array<Real, 3> ex1{st, ct, 0.0};
@@ -243,26 +248,31 @@ class Coords<Coordinates::spherical2D>
 
  public:
   KOKKOS_INLINE_FUNCTION
-  Coords(const parthenon::Coordinates_t &pco, const int k, const int j, const int i)
-      : CoordsBase<Coords<Coordinates::spherical2D>>(pco, k, j, i) {}
+  Coords(const CoordParams &cpars, const parthenon::Coordinates_t &pco, const int k,
+         const int j, const int i)
+      : CoordsBase<Coords<Coordinates::spherical2D>>(cpars, pco, k, j, i) {}
+  KOKKOS_INLINE_FUNCTION
+  Coords(const bool log, const parthenon::Coordinates_t &pco, const int k, const int j,
+         const int i)
+      : CoordsBase<Coords<Coordinates::spherical2D>>(log, pco, k, j, i) {}
   KOKKOS_INLINE_FUNCTION
   Coords() : CoordsBase<Coords<Coordinates::spherical2D>>() {}
 
-  KOKKOS_INLINE_FUNCTION bool x1dep() { return true; }
-  KOKKOS_INLINE_FUNCTION bool x2dep() { return true; }
+  KOKKOS_INLINE_FUNCTION bool x1dep() const { return true; }
+  KOKKOS_INLINE_FUNCTION bool x2dep() const { return true; }
 
-  KOKKOS_INLINE_FUNCTION Real hx2(const Real x1, const Real x2, const Real x3) {
+  KOKKOS_INLINE_FUNCTION Real hx2(const Real x1, const Real x2, const Real x3) const {
     return x1;
   }
-  KOKKOS_INLINE_FUNCTION Real hx3(const Real x1, const Real x2, const Real x3) {
+  KOKKOS_INLINE_FUNCTION Real hx3(const Real x1, const Real x2, const Real x3) const {
     return x1 * std::sin(x2);
   }
 
-  KOKKOS_INLINE_FUNCTION Real x1v() {
+  KOKKOS_INLINE_FUNCTION Real x1v() const {
     const Real dr2 = bnds.x1[0] * bnds.x1[0] + bnds.x1[1] * bnds.x1[1];
     return 0.75 * (bnds.x1[0] + bnds.x1[1]) * dr2 / (dr2 + bnds.x1[0] * bnds.x1[1]);
   }
-  KOKKOS_INLINE_FUNCTION Real x2v() {
+  KOKKOS_INLINE_FUNCTION Real x2v() const {
     // \int t * sin(t) *dt/ \int sin(t) * dt = d( sin(t) -
     // t*cos(t))/d(-cos(t))
     const Real ctm = std::cos(bnds.x2[0]);
@@ -271,8 +281,8 @@ class Coords<Coordinates::spherical2D>
     return (dst - bnds.x2[1] * ctp + bnds.x2[0] * ctm) / std::abs(ctm - ctp);
   }
 
-  KOKKOS_INLINE_FUNCTION Real hx2v() { return x1v(); }
-  KOKKOS_INLINE_FUNCTION Real hx3v() {
+  KOKKOS_INLINE_FUNCTION Real hx2v() const { return x1v(); }
+  KOKKOS_INLINE_FUNCTION Real hx3v() const {
     // \int r sin(t)  (r^2 sin(t) dr dt dp)
     // \int r^3 dr/ int r^2 dr  * \int sin^2 dt / \int sin dt
     // <r> <sin(t)>
@@ -289,7 +299,7 @@ class Coords<Coordinates::spherical2D>
     return x1v() * 0.5 * (dx2 - dsc) / std::abs(ctm - ctp);
   }
 
-  KOKKOS_INLINE_FUNCTION std::array<Real, 3> FaceCenX2(const CellFace f) {
+  KOKKOS_INLINE_FUNCTION std::array<Real, 3> FaceCenX2(const CellFace f) const {
     // <r> = d(r^3/3) / d(r^2/2)
     return {2.0 / 3.0 *
                 (bnds.x1[0] * bnds.x1[0] + bnds.x1[0] * bnds.x1[1] +
@@ -298,7 +308,7 @@ class Coords<Coordinates::spherical2D>
             bnds.x2[static_cast<int>(f)], 0.0};
   }
 
-  KOKKOS_INLINE_FUNCTION std::array<Real, 3> FaceCenX3(const CellFace f) {
+  KOKKOS_INLINE_FUNCTION std::array<Real, 3> FaceCenX3(const CellFace f) const {
     // <r> = d(r^3/3) / d(r^2/2)
     return {2.0 / 3.0 *
                 (bnds.x1[0] * bnds.x1[0] + bnds.x1[0] * bnds.x1[1] +
@@ -307,23 +317,23 @@ class Coords<Coordinates::spherical2D>
             0.5 * (bnds.x2[0] + bnds.x2[1]), 0.0};
   }
 
-  KOKKOS_INLINE_FUNCTION Real AreaX1(const Real x1f) {
+  KOKKOS_INLINE_FUNCTION Real AreaX1(const Real x1f) const {
     // \int r^2 sin(t) dp*dt = d(-cos(t)) * r^2 *dp
     return x1f * x1f * std::abs(std::cos(bnds.x2[0]) - std::cos(bnds.x2[1]));
   }
-  KOKKOS_INLINE_FUNCTION Real AreaX2(const Real x2f) {
+  KOKKOS_INLINE_FUNCTION Real AreaX2(const Real x2f) const {
     // \int r*sin(t)*dp*dr = d(r^2/2)*sin(t)*dp
     const Real dx1 = bnds.x1[1] - bnds.x1[0];
     return 0.5 * (bnds.x1[1] + bnds.x1[0]) * std::sin(x2f) * dx1;
   }
-  KOKKOS_INLINE_FUNCTION Real AreaX3(const Real x3f) {
+  KOKKOS_INLINE_FUNCTION Real AreaX3(const Real x3f) const {
     // \int r*dt*dr = d(r^2/2)*dt
     const Real dx1 = bnds.x1[1] - bnds.x1[0];
     const Real dx2 = bnds.x2[1] - bnds.x2[0];
     return 0.5 * (bnds.x1[0] + bnds.x1[1]) * dx1 * dx2;
   }
 
-  KOKKOS_INLINE_FUNCTION Real Volume() {
+  KOKKOS_INLINE_FUNCTION Real Volume() const {
     // \int r^2 sin(t) dr dt dp = d(r^3/3) d(-cos(t)) dp
     const Real dx1 = bnds.x1[1] - bnds.x1[0];
     const Real rfac =
@@ -333,20 +343,20 @@ class Coords<Coordinates::spherical2D>
     return rfac * dx1 * dx2;
   }
 
-  KOKKOS_INLINE_FUNCTION Real dh2dx1() {
+  KOKKOS_INLINE_FUNCTION Real dh2dx1() const {
     return 3.0 / 2.0 * (bnds.x1[0] + bnds.x1[1]) /
            (bnds.x1[0] * bnds.x1[0] + bnds.x1[0] * bnds.x1[1] + bnds.x1[1] * bnds.x1[1]);
   }
-  KOKKOS_INLINE_FUNCTION Real dh3dx1() {
+  KOKKOS_INLINE_FUNCTION Real dh3dx1() const {
     return 3.0 / 2.0 * (bnds.x1[0] + bnds.x1[1]) /
            (bnds.x1[0] * bnds.x1[0] + bnds.x1[0] * bnds.x1[1] + bnds.x1[1] * bnds.x1[1]);
   }
-  KOKKOS_INLINE_FUNCTION Real dh3dx2() {
+  KOKKOS_INLINE_FUNCTION Real dh3dx2() const {
     return (std::sin(bnds.x2[1]) - std::sin(bnds.x2[0])) /
            std::abs(std::cos(bnds.x2[0]) - std::cos(bnds.x2[1]));
   }
 
-  KOKKOS_INLINE_FUNCTION Mat3x2 RFWeights() {
+  KOKKOS_INLINE_FUNCTION Mat3x2 RFWeights() const {
     // Set the flux averaging weights in the rotating frame for the angular momentum
     // \pm ( <R^2>_j^\pm - <R^2> ) where R is the cylindrical radius
 
@@ -370,14 +380,14 @@ class Coords<Coordinates::spherical2D>
   }
 
   KOKKOS_INLINE_FUNCTION std::array<Real, 3>
-  ConvertCoordsToCart(const std::array<Real, 3> &xi) {
+  ConvertCoordsToCart(const std::array<Real, 3> &xi) const {
     const Real cp = 1.0;
     const Real sp = 0.0;
     const Real ct = std::cos(xi[1]);
     const Real st = std::sin(xi[1]);
     return {xi[0] * st * cp, xi[0] * st * sp, xi[0] * ct};
   }
-  KOKKOS_INLINE_FUNCTION Mat3x3 ConvertVecToCart(const std::array<Real, 3> &xi) {
+  KOKKOS_INLINE_FUNCTION Mat3x3 ConvertVecToCart(const std::array<Real, 3> &xi) const {
     const Real cp = 1.0;
     const Real sp = 0.0;
     const Real ct = std::cos(xi[1]);
@@ -389,10 +399,10 @@ class Coords<Coordinates::spherical2D>
   }
 
   KOKKOS_INLINE_FUNCTION std::array<Real, 3>
-  ConvertCoordsToSph(const std::array<Real, 3> &xi) {
+  ConvertCoordsToSph(const std::array<Real, 3> &xi) const {
     return xi;
   }
-  KOKKOS_INLINE_FUNCTION Mat3x3 ConvertVecToSph(const std::array<Real, 3> &xi) {
+  KOKKOS_INLINE_FUNCTION Mat3x3 ConvertVecToSph(const std::array<Real, 3> &xi) const {
     std::array<Real, 3> ex1{1.0, 0.0, 0.0};
     std::array<Real, 3> ex2{0.0, 1.0, 0.0};
     std::array<Real, 3> ex3{0.0, 0.0, 1.0};
@@ -400,7 +410,7 @@ class Coords<Coordinates::spherical2D>
   }
 
   KOKKOS_INLINE_FUNCTION std::array<Real, 3>
-  ConvertCoordsToCyl(const std::array<Real, 3> &xi) {
+  ConvertCoordsToCyl(const std::array<Real, 3> &xi) const {
     // rhat = st * Rhat + ct * Zhat = (st, 0, ct)
     // that = ct * Rhat - st * Zhat = (ct, 0, -st)
     // phat = phat                  = (0, 1,0)
@@ -409,7 +419,7 @@ class Coords<Coordinates::spherical2D>
 
     return {xi[0] * st, 0.0, xi[0] * ct};
   }
-  KOKKOS_INLINE_FUNCTION Mat3x3 ConvertVecToCyl(const std::array<Real, 3> &xi) {
+  KOKKOS_INLINE_FUNCTION Mat3x3 ConvertVecToCyl(const std::array<Real, 3> &xi) const {
     // rhat = st * Rhat + ct * Zhat = (st, 0, ct)
     // that = ct * Rhat - st * Zhat = (ct, 0, -st)
     // phat = phat                  = (0, 1,0)
@@ -422,12 +432,12 @@ class Coords<Coordinates::spherical2D>
   }
 
   KOKKOS_INLINE_FUNCTION std::array<Real, 3>
-  ConvertCoordsToAxi(const std::array<Real, 3> &xi) {
+  ConvertCoordsToAxi(const std::array<Real, 3> &xi) const {
     const Real ct = std::cos(xi[1]);
     const Real st = std::sin(xi[1]);
     return {xi[0] * st, xi[0] * ct, 0.0};
   }
-  KOKKOS_INLINE_FUNCTION Mat3x3 ConvertVecToAxi(const std::array<Real, 3> &xi) {
+  KOKKOS_INLINE_FUNCTION Mat3x3 ConvertVecToAxi(const std::array<Real, 3> &xi) const {
     const Real ct = std::cos(xi[1]);
     const Real st = std::sin(xi[1]);
     std::array<Real, 3> ex1{st, ct, 0.0};
@@ -444,23 +454,28 @@ class Coords<Coordinates::spherical1D>
 
  public:
   KOKKOS_INLINE_FUNCTION
-  Coords(const parthenon::Coordinates_t &pco, const int k, const int j, const int i)
-      : CoordsBase<Coords<Coordinates::spherical1D>>(pco, k, j, i) {}
+  Coords(const CoordParams &cpars, const parthenon::Coordinates_t &pco, const int k,
+         const int j, const int i)
+      : CoordsBase<Coords<Coordinates::spherical1D>>(cpars, pco, k, j, i) {}
+  KOKKOS_INLINE_FUNCTION
+  Coords(const bool log, const parthenon::Coordinates_t &pco, const int k, const int j,
+         const int i)
+      : CoordsBase<Coords<Coordinates::spherical1D>>(log, pco, k, j, i) {}
   KOKKOS_INLINE_FUNCTION
   Coords() : CoordsBase<Coords<Coordinates::spherical1D>>() {}
 
-  KOKKOS_INLINE_FUNCTION bool x1dep() { return true; }
+  KOKKOS_INLINE_FUNCTION bool x1dep() const { return true; }
 
-  KOKKOS_INLINE_FUNCTION Real hx2(const Real x1, const Real x2, const Real x3) {
+  KOKKOS_INLINE_FUNCTION Real hx2(const Real x1, const Real x2, const Real x3) const {
     return x1;
   }
 
-  KOKKOS_INLINE_FUNCTION Real x1v() {
+  KOKKOS_INLINE_FUNCTION Real x1v() const {
     const Real dr2 = bnds.x1[0] * bnds.x1[0] + bnds.x1[1] * bnds.x1[1];
     return 0.75 * (bnds.x1[0] + bnds.x1[1]) * dr2 / (dr2 + bnds.x1[0] * bnds.x1[1]);
   }
 
-  KOKKOS_INLINE_FUNCTION std::array<Real, 3> FaceCenX2(const CellFace f) {
+  KOKKOS_INLINE_FUNCTION std::array<Real, 3> FaceCenX2(const CellFace f) const {
     // <r> = d(r^3/3) / d(r^2/2)
     return {2.0 / 3.0 *
                 (bnds.x1[0] * bnds.x1[0] + bnds.x1[0] * bnds.x1[1] +
@@ -469,7 +484,7 @@ class Coords<Coordinates::spherical1D>
             M_PI * 0.5, 0.0};
   }
 
-  KOKKOS_INLINE_FUNCTION std::array<Real, 3> FaceCenX3(const CellFace f) {
+  KOKKOS_INLINE_FUNCTION std::array<Real, 3> FaceCenX3(const CellFace f) const {
     // <r> = d(r^3/3) / d(r^2/2)
     return {2.0 / 3.0 *
                 (bnds.x1[0] * bnds.x1[0] + bnds.x1[0] * bnds.x1[1] +
@@ -478,22 +493,22 @@ class Coords<Coordinates::spherical1D>
             M_PI * 0.5, 0.0};
   }
 
-  KOKKOS_INLINE_FUNCTION Real AreaX1(const Real x1f) {
+  KOKKOS_INLINE_FUNCTION Real AreaX1(const Real x1f) const {
     // \int r^2 sin(t) dp*dt = d(-cos(t)) * r^2 *dp
     return x1f * x1f;
   }
-  KOKKOS_INLINE_FUNCTION Real AreaX2(const Real x2f) {
+  KOKKOS_INLINE_FUNCTION Real AreaX2(const Real x2f) const {
     // \int r*sin(t)*dp*dr = d(r^2/2)*sin(t)*dp
     const Real dx1 = bnds.x1[1] - bnds.x1[0];
     return 0.5 * (bnds.x1[1] + bnds.x1[0]) * dx1;
   }
-  KOKKOS_INLINE_FUNCTION Real AreaX3(const Real x3f) {
+  KOKKOS_INLINE_FUNCTION Real AreaX3(const Real x3f) const {
     // \int r*dt*dr = d(r^2/2)*dt
     const Real dx1 = bnds.x1[1] - bnds.x1[0];
     return 0.5 * (bnds.x1[0] + bnds.x1[1]) * dx1;
   }
 
-  KOKKOS_INLINE_FUNCTION Real Volume() {
+  KOKKOS_INLINE_FUNCTION Real Volume() const {
     // \int r^2 sin(t) dr dt dp = d(r^3/3) d(-cos(t)) dp
     const Real dx1 = bnds.x1[1] - bnds.x1[0];
     const Real rfac =
@@ -502,16 +517,16 @@ class Coords<Coordinates::spherical1D>
     return rfac * dx1;
   }
 
-  KOKKOS_INLINE_FUNCTION Real dh2dx1() {
+  KOKKOS_INLINE_FUNCTION Real dh2dx1() const {
     return 3.0 / 2.0 * (bnds.x1[0] + bnds.x1[1]) /
            (bnds.x1[0] * bnds.x1[0] + bnds.x1[0] * bnds.x1[1] + bnds.x1[1] * bnds.x1[1]);
   }
-  KOKKOS_INLINE_FUNCTION Real dh3dx1() {
+  KOKKOS_INLINE_FUNCTION Real dh3dx1() const {
     return 3.0 / 2.0 * (bnds.x1[0] + bnds.x1[1]) /
            (bnds.x1[0] * bnds.x1[0] + bnds.x1[0] * bnds.x1[1] + bnds.x1[1] * bnds.x1[1]);
   }
 
-  KOKKOS_INLINE_FUNCTION Mat3x2 RFWeights() {
+  KOKKOS_INLINE_FUNCTION Mat3x2 RFWeights() const {
     // Set the flux averaging weights in the rotating frame for the angular momentum
     // \pm ( <R^2>_j^\pm - <R^2> ) where R is the cylindrical radius
 
@@ -526,14 +541,14 @@ class Coords<Coordinates::spherical1D>
   }
 
   KOKKOS_INLINE_FUNCTION std::array<Real, 3>
-  ConvertCoordsToCart(const std::array<Real, 3> &xi) {
+  ConvertCoordsToCart(const std::array<Real, 3> &xi) const {
     const Real cp = 1.0;
     const Real sp = 0.0;
     const Real ct = 0.0;
     const Real st = 1.0;
     return {xi[0] * st * cp, xi[0] * st * sp, xi[0] * ct};
   }
-  KOKKOS_INLINE_FUNCTION Mat3x3 ConvertVecToCart(const std::array<Real, 3> &xi) {
+  KOKKOS_INLINE_FUNCTION Mat3x3 ConvertVecToCart(const std::array<Real, 3> &xi) const {
     const Real cp = 1.0;
     const Real sp = 0.0;
     const Real ct = 0.0;
@@ -545,10 +560,10 @@ class Coords<Coordinates::spherical1D>
   }
 
   KOKKOS_INLINE_FUNCTION std::array<Real, 3>
-  ConvertCoordsToSph(const std::array<Real, 3> &xi) {
+  ConvertCoordsToSph(const std::array<Real, 3> &xi) const {
     return xi;
   }
-  KOKKOS_INLINE_FUNCTION Mat3x3 ConvertVecToSph(const std::array<Real, 3> &xi) {
+  KOKKOS_INLINE_FUNCTION Mat3x3 ConvertVecToSph(const std::array<Real, 3> &xi) const {
     std::array<Real, 3> ex1{1.0, 0.0, 0.0};
     std::array<Real, 3> ex2{0.0, 1.0, 0.0};
     std::array<Real, 3> ex3{0.0, 0.0, 1.0};
@@ -556,7 +571,7 @@ class Coords<Coordinates::spherical1D>
   }
 
   KOKKOS_INLINE_FUNCTION std::array<Real, 3>
-  ConvertCoordsToCyl(const std::array<Real, 3> &xi) {
+  ConvertCoordsToCyl(const std::array<Real, 3> &xi) const {
     // rhat = st * Rhat + ct * Zhat = (st, 0, ct)
     // that = ct * Rhat - st * Zhat = (ct, 0, -st)
     // phat = phat                  = (0, 1,0)
@@ -565,7 +580,7 @@ class Coords<Coordinates::spherical1D>
 
     return {xi[0] * st, 0.0, xi[0] * ct};
   }
-  KOKKOS_INLINE_FUNCTION Mat3x3 ConvertVecToCyl(const std::array<Real, 3> &xi) {
+  KOKKOS_INLINE_FUNCTION Mat3x3 ConvertVecToCyl(const std::array<Real, 3> &xi) const {
     // rhat = st * Rhat + ct * Zhat = (st, 0, ct)
     // that = ct * Rhat - st * Zhat = (ct, 0, -st)
     // phat = phat                  = (0, 1,0)
@@ -578,12 +593,12 @@ class Coords<Coordinates::spherical1D>
   }
 
   KOKKOS_INLINE_FUNCTION std::array<Real, 3>
-  ConvertCoordsToAxi(const std::array<Real, 3> &xi) {
+  ConvertCoordsToAxi(const std::array<Real, 3> &xi) const {
     const Real ct = 0.0;
     const Real st = 1.0;
     return {xi[0] * st, xi[0] * ct, 0.0};
   }
-  KOKKOS_INLINE_FUNCTION Mat3x3 ConvertVecToAxi(const std::array<Real, 3> &xi) {
+  KOKKOS_INLINE_FUNCTION Mat3x3 ConvertVecToAxi(const std::array<Real, 3> &xi) const {
     const Real ct = 0.0;
     const Real st = 1.0;
     std::array<Real, 3> ex1{st, ct, 0.0};

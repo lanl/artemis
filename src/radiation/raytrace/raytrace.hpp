@@ -35,20 +35,28 @@ struct ParticleWeights {
   Real mult = 1.;
   Real x2min, x2max, x3min, x3max;
   ParticleWeights(const Real x2min, const Real x2max, const Real x3min, const Real x3max)
-      : x2min(x2min), x2max(x2max), x3min(x3min), x3max(x3max){};
+      : x2min(x2min), x2max(x2max), x3min(x3min), x3max(x3max) {};
 };
 
-KOKKOS_FORCEINLINE_FUNCTION
-std::array<int, 3> GetIndices(const parthenon::Coordinates_t &pco,
-                              std::array<Real, 3> x) {
+template <bool LOG>
+KOKKOS_FORCEINLINE_FUNCTION std::array<int, 3>
+GetIndices(const parthenon::Coordinates_t &pco, std::array<Real, 3> x) {
 
+  if constexpr (LOG) {
+    return {static_cast<int>(
+                std::floor((std::log(x[0]) - pco.Xf<1>(0)) / pco.CellWidth<1>(0, 0, 0))),
+            static_cast<int>(
+                std::floor((std::log(x[1]) - pco.Xf<2>(0)) / pco.CellWidth<2>(0, 0, 0))),
+            static_cast<int>(
+                std::floor((std::log(x[2]) - pco.Xf<3>(0)) / pco.CellWidth<3>(0, 0, 0)))};
+  }
   return {
       static_cast<int>(std::floor((x[0] - pco.Xf<1>(0)) / pco.CellWidth<1>(0, 0, 0))),
       static_cast<int>(std::floor((x[1] - pco.Xf<2>(0)) / pco.CellWidth<2>(0, 0, 0))),
       static_cast<int>(std::floor((x[2] - pco.Xf<3>(0)) / pco.CellWidth<3>(0, 0, 0)))};
 }
 
-template <Coordinates GEOM>
+template <Coordinates GEOM, bool LOGR>
 TaskStatus PushParticlesImpl(MeshData<Real> *md) {
   auto pm = md->GetParentPointer();
   auto &resolved_pkgs = pm->resolved_packages;
@@ -96,13 +104,13 @@ TaskStatus PushParticlesImpl(MeshData<Real> *md) {
           int &j = ppack_i(b, rad::part::ijk(1), n);
           int &k = ppack_i(b, rad::part::ijk(2), n);
           const auto &pco = vmesh.GetCoordinates(b);
-          const auto inds = GetIndices(pco, {xp, yp, zp});
+          const auto inds = GetIndices<LOGR>(pco, {xp, yp, zp});
           i = ib.s + inds[0] - ngh;
           if (multi_d) j = jb.s + inds[1] - ngh;
           if (three_d) k = kb.s + inds[2] - ngh;
 
           while ((i <= ib.e) && (ee > 0.0)) {
-            geometry::Coords<GEOM> coords(pco, k, j, i);
+            geometry::Coords<GEOM> coords(LOGR, pco, k, j, i);
 
             // Deposit energy for this cell and decrement the photon energy
             const auto dx = coords.bnds.x1[1] - coords.bnds.x1[0];
@@ -160,6 +168,8 @@ TaskStatus SourceParticlesImpl(MeshData<Real> *md, const ParticleWeights &pwght)
 
   auto &rt_pkg = pm->packages.Get("raytrace");
   const auto x1min = rt_pkg->template Param<Real>("x1min");
+  const auto &cpars =
+      pm->packages.Get("artemis")->template Param<geometry::CoordParams>("coord_params");
 
   // auto newParticlesContext = swarm->AddEmptyParticles(pwght.np2 * pwght.np3);
 
@@ -221,7 +231,7 @@ TaskStatus SourceParticlesImpl(MeshData<Real> *md, const ParticleWeights &pwght)
       kb.s, kb.e, jb.s, jb.e, KOKKOS_LAMBDA(const int &b, const int &k, const int &j) {
         const int tot = new_parts(b);
         if (tot > 0) {
-          geometry::Coords<GEOM> coords(vmesh.GetCoordinates(b), k, j, ib.s);
+          geometry::Coords<GEOM> coords(cpars, vmesh.GetCoordinates(b), k, j, ib.s);
           const int nbx2 = (jb.e - jb.s) + 1;
           const int nper_cell = (multi_d) ? new_part_per_cell(b) : 1;
           const int ntot_cell = (three_d) ? SQR(nper_cell) : nper_cell;

@@ -158,7 +158,7 @@ class CoordsBase {
   BBox bnds;
   KOKKOS_INLINE_FUNCTION
   CoordsBase(const parthenon::Coordinates_t &pco, const int k, const int j, const int i)
-      : bnds(pco, k, j, i){};
+      : bnds(pco, k, j, i) {};
 
   KOKKOS_INLINE_FUNCTION
   CoordsBase(const CoordParams &cpars, const parthenon::Coordinates_t &pco, const int k,

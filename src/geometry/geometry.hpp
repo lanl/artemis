@@ -36,7 +36,6 @@ struct CoordParams {
   CoordParams(ParameterInput *pin) {
     log = (pin->GetOrAddString("artemis", "radial_spacing", "uniform") == "logarithmic");
   }
-  KOKKOS_INLINE_FUNCTION
   CoordParams() = default;
 
   bool log = false;

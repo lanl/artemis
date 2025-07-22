@@ -38,18 +38,8 @@ struct ParticleWeights {
       : x2min(x2min), x2max(x2max), x3min(x3min), x3max(x3max) {};
 };
 
-template <bool LOG>
 KOKKOS_FORCEINLINE_FUNCTION std::array<int, 3>
 GetIndices(const parthenon::Coordinates_t &pco, std::array<Real, 3> x) {
-
-  if constexpr (LOG) {
-    return {static_cast<int>(
-                std::floor((std::log(x[0]) - pco.Xf<1>(0)) / pco.CellWidth<1>(0, 0, 0))),
-            static_cast<int>(
-                std::floor((std::log(x[1]) - pco.Xf<2>(0)) / pco.CellWidth<2>(0, 0, 0))),
-            static_cast<int>(
-                std::floor((std::log(x[2]) - pco.Xf<3>(0)) / pco.CellWidth<3>(0, 0, 0)))};
-  }
   return {
       static_cast<int>(std::floor((x[0] - pco.Xf<1>(0)) / pco.CellWidth<1>(0, 0, 0))),
       static_cast<int>(std::floor((x[1] - pco.Xf<2>(0)) / pco.CellWidth<2>(0, 0, 0))),
@@ -104,7 +94,7 @@ TaskStatus PushParticlesImpl(MeshData<Real> *md) {
           int &j = ppack_i(b, rad::part::ijk(1), n);
           int &k = ppack_i(b, rad::part::ijk(2), n);
           const auto &pco = vmesh.GetCoordinates(b);
-          const auto inds = GetIndices<LOGR>(pco, {xp, yp, zp});
+          const auto inds = GetIndices(pco, {xp, yp, zp});
           i = ib.s + inds[0] - ngh;
           if (multi_d) j = jb.s + inds[1] - ngh;
           if (three_d) k = kb.s + inds[2] - ngh;
@@ -116,7 +106,13 @@ TaskStatus PushParticlesImpl(MeshData<Real> *md) {
             const auto dx = coords.bnds.x1[1] - coords.bnds.x1[0];
             Real dtau = vmesh(b, rad::opac::cross_section(), k, j, i);
             if (xp <= x1min + 1e-10) {
-              const Real dtau_i = dtau * (x1min - 6 * rstar);
+              Real dtau_i = dtau;
+              const Real zero_rad = 6 * rstar;
+              if constexpr (LOGR) {
+                dtau_i *= (std::exp(x1min) - zero_rad);
+              } else {
+                dtau_i *= (x1min - zero_rad);
+              }
               const Real efac = (dtau_i > 100.) ? 0.0 : std::exp(-dtau_i);
               ee *= efac;
               if (ee < efloor) ee = 0.0;
@@ -138,7 +134,11 @@ TaskStatus PushParticlesImpl(MeshData<Real> *md) {
 
             // move the particle to the next face;
             i += 1;
-            xp = coords.bnds.x1[1];
+            if constexpr (LOGR) {
+              xp = pco.Xf<X1DIR>(i);
+            } else {
+              xp = coords.bnds.x1[1];
+            }
             if (std::abs(xp - x1max) <= 1e-10) xp = x1max;
             if ((ee == 0.0) || (xp >= x1max)) {
               swarm_d.MarkParticleForRemoval(n);
@@ -151,7 +151,7 @@ TaskStatus PushParticlesImpl(MeshData<Real> *md) {
   return TaskStatus::complete;
 }
 
-template <Coordinates GEOM>
+template <Coordinates GEOM, bool LOGR>
 TaskStatus SourceParticlesImpl(MeshData<Real> *md, const ParticleWeights &pwght) {
   // Create SwarmPacks
 
@@ -231,7 +231,8 @@ TaskStatus SourceParticlesImpl(MeshData<Real> *md, const ParticleWeights &pwght)
       kb.s, kb.e, jb.s, jb.e, KOKKOS_LAMBDA(const int &b, const int &k, const int &j) {
         const int tot = new_parts(b);
         if (tot > 0) {
-          geometry::Coords<GEOM> coords(cpars, vmesh.GetCoordinates(b), k, j, ib.s);
+          const auto &pco = vmesh.GetCoordinates(b);
+          geometry::Coords<GEOM> coords(cpars, pco, k, j, ib.s);
           const int nbx2 = (jb.e - jb.s) + 1;
           const int nper_cell = (multi_d) ? new_part_per_cell(b) : 1;
           const int ntot_cell = (three_d) ? SQR(nper_cell) : nper_cell;
@@ -244,7 +245,12 @@ TaskStatus SourceParticlesImpl(MeshData<Real> *md, const ParticleWeights &pwght)
               ppack_i(b, rad::part::ijk(0), n) = ib.s;
               ppack_i(b, rad::part::ijk(1), n) = j;
               ppack_i(b, rad::part::ijk(2), n) = k;
-              const Real x = coords.bnds.x1[0];
+              Real x = Null<Real>();
+              if constexpr (LOGR) {
+                x = pco.Xf<X1DIR>(ib.s);
+              } else {
+                x = coords.bnds.x1[0];
+              }
               const Real ym = coords.bnds.x2[0] + jp * pwght.dx2;
               const Real yp = ym + pwght.dx2;
               const Real dcos = (multi_d) ? (std::cos(ym) - std::cos(yp)) : 2.;

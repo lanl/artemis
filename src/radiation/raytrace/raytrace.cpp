@@ -54,6 +54,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
              pin->GetOrAddInteger("radiation/raytrace", "max_iterations", 1000));
 
   params.Add("efloor", pin->GetOrAddReal("radiation/raytrace", "efloor", 1e-10));
+
+  // Note that these pull the real x1 values, not the ones from the artemis package
   params.Add("x1min", pin->GetReal("parthenon/mesh", "x1min"));
   params.Add("x1max", pin->GetReal("parthenon/mesh", "x1max"));
   params.Add("x2min", pin->GetReal("parthenon/mesh", "x2min"));
@@ -120,13 +122,29 @@ TaskStatus SourceParticles(MeshData<Real> *md, const ParticleWeights &pwght) {
   auto pm = md->GetParentPointer();
   auto &artemis_pkg = pm->packages.Get("artemis");
   auto geom = artemis_pkg->Param<Coordinates>("coords");
+  auto cpars = artemis_pkg->Param<geometry::CoordParams>("coord_params");
   switch (geom) {
-  case Coordinates::spherical1D:
-    return SourceParticlesImpl<Coordinates::spherical1D>(md, pwght);
-  case Coordinates::spherical2D:
-    return SourceParticlesImpl<Coordinates::spherical2D>(md, pwght);
-  case Coordinates::spherical3D:
-    return SourceParticlesImpl<Coordinates::spherical3D>(md, pwght);
+  case Coordinates::spherical1D: {
+    if (cpars.log) {
+      return SourceParticlesImpl<Coordinates::spherical1D, true>(md, pwght);
+    } else {
+      return SourceParticlesImpl<Coordinates::spherical1D, false>(md, pwght);
+    }
+  }
+  case Coordinates::spherical2D: {
+    if (cpars.log) {
+      return SourceParticlesImpl<Coordinates::spherical2D, true>(md, pwght);
+    } else {
+      return SourceParticlesImpl<Coordinates::spherical2D, false>(md, pwght);
+    }
+  }
+  case Coordinates::spherical3D: {
+    if (cpars.log) {
+      return SourceParticlesImpl<Coordinates::spherical3D, true>(md, pwght);
+    } else {
+      return SourceParticlesImpl<Coordinates::spherical3D, false>(md, pwght);
+    }
+  }
   default:
     PARTHENON_FAIL("Unsupported geometry in raytracing");
   }
@@ -140,24 +158,27 @@ TaskStatus PushParticles(MeshData<Real> *md) {
   auto geom = artemis_pkg->Param<Coordinates>("coords");
   auto cpars = artemis_pkg->Param<geometry::CoordParams>("coord_params");
   switch (geom) {
-  case Coordinates::spherical1D:
+  case Coordinates::spherical1D: {
     if (cpars.log) {
       return PushParticlesImpl<Coordinates::spherical1D, true>(md);
     } else {
       return PushParticlesImpl<Coordinates::spherical1D, false>(md);
     }
-  case Coordinates::spherical2D:
+  }
+  case Coordinates::spherical2D: {
     if (cpars.log) {
       return PushParticlesImpl<Coordinates::spherical2D, true>(md);
     } else {
       return PushParticlesImpl<Coordinates::spherical2D, false>(md);
     }
-  case Coordinates::spherical3D:
+  }
+  case Coordinates::spherical3D: {
     if (cpars.log) {
       return PushParticlesImpl<Coordinates::spherical3D, true>(md);
     } else {
       return PushParticlesImpl<Coordinates::spherical3D, false>(md);
     }
+  }
   default:
     PARTHENON_FAIL("Unsupported geometry in raytracing");
   }
@@ -285,7 +306,7 @@ TaskCollection RaytraceDriverTasks(Mesh *pmesh, const ParticleWeights &pwght) {
 
 TaskListStatus RaytraceDriver(Mesh *pmesh) {
   auto &artemis_pkg = pmesh->packages.Get("artemis");
-  auto geom = artemis_pkg->Param<Coordinates>("PushParticlesImpl");
+  auto geom = artemis_pkg->Param<Coordinates>("coords");
   // What is the minimum dtheta, dphi
   auto &rt_pkg = pmesh->packages.Get("raytrace");
 

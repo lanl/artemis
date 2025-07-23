@@ -218,8 +218,6 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
   const auto c = moments_pkg->template Param<Real>("c");
   const auto arad = moments_pkg->template Param<Real>("arad");
   const auto tfloor = moments_pkg->template Param<Real>("tfloor");
-  const auto Bfloor = arad * SQR(SQR(tfloor));
-  const auto efloor = Bfloor;
   const auto outer_max = moments_pkg->template Param<int>("outer_iteration_max");
   const auto inner_max = moments_pkg->template Param<int>("inner_iteration_max");
   const auto outer_tol = moments_pkg->template Param<Real>("outer_iteration_tol");
@@ -280,7 +278,8 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
         // step we update the energy with an increment.
         Real T = eos_d.TemperatureFromDensityInternalEnergy(
             dens, v0(b, gas::cons::internal_energy(), k, j, i) / dens);
-        const Real eg0 = dens * eos_d.InternalEnergyFromDensityTemperature(dens, T);
+        Real eg0 = dens * eos_d.InternalEnergyFromDensityTemperature(dens, T);
+        Real B = arad * SQR(SQR(T));
 
         const auto vb =
             RotatingFrame::BackgroundVelocity<GEOM>(qshear, om0, coords.x1v());
@@ -289,15 +288,27 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
             vb[1] * dens + v0(b, gas::cons::momentum(1), k, j, i) / hx[1],
             vb[2] * dens + v0(b, gas::cons::momentum(2), k, j, i) / hx[2]};
 
-        const Real &E0 = v0(b, rad::cons::energy(), k, j, i);
-        const std::array<Real, 3> Fr0{v0(b, rad::cons::flux(0), k, j, i) / hx[0],
-                                      v0(b, rad::cons::flux(1), k, j, i) / hx[1],
-                                      v0(b, rad::cons::flux(2), k, j, i) / hx[2]};
+        Real E0 = v0(b, rad::cons::energy(), k, j, i);
+        // choose the ref scale
+
+        Real eref = std::sqrt(E0 * B);
+        if (eref == 0.0) eref = 0.5 * (E0 + B);
+        const Real fref = c * eref;
+        const Real efloor = SQR(SQR(tfloor)) * arad / eref;
+        const Real Bfloor = efloor;
+
+        Q /= eref;
+        E0 /= eref;
+        eg0 /= eref;
+        B /= eref;
+
+        const std::array<Real, 3> Fr0{v0(b, rad::cons::flux(0), k, j, i) / hx[0] / fref,
+                                      v0(b, rad::cons::flux(1), k, j, i) / hx[1] / fref,
+                                      v0(b, rad::cons::flux(2), k, j, i) / hx[2] / fref};
 
         std::array<Real, 3> v{p0[0] / dens, p0[1] / dens, p0[2] / dens};
-        const Real ke0 = 0.5 * dens * (SQR(v[0]) + SQR(v[1]) + SQR(v[2]));
+        const Real ke0 = 0.5 * dens * (SQR(v[0]) + SQR(v[1]) + SQR(v[2])) / eref;
         const Real et0 = ke0 + eg0;
-        Real B = arad * SQR(SQR(T));
 
         Real E = E0;
         auto F = Fr0;
@@ -320,7 +331,7 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
         for (outer_iter = 1; outer_iter <= outer_max; outer_iter++) {
 
           // Set some v and F quantities
-          Real ke = 0.5 * dens * (SQR(v[0]) + SQR(v[1]) + SQR(v[2]));
+          Real ke = 0.5 * dens * (SQR(v[0]) + SQR(v[1]) + SQR(v[2])) / eref;
           std::array<Real, 3> beta{v[0] / c, v[1] / c, v[2] / c};
           const Real beta2 = SQR(beta[0]) + SQR(beta[1]) + SQR(beta[2]);
           const Real g2 = 1. / (1. - beta2);
@@ -337,14 +348,14 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
               beta[0] * fedd[TensIdx::X13] + beta[1] * fedd[TensIdx::X23] +
                   beta[2] * fedd[TensIdx::X33]};
           const Real bdbdp = beta[0] * bdp[0] + beta[1] * bdp[1] + beta[2] * bdp[2];
-          const Real bdf = beta[0] * F[0] / c + beta[1] * F[1] / c + beta[2] * F[2] / c;
+          const Real bdf = beta[0] * F[0] + beta[1] * F[1] + beta[2] * F[2]; // 1/c
 
           // start inner iteration for (B,E)
           for (inner_iter = 1; inner_iter <= inner_max; inner_iter++) {
-            T = std::pow(B / arad, 0.25);
-            Real eint = dens * eos_d.InternalEnergyFromDensityTemperature(dens, T);
+            T = std::pow(eref * B / arad, 0.25);
+            Real eint = dens * eos_d.InternalEnergyFromDensityTemperature(dens, T) / eref;
             Real et = ke + eint;
-            const Real Cv = dens * eos_d.SpecificHeatFromDensityTemperature(dens, T);
+            Real Cv = dens * eos_d.SpecificHeatFromDensityTemperature(dens, T);
             const Real fleck = FleckFactor(arad, T, Cv);
 
             const Real sigp = chat * dt * opac_d.PlanckMeanAbsorptionCoefficient(dens, T);
@@ -361,10 +372,10 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
             const Real Fr = (E - E0) + G0;
 
             // not converged yet
-            const Real idet = 1. / (1. + ca + c / chat * fleck * cb);
-            Real dE = ((1. + c / chat * fleck * cb) * (-Fr) + cb * (-fleck * Fi)) * idet;
-            Real dB =
-                ((c / chat * fleck * ca) * (-Fr) + (1. + ca) * (-fleck * Fi)) * idet;
+            const Real dfac = 1. + c / chat * fleck * cb;
+            Real dE = dfac / (dfac + ca) * (-Fr) + fleck / (dfac + ca) * (-Fi * cb);
+            Real dB = c / chat * fleck / (dfac + ca) * (-ca * Fr) +
+                      (1. + ca) * fleck / (dfac + ca) * (-Fi);
             Real Enew = E + dE;
             E = (Enew < efloor) ? efloor : Enew;
             Real Bnew = B + dB;
@@ -376,6 +387,17 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
               // converged, so don't compute new E and B;
               break;
             }
+
+            // if ((inner_iter == inner_max) || (inner_err != inner_err)) {
+            //   // Didn't converge
+            //   printf("(%d,%d,%d,%d,%d): "
+            //          "E=%lg,B=%lg,T=%lg,dE=%lg,dB=%lg,Enew=%lg,Bnew=%lg,idet=%lg,Fr=%lg,"
+            //          "Fi=%lg,G0=%lg,ca=%lg,cb=%lg,cd=%lg,sp=%lg,ss=%lg,sf=%lg,Q=%lg,Cv=%"
+            //          "lg,fleck=%lg,et=%lg,E0=%lg,et0=%lg,floor=(%lg,%lg),err=%lg\n",
+            //          b, k, j, i, outer_iter, E, B, T, dE, dB, Enew, Bnew,
+            //          1. / (dfac + ca), Fr, Fi, G0, ca, cb, cd, sigp, sigs, sigf, Q, Cv,
+            //          fleck, et, E0, et0, efloor, Bfloor, inner_err);
+            // }
           } // inner_iter
           if ((inner_iter > inner_max) && (fatal_if_unconverged)) {
             printf("(%d,%d,%d,%d)  %lg > %lg after %d iterations\n", b, k, j, i,
@@ -385,8 +407,8 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
 
           // Have new E and T
 
-          T = std::pow(B / arad, 0.25);
-          Real eg = dens * eos_d.InternalEnergyFromDensityTemperature(dens, T);
+          T = std::pow(eref * B / arad, 0.25);
+          Real eg = dens * eos_d.InternalEnergyFromDensityTemperature(dens, T) / eref;
           dEg = eg - eg0;
 
           const Real sigp =
@@ -397,8 +419,8 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
 
           const Real a = g * sigf;
           const Real b = 2. * g2 * g * sigs;
-          const Real d1 = g * c * (sigp * B + g2 * sigs * (1. + bdbdp) * E);
-          const Real d2 = g * c * sigf * E;
+          const Real d1 = g * (sigp * B + g2 * sigs * (1. + bdbdp) * E); // * c
+          const Real d2 = g * sigf * E;                                  // * c
           const std::array<Real, 3> rhs{Fr0[0] + d1 * beta[0] + d2 * bdp[0],
                                         Fr0[1] + d1 * beta[1] + d2 * bdp[1],
                                         Fr0[2] + d1 * beta[2] + d2 * bdp[2]};
@@ -407,14 +429,15 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
 
           for (int d = 0; d < 3; d++) {
             dF[d] = F[d] - Fr0[d];
-            dv[d] = -icc * dF[d];
+            dv[d] = -icc * dF[d] * fref;
             v[d] = p0[d] / dens + dv[d];
           }
 
           const Real dEk_prev = dEk;
           dEk = 0.5 * dens *
                 (dv[0] * (v[0] + p0[0] / dens) + dv[1] * (v[1] + p0[1] / dens) +
-                 dv[2] * (v[2] + p0[2] / dens));
+                 dv[2] * (v[2] + p0[2] / dens)) /
+                eref;
           dEr = -chat / c * (dEg + dEk);
           E = E0 + dEr;
 
@@ -432,15 +455,15 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
         }
 
         // Update state vector (both gas and radiation)
-        v0(b, gas::cons::internal_energy(), k, j, i) += dEg;
-        v0(b, gas::cons::total_energy(), k, j, i) += dEg + dEk;
-        v0(b, rad::cons::energy(), k, j, i) += dEr;
+        v0(b, gas::cons::internal_energy(), k, j, i) += dEg * eref;
+        v0(b, gas::cons::total_energy(), k, j, i) += (dEg + dEk) * eref;
+        v0(b, rad::cons::energy(), k, j, i) += dEr * eref;
         v0(b, gas::cons::momentum(0), k, j, i) += dv[0] * dens * hx[0];
         v0(b, gas::cons::momentum(1), k, j, i) += dv[1] * dens * hx[1];
         v0(b, gas::cons::momentum(2), k, j, i) += dv[2] * dens * hx[2];
-        v0(b, rad::cons::flux(0), k, j, i) += dF[0] * hx[0];
-        v0(b, rad::cons::flux(1), k, j, i) += dF[1] * hx[1];
-        v0(b, rad::cons::flux(2), k, j, i) += dF[2] * hx[2];
+        v0(b, rad::cons::flux(0), k, j, i) += dF[0] * hx[0] * fref;
+        v0(b, rad::cons::flux(1), k, j, i) += dF[1] * hx[1] * fref;
+        v0(b, rad::cons::flux(2), k, j, i) += dF[2] * hx[2] * fref;
       });
 
   return TaskStatus::complete;

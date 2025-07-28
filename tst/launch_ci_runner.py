@@ -231,14 +231,6 @@ def run_test(args, suffix, sbatch_partition_cmd, test_context, test_suite):
                 "SLURM job submission failed with error: " + repr(err),
                 test_context,
             )
-        finally:
-            update_status(
-                commit_sha,
-                "failure",
-                "SLURM job submission didn't complete sucessfully",
-                test_context,
-            )
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -247,7 +239,9 @@ if __name__ == "__main__":
     parser.add_argument(
         "pr_number", type=int, help="Pull request number for the CI run."
     )
-    parser.add_argument("test_suite", type=str, default="gpu", help="cpu or gpu tests")
+    parser.add_argument(
+        "test_suite", type=str, default="gpu", help="Cpu or gpu tests."
+    )
     parser.add_argument(
         "--submission",
         action="store_true",
@@ -277,8 +271,10 @@ if __name__ == "__main__":
     sbatch_cmd_cpu = "--partition=skylake-gold"
 
     if args.test_suite == "cpu":
+        print("Running cpu tests")
         # run cpu tests
         run_test(args, "cpu", sbatch_cmd_cpu, cpu_context, test_suite_cpu)
     if args.test_suite == "gpu":
+        print("Running gpu tests")
         # run gpu tests
         run_test(args, "gpu", sbatch_cmd_gpu, gpu_context, test_suite_gpu)

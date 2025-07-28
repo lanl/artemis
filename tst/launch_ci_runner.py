@@ -127,6 +127,48 @@ def run_tests_in_temp_dir(
 
 
 def run_test(args, suffix, sbatch_partition_cmd, test_context, test_suite):
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description="Run CI tasks with optional Slurm submission."
+    )
+    parser.add_argument(
+        "pr_number", type=int, help="Pull request number for the CI run."
+    )
+    parser.add_argument(
+        "test_suite", type=str, default="gpu", help="Cpu or gpu tests."
+    )
+    parser.add_argument(
+        "--submission",
+        action="store_true",
+        help="Flag to indicate the script is running as a Slurm submission job.",
+    )
+    parser.add_argument(
+        "--output_dir",
+        type=str,
+        default=None,
+        help="Output directory created when launching submission script",
+    )
+    args = parser.parse_args()
+
+    # Fetch PR information
+    pr_info = get_pr_info(args.pr_number)
+    head_repo = pr_info["head"]["repo"]["clone_url"]
+    head_ref = pr_info["head"]["ref"]
+    commit_sha = pr_info["head"]["sha"]
+
+    # set test specific context and commands
+    if args.test_suite == "cpu":
+        test_context = "Continuous Integration / darwin_skylake-gold"
+        sbatch_cmd = "--partition=skylake-gold"
+        test_suite = "regression.suite"
+        suffix = "cpu"
+        print("Running cpu tests")
+    if args.test_suite == "gpu":
+        test_context = "Continuous Integration / darwin_volta-x86"
+        sbatch_cmd = "--partition=volta-x86"
+        test_suite = "gpu.suite"
+        suffix = "gpu"
+        print("Running gpu tests")
 
     if args.submission:
         # Update github PR status to indicate we have begun testing
@@ -205,10 +247,10 @@ def run_test(args, suffix, sbatch_partition_cmd, test_context, test_suite):
                 f"--job-name={job_name}",
                 f"--output={os.path.join(output_dir, job_name)}_%j.out",
                 f"--error={os.path.join(output_dir, job_name)}_%j.out",
-                sbatch_partition_cmd,
+                sbatch_cmd,
                 "--time=04:00:00",
                 "--wrap",
-                f"python3 {sys.argv[0]} {args.pr_number} --submission --output_dir {output_dir}",
+                f"python3 {sys.argv[0]} {args.pr_number} {args.test_suite} --submission --output_dir {output_dir}",
             ]
             result = subprocess.run(
                 sbatch_command,
@@ -232,49 +274,5 @@ def run_test(args, suffix, sbatch_partition_cmd, test_context, test_suite):
                 test_context,
             )
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Run CI tasks with optional Slurm submission."
-    )
-    parser.add_argument(
-        "pr_number", type=int, help="Pull request number for the CI run."
-    )
-    parser.add_argument(
-        "test_suite", type=str, default="gpu", help="Cpu or gpu tests."
-    )
-    parser.add_argument(
-        "--submission",
-        action="store_true",
-        help="Flag to indicate the script is running as a Slurm submission job.",
-    )
-    parser.add_argument(
-        "--output_dir",
-        type=str,
-        default=None,
-        help="Output directory created when launching submission script",
-    )
-    args = parser.parse_args()
 
-    # Fetch PR information
-    pr_info = get_pr_info(args.pr_number)
-    head_repo = pr_info["head"]["repo"]["clone_url"]
-    head_ref = pr_info["head"]["ref"]
-    commit_sha = pr_info["head"]["sha"]
 
-    # set test specific context and commands
-    gpu_context = "Continuous Integration / darwin_volta-x86"
-    test_suite_gpu = "gpu.suite"
-    sbatch_cmd_gpu = "--partition=volta-x86"
-
-    cpu_context = "Continuous Integration / darwin_skylake-gold"
-    test_suite_cpu = "regression.suite"
-    sbatch_cmd_cpu = "--partition=skylake-gold"
-
-    if args.test_suite == "cpu":
-        print("Running cpu tests")
-        # run cpu tests
-        run_test(args, "cpu", sbatch_cmd_cpu, cpu_context, test_suite_cpu)
-    if args.test_suite == "gpu":
-        print("Running gpu tests")
-        # run gpu tests
-        run_test(args, "gpu", sbatch_cmd_gpu, gpu_context, test_suite_gpu)

@@ -54,7 +54,9 @@ def update_status(commit_sha, state, description, context):
         sys.exit(1)
 
 
-def run_tests_in_temp_dir(pr_number, head_repo, head_ref, output_dir, test_cmd, suffix):
+def run_tests_in_temp_dir(
+        pr_number, head_repo, head_ref, output_dir, test_suite, suffix
+):
     current_dir = os.getcwd()
 
     # Create a temporary directory
@@ -77,6 +79,7 @@ def run_tests_in_temp_dir(pr_number, head_repo, head_ref, output_dir, test_cmd, 
         os.chdir(os.path.join(temp_dir, "tst"))
         build_dir = os.path.join(temp_dir, "build")
 
+        # Run subprocess command to compile code and launch run_tests.py
         test_command = [
             "bash",
             "-c",
@@ -84,15 +87,13 @@ def run_tests_in_temp_dir(pr_number, head_repo, head_ref, output_dir, test_cmd, 
             + build_dir
             + " -j 20 -f && cd "
             + os.path.join(temp_dir, "tst")
-            + test_cmd
+            + " && python3 run_tests.py " + test_suite + " "
             + "--exe "
             + os.path.join(build_dir, "src", "artemis")
             + f" --output_dir={output_dir}"
             + " --log_file=darwin_log_" + suffix + ".txt"
             + " --erase_data",
-    ]
-
-        # Run subprocess command to compile code and launch run_tests.py
+        ]
         try:
             ret = subprocess.run(test_command, check=True)
             result = ret.returncode == 0
@@ -120,19 +121,24 @@ def run_tests_in_temp_dir(pr_number, head_repo, head_ref, output_dir, test_cmd, 
         # Return true if the test script succeeded
         return result
 
+def run_test(args, suffix, sbatch_partition_cmd, test_context, test_suite):
 
-def run_test(args, test_context, test_cmd, sbatch_cmd, suffix):
     if args.submission:
         # Update github PR status to indicate we have begun testing
-        update_status(commit_sha, "pending", "CI Slurm job running...", context=test_context)
+        update_status(commit_sha, "pending", "CI Slurm job running...", 
+                test_context)
 
         # Run the tests in a temporary directory
         test_success = run_tests_in_temp_dir(
-            args.pr_number, head_repo, head_ref, args.output_dir, test_cmd, suffix
+            args.pr_number, head_repo, head_ref, args.output_dir, 
+            test_suite, suffix
         )
 
-        return test_success
-
+        # Update github PR status to indicate that testing has concluded
+        if test_success:
+            update_status(commit_sha, "success", "All " + suffix + " tests passed.", test_context)
+        else:
+            update_status(commit_sha, "failure", "Tests failed.", test_context)
     else:
         # Check that we are on the right system
         hostname = socket.gethostname()
@@ -187,19 +193,18 @@ def run_test(args, test_context, test_cmd, sbatch_cmd, suffix):
                 current_date_time + "_" + suffix
             )
             subprocess.run(["mkdir", "-p", output_dir], check=True)
-    
+
+            # Create subprocess command for submitting CI job, and submit
             sbatch_command = [
                 "sbatch",
                 f"--job-name={job_name}",
                 f"--output={os.path.join(output_dir, job_name)}_%j.out",
                 f"--error={os.path.join(output_dir, job_name)}_%j.out",
-                sbatch_cmd,
+                sbatch_partition_cmd,
                 "--time=04:00:00",
                 "--wrap",
                 f"python3 {sys.argv[0]} {args.pr_number} --submission --output_dir {output_dir}",
             ]
-
-
             result = subprocess.run(
                 sbatch_command,
                 stdout=subprocess.PIPE,
@@ -207,18 +212,24 @@ def run_test(args, test_context, test_cmd, sbatch_cmd, suffix):
                 check=True,
                 universal_newlines=True,
             )
-
             print(result.stdout.strip())
 
             # Update PR status that we have successfully submitted to SLURM job
-            update_status(commit_sha, "pending", "CI SLURM job submitted...", context=test_context)
+            update_status(commit_sha, "pending", "CI SLURM job submitted...", test_context)
         except Exception as err:
             # Update PR status that we have failed to submit the SLURM job
             update_status(
                 commit_sha,
                 "failure",
                 "SLURM job submission failed with error: " + repr(err),
-                context=test_context
+                test_context
+            )
+        finally:
+            update_status(
+                commit_sha,
+                "failure",
+                "SLURM job submission didn't complete sucessfully",
+                test_context
             )
 
 if __name__ == "__main__":
@@ -249,28 +260,15 @@ if __name__ == "__main__":
 
     # set test specific context and commands
     gpu_context = "Continuous Integration / darwin_volta-x86"
-    test_cmd_gpu = " && python3 run_tests.py gpu.suite "
+    test_suite_gpu = "gpu.suite"
     sbatch_cmd_gpu = "--partition=volta-x86"
 
 
     cpu_context = "Continuous Integration / darwin_skylake-gold"
-    test_cmd_cpu = " && python3 run_tests.py regression.suite "
+    test_suite_cpu = "regression.suite"
     sbatch_cmd_cpu = "--partition=skylake-gold"
 
-    # gpu tests
-    gpu_test_success = run_test(args, test_context=gpu_context, test_cmd=test_cmd_gpu, sbatch_cmd=sbatch_cmd_gpu, suffix="gpu")
-
-    # Update github PR status to indicate that gpu testing has concluded
-    if gpu_test_success:
-        update_status(commit_sha, "success", "All tests passed.", context=gpu_context)
-    else:
-        update_status(commit_sha, "failure", "Tests failed.", context=gpu_context)
-
-    # cpu_tests
-    cpu_test_success = run_test(args, test_context=cpu_context, test_cmd=test_cmd_cpu, sbatch_cmd=sbatch_cmd_cpu, suffix="cpu")
-
-    # Update github PR status to indicate that cpu testing has concluded
-    if cpu_test_success:
-        update_status(commit_sha, "success", "All tests passed.", context=cpu_context)
-    else:
-        update_status(commit_sha, "failure", "Tests failed.", context=cpu_context)
+    # run cpu tests
+    run_test(args, "cpu", sbatch_cmd_cpu, cpu_context, test_suite_cpu)
+    # run gpu tests
+    run_test(args, "gpu", sbatch_cmd_gpu, gpu_context, test_suite_gpu)

@@ -25,7 +25,6 @@ import subprocess
 import argparse
 import tempfile
 import shlex
-import multiprocess
 from datetime import datetime
 
 # The personal access token (PAT) with 'repo:status' permission

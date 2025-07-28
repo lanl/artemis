@@ -126,7 +126,6 @@ def run_tests_in_temp_dir(
         return result
 
 
-def run_test(args, suffix, sbatch_partition_cmd, test_context, test_suite):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Run CI tasks with optional Slurm submission."

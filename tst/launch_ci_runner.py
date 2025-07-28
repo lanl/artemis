@@ -25,6 +25,7 @@ import subprocess
 import argparse
 import tempfile
 import shlex
+import multiprocess
 from datetime import datetime
 
 # The personal access token (PAT) with 'repo:status' permission
@@ -55,7 +56,7 @@ def update_status(commit_sha, state, description, context):
 
 
 def run_tests_in_temp_dir(
-        pr_number, head_repo, head_ref, output_dir, test_suite, suffix
+    pr_number, head_repo, head_ref, output_dir, test_suite, suffix
 ):
     current_dir = os.getcwd()
 
@@ -87,11 +88,15 @@ def run_tests_in_temp_dir(
             + build_dir
             + " -j 20 -f && cd "
             + os.path.join(temp_dir, "tst")
-            + " && python3 run_tests.py " + test_suite + " "
+            + " && python3 run_tests.py "
+            + test_suite
+            + " "
             + "--exe "
             + os.path.join(build_dir, "src", "artemis")
             + f" --output_dir={output_dir}"
-            + " --log_file=darwin_log_" + suffix + ".txt"
+            + " --log_file=darwin_log_"
+            + suffix
+            + ".txt"
             + " --erase_data",
         ]
         try:
@@ -121,22 +126,23 @@ def run_tests_in_temp_dir(
         # Return true if the test script succeeded
         return result
 
+
 def run_test(args, suffix, sbatch_partition_cmd, test_context, test_suite):
 
     if args.submission:
         # Update github PR status to indicate we have begun testing
-        update_status(commit_sha, "pending", "CI Slurm job running...", 
-                test_context)
+        update_status(commit_sha, "pending", "CI Slurm job running...", test_context)
 
         # Run the tests in a temporary directory
         test_success = run_tests_in_temp_dir(
-            args.pr_number, head_repo, head_ref, args.output_dir, 
-            test_suite, suffix
+            args.pr_number, head_repo, head_ref, args.output_dir, test_suite, suffix
         )
 
         # Update github PR status to indicate that testing has concluded
         if test_success:
-            update_status(commit_sha, "success", "All " + suffix + " tests passed.", test_context)
+            update_status(
+                commit_sha, "success", "All " + suffix + " tests passed.", test_context
+            )
         else:
             update_status(commit_sha, "failure", "Tests failed.", test_context)
     else:
@@ -190,7 +196,7 @@ def run_test(args, suffix, sbatch_partition_cmd, test_context, test_suite):
                 "jovian",
                 "ci",
                 f"pr_{args.pr_number}",
-                current_date_time + "_" + suffix
+                current_date_time + "_" + suffix,
             )
             subprocess.run(["mkdir", "-p", output_dir], check=True)
 
@@ -215,22 +221,25 @@ def run_test(args, suffix, sbatch_partition_cmd, test_context, test_suite):
             print(result.stdout.strip())
 
             # Update PR status that we have successfully submitted to SLURM job
-            update_status(commit_sha, "pending", "CI SLURM job submitted...", test_context)
+            update_status(
+                commit_sha, "pending", "CI SLURM job submitted...", test_context
+            )
         except Exception as err:
             # Update PR status that we have failed to submit the SLURM job
             update_status(
                 commit_sha,
                 "failure",
                 "SLURM job submission failed with error: " + repr(err),
-                test_context
+                test_context,
             )
         finally:
             update_status(
                 commit_sha,
                 "failure",
                 "SLURM job submission didn't complete sucessfully",
-                test_context
+                test_context,
             )
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -239,6 +248,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "pr_number", type=int, help="Pull request number for the CI run."
     )
+    parser.add_argument("test_suite", type=str, default="gpu", help="cpu or gpu tests")
     parser.add_argument(
         "--submission",
         action="store_true",
@@ -263,12 +273,13 @@ if __name__ == "__main__":
     test_suite_gpu = "gpu.suite"
     sbatch_cmd_gpu = "--partition=volta-x86"
 
-
     cpu_context = "Continuous Integration / darwin_skylake-gold"
     test_suite_cpu = "regression.suite"
     sbatch_cmd_cpu = "--partition=skylake-gold"
 
-    # run cpu tests
-    run_test(args, "cpu", sbatch_cmd_cpu, cpu_context, test_suite_cpu)
-    # run gpu tests
-    run_test(args, "gpu", sbatch_cmd_gpu, gpu_context, test_suite_gpu)
+    if args.test_suite == "cpu":
+        # run cpu tests
+        run_test(args, "cpu", sbatch_cmd_cpu, cpu_context, test_suite_cpu)
+    if args.test_suite == "gpu":
+        # run gpu tests
+        run_test(args, "gpu", sbatch_cmd_gpu, gpu_context, test_suite_gpu)

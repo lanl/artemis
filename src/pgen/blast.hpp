@@ -170,12 +170,13 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
   auto &pco = pmb->coords;
   auto pars = blast_params;
+  const auto &cpars = artemis_pkg->template Param<geometry::CoordParams>("coord_params");
 
   // setup uniform ambient medium with spherical over-pressured region
   pmb->par_for(
       "blast", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        geometry::Coords<GEOM> coords(pco, k, j, i);
+        geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
         Real total_vol = coords.Volume();
         const auto &xv = coords.GetCellCenter();
         Real den = pars.d0;

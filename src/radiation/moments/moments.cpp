@@ -125,6 +125,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   const int scr_level = pin->GetOrAddInteger("radiation/moment", "scr_level", 0);
   params.Add("scr_level", scr_level);
 
+  const bool log =
+      pin->GetOrAddString("artemis", "radial_spacing", "uniform") == "logarithmic";
+
   // Control field for sparse radiation fields
   std::string control_field = rad::cons::energy::name();
 
@@ -132,7 +135,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   Metadata m = Metadata({Metadata::Cell, Metadata::Conserved, Metadata::Independent,
                          Metadata::WithFluxes, Metadata::Sparse, MetadataMoments,
                          MetadataOperatorSplit});
-  ArtemisUtils::EnrollArtemisRefinementOps(m, coords);
+  ArtemisUtils::EnrollArtemisRefinementOps(m, coords, log);
   m.SetSparseThresholds(0.0, 0.0, 0.0);
   moments->AddSparsePool<rad::cons::energy>(m, control_field, fluidids);
 
@@ -141,7 +144,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
                 Metadata::Independent, Metadata::WithFluxes, Metadata::Sparse,
                 MetadataMoments, MetadataOperatorSplit},
                std::vector<int>({3}));
-  ArtemisUtils::EnrollArtemisRefinementOps(m, coords);
+  ArtemisUtils::EnrollArtemisRefinementOps(m, coords, log);
   m.SetSparseThresholds(0.0, 0.0, 0.0);
   moments->AddSparsePool<rad::cons::flux>(m, control_field, fluidids);
 
@@ -149,7 +152,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   m = Metadata({Metadata::Cell, Metadata::Derived, Metadata::Intensive, Metadata::OneCopy,
                 Metadata::FillGhost, Metadata::Sparse, MetadataMoments,
                 MetadataOperatorSplit});
-  ArtemisUtils::EnrollArtemisRefinementOps(m, coords);
+  ArtemisUtils::EnrollArtemisRefinementOps(m, coords, log);
   m.SetSparseThresholds(0.0, 0.0, 0.0);
   moments->AddSparsePool<rad::prim::energy>(m, control_field, fluidids);
 
@@ -157,7 +160,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   m = Metadata({Metadata::Cell, Metadata::Derived, Metadata::Intensive, Metadata::OneCopy,
                 Metadata::WithFluxes, Metadata::Sparse, MetadataMoments,
                 MetadataOperatorSplit});
-  ArtemisUtils::EnrollArtemisRefinementOps(m, coords);
+  ArtemisUtils::EnrollArtemisRefinementOps(m, coords, log);
   m.SetSparseThresholds(0.0, 0.0, 0.0);
   moments->AddSparsePool<rad::prim::pressure>(m, control_field, fluidids);
 
@@ -166,7 +169,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
                 Metadata::OneCopy, Metadata::FillGhost, Metadata::Sparse, MetadataMoments,
                 MetadataOperatorSplit},
                std::vector<int>({3}));
-  ArtemisUtils::EnrollArtemisRefinementOps(m, coords);
+  ArtemisUtils::EnrollArtemisRefinementOps(m, coords, log);
   m.SetSparseThresholds(0.0, 0.0, 0.0);
   moments->AddSparsePool<rad::prim::flux>(m, control_field, fluidids);
 

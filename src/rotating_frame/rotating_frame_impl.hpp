@@ -51,12 +51,16 @@ TaskStatus ShearingBoxImpl(MeshData<Real> *md, const Real om0, const Real qshear
   const Real qm2_om = qom - two_om;
   const Real g3_over_x3 = (three_d) * (-SQR(om0));
 
+  const auto &cpars =
+      pm->packages.Get("artemis")->template Param<geometry::CoordParams>("coord_params");
+
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "ShearingBox", parthenon::DevExecSpace(), 0,
       md->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
         // Evaluate vertical gravity
-        geometry::Coords<Coordinates::cartesian> coords(vmesh.GetCoordinates(b), k, j, i);
+        geometry::Coords<Coordinates::cartesian> coords(cpars, vmesh.GetCoordinates(b), k,
+                                                        j, i);
         const Real g3 = g3_over_x3 * coords.x3v();
 
         if (do_gas) {
@@ -116,12 +120,14 @@ TaskStatus RotatingFrameImpl(MeshData<Real> *md, const Real om0, const bool do_g
 
   const Real omdt = om0 * dt;
   const Real om2dt = omdt * om0;
+  const auto &cpars =
+      pm->packages.Get("artemis")->template Param<geometry::CoordParams>("coord_params");
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "RotatingFrame", parthenon::DevExecSpace(), 0,
       md->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
         // Extract coordinates
-        geometry::Coords<GEOM> coords(vf.GetCoordinates(b), k, j, i);
+        geometry::Coords<GEOM> coords(cpars, vf.GetCoordinates(b), k, j, i);
         const auto &xv = coords.GetCellCenter();
         const auto &[xcyl, ex1, ex2, ex3] = coords.ConvertToCylWithVec(xv);
 

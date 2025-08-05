@@ -70,13 +70,15 @@ TaskStatus ApplyUpdate(MeshData<Real> *u0, MeshData<Real> *u1, const Real g0,
   const auto kb = u0->GetBoundsK(IndexDomain::interior);
   const bool multi_d = (pm->ndim > 1);
   const bool three_d = (pm->ndim > 2);
+  const auto &cpars =
+      pm->packages.Get("artemis")->template Param<geometry::CoordParams>("coord_params");
 
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "ApplyUpdate", parthenon::DevExecSpace(), 0,
       u0->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
         // Extract coordinates
-        geometry::Coords<GEOM> coords(v0.GetCoordinates(b), k, j, i);
+        geometry::Coords<GEOM> coords(cpars, v0.GetCoordinates(b), k, j, i);
         const auto ax1 = coords.GetFaceAreaX1();
         const auto ax2 = (multi_d) ? coords.GetFaceAreaX2() : NewArray<Real, 2>(0.0);
         const auto ax3 = (three_d) ? coords.GetFaceAreaX3() : NewArray<Real, 2>(0.0);

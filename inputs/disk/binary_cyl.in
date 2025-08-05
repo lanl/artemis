@@ -14,6 +14,7 @@
 <artemis>
 problem = disk             # name of the pgen
 coordinates = cylindrical  # coordinate system
+radial_spacing = logarithmic
 
 <parthenon/job>
 problem_id = disk  # problem ID: basename of output filenames
@@ -37,8 +38,8 @@ nghost = 2
 # numlevel = 4
 
 nx1    = 256                 # Number of zones in X1-direction
-x1min  = 0.3                 # minimum value of X1
-x1max  = 3.0                 # maximum value of X1
+x1min  = -1.2039728043259361 # minimum value of X1 ( = 0.3)
+x1max  = 1.0986122886681098  # maximum value of X1 ( = 3.0)
 ix1_bc = ic                  # Inner-X1 boundary condition flag
 ox1_bc = ic                  # Outer-X1 boundary condition flag
 

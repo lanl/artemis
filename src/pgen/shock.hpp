@@ -103,12 +103,13 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   // Shock parameters
   auto shkp = artemis_pkg->Param<ShockParams>("shock_params");
+  const auto &cpars = artemis_pkg->template Param<geometry::CoordParams>("coord_params");
 
   // Setup shock state
   pmb->par_for(
       "shock", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        geometry::Coords<GEOM> coords(pco, k, j, i);
+        geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
         const auto &xi = coords.GetCellCenter();
         const bool upwind = (xi[0] <= shkp.xdisc);
         const Real rho = upwind ? shkp.rhol : shkp.rhor;

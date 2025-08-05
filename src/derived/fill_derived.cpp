@@ -52,13 +52,16 @@ TaskStatus SetAuxillaryFields(MeshData<Real> *md) {
   IndexRange jb = md->GetBoundsJ(IndexDomain::interior);
   IndexRange kb = md->GetBoundsK(IndexDomain::interior);
 
+  const auto &cpars = artemis_pkg->template Param<geometry::CoordParams>("coord_params");
+
   // Apply dual energy formalism to sync internal energy and total energy
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "SetAuxillaryFields", parthenon::DevExecSpace(), 0,
       md->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
         // Extract geometry
-        geometry::Coords<GEOM> coords(vmesh.GetCoordinates(b), k, j, i);
+        geometry::Coords<GEOM> coords(cpars, vmesh.GetCoordinates(b), k, j, i);
+
         const auto &hx = coords.GetScaleFactors();
 
         for (int n = 0; n < vmesh.GetSize(b, gas::cons::density()); ++n) {
@@ -119,6 +122,7 @@ void ConsToPrim(MeshData<Real> *md) {
     eflr_rad = rad_pkg->template Param<Real>("efloor");
     c = rad_pkg->template Param<Real>("c");
   }
+  const auto &cpars = artemis_pkg->template Param<geometry::CoordParams>("coord_params");
 
   // Packing and indexing
   static auto desc = MakePackDescriptor<
@@ -137,7 +141,7 @@ void ConsToPrim(MeshData<Real> *md) {
       md->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
         // Extract coordinates
-        geometry::Coords<GEOM> coords(vmesh.GetCoordinates(b), k, j, i);
+        geometry::Coords<GEOM> coords(cpars, vmesh.GetCoordinates(b), k, j, i);
         const auto &xv = coords.GetCellCenter();
         const auto &hx = coords.GetScaleFactors();
 
@@ -249,6 +253,7 @@ void PrimToCons(T *md) {
     eflr_rad = rad_pkg->template Param<Real>("efloor");
     c = rad_pkg->template Param<Real>("c");
   }
+  const auto &cpars = artemis_pkg->template Param<geometry::CoordParams>("coord_params");
 
   // Packing and indexing
   static auto desc =
@@ -269,7 +274,7 @@ void PrimToCons(T *md) {
       vmesh.GetNBlocks() - 1, kbe.s, kbe.e, jbe.s, jbe.e, ibe.s, ibe.e,
       KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
         // Extract coordinates
-        geometry::Coords<GEOM> coords(vmesh.GetCoordinates(b), k, j, i);
+        geometry::Coords<GEOM> coords(cpars, vmesh.GetCoordinates(b), k, j, i);
         const auto &xv = coords.GetCellCenter();
         const auto &hx = coords.GetScaleFactors();
 

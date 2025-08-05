@@ -45,6 +45,9 @@ AmrTag ScalarFirstDerivative(MeshBlockData<Real> *md) {
   IndexRange kb = md->GetBoundsK(IndexDomain::interior);
   const int ndim = pmb->pmy_mesh->ndim;
 
+  const auto &cpars =
+      pm->packages.Get("artemis")->template Param<geometry::CoordParams>("coord_params");
+
   Real maxeps = 0.0;
   if (ndim == 3) {
     parthenon::par_reduce(
@@ -52,12 +55,12 @@ AmrTag ScalarFirstDerivative(MeshBlockData<Real> *md) {
         kb.s - 1, kb.e + 1, jb.s - 1, jb.e + 1, ib.s - 1, ib.e + 1,
         KOKKOS_LAMBDA(const int k, const int j, const int i, Real &lmaxeps) {
           // Get coordinate positions
-          geometry::Coords<GEOM> coords_ip1(pco, k, j, i + 1);
-          geometry::Coords<GEOM> coords_im1(pco, k, j, i - 1);
-          geometry::Coords<GEOM> coords_jp1(pco, k, j + 1, i);
-          geometry::Coords<GEOM> coords_jm1(pco, k, j - 1, i);
-          geometry::Coords<GEOM> coords_kp1(pco, k + 1, j, i);
-          geometry::Coords<GEOM> coords_km1(pco, k - 1, j, i);
+          geometry::Coords<GEOM> coords_ip1(cpars, pco, k, j, i + 1);
+          geometry::Coords<GEOM> coords_im1(cpars, pco, k, j, i - 1);
+          geometry::Coords<GEOM> coords_jp1(cpars, pco, k, j + 1, i);
+          geometry::Coords<GEOM> coords_jm1(cpars, pco, k, j - 1, i);
+          geometry::Coords<GEOM> coords_kp1(cpars, pco, k + 1, j, i);
+          geometry::Coords<GEOM> coords_km1(cpars, pco, k - 1, j, i);
           const auto &ip1 = coords_ip1.GetCellCenter();
           const auto &im1 = coords_im1.GetCellCenter();
           const auto &jp1 = coords_jp1.GetCellCenter();
@@ -70,7 +73,7 @@ AmrTag ScalarFirstDerivative(MeshBlockData<Real> *md) {
           const Real sdx2 = jp1[1] - jm1[1];
           const Real sdx3 = kp1[2] - km1[2];
           // Get scale factors
-          geometry::Coords<GEOM> coords(pco, k, j, i);
+          geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
           const auto &cc = coords.GetCellCenter();
           const auto &hx = coords.GetScaleFactors();
           // NOTE(PDM): here, if passed a SparsePool, we will only be accessing the first
@@ -93,10 +96,10 @@ AmrTag ScalarFirstDerivative(MeshBlockData<Real> *md) {
         jb.s - 1, jb.e + 1, ib.s - 1, ib.e + 1,
         KOKKOS_LAMBDA(const int j, const int i, Real &lmaxeps) {
           // Get coordinate positions
-          geometry::Coords<GEOM> coords_ip1(pco, k, j, i + 1);
-          geometry::Coords<GEOM> coords_im1(pco, k, j, i - 1);
-          geometry::Coords<GEOM> coords_jp1(pco, k, j + 1, i);
-          geometry::Coords<GEOM> coords_jm1(pco, k, j - 1, i);
+          geometry::Coords<GEOM> coords_ip1(cpars, pco, k, j, i + 1);
+          geometry::Coords<GEOM> coords_im1(cpars, pco, k, j, i - 1);
+          geometry::Coords<GEOM> coords_jp1(cpars, pco, k, j + 1, i);
+          geometry::Coords<GEOM> coords_jm1(cpars, pco, k, j - 1, i);
           const auto &ip1 = coords_ip1.GetCellCenter();
           const auto &im1 = coords_im1.GetCellCenter();
           const auto &jp1 = coords_jp1.GetCellCenter();
@@ -106,7 +109,7 @@ AmrTag ScalarFirstDerivative(MeshBlockData<Real> *md) {
           const Real sdx1 = ip1[0] - im1[0];
           const Real sdx2 = jp1[1] - jm1[1];
           // Get scale factors
-          geometry::Coords<GEOM> coords(pco, k, j, i);
+          geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
           const auto &cc = coords.GetCellCenter();
           const Real hx1 = coords.hx1(cc[0], cc[1], cc[2]);
           const Real hx2 = coords.hx2(cc[0], cc[1], cc[2]);

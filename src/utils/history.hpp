@@ -38,6 +38,9 @@ std::vector<Real> ReduceSpeciesVolumeIntegral(MeshData<Real> *md) {
   const int nblocks = md->NumBlocks();
   const int nspecies_total = vmesh.GetMaxNumberOfVars();
 
+  const auto &cpars =
+      pm->packages.Get("artemis")->template Param<geometry::CoordParams>("coord_params");
+
   std::vector<Real> integrals(nspecies_total, 0.0);
   for (int n = 0; n < nspecies_total; n++) {
     parthenon::par_reduce(
@@ -45,7 +48,7 @@ std::vector<Real> ReduceSpeciesVolumeIntegral(MeshData<Real> *md) {
         parthenon::DevExecSpace(), 0, nblocks - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
         KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i,
                       Real &lint) {
-          geometry::Coords<GEOM> coords(vmesh.GetCoordinates(b), k, j, i);
+          geometry::Coords<GEOM> coords(cpars, vmesh.GetCoordinates(b), k, j, i);
           const Real vv = coords.Volume();
           for (int nn = 0; nn < vmesh.GetSize(b, VAR()); nn++) {
             if (vmesh(b, VAR(nn)).sparse_id == n) {
@@ -77,6 +80,8 @@ std::vector<Real> ReduceSpeciesVectorVolumeIntegral(MeshData<Real> *md) {
   const auto kb = md->GetBoundsK(IndexDomain::interior);
   const int nblocks = md->NumBlocks();
   const int nspecies_total = vmesh.GetMaxNumberOfVars() / 3;
+  const auto &cpars =
+      pm->packages.Get("artemis")->template Param<geometry::CoordParams>("coord_params");
 
   std::vector<Real> integrals(nspecies_total, 0.0);
   for (int n = 0; n < nspecies_total; n++) {
@@ -85,7 +90,7 @@ std::vector<Real> ReduceSpeciesVectorVolumeIntegral(MeshData<Real> *md) {
         parthenon::DevExecSpace(), 0, nblocks - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
         KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i,
                       Real &lint) {
-          geometry::Coords<GEOM> coords(vmesh.GetCoordinates(b), k, j, i);
+          geometry::Coords<GEOM> coords(cpars, vmesh.GetCoordinates(b), k, j, i);
           const Real vv = coords.Volume();
           for (int nn = 0; nn < vmesh.GetSize(b, VAR()) / 3; nn++) {
             if (vmesh(b, VAR(VI(nn, DIR - 1))).sparse_id == n) {

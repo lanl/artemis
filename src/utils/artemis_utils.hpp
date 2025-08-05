@@ -166,7 +166,8 @@ struct SumMyArray {
 //! Defined in artemis_utils.cpp
 //! NOTE(@pdmullen): We should likely move everything above to implementation file too...
 void PrintArtemisConfiguration(Packages_t &packages);
-void EnrollArtemisRefinementOps(parthenon::Metadata &m, Coordinates coords);
+void EnrollArtemisRefinementOps(parthenon::Metadata &m, Coordinates coords,
+                                const bool log);
 std::vector<std::vector<Real>> loadtxt(std::string fname);
 
 //----------------------------------------------------------------------------------------

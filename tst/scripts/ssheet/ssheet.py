@@ -53,7 +53,7 @@ def analyze():
     os.makedirs(artemis.get_fig_dir(), exist_ok=True)
     analyze_status = True
 
-    time, x, y, z, [d, u, v, w, T] = analysis.load_level(
+    time, x, y, z, [d, u, v, w, T], _ = analysis.load_level(
         "final", dir=artemis.get_data_dir(), base="{}.out1".format(_file_id)
     )
     xc = 0.5 * (x[1:] + x[:-1])

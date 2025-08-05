@@ -45,6 +45,9 @@ TaskStatus ThermalFluxImpl(MeshData<Real> *md, DiffCoeffParams dp, PKG &pkg,
   auto pm = md->GetParentPointer();
   auto eos_d = pkg->template Param<EOS>("eos_d");
 
+  const auto &cpars =
+      pm->packages.Get("artemis")->template Param<geometry::CoordParams>("coord_params");
+
   const int scr_level = pkg->template Param<int>("scr_level");
 
   const auto ib = md->GetBoundsI(IndexDomain::interior);
@@ -80,8 +83,8 @@ TaskStatus ThermalFluxImpl(MeshData<Real> *md, DiffCoeffParams dp, PKG &pkg,
           parthenon::par_for_inner(
               DEFAULT_INNER_LOOP_PATTERN, mbr, il, iu, [&](const int i) {
                 // F = -K grad(T)
-                geometry::Coords<GEOM> coords(pco, k, j, i);
-                geometry::Coords<GEOM> coords_m(pco, k, j, i - 1);
+                geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
+                geometry::Coords<GEOM> coords_m(cpars, pco, k, j, i - 1);
                 const auto &xv = coords.GetCellCenter();
                 const auto &xv_m = coords_m.GetCellCenter();
                 const Real dx1 = coords.Distance(xv, xv_m);
@@ -135,8 +138,8 @@ TaskStatus ThermalFluxImpl(MeshData<Real> *md, DiffCoeffParams dp, PKG &pkg,
                 parthenon::par_for_inner(
                     DEFAULT_INNER_LOOP_PATTERN, mbr, il, iu, [&](const int i) {
                       // F = -kappa * cv grad(T)
-                      geometry::Coords<GEOM> coords(pco, k, j, i);
-                      geometry::Coords<GEOM> coords_m(pco, k, j - 1, i);
+                      geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
+                      geometry::Coords<GEOM> coords_m(cpars, pco, k, j - 1, i);
                       const auto &xv = coords.GetCellCenter();
                       const auto &xv_m = coords_m.GetCellCenter();
                       const Real dx2 = coords.Distance(xv, xv_m);
@@ -195,8 +198,8 @@ TaskStatus ThermalFluxImpl(MeshData<Real> *md, DiffCoeffParams dp, PKG &pkg,
                 parthenon::par_for_inner(
                     DEFAULT_INNER_LOOP_PATTERN, mbr, il, iu, [&](const int i) {
                       // F = -kappa * cv grad(T)
-                      geometry::Coords<GEOM> coords(pco, k, j, i);
-                      geometry::Coords<GEOM> coords_m(pco, k - 1, j, i);
+                      geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
+                      geometry::Coords<GEOM> coords_m(cpars, pco, k - 1, j, i);
                       const auto &xv = coords.GetCellCenter();
                       const auto &xv_m = coords_m.GetCellCenter();
                       const Real dx3 = coords.Distance(xv, xv_m);

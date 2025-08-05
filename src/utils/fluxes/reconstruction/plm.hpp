@@ -78,8 +78,9 @@ template <Coordinates GEOM>
 struct Reconstruction<ReconstructionMethod::plm, X1DIR, GEOM> {
   template <typename V>
   KOKKOS_INLINE_FUNCTION void
-  operator()(parthenon::team_mbr_t const &member, const int b, const int k, const int j,
-             const int il, const int iu, const V &q, parthenon::ScratchPad2D<Real> &ql,
+  operator()(parthenon::team_mbr_t const &member, const geometry::CoordParams &cpars,
+             const int b, const int k, const int j, const int il, const int iu,
+             const V &q, parthenon::ScratchPad2D<Real> &ql,
              parthenon::ScratchPad2D<Real> &qr) const {
     auto &pco = q.GetCoordinates(b);
     for (int n = q.GetLowerBound(b); n <= q.GetUpperBound(b); ++n) {
@@ -89,9 +90,9 @@ struct Reconstruction<ReconstructionMethod::plm, X1DIR, GEOM> {
               PLM(q(b, n, k, j, i - 1), q(b, n, k, j, i), q(b, n, k, j, i + 1),
                   ql(n, i + 1), qr(n, i));
             } else {
-              geometry::Coords<GEOM> coords_m(pco, k, j, i - 1);
-              geometry::Coords<GEOM> coords_c(pco, k, j, i);
-              geometry::Coords<GEOM> coords_p(pco, k, j, i + 1);
+              geometry::Coords<GEOM> coords_m(cpars, pco, k, j, i - 1);
+              geometry::Coords<GEOM> coords_c(cpars, pco, k, j, i);
+              geometry::Coords<GEOM> coords_p(cpars, pco, k, j, i + 1);
               const Real xvm = coords_m.x1v();
               const Real xvc = coords_c.x1v();
               const Real xvp = coords_p.x1v();
@@ -110,11 +111,11 @@ struct Reconstruction<ReconstructionMethod::plm, X1DIR, GEOM> {
 template <Coordinates GEOM>
 struct Reconstruction<ReconstructionMethod::plm, X2DIR, GEOM> {
   template <typename V>
-  KOKKOS_INLINE_FUNCTION void operator()(parthenon::team_mbr_t const &member, const int b,
-                                         const int k, const int j, const int il,
-                                         const int iu, const V &q,
-                                         parthenon::ScratchPad2D<Real> &ql_jp1,
-                                         parthenon::ScratchPad2D<Real> &qr_j) const {
+  KOKKOS_INLINE_FUNCTION void
+  operator()(parthenon::team_mbr_t const &member, const geometry::CoordParams &cpars,
+             const int b, const int k, const int j, const int il, const int iu,
+             const V &q, parthenon::ScratchPad2D<Real> &ql_jp1,
+             parthenon::ScratchPad2D<Real> &qr_j) const {
     auto &pco = q.GetCoordinates(b);
     for (int n = q.GetLowerBound(b); n <= q.GetUpperBound(b); ++n) {
       parthenon::par_for_inner(
@@ -123,9 +124,9 @@ struct Reconstruction<ReconstructionMethod::plm, X2DIR, GEOM> {
               PLM(q(b, n, k, j - 1, i), q(b, n, k, j, i), q(b, n, k, j + 1, i),
                   ql_jp1(n, i), qr_j(n, i));
             } else {
-              geometry::Coords<GEOM> coords_m(pco, k, j - 1, i);
-              geometry::Coords<GEOM> coords_c(pco, k, j, i);
-              geometry::Coords<GEOM> coords_p(pco, k, j + 1, i);
+              geometry::Coords<GEOM> coords_m(cpars, pco, k, j - 1, i);
+              geometry::Coords<GEOM> coords_c(cpars, pco, k, j, i);
+              geometry::Coords<GEOM> coords_p(cpars, pco, k, j + 1, i);
               const Real xvm = coords_m.x2v();
               const Real xvc = coords_c.x2v();
               const Real xvp = coords_p.x2v();
@@ -144,11 +145,11 @@ struct Reconstruction<ReconstructionMethod::plm, X2DIR, GEOM> {
 template <Coordinates GEOM>
 struct Reconstruction<ReconstructionMethod::plm, X3DIR, GEOM> {
   template <typename V>
-  KOKKOS_INLINE_FUNCTION void operator()(parthenon::team_mbr_t const &member, const int b,
-                                         const int k, const int j, const int il,
-                                         const int iu, const V &q,
-                                         parthenon::ScratchPad2D<Real> &ql_kp1,
-                                         parthenon::ScratchPad2D<Real> &qr_k) const {
+  KOKKOS_INLINE_FUNCTION void
+  operator()(parthenon::team_mbr_t const &member, const geometry::CoordParams &cpars,
+             const int b, const int k, const int j, const int il, const int iu,
+             const V &q, parthenon::ScratchPad2D<Real> &ql_kp1,
+             parthenon::ScratchPad2D<Real> &qr_k) const {
     auto &pco = q.GetCoordinates(b);
     for (int n = q.GetLowerBound(b); n <= q.GetUpperBound(b); ++n) {
       parthenon::par_for_inner(
@@ -157,9 +158,9 @@ struct Reconstruction<ReconstructionMethod::plm, X3DIR, GEOM> {
               PLM(q(b, n, k - 1, j, i), q(b, n, k, j, i), q(b, n, k + 1, j, i),
                   ql_kp1(n, i), qr_k(n, i));
             } else {
-              geometry::Coords<GEOM> coords_m(pco, k - 1, j, i);
-              geometry::Coords<GEOM> coords_c(pco, k, j, i);
-              geometry::Coords<GEOM> coords_p(pco, k + 1, j, i);
+              geometry::Coords<GEOM> coords_m(cpars, pco, k - 1, j, i);
+              geometry::Coords<GEOM> coords_c(cpars, pco, k, j, i);
+              geometry::Coords<GEOM> coords_p(cpars, pco, k + 1, j, i);
               const Real xvm = coords_m.x3v();
               const Real xvc = coords_c.x3v();
               const Real xvp = coords_p.x3v();
@@ -172,13 +173,13 @@ struct Reconstruction<ReconstructionMethod::plm, X3DIR, GEOM> {
   }
 };
 
-template <>
-struct ReconGradient<ReconstructionMethod::plm> {
+template <Coordinates GEOM>
+struct ReconGradient<GEOM, ReconstructionMethod::plm> {
   template <typename V>
   KOKKOS_INLINE_FUNCTION std::array<Real, 3>
-  operator()(const V &q, const std::array<Real, 3> &dx, const int multi_d,
-             const int three_d, const int b, const int n, const int k, const int j,
-             const int i) const {
+  operator()(const geometry::CoordParams &cpars, const V &q,
+             const std::array<Real, 3> &dx, const int multi_d, const int three_d,
+             const int b, const int n, const int k, const int j, const int i) const {
     std::array<Real, 3> dqdx{0.0, 0.0, 0.0};
     Real wl = Null<Real>(), wr = Null<Real>();
 

@@ -66,18 +66,18 @@ if __name__ == "__main__":
 
     if args.submission:
         # Update github PR status to indicate we have begun testing
-        update_status(commit_sha, "pending", "CI Slurm job running...")
+        update_status(commit_sha, "pending", "CI Slurm job running...", context)
 
         # Run the tests in a temporary directory
         test_success = run_tests_in_temp_dir(
-            args.pr_number, head_repo, head_ref, args.output_dir
+            args.pr_number, head_repo, head_ref, args.output_dir, test_suite, suffix
         )
 
         # Update github PR status to indicate that testing has concluded
         if test_success:
-            update_status(commit_sha, "success", "All tests passed.")
+            update_status(commit_sha, "success", "All tests passed.", context)
         else:
-            update_status(commit_sha, "failure", "Tests failed.")
+            update_status(commit_sha, "failure", "Tests failed.", context)
     else:
         # Check that we are on the right system
         hostname = socket.gethostname()
@@ -154,17 +154,19 @@ if __name__ == "__main__":
             print(result.stdout.strip())
 
             # Update PR status that we have successfully submitted to SLURM job
-            update_status(commit_sha, "pending", "CI SLURM job submitted...")
+            update_status(commit_sha, "pending", "CI SLURM job submitted...", context)
         except Exception as err:
             # Update PR status that we have failed to submit the SLURM job
             update_status(
                 commit_sha,
                 "failure",
                 "SLURM job submission failed with error: " + repr(err),
+                context
             )
         finally:
             update_status(
                 commit_sha,
                 "failure",
                 "SLURM job submission didn't complete sucessfully",
+                context
             )

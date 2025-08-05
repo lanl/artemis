@@ -59,11 +59,10 @@ if __name__ == "__main__":
     head_ref = pr_info["head"]["ref"]
     commit_sha = pr_info["head"]["sha"]
 
-    #cpu context
+    # cpu context
     context = "Continuous Integration / darwin_skylake-gold"
     test_suite = "regression.suite"
     suffix = "cpu"
-
 
     if args.submission:
         # Update github PR status to indicate we have begun testing
@@ -162,12 +161,12 @@ if __name__ == "__main__":
                 commit_sha,
                 "failure",
                 "SLURM job submission failed with error: " + repr(err),
-                context
+                context,
             )
         finally:
             update_status(
                 commit_sha,
                 "failure",
                 "SLURM job submission didn't complete sucessfully",
-                context
+                context,
             )

@@ -59,7 +59,7 @@ if __name__ == "__main__":
     head_ref = pr_info["head"]["ref"]
     commit_sha = pr_info["head"]["sha"]
 
-    #gpu context
+    # gpu context
     context = "Continuous Integration / darwin_volta-x86"
     test_suite = "gpu.suite"
     suffix = "gpu"
@@ -161,12 +161,12 @@ if __name__ == "__main__":
                 commit_sha,
                 "failure",
                 "SLURM job submission failed with error: " + repr(err),
-                context
+                context,
             )
         finally:
             update_status(
                 commit_sha,
                 "failure",
                 "SLURM job submission didn't complete sucessfully",
-                context
+                context,
             )

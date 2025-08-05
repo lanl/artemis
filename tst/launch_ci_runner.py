@@ -146,15 +146,14 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    run_cmd = ['./darwin_cpu_ci.py', str(args.pr_number)]
-    if args.output_dir:
-        run_cmd.append("--output_dir=" + str(args.output_dir))
-    
-    subprocess.run(run_cmd)
-
-    run_cmd = ['./darwin_gpu_ci.py', str(args.pr_number)]
+    run_cmd = ["./darwin_cpu_ci.py", str(args.pr_number)]
     if args.output_dir:
         run_cmd.append("--output_dir=" + str(args.output_dir))
 
     subprocess.run(run_cmd)
 
+    run_cmd = ["./darwin_gpu_ci.py", str(args.pr_number)]
+    if args.output_dir:
+        run_cmd.append("--output_dir=" + str(args.output_dir))
+
+    subprocess.run(run_cmd)

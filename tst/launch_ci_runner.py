@@ -134,9 +134,6 @@ if __name__ == "__main__":
         "pr_number", type=int, help="Pull request number for the CI run."
     )
     parser.add_argument(
-        "test_suite", type=str, default="gpu", help="Cpu or gpu tests."
-    )
-    parser.add_argument(
         "--submission",
         action="store_true",
         help="Flag to indicate the script is running as a Slurm submission job.",
@@ -149,129 +146,15 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    # Fetch PR information
-    pr_info = get_pr_info(args.pr_number)
-    head_repo = pr_info["head"]["repo"]["clone_url"]
-    head_ref = pr_info["head"]["ref"]
-    commit_sha = pr_info["head"]["sha"]
+    run_cmd = ['./darwin_cpu_ci.py', str(args.pr_number)]
+    if args.output_dir:
+        run_cmd.append("--output_dir=" + str(args.output_dir))
+    
+    subprocess.run(run_cmd)
 
-    # set test specific context and commands
-    if args.test_suite == "cpu":
-        test_context = "Continuous Integration / darwin_skylake-gold"
-        sbatch_cmd = "--partition=skylake-gold"
-        test_suite = "regression.suite"
-        suffix = "cpu"
-        print("Running cpu tests")
-    if args.test_suite == "gpu":
-        test_context = "Continuous Integration / darwin_volta-x86"
-        sbatch_cmd = "--partition=volta-x86"
-        test_suite = "gpu.suite"
-        suffix = "gpu"
-        print("Running gpu tests")
+    run_cmd = ['./darwin_gpu_ci.py', str(args.pr_number)]
+    if args.output_dir:
+        run_cmd.append("--output_dir=" + str(args.output_dir))
 
-    if args.submission:
-        # Update github PR status to indicate we have begun testing
-        update_status(commit_sha, "pending", "CI Slurm job running...", test_context)
-
-        # Run the tests in a temporary directory
-        test_success = run_tests_in_temp_dir(
-            args.pr_number, head_repo, head_ref, args.output_dir, test_suite, suffix
-        )
-
-        # Update github PR status to indicate that testing has concluded
-        if test_success:
-            update_status(
-                commit_sha, "success", "All " + suffix + " tests passed.", test_context
-            )
-        else:
-            update_status(commit_sha, "failure", "Tests failed.", test_context)
-    else:
-        # Check that we are on the right system
-        hostname = socket.gethostname()
-        cluster = os.getenv("SLURM_CLUSTER_NAME")
-
-        if not fnmatch.fnmatch(hostname, "darwin-fe*"):
-            # if we are on a backend
-            if cluster is None or cluster.lower() != "darwin":
-                print("ERROR script must be run from Darwin!")
-                sys.exit(1)
-
-        # Execute the sbatch command
-        try:
-            # Submit batch job with ci_runner script that will checkout and build the code and run
-            # tests
-            job_name = f"artemis_ci_PR{args.pr_number}_" + suffix
-
-            # Clean up existing jobs for same PR
-            squeue_command = f"squeue --name={shlex.quote(job_name)} --user=$(whoami) --noheader  --format=%i"
-            squeue_result = subprocess.run(
-                squeue_command,
-                shell=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                universal_newlines=True,
-            )
-
-            job_ids = squeue_result.stdout.strip().split()
-            if len(job_ids) >= 1:
-                print("Canceling jobs:")
-                for job_id in job_ids:
-                    print(f"  {job_id}")
-
-                # Use scancel to cancel the jobs
-                scancel_command = ["scancel"] + job_ids
-                scancel_result = subprocess.run(
-                    scancel_command,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    universal_newlines=True,
-                )
-
-            # Build output path and create directory if necessary
-            username = os.getenv("USER")
-            current_date_time = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
-            output_dir = os.path.join(
-                "/usr",
-                "projects",
-                "jovian",
-                "ci",
-                f"pr_{args.pr_number}",
-                current_date_time + "_" + suffix,
-            )
-            subprocess.run(["mkdir", "-p", output_dir], check=True)
-
-            # Create subprocess command for submitting CI job, and submit
-            sbatch_command = [
-                "sbatch",
-                f"--job-name={job_name}",
-                f"--output={os.path.join(output_dir, job_name)}_%j.out",
-                f"--error={os.path.join(output_dir, job_name)}_%j.out",
-                sbatch_cmd,
-                "--time=04:00:00",
-                "--wrap",
-                f"python3 {sys.argv[0]} {args.pr_number} {args.test_suite} --submission --output_dir {output_dir}",
-            ]
-            result = subprocess.run(
-                sbatch_command,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                check=True,
-                universal_newlines=True,
-            )
-            print(result.stdout.strip())
-
-            # Update PR status that we have successfully submitted to SLURM job
-            update_status(
-                commit_sha, "pending", "CI SLURM job submitted...", test_context
-            )
-        except Exception as err:
-            # Update PR status that we have failed to submit the SLURM job
-            update_status(
-                commit_sha,
-                "failure",
-                "SLURM job submission failed with error: " + repr(err),
-                test_context,
-            )
-
-
+    subprocess.run(run_cmd)
 

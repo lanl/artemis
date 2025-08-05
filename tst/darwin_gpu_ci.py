@@ -32,96 +32,6 @@ from datetime import datetime
 GITHUB_TOKEN = os.environ.get("ARTEMIS_GITHUB_TOKEN")
 
 
-def get_pr_info(pr_number):
-    url = f"https://api.github.com/repos/lanl/artemis/pulls/{pr_number}"
-    headers = {"Authorization": f"token {GITHUB_TOKEN}"}
-    response = requests.get(url, headers=headers)
-    if response.status_code != 200:
-        print(f"Error fetching PR info: {response.status_code}")
-        print(response.text)
-        sys.exit(1)
-    return response.json()
-
-
-def update_status(
-    commit_sha, state, description, context="Continuous Integration / darwin_skylake-gold"
-):
-    url = f"https://api.github.com/repos/lanl/artemis/statuses/{commit_sha}"
-    headers = {"Authorization": f"token {GITHUB_TOKEN}"}
-    data = {"state": state, "description": description, "context": context}
-    response = requests.post(url, headers=headers, data=json.dumps(data))
-    if response.status_code != 201:
-        print(f"Error setting status: {response.status_code}")
-        print(response.text)
-        sys.exit(1)
-
-
-def run_tests_in_temp_dir(pr_number, head_repo, head_ref, output_dir):
-    current_dir = os.getcwd()
-
-    # Create a temporary directory
-    with tempfile.TemporaryDirectory() as temp_dir:
-        print(f"Using temporary directory: {temp_dir}")
-
-        # Clone the repository into the temporary directory
-        subprocess.run(["git", "clone", head_repo, temp_dir], check=True)
-        os.chdir(temp_dir)
-
-        # Checkout the PR branch
-        subprocess.run(["git", "pull", "--no-rebase", "origin", head_ref], check=True)
-
-        # Update submodules
-        subprocess.run(
-            ["git", "submodule", "update", "--init", "--recursive"], check=True
-        )
-
-        # Run the tests
-        os.chdir(os.path.join(temp_dir, "tst"))
-        build_dir = os.path.join(temp_dir, "build")
-
-        # Run subprocess command to compile code and launch run_tests.py
-        test_command = [
-            "bash",
-            "-c",
-            "source ../env/bash && build_artemis -b "
-            + build_dir
-            + " -j 20 -f && cd "
-            + os.path.join(temp_dir, "tst")
-            + " && python3 run_tests.py regression.suite "
-            + "--exe "
-            + os.path.join(build_dir, "src", "artemis")
-            + f" --output_dir={output_dir}"
-            + " --log_file=darwin_cpu_log.txt"
-            + " --erase_data",
-        ]
-        try:
-            ret = subprocess.run(test_command, check=True)
-            result = ret.returncode == 0
-        except:
-            result = False
-
-        # Set group ownership
-        subprocess.run(
-            ["chgrp", "-R", "jovian", output_dir],
-            check=True,
-        )
-
-        # Set permissions for directories
-        subprocess.run(
-            ["find", output_dir, "-type", "d", "-exec", "chmod", "770", "{}", "+"],
-            check=True,
-        )
-
-        # Set permissions for files
-        subprocess.run(
-            ["find", output_dir, "-type", "f", "-exec", "chmod", "660", "{}", "+"],
-            check=True,
-        )
-
-        # Return true if the test script succeeded
-        return result
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Run CI tasks with optional Slurm submission."
@@ -147,6 +57,11 @@ if __name__ == "__main__":
     head_repo = pr_info["head"]["repo"]["clone_url"]
     head_ref = pr_info["head"]["ref"]
     commit_sha = pr_info["head"]["sha"]
+
+    #gpu context
+    context = "Continuous Integration / darwin_volta-x86"
+    test_suite = "gpu.suite"
+    suffix = "gpu"
 
     if args.submission:
         # Update github PR status to indicate we have begun testing
@@ -177,7 +92,7 @@ if __name__ == "__main__":
         try:
             # Submit batch job with ci_runner script that will checkout and build the code and run
             # tests
-            job_name = f"artemis_ci_darwin_darwin_skylake-gold_PR{args.pr_number}"
+            job_name = f"artemis_ci_darwin_volta-x86_PR{args.pr_number}"
 
             # Clean up existing jobs for same PR
             squeue_command = f"squeue --name={shlex.quote(job_name)} --user=$(whoami) --noheader  --format=%i"
@@ -223,7 +138,7 @@ if __name__ == "__main__":
                 f"--job-name={job_name}",
                 f"--output={os.path.join(output_dir, job_name)}_%j.out",
                 f"--error={os.path.join(output_dir, job_name)}_%j.out",
-                "--partition=skylake-gold",
+                "--partition=volta-x86",
                 "--time=04:00:00",
                 "--wrap",
                 f"python3 {sys.argv[0]} {args.pr_number} --submission --output_dir {output_dir}",

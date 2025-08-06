@@ -38,9 +38,9 @@ class Coords<Coordinates::spherical3D>
   // the derived  specialization
 
  public:
-  KOKKOS_INLINE_FUNCTION
-  Coords(const CoordParams &cpars, const parthenon::Coordinates_t &pco, const int k,
-         const int j, const int i)
+  template <typename PAR>
+  KOKKOS_INLINE_FUNCTION Coords(const PAR &cpars, const parthenon::Coordinates_t &pco,
+                                const int k, const int j, const int i)
       : CoordsBase<Coords<Coordinates::spherical3D>>(cpars, pco, k, j, i) {}
   KOKKOS_INLINE_FUNCTION
   Coords(const bool log, const parthenon::Coordinates_t &pco, const int k, const int j,
@@ -247,9 +247,9 @@ class Coords<Coordinates::spherical2D>
   // the derived  specialization for 2D spherical coordinates
 
  public:
-  KOKKOS_INLINE_FUNCTION
-  Coords(const CoordParams &cpars, const parthenon::Coordinates_t &pco, const int k,
-         const int j, const int i)
+  template <typename PAR>
+  KOKKOS_INLINE_FUNCTION Coords(const PAR &cpars, const parthenon::Coordinates_t &pco,
+                                const int k, const int j, const int i)
       : CoordsBase<Coords<Coordinates::spherical2D>>(cpars, pco, k, j, i) {}
   KOKKOS_INLINE_FUNCTION
   Coords(const bool log, const parthenon::Coordinates_t &pco, const int k, const int j,
@@ -453,9 +453,9 @@ class Coords<Coordinates::spherical1D>
   // the derived  specialization for 1D spherical coordinates
 
  public:
-  KOKKOS_INLINE_FUNCTION
-  Coords(const CoordParams &cpars, const parthenon::Coordinates_t &pco, const int k,
-         const int j, const int i)
+  template <typename PAR>
+  KOKKOS_INLINE_FUNCTION Coords(const PAR &cpars, const parthenon::Coordinates_t &pco,
+                                const int k, const int j, const int i)
       : CoordsBase<Coords<Coordinates::spherical1D>>(cpars, pco, k, j, i) {}
   KOKKOS_INLINE_FUNCTION
   Coords(const bool log, const parthenon::Coordinates_t &pco, const int k, const int j,

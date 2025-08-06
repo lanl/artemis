@@ -33,6 +33,7 @@ set (SRC_LIST
   gas/cooling/cooling.cpp
   gas/cooling/cooling.hpp
 
+  geometry/geometry.cpp
   geometry/geometry.hpp
   geometry/spherical.hpp
   geometry/cylindrical.hpp

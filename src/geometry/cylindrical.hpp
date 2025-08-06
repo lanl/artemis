@@ -33,9 +33,9 @@ template <>
 class Coords<Coordinates::cylindrical>
     : public CoordsBase<Coords<Coordinates::cylindrical>> {
  public:
-  KOKKOS_INLINE_FUNCTION
-  Coords(const CoordParams &cpars, const parthenon::Coordinates_t &pco, const int k,
-         const int j, const int i)
+  template <typename PAR>
+  KOKKOS_INLINE_FUNCTION Coords(const PAR &cpars, const parthenon::Coordinates_t &pco,
+                                const int k, const int j, const int i)
       : CoordsBase<Coords<Coordinates::cylindrical>>(cpars, pco, k, j, i) {}
   KOKKOS_INLINE_FUNCTION
   Coords(const bool log, const parthenon::Coordinates_t &pco, const int k, const int j,

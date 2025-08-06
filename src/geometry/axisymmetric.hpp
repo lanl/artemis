@@ -36,9 +36,9 @@ template <>
 class Coords<Coordinates::axisymmetric>
     : public CoordsBase<Coords<Coordinates::axisymmetric>> {
  public:
-  KOKKOS_INLINE_FUNCTION
-  Coords(const CoordParams &cpars, const parthenon::Coordinates_t &pco, const int k,
-         const int j, const int i)
+  template <typename PAR>
+  KOKKOS_INLINE_FUNCTION Coords(const PAR &cpars, const parthenon::Coordinates_t &pco,
+                                const int k, const int j, const int i)
       : CoordsBase<Coords<Coordinates::axisymmetric>>(cpars, pco, k, j, i) {}
   KOKKOS_INLINE_FUNCTION
   Coords(const bool log, const parthenon::Coordinates_t &pco, const int k, const int j,

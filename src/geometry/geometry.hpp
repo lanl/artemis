@@ -29,18 +29,13 @@ using Mat4x3 = std::tuple<std::array<Real, 3>, std::array<Real, 3>, std::array<R
 
 namespace geometry {
 
+std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
+template <Coordinates GEOM>
+void InitBlockGeom(MeshBlock *pmb, ParameterInput *pin);
+parthenon::TaskStatus UpdateGeom(parthenon::MeshBlockData<Real> *md);
+
 // Face indexing
 enum class CellFace { lower = 0, upper = 1 };
-
-struct CoordParams {
-  CoordParams(ParameterInput *pin) {
-    log = (pin->GetOrAddString("artemis", "radial_spacing", "uniform") == "logarithmic");
-  }
-  KOKKOS_INLINE_FUNCTION
-  CoordParams() = default;
-
-  bool log = false;
-};
 
 //----------------------------------------------------------------------------------------
 //! \fn  Coordinates geometry::CoordSelect
@@ -64,6 +59,102 @@ inline Coordinates CoordSelect(std::string sys, const int ndim) {
     return Coordinates::null;
   }
 }
+
+KOKKOS_INLINE_FUNCTION bool is_spherical(Coordinates T) {
+  return (T == Coordinates::spherical3D) || (T == Coordinates::spherical1D) ||
+         (T == Coordinates::spherical2D);
+}
+KOKKOS_INLINE_FUNCTION bool is_cylindrical(Coordinates T) {
+  return (T == Coordinates::cylindrical);
+}
+KOKKOS_INLINE_FUNCTION bool is_axisymmetric(Coordinates T) {
+  return (T == Coordinates::axisymmetric) || (T == Coordinates::spherical1D) ||
+         (T == Coordinates::spherical2D);
+}
+KOKKOS_INLINE_FUNCTION bool is_cartesian(Coordinates T) {
+  return (T == Coordinates::cartesian);
+}
+
+KOKKOS_INLINE_FUNCTION
+bool x1dep(Coordinates T) {
+  return is_spherical(T) || is_cylindrical(T) || (T == Coordinates::axisymmetric);
+}
+KOKKOS_INLINE_FUNCTION
+bool x2dep(Coordinates T) {
+  return (T == Coordinates::spherical3D) || (T == Coordinates::spherical2D);
+}
+KOKKOS_INLINE_FUNCTION
+bool x3dep(Coordinates T) { return false; }
+
+struct CoordParams {
+  CoordParams(ParameterInput *pin) {
+    log = (pin->GetOrAddString("artemis", "radial_spacing", "uniform") == "logarithmic");
+    nx1 = pin->GetInteger("parthenon/meshblock", "nx1");
+    nx2 = pin->GetInteger("parthenon/meshblock", "nx2");
+    nx3 = pin->GetInteger("parthenon/meshblock", "nx3");
+    const int ndim = (nx3 > 1) ? 3 : ((nx2 > 1) ? 2 : 1);
+    sys = CoordSelect(pin->GetOrAddString("artemis", "coordinates", "cartesian"), ndim);
+    dep = {x1dep(sys), x2dep(sys), x3dep(sys)};
+    cstrides = {0, 0, 0};
+    for (int i = 0; i < 3; i++)
+      fstrides[i] = {0, 0, 0};
+
+    if (dep[0]) {
+      cstrides[0] = 1;
+      for (int i = 0; i < 3; i++) {
+        fstrides[i][0] = 1;
+      }
+      if (dep[1]) {
+        cstrides[1] = nx1;
+        fstrides[0][1] = nx1 + 1;
+        fstrides[1][1] = nx1;
+        fstrides[2][1] = nx1;
+        if (dep[2]) {
+          cstrides[2] = nx1 * nx2;
+          fstrides[0][2] = (nx1 + 1) * nx2;
+          fstrides[1][2] = nx1 * (nx2 + 1);
+          fstrides[2][2] = nx1 * nx2;
+        }
+      } else {
+        if (dep[2]) {
+          cstrides[2] = nx1;
+          fstrides[0][2] = nx1 + 1;
+          fstrides[1][2] = nx1;
+          fstrides[2][2] = nx1;
+        }
+      }
+    } else {
+      if (dep[1]) {
+        cstrides[1] = 1;
+        fstrides[0][1] = 1;
+        fstrides[1][1] = 1;
+        fstrides[2][1] = 1;
+        if (dep[2]) {
+          cstrides[2] = nx2;
+          fstrides[0][2] = nx2;
+          fstrides[1][2] = nx2 + 1;
+          fstrides[2][2] = nx2;
+        }
+      } else {
+        if (dep[2]) {
+          cstrides[2] = 1;
+          fstrides[0][2] = 1;
+          fstrides[1][2] = 1;
+          fstrides[2][2] = 1;
+        }
+      }
+    }
+  }
+  KOKKOS_INLINE_FUNCTION
+  CoordParams() = default;
+
+  bool log = false;
+  int nx1, nx2, nx3;
+  std::array<bool, 3> dep;
+  std::array<int, 3> cstrides;
+  std::array<std::array<int, 3>, 3> fstrides;
+  Coordinates sys;
+};
 
 //----------------------------------------------------------------------------------------
 //! \struct  geometry::BBox
@@ -122,32 +213,6 @@ KOKKOS_INLINE_FUNCTION constexpr bool x3dep() {
   return false;
 }
 
-KOKKOS_INLINE_FUNCTION bool is_spherical(Coordinates T) {
-  return (T == Coordinates::spherical3D) || (T == Coordinates::spherical1D) ||
-         (T == Coordinates::spherical2D);
-}
-KOKKOS_INLINE_FUNCTION bool is_cylindrical(Coordinates T) {
-  return (T == Coordinates::cylindrical);
-}
-KOKKOS_INLINE_FUNCTION bool is_axisymmetric(Coordinates T) {
-  return (T == Coordinates::axisymmetric) || (T == Coordinates::spherical1D) ||
-         (T == Coordinates::spherical2D);
-}
-KOKKOS_INLINE_FUNCTION bool is_cartesian(Coordinates T) {
-  return (T == Coordinates::cartesian);
-}
-
-KOKKOS_INLINE_FUNCTION
-bool x1dep(Coordinates T) {
-  return is_spherical(T) || is_cylindrical(T) || (T == Coordinates::axisymmetric);
-}
-KOKKOS_INLINE_FUNCTION
-bool x2dep(Coordinates T) {
-  return (T == Coordinates::spherical3D) || (T == Coordinates::spherical2D);
-}
-KOKKOS_INLINE_FUNCTION
-bool x3dep(Coordinates T) { return false; }
-
 //----------------------------------------------------------------------------------------
 //! \class  geometry::CoordsBase
 //! \brief  The base coordinates class that defines all methods and the default behavior
@@ -156,14 +221,18 @@ template <class T>
 class CoordsBase {
  public:
   BBox bnds;
+  std::array<int, 3> cstrides;
+  std::array<std::array<int, 3>, 3> fstrides;
   KOKKOS_INLINE_FUNCTION
   CoordsBase(const parthenon::Coordinates_t &pco, const int k, const int j, const int i)
       : bnds(pco, k, j, i) {};
 
-  KOKKOS_INLINE_FUNCTION
-  CoordsBase(const CoordParams &cpars, const parthenon::Coordinates_t &pco, const int k,
-             const int j, const int i)
+  template <typename PAR>
+  KOKKOS_INLINE_FUNCTION CoordsBase(const PAR &cpars, const parthenon::Coordinates_t &pco,
+                                    const int k, const int j, const int i)
       : bnds(pco, k, j, i) {
+    cstrides = cpars.cstrides;
+    fstrides = cpars.fstrides;
     if (cpars.log) {
       bnds.x1[0] = std::exp(bnds.x1[0]);
       bnds.x1[1] = std::exp(bnds.x1[1]);
@@ -172,7 +241,7 @@ class CoordsBase {
   KOKKOS_INLINE_FUNCTION
   CoordsBase(const bool log, const parthenon::Coordinates_t &pco, const int k,
              const int j, const int i)
-      : bnds(pco, k, j, i) {
+      : bnds(pco, k, j, i), cstrides{}, fstrides{} {
     if (log) {
       bnds.x1[0] = std::exp(bnds.x1[0]);
       bnds.x1[1] = std::exp(bnds.x1[1]);
@@ -181,7 +250,19 @@ class CoordsBase {
 
   // This constructor allows us to easily access the coordinate conversion routines
   KOKKOS_INLINE_FUNCTION
-  CoordsBase() : bnds() {}
+  CoordsBase() : bnds(), cstrides{}, fstrides{} {}
+
+  template <class VAR>
+  int CI(const int k, const int j, const int i) const {
+    if constexpr (std::is_same_v<VAR, geom::xv>) {
+      return cstrides[0] * i + cstrides[1] * j + cstrides[2] * k;
+    }
+    return -1;
+  }
+  template <int dir>
+  int FI(const int k, const int j, const int i) const {
+    return fstrides[dir - 1][0] * i + fstrides[dir - 1][1] * j + fstrides[dir - 1][2] * k;
+  }
 
   // Is the metric x1, x2, and/or x3 dependent?
   KOKKOS_INLINE_FUNCTION bool x1dep() const { return false; }
@@ -541,9 +622,9 @@ class Coords : public CoordsBase<Coords<GEOM>> {};
 template <>
 class Coords<Coordinates::cartesian> : public CoordsBase<Coords<Coordinates::cartesian>> {
  public:
-  KOKKOS_INLINE_FUNCTION
-  Coords(const CoordParams &cpars, const parthenon::Coordinates_t &pco, const int k,
-         const int j, const int i)
+  template <typename PAR>
+  KOKKOS_INLINE_FUNCTION Coords(const PAR &cpars, const parthenon::Coordinates_t &pco,
+                                const int k, const int j, const int i)
       : CoordsBase<Coords<Coordinates::cartesian>>(cpars, pco, k, j, i) {}
   KOKKOS_INLINE_FUNCTION
   Coords(const bool log, const parthenon::Coordinates_t &pco, const int k, const int j,

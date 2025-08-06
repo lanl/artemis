@@ -69,6 +69,8 @@ struct DiffCoeffParams {
   DiffType type;
   DiffAvg avg;
   bool log;
+  std::array<int, 3> cstrides;
+  std::array<std::array<int, 3>, 3> fstrides;
 
   // Viscosity
   // -----------------
@@ -99,7 +101,10 @@ struct DiffCoeffParams {
                   parthenon::ParameterInput *pin,
                   const ArtemisUtils::Constants &constants, const Packages_t &packages) {
     // Read the parameter file
-    log = pin->GetOrAddString("artemis", "radial_spacing", "uniform") == "logarithmic";
+    const auto cpars = geometry::CoordParams(pin);
+    log = cpars.log;
+    cstrides = cpars.cstrides;
+    fstrides = cpars.fstrides;
     std::string type_ = pin->GetString(block_name, "type");
     type = ChooseDiffusion(dtype, type_);
     if (type == DiffType::null) {

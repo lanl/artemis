@@ -85,6 +85,10 @@ ARTEMIS_VARIABLE(rad.opac, scattering);
 } // namespace opac
 } // namespace rad
 
+namespace geom {
+ARTEMIS_VARIABLE(geom, xv);
+} // namespace geom
+
 #undef ARTEMIS_VARIABLE
 
 // Restart options (see Parthenon #1231)

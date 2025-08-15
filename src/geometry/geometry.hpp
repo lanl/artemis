@@ -89,70 +89,19 @@ bool x3dep(Coordinates T) { return false; }
 struct CoordParams {
   CoordParams(ParameterInput *pin) {
     log = (pin->GetOrAddString("artemis", "radial_spacing", "uniform") == "logarithmic");
-    nx1 = pin->GetInteger("parthenon/meshblock", "nx1");
-    nx2 = pin->GetInteger("parthenon/meshblock", "nx2");
-    nx3 = pin->GetInteger("parthenon/meshblock", "nx3");
-    const int ndim = (nx3 > 1) ? 3 : ((nx2 > 1) ? 2 : 1);
+    nx = {pin->GetInteger("parthenon/meshblock", "nx1"),
+          pin->GetInteger("parthenon/meshblock", "nx2"),
+          pin->GetInteger("parthenon/meshblock", "nx3")};
+    const int ndim = (nx[2] > 1) ? 3 : ((nx[1] > 1) ? 2 : 1);
     sys = CoordSelect(pin->GetOrAddString("artemis", "coordinates", "cartesian"), ndim);
     dep = {x1dep(sys), x2dep(sys), x3dep(sys)};
-    cstrides = {0, 0, 0};
-    for (int i = 0; i < 3; i++)
-      fstrides[i] = {0, 0, 0};
-
-    if (dep[0]) {
-      cstrides[0] = 1;
-      for (int i = 0; i < 3; i++) {
-        fstrides[i][0] = 1;
-      }
-      if (dep[1]) {
-        cstrides[1] = nx1;
-        fstrides[0][1] = nx1 + 1;
-        fstrides[1][1] = nx1;
-        fstrides[2][1] = nx1;
-        if (dep[2]) {
-          cstrides[2] = nx1 * nx2;
-          fstrides[0][2] = (nx1 + 1) * nx2;
-          fstrides[1][2] = nx1 * (nx2 + 1);
-          fstrides[2][2] = nx1 * nx2;
-        }
-      } else {
-        if (dep[2]) {
-          cstrides[2] = nx1;
-          fstrides[0][2] = nx1 + 1;
-          fstrides[1][2] = nx1;
-          fstrides[2][2] = nx1;
-        }
-      }
-    } else {
-      if (dep[1]) {
-        cstrides[1] = 1;
-        fstrides[0][1] = 1;
-        fstrides[1][1] = 1;
-        fstrides[2][1] = 1;
-        if (dep[2]) {
-          cstrides[2] = nx2;
-          fstrides[0][2] = nx2;
-          fstrides[1][2] = nx2 + 1;
-          fstrides[2][2] = nx2;
-        }
-      } else {
-        if (dep[2]) {
-          cstrides[2] = 1;
-          fstrides[0][2] = 1;
-          fstrides[1][2] = 1;
-          fstrides[2][2] = 1;
-        }
-      }
-    }
   }
   KOKKOS_INLINE_FUNCTION
   CoordParams() = default;
 
   bool log = false;
-  int nx1, nx2, nx3;
   std::array<bool, 3> dep;
-  std::array<int, 3> cstrides;
-  std::array<std::array<int, 3>, 3> fstrides;
+  std::array<int, 3> nx;
   Coordinates sys;
 };
 
@@ -221,18 +170,16 @@ template <class T>
 class CoordsBase {
  public:
   BBox bnds;
-  std::array<int, 3> cstrides;
-  std::array<std::array<int, 3>, 3> fstrides;
+  std::array<int, 3> nx;
   KOKKOS_INLINE_FUNCTION
   CoordsBase(const parthenon::Coordinates_t &pco, const int k, const int j, const int i)
-      : bnds(pco, k, j, i) {};
+      : bnds(pco, k, j, i), nx{1, 1, 1} {};
 
   template <typename PAR>
   KOKKOS_INLINE_FUNCTION CoordsBase(const PAR &cpars, const parthenon::Coordinates_t &pco,
                                     const int k, const int j, const int i)
       : bnds(pco, k, j, i) {
-    cstrides = cpars.cstrides;
-    fstrides = cpars.fstrides;
+    nx = cpars.nx;
     if (cpars.log) {
       bnds.x1[0] = std::exp(bnds.x1[0]);
       bnds.x1[1] = std::exp(bnds.x1[1]);
@@ -241,7 +188,7 @@ class CoordsBase {
   KOKKOS_INLINE_FUNCTION
   CoordsBase(const bool log, const parthenon::Coordinates_t &pco, const int k,
              const int j, const int i)
-      : bnds(pco, k, j, i), cstrides{}, fstrides{} {
+      : bnds(pco, k, j, i), nx{1, 1, 1} {
     if (log) {
       bnds.x1[0] = std::exp(bnds.x1[0]);
       bnds.x1[1] = std::exp(bnds.x1[1]);
@@ -250,18 +197,20 @@ class CoordsBase {
 
   // This constructor allows us to easily access the coordinate conversion routines
   KOKKOS_INLINE_FUNCTION
-  CoordsBase() : bnds(), cstrides{}, fstrides{} {}
+  CoordsBase() : bnds(), nx{1, 1, 1} {}
+
+  template <typename PAR>
+  CoordsBase(const PAR &cpars) : bnds() {
+    nx = cpars.nx;
+  }
 
   template <class VAR>
-  int CI(const int k, const int j, const int i) const {
-    if constexpr (std::is_same_v<VAR, geom::xv>) {
-      return cstrides[0] * i + cstrides[1] * j + cstrides[2] * k;
-    }
-    return -1;
+  KOKKOS_INLINE_FUNCTION int index_(const int k, const int j, const int i) const {
+    return 0;
   }
-  template <int dir>
-  int FI(const int k, const int j, const int i) const {
-    return fstrides[dir - 1][0] * i + fstrides[dir - 1][1] * j + fstrides[dir - 1][2] * k;
+  template <class VAR>
+  KOKKOS_INLINE_FUNCTION std::array<int, 3> shape_() const {
+    return {1, 1, 1};
   }
 
   // Is the metric x1, x2, and/or x3 dependent?
@@ -433,6 +382,15 @@ class CoordsBase {
   // The following methods are helper functions to return aggregate data
   // We use static_cast<T*>(this)-> to access the methods in order to call
   // the correct derived variants. This is the key to static polymorphism and CRTP.
+  //
+  template <class VAR>
+  KOKKOS_INLINE_FUNCTION int index(const int k, const int j, const int i) const {
+    return static_cast<const T *>(this)->template index_<VAR>(k, j, i);
+  }
+  template <class VAR>
+  std::array<int, 3> shape() const {
+    return static_cast<const T *>(this)->template shape_<VAR>();
+  }
 
   KOKKOS_INLINE_FUNCTION BBox &GetBounds() const {
     return static_cast<const T *>(this)->bnds;
@@ -615,7 +573,9 @@ class CoordsBase {
 //----------------------------------------------------------------------------------------
 //! The derived base coordinates class
 template <Coordinates GEOM>
-class Coords : public CoordsBase<Coords<GEOM>> {};
+class Coords : public CoordsBase<Coords<GEOM>> {
+  static constexpr Coordinates Coordinates_type = GEOM;
+};
 
 //----------------------------------------------------------------------------------------
 //! The derived cartesian specialization
@@ -632,6 +592,8 @@ class Coords<Coordinates::cartesian> : public CoordsBase<Coords<Coordinates::car
       : CoordsBase<Coords<Coordinates::cartesian>>(log, pco, k, j, i) {}
   KOKKOS_INLINE_FUNCTION
   Coords() : CoordsBase<Coords<Coordinates::cartesian>>() {}
+  template <typename PAR>
+  Coords(const PAR &cpars) : CoordsBase<Coords<Coordinates::cartesian>>(cpars) {}
 };
 
 } // namespace geometry

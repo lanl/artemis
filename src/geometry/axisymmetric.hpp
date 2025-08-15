@@ -32,6 +32,25 @@ namespace geometry {
 //!
 //! This is cylindrical coordinates with phi as x3
 //! This is mainly a 1D/2D coordinate system.
+
+// NOTE(@amd)
+// This is a dirty trick because I am running into constexpr issues with actual member
+// functions of the CRTP classes
+namespace axi {
+template <class VAR>
+constexpr bool is_x1dep() {
+  return (std::is_same_v<VAR, geom::x1v> || std::is_same_v<VAR, geom::vol>);
+}
+template <class VAR>
+constexpr bool is_x2dep() {
+  return false;
+}
+template <class VAR>
+constexpr bool is_x3dep() {
+  return false;
+}
+} // namespace axi
+
 template <>
 class Coords<Coordinates::axisymmetric>
     : public CoordsBase<Coords<Coordinates::axisymmetric>> {
@@ -46,6 +65,23 @@ class Coords<Coordinates::axisymmetric>
       : CoordsBase<Coords<Coordinates::axisymmetric>>(log, pco, k, j, i) {}
   KOKKOS_INLINE_FUNCTION
   Coords() : CoordsBase<Coords<Coordinates::axisymmetric>>() {}
+  template <typename PAR>
+  Coords(const PAR &cpars) : CoordsBase<Coords<Coordinates::axisymmetric>>(cpars) {}
+
+  template <class VAR>
+  KOKKOS_INLINE_FUNCTION int index_(const int k, const int j, const int i) const {
+    if constexpr (axi::is_x1dep<VAR>()) {
+      return i;
+    }
+    return 0;
+  }
+  template <class VAR>
+  KOKKOS_INLINE_FUNCTION std::array<int, 3> shape_() const {
+    if constexpr (axi::is_x1dep<VAR>()) {
+      return {nx[0], 1, 1};
+    }
+    return {1, 1, 1};
+  }
 
   KOKKOS_INLINE_FUNCTION
   bool x1dep() const { return true; }

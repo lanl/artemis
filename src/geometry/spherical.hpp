@@ -32,6 +32,21 @@ namespace geometry {
 //!
 //!  We have special handling for 1D and 2D that drops the angle dependence
 
+namespace sph {
+template <class VAR>
+constexpr bool is_x1dep() {
+  return (std::is_same_v<VAR, geom::x1v> || std::is_same_v<VAR, geom::vol>);
+}
+template <class VAR>
+constexpr bool is_x2dep() {
+  return (std::is_same_v<VAR, geom::x2v> || std::is_same_v<VAR, geom::vol>);
+}
+template <class VAR>
+constexpr bool is_x3dep() {
+  return false;
+}
+} // namespace sph
+
 template <>
 class Coords<Coordinates::spherical3D>
     : public CoordsBase<Coords<Coordinates::spherical3D>> {
@@ -48,6 +63,33 @@ class Coords<Coordinates::spherical3D>
       : CoordsBase<Coords<Coordinates::spherical3D>>(log, pco, k, j, i) {}
   KOKKOS_INLINE_FUNCTION
   Coords() : CoordsBase<Coords<Coordinates::spherical3D>>() {}
+  template <typename PAR>
+  Coords(const PAR &cpars) : CoordsBase<Coords<Coordinates::spherical3D>>(cpars) {}
+
+  template <class VAR>
+  KOKKOS_INLINE_FUNCTION std::array<int, 3> shape_() const {
+    if constexpr (sph::is_x1dep<VAR>()) {
+      if constexpr (sph::is_x2dep<VAR>()) {
+        return {nx[0], nx[1], 1};
+      }
+      return {nx[0], 1, 1};
+    } else if constexpr (sph::is_x2dep<VAR>()) {
+      return {1, nx[1], 1};
+    }
+    return {1, 1, 1};
+  }
+  template <class VAR>
+  KOKKOS_INLINE_FUNCTION int index_(const int k, const int j, const int i) const {
+    if constexpr (sph::is_x1dep<VAR>()) {
+      if constexpr (sph::is_x2dep<VAR>()) {
+        return i + shape_<VAR>()[0] * j;
+      }
+      return i;
+    } else if constexpr (sph::is_x2dep<VAR>()) {
+      return j;
+    }
+    return 0;
+  }
 
   KOKKOS_INLINE_FUNCTION bool x1dep() const { return true; }
   KOKKOS_INLINE_FUNCTION bool x2dep() const { return true; }
@@ -257,6 +299,33 @@ class Coords<Coordinates::spherical2D>
       : CoordsBase<Coords<Coordinates::spherical2D>>(log, pco, k, j, i) {}
   KOKKOS_INLINE_FUNCTION
   Coords() : CoordsBase<Coords<Coordinates::spherical2D>>() {}
+  template <typename PAR>
+  Coords(const PAR &cpars) : CoordsBase<Coords<Coordinates::spherical2D>>(cpars) {}
+
+  template <class VAR>
+  KOKKOS_INLINE_FUNCTION std::array<int, 3> shape_() const {
+    if constexpr (sph::is_x1dep<VAR>()) {
+      if constexpr (sph::is_x2dep<VAR>()) {
+        return {nx[0], nx[1], 1};
+      }
+      return {nx[0], 1, 1};
+    } else if constexpr (sph::is_x2dep<VAR>()) {
+      return {1, nx[1], 1};
+    }
+    return {1, 1, 1};
+  }
+  template <class VAR>
+  KOKKOS_INLINE_FUNCTION int index_(const int k, const int j, const int i) const {
+    if constexpr (sph::is_x1dep<VAR>()) {
+      if constexpr (sph::is_x2dep<VAR>()) {
+        return i + shape_<VAR>()[0] * j;
+      }
+      return i;
+    } else if constexpr (sph::is_x2dep<VAR>()) {
+      return j;
+    }
+    return 0;
+  }
 
   KOKKOS_INLINE_FUNCTION bool x1dep() const { return true; }
   KOKKOS_INLINE_FUNCTION bool x2dep() const { return true; }
@@ -463,6 +532,23 @@ class Coords<Coordinates::spherical1D>
       : CoordsBase<Coords<Coordinates::spherical1D>>(log, pco, k, j, i) {}
   KOKKOS_INLINE_FUNCTION
   Coords() : CoordsBase<Coords<Coordinates::spherical1D>>() {}
+  template <typename PAR>
+  Coords(const PAR &cpars) : CoordsBase<Coords<Coordinates::spherical1D>>(cpars) {}
+
+  template <class VAR>
+  KOKKOS_INLINE_FUNCTION int index_(const int k, const int j, const int i) const {
+    if constexpr (sph::is_x1dep<VAR>()) {
+      return i;
+    }
+    return 0;
+  }
+  template <class VAR>
+  KOKKOS_INLINE_FUNCTION std::array<int, 3> shape_() const {
+    if constexpr (sph::is_x1dep<VAR>()) {
+      return {nx[0], 1, 1};
+    }
+    return {1, 1, 1};
+  }
 
   KOKKOS_INLINE_FUNCTION bool x1dep() const { return true; }
 

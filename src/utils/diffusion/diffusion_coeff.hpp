@@ -69,8 +69,7 @@ struct DiffCoeffParams {
   DiffType type;
   DiffAvg avg;
   bool log;
-  std::array<int, 3> cstrides;
-  std::array<std::array<int, 3>, 3> fstrides;
+  std::array<int, 3> nx;
 
   // Viscosity
   // -----------------
@@ -103,8 +102,7 @@ struct DiffCoeffParams {
     // Read the parameter file
     const auto cpars = geometry::CoordParams(pin);
     log = cpars.log;
-    cstrides = cpars.cstrides;
-    fstrides = cpars.fstrides;
+    nx = cpars.nx;
     std::string type_ = pin->GetString(block_name, "type");
     type = ChooseDiffusion(dtype, type_);
     if (type == DiffType::null) {

@@ -18,6 +18,25 @@
 
 namespace geometry {
 
+// helper macro
+#define ADD_FIELD(name)                                                                  \
+  shape = coords.template shape<name>();                                                 \
+  pkg->AddField<name>(Metadata({Metadata::None, Metadata::OneCopy},                      \
+                               std::vector<int>({shape[0] * shape[1] * shape[2]})));
+
+template <Coordinates GEOM>
+void EnrollFields(StateDescriptor *pkg, CoordParams &cpars) {
+
+  Coords<GEOM> coords(cpars);
+
+  std::array<int, 3> shape;
+
+  ADD_FIELD(geom::x1v);
+  ADD_FIELD(geom::x2v);
+  ADD_FIELD(geom::x3v);
+  ADD_FIELD(geom::vol);
+}
+
 //----------------------------------------------------------------------------------------
 //! \fn  StateDescriptor RotatingFrame::Initialize
 //! \brief Adds intialization function for rotating frame package
@@ -25,30 +44,21 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   auto geom = std::make_shared<StateDescriptor>("geometry");
   Params &params = geom->AllParams();
 
-  const bool log =
-      pin->GetOrAddString("artemis", "radial_spacing", "uniform") == "logarithmic";
+  CoordParams cpars(pin);
 
-  // Coordinates
-  const int ndim = ProblemDimension(pin);
-  std::string sys = pin->GetOrAddString("artemis", "coordinates", "cartesian");
-  Coordinates coords = geometry::CoordSelect(sys, ndim);
-
-  const int nx1 = pin->GetInteger("parthenon/meshblock", "nx1");
-  const int nx2 = pin->GetInteger("parthenon/meshblock", "nx2");
-  const int nx3 = pin->GetInteger("parthenon/meshblock", "nx3");
-
-  const std::array<int, 3> cc_shape = {std::max(1, x1dep(coords) * nx1),
-                                       std::max(1, x2dep(coords) * nx2),
-                                       std::max(1, x3dep(coords) * nx3)};
-  const int cc_size = cc_shape[0] * cc_shape[1] * cc_shape[2];
-  const int fx_size = (cc_shape[0] + 1) * cc_shape[1] * cc_shape[2];
-  const int fy_size = cc_shape[0] * (cc_shape[1] + 1) * cc_shape[2];
-  const int fz_size = cc_shape[0] * cc_shape[1] * (cc_shape[2] + 1);
-
-  printf("SHAPE %d %d %d\n", cc_shape[0], cc_shape[1], cc_shape[2]);
-  Metadata m =
-      Metadata({Metadata::None, Metadata::OneCopy}, std::vector<int>({cc_size, 3}));
-  geom->AddField<geom::xv>(m);
+  if (cpars.sys == Coordinates::cartesian) {
+    EnrollFields<Coordinates::cartesian>(geom.get(), cpars);
+  } else if (cpars.sys == Coordinates::axisymmetric) {
+    EnrollFields<Coordinates::axisymmetric>(geom.get(), cpars);
+  } else if (cpars.sys == Coordinates::cylindrical) {
+    EnrollFields<Coordinates::cylindrical>(geom.get(), cpars);
+  } else if (cpars.sys == Coordinates::spherical1D) {
+    EnrollFields<Coordinates::spherical1D>(geom.get(), cpars);
+  } else if (cpars.sys == Coordinates::spherical2D) {
+    EnrollFields<Coordinates::spherical2D>(geom.get(), cpars);
+  } else if (cpars.sys == Coordinates::spherical3D) {
+    EnrollFields<Coordinates::spherical3D>(geom.get(), cpars);
+  }
 
   return geom;
 }
@@ -75,5 +85,18 @@ template void InitBlockGeom<Coordinates::cylindrical>(MeshBlock *pmb,
                                                       ParameterInput *pin);
 template void InitBlockGeom<Coordinates::axisymmetric>(MeshBlock *pmb,
                                                        ParameterInput *pin);
+
+template void EnrollFields<Coordinates::cartesian>(StateDescriptor *pkg,
+                                                   CoordParams &cpars);
+template void EnrollFields<Coordinates::axisymmetric>(StateDescriptor *pkg,
+                                                      CoordParams &cpars);
+template void EnrollFields<Coordinates::cylindrical>(StateDescriptor *pkg,
+                                                     CoordParams &cpars);
+template void EnrollFields<Coordinates::spherical1D>(StateDescriptor *pkg,
+                                                     CoordParams &cpars);
+template void EnrollFields<Coordinates::spherical2D>(StateDescriptor *pkg,
+                                                     CoordParams &cpars);
+template void EnrollFields<Coordinates::spherical3D>(StateDescriptor *pkg,
+                                                     CoordParams &cpars);
 
 } // namespace geometry

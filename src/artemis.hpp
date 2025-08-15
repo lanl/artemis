@@ -86,7 +86,28 @@ ARTEMIS_VARIABLE(rad.opac, scattering);
 } // namespace rad
 
 namespace geom {
-ARTEMIS_VARIABLE(geom, xv);
+ARTEMIS_VARIABLE(geom, x1v);
+ARTEMIS_VARIABLE(geom, x2v);
+ARTEMIS_VARIABLE(geom, x3v);
+ARTEMIS_VARIABLE(geom, x1f1);
+ARTEMIS_VARIABLE(geom, x2f1);
+ARTEMIS_VARIABLE(geom, x3f1);
+ARTEMIS_VARIABLE(geom, x1f2);
+ARTEMIS_VARIABLE(geom, x2f2);
+ARTEMIS_VARIABLE(geom, x3f2);
+ARTEMIS_VARIABLE(geom, x1f3);
+ARTEMIS_VARIABLE(geom, x2f3);
+ARTEMIS_VARIABLE(geom, x3f3);
+ARTEMIS_VARIABLE(geom, dx1);
+ARTEMIS_VARIABLE(geom, dx2);
+ARTEMIS_VARIABLE(geom, dx3);
+ARTEMIS_VARIABLE(geom, vol);
+ARTEMIS_VARIABLE(geom, ax1);
+ARTEMIS_VARIABLE(geom, ax2);
+ARTEMIS_VARIABLE(geom, ax3);
+ARTEMIS_VARIABLE(geom, dh3dx1);
+ARTEMIS_VARIABLE(geom, dh3dx2);
+ARTEMIS_VARIABLE(geom, dh2dx1);
 } // namespace geom
 
 #undef ARTEMIS_VARIABLE

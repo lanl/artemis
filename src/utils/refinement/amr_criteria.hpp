@@ -40,6 +40,9 @@ AmrTag ScalarFirstDerivative(MeshBlockData<Real> *md) {
 
   static auto desc = MakePackDescriptor<FIELD>(resolved_pkgs.get());
   auto v = desc.GetPack(md);
+  static auto desc_g = MakePackDescriptor<geom::x1v, geom::x2v, geom::x3v, geom::hx1v,
+                                          geom::hx2v, geom::hx3v>(resolved_pkgs.get());
+  auto vg = desc_g.GetPack(md);
   IndexRange ib = md->GetBoundsI(IndexDomain::interior);
   IndexRange jb = md->GetBoundsJ(IndexDomain::interior);
   IndexRange kb = md->GetBoundsK(IndexDomain::interior);
@@ -54,28 +57,24 @@ AmrTag ScalarFirstDerivative(MeshBlockData<Real> *md) {
         parthenon::loop_pattern_mdrange_tag, PARTHENON_AUTO_LABEL, DevExecSpace(),
         kb.s - 1, kb.e + 1, jb.s - 1, jb.e + 1, ib.s - 1, ib.e + 1,
         KOKKOS_LAMBDA(const int k, const int j, const int i, Real &lmaxeps) {
-          // Get coordinate positions
-          geometry::Coords<GEOM> coords_ip1(cpars, pco, k, j, i + 1);
-          geometry::Coords<GEOM> coords_im1(cpars, pco, k, j, i - 1);
-          geometry::Coords<GEOM> coords_jp1(cpars, pco, k, j + 1, i);
-          geometry::Coords<GEOM> coords_jm1(cpars, pco, k, j - 1, i);
-          geometry::Coords<GEOM> coords_kp1(cpars, pco, k + 1, j, i);
-          geometry::Coords<GEOM> coords_km1(cpars, pco, k - 1, j, i);
-          const auto &ip1 = coords_ip1.GetCellCenter();
-          const auto &im1 = coords_im1.GetCellCenter();
-          const auto &jp1 = coords_jp1.GetCellCenter();
-          const auto &jm1 = coords_jm1.GetCellCenter();
-          const auto &kp1 = coords_kp1.GetCellCenter();
-          const auto &km1 = coords_km1.GetCellCenter();
+          geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
 
           // Get stencil widths
-          const Real sdx1 = ip1[0] - im1[0];
-          const Real sdx2 = jp1[1] - jm1[1];
-          const Real sdx3 = kp1[2] - km1[2];
+          const Real sdx1 =
+              vg(0, geom::x1v(), coords.template index<geom::x1v>(k, j, i + 1)) -
+              vg(0, geom::x1v(), coords.template index<geom::x1v>(k, j, i - 1));
+          const Real sdx2 =
+              vg(0, geom::x2v(), coords.template index<geom::x2v>(k, j + 1, i)) -
+              vg(0, geom::x2v(), coords.template index<geom::x2v>(k, j - 1, i));
+          const Real sdx3 =
+              vg(0, geom::x3v(), coords.template index<geom::x2v>(k + 1, j, i)) -
+              vg(0, geom::x3v(), coords.template index<geom::x2v>(k - 1, j, i));
+
           // Get scale factors
-          geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
-          const auto &cc = coords.GetCellCenter();
-          const auto &hx = coords.GetScaleFactors();
+          const std::array<Real, 3> hx{
+              vg(0, geom::hx1v(), coords.template index<geom::hx1v>(k, j, i)),
+              vg(0, geom::hx2v(), coords.template index<geom::hx2v>(k, j, i)),
+              vg(0, geom::hx3v(), coords.template index<geom::hx3v>(k, j, i))};
           // NOTE(PDM): here, if passed a SparsePool, we will only be accessing the first
           // entry in the SparsePool.  If more fine-tuned control required, create a
           // user-defined AMR criterion.
@@ -95,29 +94,25 @@ AmrTag ScalarFirstDerivative(MeshBlockData<Real> *md) {
         parthenon::loop_pattern_mdrange_tag, PARTHENON_AUTO_LABEL, DevExecSpace(),
         jb.s - 1, jb.e + 1, ib.s - 1, ib.e + 1,
         KOKKOS_LAMBDA(const int j, const int i, Real &lmaxeps) {
-          // Get coordinate positions
-          geometry::Coords<GEOM> coords_ip1(cpars, pco, k, j, i + 1);
-          geometry::Coords<GEOM> coords_im1(cpars, pco, k, j, i - 1);
-          geometry::Coords<GEOM> coords_jp1(cpars, pco, k, j + 1, i);
-          geometry::Coords<GEOM> coords_jm1(cpars, pco, k, j - 1, i);
-          const auto &ip1 = coords_ip1.GetCellCenter();
-          const auto &im1 = coords_im1.GetCellCenter();
-          const auto &jp1 = coords_jp1.GetCellCenter();
-          const auto &jm1 = coords_jm1.GetCellCenter();
-
-          // Get stencil widths
-          const Real sdx1 = ip1[0] - im1[0];
-          const Real sdx2 = jp1[1] - jm1[1];
-          // Get scale factors
           geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
-          const auto &cc = coords.GetCellCenter();
-          const Real hx1 = coords.hx1(cc[0], cc[1], cc[2]);
-          const Real hx2 = coords.hx2(cc[0], cc[1], cc[2]);
-          Real eps =
-              std::sqrt(SQR((v(0, 0, k, j, i + 1) - v(0, 0, k, j, i - 1)) / sdx1 / hx1) +
-                        SQR((v(0, 0, k, j + 1, i) - v(0, 0, k, j - 1, i)) / sdx2 / hx2));
+          // Get stencil widths
+          const Real sdx1 =
+              vg(0, geom::x1v(), coords.template index<geom::x1v>(k, j, i + 1)) -
+              vg(0, geom::x1v(), coords.template index<geom::x1v>(k, j, i - 1));
+          const Real sdx2 =
+              vg(0, geom::x2v(), coords.template index<geom::x2v>(k, j + 1, i)) -
+              vg(0, geom::x2v(), coords.template index<geom::x2v>(k, j - 1, i));
+          // Get scale factors
+
+          const std::array<Real, 2> hx{
+              vg(0, geom::hx1v(), coords.template index<geom::hx1v>(k, j, i)),
+              vg(0, geom::hx2v(), coords.template index<geom::hx2v>(k, j, i))};
+
+          Real eps = std::sqrt(
+              SQR((v(0, 0, k, j, i + 1) - v(0, 0, k, j, i - 1)) / sdx1 / hx[0]) +
+              SQR((v(0, 0, k, j + 1, i) - v(0, 0, k, j - 1, i)) / sdx2 / hx[1]));
           // NOTE(PDM): again, please check me...
-          eps /= (v(0, 0, k, j, i) / std::sqrt(SQR(sdx1 * hx1) + SQR(sdx2 * hx2)));
+          eps /= (v(0, 0, k, j, i) / std::sqrt(SQR(sdx1 * hx[0]) + SQR(sdx2 * hx[1])));
           lmaxeps = std::max(lmaxeps, eps);
         },
         Kokkos::Max<Real>(maxeps));

@@ -234,6 +234,9 @@ Real EstimateTimestepMesh(MeshData<Real> *md) {
   static auto desc =
       MakePackDescriptor<dust::prim::density, dust::prim::velocity>(resolved_pkgs.get());
   auto vmesh = desc.GetPack(md);
+  static auto desc_g =
+      MakePackDescriptor<geom::dx1, geom::dx2, geom::dx3>(resolved_pkgs.get());
+  auto vg = desc_g.GetPack(md);
   IndexRange ib = md->GetBoundsI(IndexDomain::interior);
   IndexRange jb = md->GetBoundsJ(IndexDomain::interior);
   IndexRange kb = md->GetBoundsK(IndexDomain::interior);
@@ -248,7 +251,10 @@ Real EstimateTimestepMesh(MeshData<Real> *md) {
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, Real &ldt) {
         // Extract coordinates
         geometry::Coords<GEOM> coords(cpars, vmesh.GetCoordinates(b), k, j, i);
-        const auto &dx = coords.GetCellWidths();
+        const std::array<Real, 3> dx{
+            vg(b, geom::dx1(), coords.template index<geom::dx1>(k, j, i)),
+            vg(b, geom::dx2(), coords.template index<geom::dx2>(k, j, i)),
+            vg(b, geom::dx3(), coords.template index<geom::dx3>(k, j, i))};
 
         for (int n = 0; n < vmesh.GetSize(b, dust::prim::density()); ++n) {
           Real denom = 0.0;

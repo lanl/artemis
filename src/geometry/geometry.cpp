@@ -34,6 +34,9 @@ void EnrollFields(StateDescriptor *pkg, CoordParams &cpars) {
   ADD_FIELD(geom::x1v);
   ADD_FIELD(geom::x2v);
   ADD_FIELD(geom::x3v);
+  ADD_FIELD(geom::hx1v);
+  ADD_FIELD(geom::hx2v);
+  ADD_FIELD(geom::hx3v);
   ADD_FIELD(geom::vol);
   ADD_FIELD(geom::ax1);
   ADD_FIELD(geom::ax2);
@@ -78,7 +81,8 @@ void InitBlockGeom(MeshBlock *pmb, ParameterInput *pin) {
 
   static auto desc_g =
       MakePackDescriptor<geom::x1v, geom::x2v, geom::x3v, geom::vol, geom::ax1, geom::ax2,
-                         geom::ax3>((pmb->resolved_packages).get());
+                         geom::ax3, geom::hx1v, geom::hx2v, geom::hx3v>(
+          (pmb->resolved_packages).get());
   auto vg = desc_g.GetPack(md.get());
   IndexRange ib = md->GetBoundsI(IndexDomain::entire);
   IndexRange jb = md->GetBoundsJ(IndexDomain::entire);
@@ -91,28 +95,32 @@ void InitBlockGeom(MeshBlock *pmb, ParameterInput *pin) {
         // Extract coordinates
         geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
         const auto xv = coords.GetCellCenter();
-        const int idx = coords.template index<geom::x1v>(k, j, i);
-        vg(b, geom::x1v())(coords.template index<geom::x1v>(k, j, i)) = xv[0];
-        vg(b, geom::x2v())(coords.template index<geom::x2v>(k, j, i)) = xv[1];
-        vg(b, geom::x3v())(coords.template index<geom::x3v>(k, j, i)) = xv[2];
+        vg(b, geom::x1v(), coords.template index<geom::x1v>(k, j, i)) = xv[0];
+        vg(b, geom::x2v(), coords.template index<geom::x2v>(k, j, i)) = xv[1];
+        vg(b, geom::x3v(), coords.template index<geom::x3v>(k, j, i)) = xv[2];
 
-        vg(b, geom::vol())(coords.template index<geom::vol>(k, j, i)) = coords.Volume();
+        const auto hx = coords.GetScaleFactors();
+        vg(b, geom::hx1v(), coords.template index<geom::hx1v>(k, j, i)) = hx[0];
+        vg(b, geom::hx2v(), coords.template index<geom::hx2v>(k, j, i)) = hx[1];
+        vg(b, geom::hx3v(), coords.template index<geom::hx3v>(k, j, i)) = hx[2];
+
+        vg(b, geom::vol(), coords.template index<geom::vol>(k, j, i)) = coords.Volume();
 
         // Face quantities
         auto ax = coords.GetFaceAreaX1();
-        vg(b, geom::ax1())(coords.template index<geom::ax1>(k, j, i)) = ax[0];
+        vg(b, geom::ax1(), coords.template index<geom::ax1>(k, j, i)) = ax[0];
         if (i == ib.e) {
-          vg(b, geom::ax1())(coords.template index<geom::ax1>(k, j, i + 1)) = ax[1];
+          vg(b, geom::ax1(), coords.template index<geom::ax1>(k, j, i + 1)) = ax[1];
         }
         ax = coords.GetFaceAreaX2();
-        vg(b, geom::ax2())(coords.template index<geom::ax2>(k, j, i)) = ax[0];
+        vg(b, geom::ax2(), coords.template index<geom::ax2>(k, j, i)) = ax[0];
         if ((j == jb.e) && (ndim > 1)) {
-          vg(b, geom::ax2())(coords.template index<geom::ax2>(k, j + 1, i)) = ax[1];
+          vg(b, geom::ax2(), coords.template index<geom::ax2>(k, j + 1, i)) = ax[1];
         }
         ax = coords.GetFaceAreaX3();
-        vg(b, geom::ax3())(coords.template index<geom::ax3>(k, j, i)) = ax[0];
+        vg(b, geom::ax3(), coords.template index<geom::ax3>(k, j, i)) = ax[0];
         if ((k == kb.e) && (ndim > 2)) {
-          vg(b, geom::ax3())(coords.template index<geom::ax3>(k + 1, j, i)) = ax[1];
+          vg(b, geom::ax3(), coords.template index<geom::ax3>(k + 1, j, i)) = ax[1];
         }
       });
 }
@@ -127,7 +135,8 @@ parthenon::TaskStatus UpdateGeom(MeshData<Real> *md) {
 
   static auto desc_g =
       MakePackDescriptor<geom::x1v, geom::x2v, geom::x3v, geom::vol, geom::ax1, geom::ax2,
-                         geom::ax3>((pm->resolved_packages).get());
+                         geom::ax3, geom::hx1v, geom::hx2v, geom::hx3v>(
+          (pm->resolved_packages).get());
   auto vg = desc_g.GetPack(md);
   IndexRange ib = md->GetBoundsI(IndexDomain::entire);
   IndexRange jb = md->GetBoundsJ(IndexDomain::entire);
@@ -140,27 +149,32 @@ parthenon::TaskStatus UpdateGeom(MeshData<Real> *md) {
         // Extract coordinates
         geometry::Coords<GEOM> coords(cpars, vg.GetCoordinates(b), k, j, i);
         const auto xv = coords.GetCellCenter();
-        vg(b, geom::x1v())(coords.template index<geom::x1v>(k, j, i)) = xv[0];
-        vg(b, geom::x2v())(coords.template index<geom::x2v>(k, j, i)) = xv[1];
-        vg(b, geom::x3v())(coords.template index<geom::x3v>(k, j, i)) = xv[2];
+        vg(b, geom::x1v(), coords.template index<geom::x1v>(k, j, i)) = xv[0];
+        vg(b, geom::x2v(), coords.template index<geom::x2v>(k, j, i)) = xv[1];
+        vg(b, geom::x3v(), coords.template index<geom::x3v>(k, j, i)) = xv[2];
 
-        vg(b, geom::vol())(coords.template index<geom::vol>(k, j, i)) = coords.Volume();
+        const auto hx = coords.GetScaleFactors();
+        vg(b, geom::hx1v(), coords.template index<geom::hx1v>(k, j, i)) = hx[0];
+        vg(b, geom::hx2v(), coords.template index<geom::hx2v>(k, j, i)) = hx[1];
+        vg(b, geom::hx3v(), coords.template index<geom::hx3v>(k, j, i)) = hx[2];
+
+        vg(b, geom::vol(), coords.template index<geom::vol>(k, j, i)) = coords.Volume();
 
         // Face quantities
         auto ax = coords.GetFaceAreaX1();
-        vg(b, geom::ax1())(coords.template index<geom::ax1>(k, j, i)) = ax[0];
+        vg(b, geom::ax1(), coords.template index<geom::ax1>(k, j, i)) = ax[0];
         if (i == ib.e) {
-          vg(b, geom::ax1())(coords.template index<geom::ax1>(k, j, i + 1)) = ax[1];
+          vg(b, geom::ax1(), coords.template index<geom::ax1>(k, j, i + 1)) = ax[1];
         }
         ax = coords.GetFaceAreaX2();
-        vg(b, geom::ax2())(coords.template index<geom::ax2>(k, j, i)) = ax[0];
+        vg(b, geom::ax2(), coords.template index<geom::ax2>(k, j, i)) = ax[0];
         if ((j == jb.e) && (ndim > 1)) {
-          vg(b, geom::ax2())(coords.template index<geom::ax2>(k, j + 1, i)) = ax[1];
+          vg(b, geom::ax2(), coords.template index<geom::ax2>(k, j + 1, i)) = ax[1];
         }
         ax = coords.GetFaceAreaX3();
-        vg(b, geom::ax3())(coords.template index<geom::ax3>(k, j, i)) = ax[0];
+        vg(b, geom::ax3(), coords.template index<geom::ax3>(k, j, i)) = ax[0];
         if ((k == kb.e) && (ndim > 2)) {
-          vg(b, geom::ax3())(coords.template index<geom::ax3>(k + 1, j, i)) = ax[1];
+          vg(b, geom::ax3(), coords.template index<geom::ax3>(k + 1, j, i)) = ax[1];
         }
       });
 

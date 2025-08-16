@@ -566,11 +566,16 @@ TaskStatus FluxSource(MeshData<Real> *md, const Real dt) {
           resolved_pkgs.get());
   static auto desc_face =
       parthenon::MakePackDescriptor<gas::face::velocity>(resolved_pkgs.get());
+  static auto desc_g = parthenon::MakePackDescriptor<
+      geom::ax1, geom::ax2, geom::ax3, geom::vol, geom::x1v, geom::x2v, geom::x3v,
+      geom::dh1dx1, geom::dh2dx1, geom::dh3dx1, geom::dh1dx2, geom::dh2dx2, geom::dh3dx2,
+      geom::dh1dx3, geom::dh2dx3, geom::dh3dx3>(resolved_pkgs.get());
   auto vprim = desc_prim.GetPack(md);
   auto vcons = desc_cons.GetPack(md);
   auto vface = desc_face.GetPack(md);
+  auto vg = desc_g.GetPack(md);
 
-  return ArtemisUtils::FluxSource<Fluid::gas>(md, pkg, vprim, vcons, vface, dt);
+  return ArtemisUtils::FluxSource<Fluid::gas>(md, pkg, vprim, vcons, vface, vg, dt);
 }
 
 //----------------------------------------------------------------------------------------

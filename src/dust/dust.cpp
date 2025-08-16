@@ -310,11 +310,18 @@ TaskStatus FluxSource(MeshData<Real> *md, const Real dt) {
             resolved_pkgs.get(), {}, {parthenon::PDOpt::WithFluxes});
     static auto desc_cons =
         parthenon::MakePackDescriptor<dust::cons::momentum>(resolved_pkgs.get());
+    static auto desc_g =
+        parthenon::MakePackDescriptor<geom::vol, geom::x1v, geom::x2v, geom::x3v,
+                                      geom::dh1dx1, geom::dh2dx1, geom::dh3dx1,
+                                      geom::dh1dx2, geom::dh2dx2, geom::dh3dx2,
+                                      geom::dh1dx3, geom::dh2dx3, geom::dh3dx3>(
+            resolved_pkgs.get());
     auto vprim = desc_prim.GetPack(md);
     auto vcons = desc_cons.GetPack(md);
+    auto vg = desc_g.GetPack(md);
     SparsePack vface;
 
-    return ArtemisUtils::FluxSource<Fluid::dust>(md, pkg, vprim, vcons, vface, dt);
+    return ArtemisUtils::FluxSource<Fluid::dust>(md, pkg, vprim, vcons, vface, vg, dt);
   }
 
   return TaskStatus::complete;

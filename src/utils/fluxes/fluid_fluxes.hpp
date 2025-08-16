@@ -253,9 +253,9 @@ TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, FLUX vflx,
 //!         - the geometric source terms (be wary of rotating frame...)
 //!           <1/h_k * dh_k/dxi>  (rho*v_i^2 + P)
 template <Coordinates G, Fluid F, Closure C, typename PKG, typename PRIM, typename CONS,
-          typename FACE>
+          typename FACE, typename GEO>
 TaskStatus FluxSourceImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, CONS vcons, FACE vface,
-                          const Real omf, const Real dt) {
+                          GEO vg, const Real omf, const Real dt) {
   // Indexing and geometry
   const auto ib = md->GetBoundsI(IndexDomain::interior);
   const auto jb = md->GetBoundsJ(IndexDomain::interior);
@@ -283,18 +283,30 @@ TaskStatus FluxSourceImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, CONS vcons, FAC
       KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
         // Extract coordinates
         geometry::Coords<G> coords(cpars, vp.GetCoordinates(b), k, j, i);
-        const auto ax1 = coords.GetFaceAreaX1();
-        const auto ax2 = (multi_d) ? coords.GetFaceAreaX2() : NewArray<Real, 2>(0.0);
-        const auto ax3 = (three_d) ? coords.GetFaceAreaX3() : NewArray<Real, 2>(0.0);
-        const auto dh1 = (x1dep) ? coords.GetConnX1() : NewArray<Real, 3>(0.0);
-        const auto dh2 = (x2dep) ? coords.GetConnX2() : NewArray<Real, 3>(0.0);
-        const auto dh3 = (x3dep) ? coords.GetConnX3() : NewArray<Real, 3>(0.0);
+        const Real hdtv =
+            0.5 * dt / vg(b, geom::vol(), coords.template index<geom::vol>(k, j, i));
 
+        std::array<Real, 3> dh1{0}, dh2{0}, dh3{0};
+        if constexpr (G != Coordinates::cartesian) {
+          dh1 = {vg(b, geom::dh1dx1(), coords.template index<geom::dh1dx1>(k, j, i)),
+                 vg(b, geom::dh2dx1(), coords.template index<geom::dh2dx1>(k, j, i)),
+                 vg(b, geom::dh3dx1(), coords.template index<geom::dh3dx1>(k, j, i))};
+          dh2 = {vg(b, geom::dh1dx2(), coords.template index<geom::dh1dx2>(k, j, i)),
+                 vg(b, geom::dh2dx2(), coords.template index<geom::dh2dx2>(k, j, i)),
+                 vg(b, geom::dh3dx2(), coords.template index<geom::dh3dx2>(k, j, i))};
+          dh3 = {vg(b, geom::dh1dx3(), coords.template index<geom::dh1dx3>(k, j, i)),
+                 vg(b, geom::dh2dx3(), coords.template index<geom::dh2dx3>(k, j, i)),
+                 vg(b, geom::dh3dx3(), coords.template index<geom::dh3dx3>(k, j, i))};
+        }
         // Get the rotational velocity
         std::array<Real, 3> rfv{0.0};
         [[maybe_unused]] Real omf_ = omf;
         if constexpr (F != Fluid::radiation) {
-          rfv = RotatingFrame::RotationVelocity<G>(coords.GetCellCenter(), omf_);
+          const std::array<Real, 3> xv{
+              vg(b, geom::x1v(), coords.template index<geom::x1v>(k, j, i)),
+              vg(b, geom::x2v(), coords.template index<geom::x2v>(k, j, i)),
+              vg(b, geom::x3v(), coords.template index<geom::x3v>(k, j, i))};
+          rfv = RotatingFrame::RotationVelocity<G>(xv, omf_);
         }
 
         // Timestep weighted by dx
@@ -304,7 +316,6 @@ TaskStatus FluxSourceImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, CONS vcons, FAC
                                           three_d * dt / (bnds.x3[1] - bnds.x3[0])};
 
         // Timestep weighted by (half) volume
-        const Real hdtv = 0.5 * dt / coords.Volume();
         const std::array<Real, 3> hdtvol = {hdtv, multi_d * hdtv, three_d * hdtv};
 
         // Face indexing
@@ -358,6 +369,19 @@ TaskStatus FluxSourceImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, CONS vcons, FAC
           // pdV source for gas internal energy equation
           if constexpr (F == Fluid::gas) {
             // pdV source term
+            const std::array<Real, 2> ax1{
+                vg(b, geom::ax1(), coords.template index<geom::ax1>(k, j, i)),
+                vg(b, geom::ax1(), coords.template index<geom::ax1>(k, j, i + 1))};
+
+            const std::array<Real, 2> ax2{
+                multi_d * vg(b, geom::ax2(), coords.template index<geom::ax2>(k, j, i)),
+                multi_d * vg(b, geom::ax2(),
+                             coords.template index<geom::ax2>(k, j + multi_d, i))};
+
+            const std::array<Real, 2> ax3{
+                three_d * vg(b, geom::ax3(), coords.template index<geom::ax3>(k, j, i)),
+                three_d * vg(b, geom::ax3(),
+                             coords.template index<geom::ax3>(k + three_d, j, i))};
             // clang-format off
             vc_(b, IEG, k, j, i) += hdtvol[0] *
                                     (vp_.flux(b, d1, IPR, k, j, i) +
@@ -488,9 +512,9 @@ TaskStatus CalculateFluxes(MeshData<Real> *md, PKG &pkg, PRIM vp, FLUX vflx, FAC
 //! \fn  TaskStatus ArtemisUtils::FluxSourceGeomSelect
 //! \brief Dispatch templated function depending on runtime coordinate system.
 template <Fluid F, Closure C = Closure::null, typename PKG, typename PRIM, typename CONS,
-          typename FACE>
+          typename FACE, typename GEO>
 TaskStatus FluxSource(MeshData<Real> *md, PKG &pkg, PRIM vp, CONS vcons, FACE vface,
-                      const Real dt) {
+                      GEO vg, const Real dt) {
   auto pm = md->GetParentPointer();
 
   // Extract rotating frame omega
@@ -504,17 +528,17 @@ TaskStatus FluxSource(MeshData<Real> *md, PKG &pkg, PRIM vp, CONS vcons, FACE vf
   typedef Coordinates G;
   const auto sys = pkg->template Param<Coordinates>("coords");
   if (sys == G::cartesian) {
-    return FluxSourceImpl<G::cartesian, F, C>(md, pkg, vp, vcons, vface, omf, dt);
+    return FluxSourceImpl<G::cartesian, F, C>(md, pkg, vp, vcons, vface, vg, omf, dt);
   } else if (sys == G::spherical3D) {
-    return FluxSourceImpl<G::spherical3D, F, C>(md, pkg, vp, vcons, vface, omf, dt);
+    return FluxSourceImpl<G::spherical3D, F, C>(md, pkg, vp, vcons, vface, vg, omf, dt);
   } else if (sys == G::spherical1D) {
-    return FluxSourceImpl<G::spherical1D, F, C>(md, pkg, vp, vcons, vface, omf, dt);
+    return FluxSourceImpl<G::spherical1D, F, C>(md, pkg, vp, vcons, vface, vg, omf, dt);
   } else if (sys == G::spherical2D) {
-    return FluxSourceImpl<G::spherical2D, F, C>(md, pkg, vp, vcons, vface, omf, dt);
+    return FluxSourceImpl<G::spherical2D, F, C>(md, pkg, vp, vcons, vface, vg, omf, dt);
   } else if (sys == G::cylindrical) {
-    return FluxSourceImpl<G::cylindrical, F, C>(md, pkg, vp, vcons, vface, omf, dt);
+    return FluxSourceImpl<G::cylindrical, F, C>(md, pkg, vp, vcons, vface, vg, omf, dt);
   } else if (sys == G::axisymmetric) {
-    return FluxSourceImpl<G::axisymmetric, F, C>(md, pkg, vp, vcons, vface, omf, dt);
+    return FluxSourceImpl<G::axisymmetric, F, C>(md, pkg, vp, vcons, vface, vg, omf, dt);
   } else {
     PARTHENON_FAIL("Coordinate type not recognized!");
   }

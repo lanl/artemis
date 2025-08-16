@@ -97,8 +97,8 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
 
         const std::array<Real, 2> xv{
-            vg(0, geom::x1v())(coords.template index<geom::x1v>(k, j, i)),
-            vg(0, geom::x2v())(coords.template index<geom::x2v>(k, j, i))};
+            vg(0, geom::x1v(), coords.template index<geom::x1v>(k, j, i)),
+            vg(0, geom::x2v(), coords.template index<geom::x2v>(k, j, i))};
 
         // const auto &xv = coords.GetCellCenter();
         //  compute cell-centered conserved variables

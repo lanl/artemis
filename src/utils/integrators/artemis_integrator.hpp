@@ -85,7 +85,7 @@ TaskStatus ApplyUpdate(MeshData<Real> *u0, MeshData<Real> *u1, const Real g0,
         const int d2 = d1 + multi_d;
         const int d3 = d2 + three_d;
         const Real bdt_vol =
-            beta_dt / vg(b, geom::vol())(coords.template index<geom::vol>(k, j, i));
+            beta_dt / vg(b, geom::vol(), coords.template index<geom::vol>(k, j, i));
         // Advance state vector with flux divergence
         for (int n = v0.GetLowerBound(b); n <= v0.GetUpperBound(b); ++n) {
           Real &v0n = v0(b, n, k, j, i);
@@ -93,19 +93,19 @@ TaskStatus ApplyUpdate(MeshData<Real> *u0, MeshData<Real> *u1, const Real g0,
           v0n = g0 * v0n + g1 * v1n;
           if constexpr (include_divf) {
             v0n += bdt_vol *
-                   ((vg(b, geom::ax1())(coords.template index<geom::ax1>(k, j, i)) *
+                   ((vg(b, geom::ax1(), coords.template index<geom::ax1>(k, j, i)) *
                          v0.flux(b, d1, n, k, j, i) -
-                     vg(b, geom::ax1())(coords.template index<geom::ax1>(k, j, i + 1)) *
+                     vg(b, geom::ax1(), coords.template index<geom::ax1>(k, j, i + 1)) *
                          v0.flux(b, d1, n, k, j, i + 1)) +
-                    (vg(b, geom::ax2())(coords.template index<geom::ax2>(k, j, i)) *
+                    (vg(b, geom::ax2(), coords.template index<geom::ax2>(k, j, i)) *
                          v0.flux(b, d2, n, k, j, i) -
-                     vg(b, geom::ax2())(
-                         coords.template index<geom::ax2>(k, j + multi_d, i)) *
+                     vg(b, geom::ax2(),
+                        coords.template index<geom::ax2>(k, j + multi_d, i)) *
                          v0.flux(b, d2, n, k, j + multi_d, i)) +
-                    (vg(b, geom::ax3())(coords.template index<geom::ax3>(k, j, i)) *
+                    (vg(b, geom::ax3(), coords.template index<geom::ax3>(k, j, i)) *
                          v0.flux(b, d3, n, k, j, i) -
-                     vg(b, geom::ax3())(
-                         coords.template index<geom::ax3>(k + three_d, j, i)) *
+                     vg(b, geom::ax3(),
+                        coords.template index<geom::ax3>(k + three_d, j, i)) *
                          v0.flux(b, d3, n, k + three_d, j, i)));
           }
         }

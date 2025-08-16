@@ -63,8 +63,10 @@ TaskStatus ApplyUpdate(MeshData<Real> *u0, MeshData<Real> *u1, const Real g0,
   // Packing and indexing
   std::vector<MetadataFlag> flags({Metadata::Conserved});
   static auto desc = MakePackDescriptor<any>(u0, flags, {parthenon::PDOpt::WithFluxes});
+  static auto desc_g = MakePackDescriptor<geom::vol, geom::ax1, geom::ax2, geom::ax3>(u0);
   const auto v0 = desc.GetPack(u0);
   const auto v1 = desc.GetPack(u1);
+  const auto vg = desc_g.GetPack(u1);
   const auto ib = u0->GetBoundsI(IndexDomain::interior);
   const auto jb = u0->GetBoundsJ(IndexDomain::interior);
   const auto kb = u0->GetBoundsK(IndexDomain::interior);
@@ -79,26 +81,32 @@ TaskStatus ApplyUpdate(MeshData<Real> *u0, MeshData<Real> *u1, const Real g0,
       KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
         // Extract coordinates
         geometry::Coords<GEOM> coords(cpars, v0.GetCoordinates(b), k, j, i);
-        const auto ax1 = coords.GetFaceAreaX1();
-        const auto ax2 = (multi_d) ? coords.GetFaceAreaX2() : NewArray<Real, 2>(0.0);
-        const auto ax3 = (three_d) ? coords.GetFaceAreaX3() : NewArray<Real, 2>(0.0);
         const int d1 = X1DIR;
         const int d2 = d1 + multi_d;
         const int d3 = d2 + three_d;
-        const Real bdt_vol = beta_dt / coords.Volume();
-
+        const Real bdt_vol =
+            beta_dt / vg(b, geom::vol())(coords.template index<geom::vol>(k, j, i));
         // Advance state vector with flux divergence
         for (int n = v0.GetLowerBound(b); n <= v0.GetUpperBound(b); ++n) {
           Real &v0n = v0(b, n, k, j, i);
           Real &v1n = v1(b, n, k, j, i);
           v0n = g0 * v0n + g1 * v1n;
           if constexpr (include_divf) {
-            v0n += bdt_vol * ((ax1[0] * v0.flux(b, d1, n, k, j, i) -
-                               ax1[1] * v0.flux(b, d1, n, k, j, i + 1)) +
-                              (ax2[0] * v0.flux(b, d2, n, k, j, i) -
-                               ax2[1] * v0.flux(b, d2, n, k, j + multi_d, i)) +
-                              (ax3[0] * v0.flux(b, d3, n, k, j, i) -
-                               ax3[1] * v0.flux(b, d3, n, k + three_d, j, i)));
+            v0n += bdt_vol *
+                   ((vg(b, geom::ax1())(coords.template index<geom::ax1>(k, j, i)) *
+                         v0.flux(b, d1, n, k, j, i) -
+                     vg(b, geom::ax1())(coords.template index<geom::ax1>(k, j, i + 1)) *
+                         v0.flux(b, d1, n, k, j, i + 1)) +
+                    (vg(b, geom::ax2())(coords.template index<geom::ax2>(k, j, i)) *
+                         v0.flux(b, d2, n, k, j, i) -
+                     vg(b, geom::ax2())(
+                         coords.template index<geom::ax2>(k, j + multi_d, i)) *
+                         v0.flux(b, d2, n, k, j + multi_d, i)) +
+                    (vg(b, geom::ax3())(coords.template index<geom::ax3>(k, j, i)) *
+                         v0.flux(b, d3, n, k, j, i) -
+                     vg(b, geom::ax3())(
+                         coords.template index<geom::ax3>(k + three_d, j, i)) *
+                         v0.flux(b, d3, n, k + three_d, j, i)));
           }
         }
       });

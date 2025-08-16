@@ -80,7 +80,8 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
                          rad::prim::energy, rad::prim::flux>(
           (pmb->resolved_packages).get());
   auto v = desc.GetPack(md.get());
-  static auto desc_g = MakePackDescriptor<geom::x1v>((pmb->resolved_packages).get());
+  static auto desc_g =
+      MakePackDescriptor<geom::x1v, geom::x2v>((pmb->resolved_packages).get());
   auto vg = desc_g.GetPack(md.get());
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
@@ -95,9 +96,9 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         // cell-centered coordinates
         geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
 
-        const int idx = coords.template CI<geom::xv>(k, j, i);
-        const std::array<Real, 3> xv{vg(0, geom::xv())(0, idx), vg(0, geom::xv())(1, idx),
-                                     vg(0, geom::xv())(2, idx)};
+        const std::array<Real, 2> xv{
+            vg(0, geom::x1v())(coords.template index<geom::x1v>(k, j, i)),
+            vg(0, geom::x2v())(coords.template index<geom::x2v>(k, j, i))};
 
         // const auto &xv = coords.GetCellCenter();
         //  compute cell-centered conserved variables

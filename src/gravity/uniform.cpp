@@ -47,6 +47,9 @@ TaskStatus UniformGravity(MeshData<Real> *md, const Real time, const Real dt) {
                          dust::cons::momentum, gas::prim::density, gas::prim::velocity,
                          dust::prim::density>(resolved_pkgs.get());
   auto vmesh = desc.GetPack(md);
+  static auto desc_g =
+      MakePackDescriptor<geom::hx1v, geom::hx2v, geom::hx3v>(resolved_pkgs.get());
+  auto vg = desc_g.GetPack(md);
   const auto ib = md->GetBoundsI(IndexDomain::interior);
   const auto jb = md->GetBoundsJ(IndexDomain::interior);
   const auto kb = md->GetBoundsK(IndexDomain::interior);
@@ -57,7 +60,10 @@ TaskStatus UniformGravity(MeshData<Real> *md, const Real time, const Real dt) {
       KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
         // Extract coordinates
         geometry::Coords<GEOM> coords(cpars, vmesh.GetCoordinates(b), k, j, i);
-        const auto &hx = coords.GetScaleFactors();
+        const std::array<Real, 3> hx{
+            vg(b, geom::hx1v(), coords.template index<geom::hx1v>(k, j, i)),
+            vg(b, geom::hx2v(), coords.template index<geom::hx2v>(k, j, i)),
+            vg(b, geom::hx3v(), coords.template index<geom::hx3v>(k, j, i))};
 
         if (do_gas) {
           // Gravitational acceleration and energy release

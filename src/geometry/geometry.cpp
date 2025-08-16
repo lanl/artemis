@@ -82,7 +82,9 @@ void InitBlockGeom(MeshBlock *pmb, ParameterInput *pin) {
   static auto desc_g =
       MakePackDescriptor<geom::x1v, geom::x2v, geom::x3v, geom::dx1, geom::dx2, geom::dx3,
                          geom::vol, geom::ax1, geom::ax2, geom::ax3, geom::hx1v,
-                         geom::hx2v, geom::hx3v>((pm->resolved_packages).get());
+                         geom::hx2v, geom::hx3v, geom::dh1dx1, geom::dh2dx1, geom::dh3dx1,
+                         geom::dh1dx2, geom::dh2dx2, geom::dh3dx2, geom::dh1dx3,
+                         geom::dh2dx3, geom::dh3dx3>((pm->resolved_packages).get());
   auto vg = desc_g.GetPack(md.get());
   IndexRange ib = md->GetBoundsI(IndexDomain::entire);
   IndexRange jb = md->GetBoundsJ(IndexDomain::entire);
@@ -127,6 +129,22 @@ void InitBlockGeom(MeshBlock *pmb, ParameterInput *pin) {
         if ((k == kb.e) && (ndim > 2)) {
           vg(b, geom::ax3(), coords.template index<geom::ax3>(k + 1, j, i)) = ax[1];
         }
+
+        // connection coeffs
+        auto dh = coords.GetConnX1();
+        vg(b, geom::dh1dx1(), coords.template index<geom::dh1dx1>(k, j, i)) = dh[0];
+        vg(b, geom::dh2dx1(), coords.template index<geom::dh2dx1>(k, j, i)) = dh[1];
+        vg(b, geom::dh3dx1(), coords.template index<geom::dh3dx1>(k, j, i)) = dh[2];
+
+        dh = coords.GetConnX2();
+        vg(b, geom::dh1dx2(), coords.template index<geom::dh1dx2>(k, j, i)) = dh[0];
+        vg(b, geom::dh2dx2(), coords.template index<geom::dh2dx2>(k, j, i)) = dh[1];
+        vg(b, geom::dh3dx2(), coords.template index<geom::dh3dx2>(k, j, i)) = dh[2];
+
+        dh = coords.GetConnX3();
+        vg(b, geom::dh1dx3(), coords.template index<geom::dh1dx3>(k, j, i)) = dh[0];
+        vg(b, geom::dh2dx3(), coords.template index<geom::dh2dx3>(k, j, i)) = dh[1];
+        vg(b, geom::dh3dx3(), coords.template index<geom::dh3dx3>(k, j, i)) = dh[2];
       });
 }
 

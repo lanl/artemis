@@ -35,12 +35,15 @@ namespace geometry {
 namespace sph {
 template <class VAR>
 constexpr bool is_x1dep() {
-  return (std::is_same_v<VAR, geom::x1v> || std::is_same_v<VAR, geom::hx2v> ||
-          std::is_same_v<VAR, geom::hx3v> || std::is_same_v<VAR, geom::vol>);
+  return (std::is_same_v<VAR, geom::x1v> || std::is_same_v<VAR, geom::dx1> ||
+          std::is_same_v<VAR, geom::hx2v> || std::is_same_v<VAR, geom::dx2> ||
+          std::is_same_v<VAR, geom::hx3v> || std::is_same_v<VAR, geom::dx3> ||
+          std::is_same_v<VAR, geom::vol>);
 }
 template <class VAR>
 constexpr bool is_x2dep() {
   return (std::is_same_v<VAR, geom::x2v> || std::is_same_v<VAR, geom::hx3v> ||
+          std::is_same_v<VAR, geom::dx2> || std::is_same_v<VAR, geom::dx3> ||
           std::is_same_v<VAR, geom::vol>);
 }
 template <class VAR>

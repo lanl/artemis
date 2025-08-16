@@ -80,9 +80,9 @@ void InitBlockGeom(MeshBlock *pmb, ParameterInput *pin) {
   const auto &cpars = artemis_pkg->template Param<geometry::CoordParams>("coord_params");
 
   static auto desc_g =
-      MakePackDescriptor<geom::x1v, geom::x2v, geom::x3v, geom::vol, geom::ax1, geom::ax2,
-                         geom::ax3, geom::hx1v, geom::hx2v, geom::hx3v>(
-          (pmb->resolved_packages).get());
+      MakePackDescriptor<geom::x1v, geom::x2v, geom::x3v, geom::dx1, geom::dx2, geom::dx3,
+                         geom::vol, geom::ax1, geom::ax2, geom::ax3, geom::hx1v,
+                         geom::hx2v, geom::hx3v>((pm->resolved_packages).get());
   auto vg = desc_g.GetPack(md.get());
   IndexRange ib = md->GetBoundsI(IndexDomain::entire);
   IndexRange jb = md->GetBoundsJ(IndexDomain::entire);
@@ -98,6 +98,11 @@ void InitBlockGeom(MeshBlock *pmb, ParameterInput *pin) {
         vg(b, geom::x1v(), coords.template index<geom::x1v>(k, j, i)) = xv[0];
         vg(b, geom::x2v(), coords.template index<geom::x2v>(k, j, i)) = xv[1];
         vg(b, geom::x3v(), coords.template index<geom::x3v>(k, j, i)) = xv[2];
+
+        const auto dx = coords.GetCellWidths();
+        vg(b, geom::dx1(), coords.template index<geom::dx1>(k, j, i)) = dx[0];
+        vg(b, geom::dx2(), coords.template index<geom::dx2>(k, j, i)) = dx[1];
+        vg(b, geom::dx3(), coords.template index<geom::dx3>(k, j, i)) = dx[2];
 
         const auto hx = coords.GetScaleFactors();
         vg(b, geom::hx1v(), coords.template index<geom::hx1v>(k, j, i)) = hx[0];
@@ -134,9 +139,9 @@ parthenon::TaskStatus UpdateGeom(MeshData<Real> *md) {
   const auto &cpars = artemis_pkg->template Param<geometry::CoordParams>("coord_params");
 
   static auto desc_g =
-      MakePackDescriptor<geom::x1v, geom::x2v, geom::x3v, geom::vol, geom::ax1, geom::ax2,
-                         geom::ax3, geom::hx1v, geom::hx2v, geom::hx3v>(
-          (pm->resolved_packages).get());
+      MakePackDescriptor<geom::x1v, geom::x2v, geom::x3v, geom::dx1, geom::dx2, geom::dx3,
+                         geom::vol, geom::ax1, geom::ax2, geom::ax3, geom::hx1v,
+                         geom::hx2v, geom::hx3v>((pm->resolved_packages).get());
   auto vg = desc_g.GetPack(md);
   IndexRange ib = md->GetBoundsI(IndexDomain::entire);
   IndexRange jb = md->GetBoundsJ(IndexDomain::entire);
@@ -152,6 +157,11 @@ parthenon::TaskStatus UpdateGeom(MeshData<Real> *md) {
         vg(b, geom::x1v(), coords.template index<geom::x1v>(k, j, i)) = xv[0];
         vg(b, geom::x2v(), coords.template index<geom::x2v>(k, j, i)) = xv[1];
         vg(b, geom::x3v(), coords.template index<geom::x3v>(k, j, i)) = xv[2];
+
+        const auto dx = coords.GetCellWidths();
+        vg(b, geom::dx1(), coords.template index<geom::dx1>(k, j, i)) = dx[0];
+        vg(b, geom::dx2(), coords.template index<geom::dx2>(k, j, i)) = dx[1];
+        vg(b, geom::dx3(), coords.template index<geom::dx3>(k, j, i)) = dx[2];
 
         const auto hx = coords.GetScaleFactors();
         vg(b, geom::hx1v(), coords.template index<geom::hx1v>(k, j, i)) = hx[0];

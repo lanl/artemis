@@ -40,11 +40,11 @@ constexpr bool is_x1dep() {
 }
 template <class VAR>
 constexpr bool is_x2dep() {
-  return false;
+  return std::is_same_v<VAR, geom::x2v>;
 }
 template <class VAR>
 constexpr bool is_x3dep() {
-  return false;
+  return std::is_same_v<VAR, geom::x3v>;
 }
 } // namespace cyl
 
@@ -69,13 +69,21 @@ class Coords<Coordinates::cylindrical>
   KOKKOS_INLINE_FUNCTION int index_(const int k, const int j, const int i) const {
     if constexpr (cyl::is_x1dep<VAR>()) {
       return i;
+    } else if constexpr (axi::is_x2dep<VAR>()) {
+      return j;
+    } else if constexpr (axi::is_x3dep<VAR>()) {
+      return k;
     }
     return 0;
   }
   template <class VAR>
   KOKKOS_INLINE_FUNCTION std::array<int, 3> shape_() const {
     if constexpr (cyl::is_x1dep<VAR>()) {
-      return {nx[0], 1, 1};
+      return {nx[0] + staggered_field<X1DIR, VAR>(), 1, 1};
+    } else if constexpr (cyl::is_x2dep<VAR>()) {
+      return {1, nx[1], 1};
+    } else if constexpr (cyl::is_x3dep<VAR>()) {
+      return {1, 1, nx[2]};
     }
     return {0, 0, 0};
   }

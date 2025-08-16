@@ -32,6 +32,7 @@ namespace geometry {
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
 template <Coordinates GEOM>
 void InitBlockGeom(MeshBlock *pmb, ParameterInput *pin);
+template <Coordinates GEOM>
 parthenon::TaskStatus UpdateGeom(parthenon::MeshBlockData<Real> *md);
 
 // Face indexing
@@ -92,7 +93,14 @@ struct CoordParams {
     nx = {pin->GetInteger("parthenon/meshblock", "nx1"),
           pin->GetInteger("parthenon/meshblock", "nx2"),
           pin->GetInteger("parthenon/meshblock", "nx3")};
-    const int ndim = (nx[2] > 1) ? 3 : ((nx[1] > 1) ? 2 : 1);
+    int ndim = 0;
+    for (int i = 0; i < 3; i++) {
+      if (nx[i] > 1) {
+        nx[i] += 2 * Globals::nghost;
+        ndim += 1;
+      }
+    }
+
     sys = CoordSelect(pin->GetOrAddString("artemis", "coordinates", "cartesian"), ndim);
     dep = {x1dep(sys), x2dep(sys), x3dep(sys)};
   }
@@ -162,7 +170,30 @@ KOKKOS_INLINE_FUNCTION constexpr bool x3dep() {
   return false;
 }
 
-//----------------------------------------------------------------------------------------
+template <int DIR, class VAR>
+constexpr bool staggered_field() {
+  return (std::is_same_v<VAR, geom::ax1> && DIR == 1) ||
+         (std::is_same_v<VAR, geom::ax2> && DIR == 2) ||
+         (std::is_same_v<VAR, geom::ax3> && DIR == 3);
+}
+
+// NOTE(@amd)
+// This is a dirty trick because I am running into constexpr issues with actual member
+// functions of the CRTP classes
+namespace cart {
+template <class VAR>
+constexpr bool is_x1dep() {
+  return std::is_same_v<VAR, geom::x1v>;
+}
+template <class VAR>
+constexpr bool is_x2dep() {
+  return std::is_same_v<VAR, geom::x2v>;
+}
+template <class VAR>
+constexpr bool is_x3dep() {
+  return std::is_same_v<VAR, geom::x3v>;
+}
+} // namespace cart
 //! \class  geometry::CoordsBase
 //! \brief  The base coordinates class that defines all methods and the default behavior
 //! which is Cartesian.
@@ -206,10 +237,24 @@ class CoordsBase {
 
   template <class VAR>
   KOKKOS_INLINE_FUNCTION int index_(const int k, const int j, const int i) const {
+    if constexpr (cart::is_x1dep<VAR>()) {
+      return i;
+    } else if constexpr (cart::is_x2dep<VAR>()) {
+      return j;
+    } else if constexpr (cart::is_x3dep<VAR>()) {
+      return k;
+    }
     return 0;
   }
   template <class VAR>
   KOKKOS_INLINE_FUNCTION std::array<int, 3> shape_() const {
+    if constexpr (cart::is_x1dep<VAR>()) {
+      return {1, 1, nx[0]};
+    } else if constexpr (cart::is_x2dep<VAR>()) {
+      return {1, nx[1], 1};
+    } else if constexpr (cart::is_x3dep<VAR>()) {
+      return {1, 1, nx[2]};
+    }
     return {1, 1, 1};
   }
 

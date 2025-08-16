@@ -43,7 +43,7 @@ constexpr bool is_x2dep() {
 }
 template <class VAR>
 constexpr bool is_x3dep() {
-  return false;
+  return std::is_same_v<VAR, geom::x3v>;
 }
 } // namespace sph
 
@@ -70,11 +70,14 @@ class Coords<Coordinates::spherical3D>
   KOKKOS_INLINE_FUNCTION std::array<int, 3> shape_() const {
     if constexpr (sph::is_x1dep<VAR>()) {
       if constexpr (sph::is_x2dep<VAR>()) {
-        return {nx[0], nx[1], 1};
+        return {nx[0] + staggered_field<X1DIR, VAR>(),
+                nx[1] + staggered_field<X2DIR, VAR>(), 1};
       }
-      return {nx[0], 1, 1};
+      return {nx[0] + staggered_field<X1DIR, VAR>(), 1, 1};
     } else if constexpr (sph::is_x2dep<VAR>()) {
-      return {1, nx[1], 1};
+      return {1, nx[1] + staggered_field<X2DIR, VAR>(), 1};
+    } else if constexpr (sph::is_x3dep<VAR>()) {
+      return {1, 1, nx[2]};
     }
     return {1, 1, 1};
   }
@@ -87,6 +90,8 @@ class Coords<Coordinates::spherical3D>
       return i;
     } else if constexpr (sph::is_x2dep<VAR>()) {
       return j;
+    } else if constexpr (sph::is_x3dep<VAR>()) {
+      return k;
     }
     return 0;
   }
@@ -306,11 +311,14 @@ class Coords<Coordinates::spherical2D>
   KOKKOS_INLINE_FUNCTION std::array<int, 3> shape_() const {
     if constexpr (sph::is_x1dep<VAR>()) {
       if constexpr (sph::is_x2dep<VAR>()) {
-        return {nx[0], nx[1], 1};
+        return {nx[0] + staggered_field<X1DIR, VAR>(),
+                nx[1] + staggered_field<X2DIR, VAR>(), 1};
       }
-      return {nx[0], 1, 1};
+      return {nx[0] + staggered_field<X1DIR, VAR>(), 1, 1};
     } else if constexpr (sph::is_x2dep<VAR>()) {
-      return {1, nx[1], 1};
+      return {1, nx[1] + staggered_field<X2DIR, VAR>(), 1};
+    } else if constexpr (sph::is_x3dep<VAR>()) {
+      return {1, 1, nx[2]};
     }
     return {1, 1, 1};
   }
@@ -323,6 +331,8 @@ class Coords<Coordinates::spherical2D>
       return i;
     } else if constexpr (sph::is_x2dep<VAR>()) {
       return j;
+    } else if constexpr (sph::is_x3dep<VAR>()) {
+      return k;
     }
     return 0;
   }
@@ -545,7 +555,7 @@ class Coords<Coordinates::spherical1D>
   template <class VAR>
   KOKKOS_INLINE_FUNCTION std::array<int, 3> shape_() const {
     if constexpr (sph::is_x1dep<VAR>()) {
-      return {nx[0], 1, 1};
+      return {nx[0] + staggered_field<X1DIR, VAR>(), 1, 1};
     }
     return {1, 1, 1};
   }

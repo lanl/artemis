@@ -30,12 +30,12 @@ namespace Diffusion {
 //! \fn void StrainTensorFace
 //! \brief Computes strain rate tensor
 template <Coordinates GEOM, Fluid FLUID_TYPE, parthenon::CoordinateDirection XDIR,
-          typename SparsePack>
+          typename SparsePack, typename SparsePackGeom>
 KOKKOS_INLINE_FUNCTION void
 StrainTensorFace(parthenon::team_mbr_t const &member, const geometry::CoordParams &cpars,
                  const int b, const int n, const int k, const int j, const int il,
                  const int iu, const int multi_d, const int three_d, const Real qshear,
-                 const Real om0, const SparsePack &vprim,
+                 const Real om0, const SparsePack &vprim, const SparsePackGeom &vg,
                  const parthenon::ScratchPad2D<Real> &flx) {
   // Fill the flx array with the strain tensor on the specified face
   //
@@ -72,8 +72,14 @@ StrainTensorFace(parthenon::team_mbr_t const &member, const geometry::CoordParam
   parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, member, il, iu, [&](const int i) {
     geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
     //  T_j^i = dv^i/dxj + hj^2/hi^2 dv^j/dxi  + v^k dhi/dxk / hi \delta_j^i
-    const auto &xv = coords.GetCellCenter();
-    const auto &hx = coords.GetScaleFactors();
+    const std::array<Real, 3> xv{
+        vg(b, geom::x1v(), coords.template index<geom::x1v>(k, j, i)),
+        vg(b, geom::x2v(), coords.template index<geom::x2v>(k, j, i)),
+        vg(b, geom::x3v(), coords.template index<geom::x3v>(k, j, i))};
+    const std::array<Real, 3> hx{
+        vg(b, geom::hx1v(), coords.template index<geom::hx1v>(k, j, i)),
+        vg(b, geom::hx2v(), coords.template index<geom::hx2v>(k, j, i)),
+        vg(b, geom::hx3v(), coords.template index<geom::hx3v>(k, j, i))};
 
     const std::array<Real, 3> v{vprim(b, gas::prim::velocity(VI(n, 0)), k, j, i) / hx[0],
                                 vprim(b, gas::prim::velocity(VI(n, 1)), k, j, i) / hx[1],
@@ -96,41 +102,94 @@ StrainTensorFace(parthenon::team_mbr_t const &member, const geometry::CoordParam
       // need xm
       //      ym , yp, xmym, xmyp
       //      zm , zp, xmzm, xmzp
+      const std::array<Real, 3> xv_xm{
+          vg(b, geom::x1v(), coords.template index<geom::x1v>(k, j, i - 1)),
+          vg(b, geom::x2v(), coords.template index<geom::x2v>(k, j, i - 1)),
+          vg(b, geom::x3v(), coords.template index<geom::x3v>(k, j, i - 1))};
 
-      geometry::Coords<GEOM> coords_xm(cpars, pco, k, j, i - 1);
-      geometry::Coords<GEOM> coords_xmym(cpars, pco, k, j - multi_d, i - 1);
-      geometry::Coords<GEOM> coords_xmyp(cpars, pco, k, j + multi_d, i - 1);
-      geometry::Coords<GEOM> coords_ym(cpars, pco, k, j - multi_d, i);
-      geometry::Coords<GEOM> coords_yp(cpars, pco, k, j + multi_d, i);
+      const std::array<Real, 3> xv_ym{
+          vg(b, geom::x1v(), coords.template index<geom::x1v>(k, j - multi_d, i)),
+          vg(b, geom::x2v(), coords.template index<geom::x2v>(k, j - multi_d, i)),
+          vg(b, geom::x3v(), coords.template index<geom::x3v>(k, j - multi_d, i))};
+      const std::array<Real, 3> xv_yp{
+          vg(b, geom::x1v(), coords.template index<geom::x1v>(k, j + multi_d, i)),
+          vg(b, geom::x2v(), coords.template index<geom::x2v>(k, j + multi_d, i)),
+          vg(b, geom::x3v(), coords.template index<geom::x3v>(k, j + multi_d, i))};
+      const std::array<Real, 3> xv_xmym{
+          vg(b, geom::x1v(), coords.template index<geom::x1v>(k, j - multi_d, i - 1)),
+          vg(b, geom::x2v(), coords.template index<geom::x2v>(k, j - multi_d, i - 1)),
+          vg(b, geom::x3v(), coords.template index<geom::x3v>(k, j - multi_d, i - 1))};
+      const std::array<Real, 3> xv_xmyp{
+          vg(b, geom::x1v(), coords.template index<geom::x1v>(k, j + multi_d, i - 1)),
+          vg(b, geom::x2v(), coords.template index<geom::x2v>(k, j + multi_d, i - 1)),
+          vg(b, geom::x3v(), coords.template index<geom::x3v>(k, j + multi_d, i - 1))};
 
-      geometry::Coords<GEOM> coords_xmzm(cpars, pco, k - three_d, j, i - 1);
-      geometry::Coords<GEOM> coords_xmzp(cpars, pco, k + three_d, j, i - 1);
-      geometry::Coords<GEOM> coords_zm(cpars, pco, k - three_d, j, i);
-      geometry::Coords<GEOM> coords_zp(cpars, pco, k + three_d, j, i);
+      const std::array<Real, 3> xv_zm{
+          vg(b, geom::x1v(), coords.template index<geom::x1v>(k - three_d, j, i)),
+          vg(b, geom::x2v(), coords.template index<geom::x2v>(k - three_d, j, i)),
+          vg(b, geom::x3v(), coords.template index<geom::x3v>(k - three_d, j, i))};
+      const std::array<Real, 3> xv_zp{
+          vg(b, geom::x1v(), coords.template index<geom::x1v>(k + three_d, j, i)),
+          vg(b, geom::x2v(), coords.template index<geom::x2v>(k + three_d, j, i)),
+          vg(b, geom::x3v(), coords.template index<geom::x3v>(k + three_d, j, i))};
+      const std::array<Real, 3> xv_xmzm{
+          vg(b, geom::x1v(), coords.template index<geom::x1v>(k - three_d, j, i - 1)),
+          vg(b, geom::x2v(), coords.template index<geom::x2v>(k - three_d, j, i - 1)),
+          vg(b, geom::x3v(), coords.template index<geom::x3v>(k - three_d, j, i - 1))};
+      const std::array<Real, 3> xv_xmzp{
+          vg(b, geom::x1v(), coords.template index<geom::x1v>(k + three_d, j, i - 1)),
+          vg(b, geom::x2v(), coords.template index<geom::x2v>(k + three_d, j, i - 1)),
+          vg(b, geom::x3v(), coords.template index<geom::x3v>(k + three_d, j, i - 1))};
 
-      const auto &xv_xm = coords_xm.GetCellCenter();
+      // Scale factors
+      const std::array<Real, 3> hx_xm{
+          vg(b, geom::hx1v(), coords.template index<geom::hx1v>(k, j, i - 1)),
+          vg(b, geom::hx2v(), coords.template index<geom::hx2v>(k, j, i - 1)),
+          vg(b, geom::hx3v(), coords.template index<geom::hx3v>(k, j, i - 1))};
 
-      const auto &xv_ym = coords_ym.GetCellCenter();
-      const auto &xv_yp = coords_yp.GetCellCenter();
-      const auto &xv_xmym = coords_xmym.GetCellCenter();
-      const auto &xv_xmyp = coords_xmyp.GetCellCenter();
+      const std::array<Real, 3> hx_ym{
+          vg(b, geom::hx1v(), coords.template index<geom::hx1v>(k, j - multi_d, i)),
+          vg(b, geom::hx2v(), coords.template index<geom::hx2v>(k, j - multi_d, i)),
+          vg(b, geom::hx3v(), coords.template index<geom::hx3v>(k, j - multi_d, i))};
+      const std::array<Real, 3> hx_yp{
+          vg(b, geom::hx1v(), coords.template index<geom::hx1v>(k, j + multi_d, i)),
+          vg(b, geom::hx2v(), coords.template index<geom::hx2v>(k, j + multi_d, i)),
+          vg(b, geom::hx3v(), coords.template index<geom::hx3v>(k, j + multi_d, i))};
+      const std::array<Real, 3> hx_xmym{
+          vg(b, geom::hx1v(), coords.template index<geom::hx1v>(k, j - multi_d, i - 1)),
+          vg(b, geom::hx2v(), coords.template index<geom::hx2v>(k, j - multi_d, i - 1)),
+          vg(b, geom::hx3v(), coords.template index<geom::hx3v>(k, j - multi_d, i - 1))};
+      const std::array<Real, 3> hx_xmyp{
+          vg(b, geom::hx1v(), coords.template index<geom::hx1v>(k, j + multi_d, i - 1)),
+          vg(b, geom::hx2v(), coords.template index<geom::hx2v>(k, j + multi_d, i - 1)),
+          vg(b, geom::hx3v(), coords.template index<geom::hx3v>(k, j + multi_d, i - 1))};
 
-      const auto &xv_zm = coords_zm.GetCellCenter();
-      const auto &xv_zp = coords_zp.GetCellCenter();
-      const auto &xv_xmzm = coords_xmzm.GetCellCenter();
-      const auto &xv_xmzp = coords_xmzp.GetCellCenter();
+      const std::array<Real, 3> hx_zm{
+          vg(b, geom::hx1v(), coords.template index<geom::hx1v>(k - three_d, j, i)),
+          vg(b, geom::hx2v(), coords.template index<geom::hx2v>(k - three_d, j, i)),
+          vg(b, geom::hx3v(), coords.template index<geom::hx3v>(k - three_d, j, i))};
+      const std::array<Real, 3> hx_zp{
+          vg(b, geom::hx1v(), coords.template index<geom::hx1v>(k + three_d, j, i)),
+          vg(b, geom::hx2v(), coords.template index<geom::hx2v>(k + three_d, j, i)),
+          vg(b, geom::hx3v(), coords.template index<geom::hx3v>(k + three_d, j, i))};
+      const std::array<Real, 3> hx_xmzm{
+          vg(b, geom::hx1v(), coords.template index<geom::hx1v>(k - three_d, j, i - 1)),
+          vg(b, geom::hx2v(), coords.template index<geom::hx2v>(k - three_d, j, i - 1)),
+          vg(b, geom::hx3v(), coords.template index<geom::hx3v>(k - three_d, j, i - 1))};
+      const std::array<Real, 3> hx_xmzp{
+          vg(b, geom::hx1v(), coords.template index<geom::hx1v>(k + three_d, j, i - 1)),
+          vg(b, geom::hx2v(), coords.template index<geom::hx2v>(k + three_d, j, i - 1)),
+          vg(b, geom::hx3v(), coords.template index<geom::hx3v>(k + three_d, j, i - 1))};
 
-      const auto &hx_xm = coords_xm.GetScaleFactors();
-
-      const auto &hx_ym = coords_ym.GetScaleFactors();
-      const auto &hx_yp = coords_yp.GetScaleFactors();
-      const auto &hx_xmym = coords_xmym.GetScaleFactors();
-      const auto &hx_xmyp = coords_xmyp.GetScaleFactors();
-
-      const auto &hx_zm = coords_zm.GetScaleFactors();
-      const auto &hx_zp = coords_zp.GetScaleFactors();
-      const auto &hx_xmzm = coords_xmzm.GetScaleFactors();
-      const auto &hx_xmzp = coords_xmzp.GetScaleFactors();
+      // Connection coeffs
+      const std::array<Real, 3> conn{
+          vg(b, geom::dh1dx1(), coords.template index<geom::dh1dx1>(k, j, i)),
+          vg(b, geom::dh1dx2(), coords.template index<geom::dh1dx2>(k, j, i)),
+          vg(b, geom::dh1dx3(), coords.template index<geom::dh1dx3>(k, j, i))};
+      const std::array<Real, 3> conn_xm{
+          vg(b, geom::dh1dx1(), coords.template index<geom::dh1dx1>(k, j, i - 1)),
+          vg(b, geom::dh1dx2(), coords.template index<geom::dh1dx2>(k, j, i - 1)),
+          vg(b, geom::dh1dx3(), coords.template index<geom::dh1dx3>(k, j, i - 1))};
 
       const Real dx1 = xv[0] - xv_xm[0];
       const Real dx2 = multi_d ? (xv_yp[1] - xv_ym[1]) : Fuzz<Real>();
@@ -143,16 +202,14 @@ StrainTensorFace(parthenon::team_mbr_t const &member, const geometry::CoordParam
           v[0] - vprim(b, gas::prim::velocity(VI(n, 0)), k, j, i - 1) / hx_xm[0];
 
       const Real src =
-          vprim(b, gas::prim::velocity(VI(n, 0)), k, j, i) / hx[0] * coords.dh1dx1() +
-          vprim(b, gas::prim::velocity(VI(n, 1)), k, j, i) / hx[1] * coords.dh1dx2() +
-          vprim(b, gas::prim::velocity(VI(n, 2)), k, j, i) / hx[2] * coords.dh1dx3();
+          vprim(b, gas::prim::velocity(VI(n, 0)), k, j, i) / hx[0] * conn[0] +
+          vprim(b, gas::prim::velocity(VI(n, 1)), k, j, i) / hx[1] * conn[1] +
+          vprim(b, gas::prim::velocity(VI(n, 2)), k, j, i) / hx[2] * conn[2];
 
-      const Real src_xm = vprim(b, gas::prim::velocity(VI(n, 0)), k, j, i - 1) /
-                              hx_xm[0] * coords_xm.dh1dx1() +
-                          vprim(b, gas::prim::velocity(VI(n, 1)), k, j, i - 1) /
-                              hx_xm[1] * coords_xm.dh1dx2() +
-                          vprim(b, gas::prim::velocity(VI(n, 2)), k, j, i - 1) /
-                              hx_xm[2] * coords_xm.dh1dx3();
+      const Real src_xm =
+          vprim(b, gas::prim::velocity(VI(n, 0)), k, j, i - 1) / hx_xm[0] * conn_xm[0] +
+          vprim(b, gas::prim::velocity(VI(n, 1)), k, j, i - 1) / hx_xm[1] * conn_xm[1] +
+          vprim(b, gas::prim::velocity(VI(n, 2)), k, j, i - 1) / hx_xm[2] * conn_xm[2];
 
       flx(0, i) = 2 * dv1 / dx1 + 0.5 * (src + src_xm);
 
@@ -192,42 +249,94 @@ StrainTensorFace(parthenon::team_mbr_t const &member, const geometry::CoordParam
       // need ym
       //      xm , xp, xpym, xmym
       //      zm , zp, ymzm, ymzp
+      const std::array<Real, 3> xv_xm{
+          vg(b, geom::x1v(), coords.template index<geom::x1v>(k, j, i - 1)),
+          vg(b, geom::x2v(), coords.template index<geom::x2v>(k, j, i - 1)),
+          vg(b, geom::x3v(), coords.template index<geom::x3v>(k, j, i - 1))};
+      const std::array<Real, 3> xv_xp{
+          vg(b, geom::x1v(), coords.template index<geom::x1v>(k, j, i + 1)),
+          vg(b, geom::x2v(), coords.template index<geom::x2v>(k, j, i + 1)),
+          vg(b, geom::x3v(), coords.template index<geom::x3v>(k, j, i + 1))};
+      const std::array<Real, 3> xv_xmym{
+          vg(b, geom::x1v(), coords.template index<geom::x1v>(k, j - 1, i - 1)),
+          vg(b, geom::x2v(), coords.template index<geom::x2v>(k, j - 1, i - 1)),
+          vg(b, geom::x3v(), coords.template index<geom::x3v>(k, j - 1, i - 1))};
+      const std::array<Real, 3> xv_xpym{
+          vg(b, geom::x1v(), coords.template index<geom::x1v>(k, j - 1, i + 1)),
+          vg(b, geom::x2v(), coords.template index<geom::x2v>(k, j - 1, i + 1)),
+          vg(b, geom::x3v(), coords.template index<geom::x3v>(k, j - 1, i + 1))};
 
-      geometry::Coords<GEOM> coords_xp(cpars, pco, k, j, i + 1);
-      geometry::Coords<GEOM> coords_xm(cpars, pco, k, j, i - 1);
-      geometry::Coords<GEOM> coords_xpym(cpars, pco, k, j - 1, i + 1);
-      geometry::Coords<GEOM> coords_xmym(cpars, pco, k, j - 1, i - 1);
+      const std::array<Real, 3> xv_ym{
+          vg(b, geom::x1v(), coords.template index<geom::x1v>(k, j - 1, i)),
+          vg(b, geom::x2v(), coords.template index<geom::x2v>(k, j - 1, i)),
+          vg(b, geom::x3v(), coords.template index<geom::x3v>(k, j - 1, i))};
 
-      geometry::Coords<GEOM> coords_ym(cpars, pco, k, j - 1, i);
+      const std::array<Real, 3> xv_zm{
+          vg(b, geom::x1v(), coords.template index<geom::x1v>(k - three_d, j, i)),
+          vg(b, geom::x2v(), coords.template index<geom::x2v>(k - three_d, j, i)),
+          vg(b, geom::x3v(), coords.template index<geom::x3v>(k - three_d, j, i))};
+      const std::array<Real, 3> xv_zp{
+          vg(b, geom::x1v(), coords.template index<geom::x1v>(k + three_d, j, i)),
+          vg(b, geom::x2v(), coords.template index<geom::x2v>(k + three_d, j, i)),
+          vg(b, geom::x3v(), coords.template index<geom::x3v>(k + three_d, j, i))};
+      const std::array<Real, 3> xv_ymzm{
+          vg(b, geom::x1v(), coords.template index<geom::x1v>(k - three_d, j - 1, i)),
+          vg(b, geom::x2v(), coords.template index<geom::x2v>(k - three_d, j - 1, i)),
+          vg(b, geom::x3v(), coords.template index<geom::x3v>(k - three_d, j - 1, i))};
+      const std::array<Real, 3> xv_ymzp{
+          vg(b, geom::x1v(), coords.template index<geom::x1v>(k + three_d, j - 1, i)),
+          vg(b, geom::x2v(), coords.template index<geom::x2v>(k + three_d, j - 1, i)),
+          vg(b, geom::x3v(), coords.template index<geom::x3v>(k + three_d, j - 1, i))};
 
-      geometry::Coords<GEOM> coords_zp(cpars, pco, k + three_d, j, i);
-      geometry::Coords<GEOM> coords_zm(cpars, pco, k - three_d, j, i);
-      geometry::Coords<GEOM> coords_ymzp(cpars, pco, k + three_d, j - 1, i);
-      geometry::Coords<GEOM> coords_ymzm(cpars, pco, k - three_d, j - 1, i);
+      // Scale factors
+      const std::array<Real, 3> hx_xm{
+          vg(b, geom::hx1v(), coords.template index<geom::hx1v>(k, j, i - 1)),
+          vg(b, geom::hx2v(), coords.template index<geom::hx2v>(k, j, i - 1)),
+          vg(b, geom::hx3v(), coords.template index<geom::hx3v>(k, j, i - 1))};
+      const std::array<Real, 3> hx_xp{
+          vg(b, geom::hx1v(), coords.template index<geom::hx1v>(k, j, i + 1)),
+          vg(b, geom::hx2v(), coords.template index<geom::hx2v>(k, j, i + 1)),
+          vg(b, geom::hx3v(), coords.template index<geom::hx3v>(k, j, i + 1))};
+      const std::array<Real, 3> hx_xmym{
+          vg(b, geom::hx1v(), coords.template index<geom::hx1v>(k, j - 1, i - 1)),
+          vg(b, geom::hx2v(), coords.template index<geom::hx2v>(k, j - 1, i - 1)),
+          vg(b, geom::hx3v(), coords.template index<geom::hx3v>(k, j - 1, i - 1))};
+      const std::array<Real, 3> hx_xpym{
+          vg(b, geom::hx1v(), coords.template index<geom::hx1v>(k, j - 1, i + 1)),
+          vg(b, geom::hx2v(), coords.template index<geom::hx2v>(k, j - 1, i + 1)),
+          vg(b, geom::hx3v(), coords.template index<geom::hx3v>(k, j - 1, i + 1))};
 
-      const auto &xv_xm = coords_xm.GetCellCenter();
-      const auto &xv_xp = coords_xp.GetCellCenter();
-      const auto &xv_xmym = coords_xmym.GetCellCenter();
-      const auto &xv_xpym = coords_xpym.GetCellCenter();
+      const std::array<Real, 3> hx_ym{
+          vg(b, geom::hx1v(), coords.template index<geom::hx1v>(k, j - 1, i)),
+          vg(b, geom::hx2v(), coords.template index<geom::hx2v>(k, j - 1, i)),
+          vg(b, geom::hx3v(), coords.template index<geom::hx3v>(k, j - 1, i))};
 
-      const auto &xv_ym = coords_ym.GetCellCenter();
+      const std::array<Real, 3> hx_zm{
+          vg(b, geom::hx1v(), coords.template index<geom::hx1v>(k - three_d, j, i)),
+          vg(b, geom::hx2v(), coords.template index<geom::hx2v>(k - three_d, j, i)),
+          vg(b, geom::hx3v(), coords.template index<geom::hx3v>(k - three_d, j, i))};
+      const std::array<Real, 3> hx_zp{
+          vg(b, geom::hx1v(), coords.template index<geom::hx1v>(k + three_d, j, i)),
+          vg(b, geom::hx2v(), coords.template index<geom::hx2v>(k + three_d, j, i)),
+          vg(b, geom::hx3v(), coords.template index<geom::hx3v>(k + three_d, j, i))};
+      const std::array<Real, 3> hx_ymzm{
+          vg(b, geom::hx1v(), coords.template index<geom::hx1v>(k - three_d, j - 1, i)),
+          vg(b, geom::hx2v(), coords.template index<geom::hx2v>(k - three_d, j - 1, i)),
+          vg(b, geom::hx3v(), coords.template index<geom::hx3v>(k - three_d, j - 1, i))};
+      const std::array<Real, 3> hx_ymzp{
+          vg(b, geom::hx1v(), coords.template index<geom::hx1v>(k + three_d, j - 1, i)),
+          vg(b, geom::hx2v(), coords.template index<geom::hx2v>(k + three_d, j - 1, i)),
+          vg(b, geom::hx3v(), coords.template index<geom::hx3v>(k + three_d, j - 1, i))};
 
-      const auto &xv_zm = coords_zm.GetCellCenter();
-      const auto &xv_zp = coords_zp.GetCellCenter();
-      const auto &xv_ymzm = coords_ymzm.GetCellCenter();
-      const auto &xv_ymzp = coords_ymzp.GetCellCenter();
-
-      const auto &hx_xm = coords_xm.GetScaleFactors();
-      const auto &hx_xp = coords_xp.GetScaleFactors();
-      const auto &hx_xmym = coords_xmym.GetScaleFactors();
-      const auto &hx_xpym = coords_xpym.GetScaleFactors();
-
-      const auto &hx_ym = coords_ym.GetScaleFactors();
-
-      const auto &hx_zm = coords_zm.GetScaleFactors();
-      const auto &hx_zp = coords_zp.GetScaleFactors();
-      const auto &hx_ymzm = coords_ymzm.GetScaleFactors();
-      const auto &hx_ymzp = coords_ymzp.GetScaleFactors();
+      // Connection coeffs
+      const std::array<Real, 3> conn{
+          vg(b, geom::dh2dx1(), coords.template index<geom::dh2dx1>(k, j, i)),
+          vg(b, geom::dh2dx2(), coords.template index<geom::dh2dx2>(k, j, i)),
+          vg(b, geom::dh2dx3(), coords.template index<geom::dh2dx3>(k, j, i))};
+      const std::array<Real, 3> conn_ym{
+          vg(b, geom::dh2dx1(), coords.template index<geom::dh2dx1>(k, j - 1, i)),
+          vg(b, geom::dh2dx2(), coords.template index<geom::dh2dx2>(k, j - 1, i)),
+          vg(b, geom::dh2dx3(), coords.template index<geom::dh2dx3>(k, j - 1, i))};
 
       const Real dx1 = xv_xp[0] - xv_xm[0];
       const Real dx1_ym = xv_xpym[0] - xv_xmym[0];
@@ -256,16 +365,14 @@ StrainTensorFace(parthenon::team_mbr_t const &member, const geometry::CoordParam
           v[1] - vprim(b, gas::prim::velocity(VI(n, 1)), k, j - 1, i) / hx_ym[1];
 
       const Real src =
-          vprim(b, gas::prim::velocity(VI(n, 0)), k, j, i) / hx[0] * coords.dh2dx1() +
-          vprim(b, gas::prim::velocity(VI(n, 1)), k, j, i) / hx[1] * coords.dh2dx2() +
-          vprim(b, gas::prim::velocity(VI(n, 2)), k, j, i) / hx[2] * coords.dh2dx3();
+          vprim(b, gas::prim::velocity(VI(n, 0)), k, j, i) / hx[0] * conn[0] +
+          vprim(b, gas::prim::velocity(VI(n, 1)), k, j, i) / hx[1] * conn[1] +
+          vprim(b, gas::prim::velocity(VI(n, 2)), k, j, i) / hx[2] * conn[2];
 
-      const Real src_ym = vprim(b, gas::prim::velocity(VI(n, 0)), k, j - 1, i) /
-                              hx_ym[0] * coords_ym.dh2dx1() +
-                          vprim(b, gas::prim::velocity(VI(n, 1)), k, j - 1, i) /
-                              hx_ym[1] * coords_ym.dh2dx2() +
-                          vprim(b, gas::prim::velocity(VI(n, 2)), k, j - 1, i) /
-                              hx_ym[2] * coords_ym.dh2dx3();
+      const Real src_ym =
+          vprim(b, gas::prim::velocity(VI(n, 0)), k, j - 1, i) / hx_ym[0] * conn_ym[0] +
+          vprim(b, gas::prim::velocity(VI(n, 1)), k, j - 1, i) / hx_ym[1] * conn_ym[1] +
+          vprim(b, gas::prim::velocity(VI(n, 2)), k, j - 1, i) / hx_ym[2] * conn_ym[2];
 
       flx(1, i) = 2 * dv2 / dx2 + 0.5 * (src + src_ym);
 
@@ -288,41 +395,95 @@ StrainTensorFace(parthenon::team_mbr_t const &member, const geometry::CoordParam
     } else if constexpr (XDIR == X3DIR) {
       // T_*^3  flx = { T_1^3 , T_2^3 , T_3^3 }
 
-      geometry::Coords<GEOM> coords_xp(cpars, pco, k, j, i + 1);
-      geometry::Coords<GEOM> coords_xm(cpars, pco, k, j, i - 1);
-      geometry::Coords<GEOM> coords_xpzm(cpars, pco, k - 1, j, i + 1);
-      geometry::Coords<GEOM> coords_xmzm(cpars, pco, k - 1, j, i - 1);
+      const std::array<Real, 3> xv_xm{
+          vg(b, geom::x1v(), coords.template index<geom::x1v>(k, j, i - 1)),
+          vg(b, geom::x2v(), coords.template index<geom::x2v>(k, j, i - 1)),
+          vg(b, geom::x3v(), coords.template index<geom::x3v>(k, j, i - 1))};
+      const std::array<Real, 3> xv_xp{
+          vg(b, geom::x1v(), coords.template index<geom::x1v>(k, j, i - 1)),
+          vg(b, geom::x2v(), coords.template index<geom::x2v>(k, j, i - 1)),
+          vg(b, geom::x3v(), coords.template index<geom::x3v>(k, j, i - 1))};
+      const std::array<Real, 3> xv_xmzm{
+          vg(b, geom::x1v(), coords.template index<geom::x1v>(k - 1, j, i - 1)),
+          vg(b, geom::x2v(), coords.template index<geom::x2v>(k - 1, j, i - 1)),
+          vg(b, geom::x3v(), coords.template index<geom::x3v>(k - 1, j, i - 1))};
+      const std::array<Real, 3> xv_xpzm{
+          vg(b, geom::x1v(), coords.template index<geom::x1v>(k - 1, j, i - 1)),
+          vg(b, geom::x2v(), coords.template index<geom::x2v>(k - 1, j, i - 1)),
+          vg(b, geom::x3v(), coords.template index<geom::x3v>(k - 1, j, i - 1))};
 
-      geometry::Coords<GEOM> coords_yp(cpars, pco, k, j + 1, i);
-      geometry::Coords<GEOM> coords_ym(cpars, pco, k, j - 1, i);
-      geometry::Coords<GEOM> coords_ypzm(cpars, pco, k - 1, j + 1, i);
-      geometry::Coords<GEOM> coords_ymzm(cpars, pco, k - 1, j - 1, i);
+      const std::array<Real, 3> xv_ym{
+          vg(b, geom::x1v(), coords.template index<geom::x1v>(k, j - 1, i)),
+          vg(b, geom::x2v(), coords.template index<geom::x2v>(k, j - 1, i)),
+          vg(b, geom::x3v(), coords.template index<geom::x3v>(k, j - 1, i))};
+      const std::array<Real, 3> xv_yp{
+          vg(b, geom::x1v(), coords.template index<geom::x1v>(k, j + 1, i)),
+          vg(b, geom::x2v(), coords.template index<geom::x2v>(k, j + 1, i)),
+          vg(b, geom::x3v(), coords.template index<geom::x3v>(k, j + 1, i))};
+      const std::array<Real, 3> xv_ymzm{
+          vg(b, geom::x1v(), coords.template index<geom::x1v>(k - 1, j - 1, i)),
+          vg(b, geom::x2v(), coords.template index<geom::x2v>(k - 1, j - 1, i)),
+          vg(b, geom::x3v(), coords.template index<geom::x3v>(k - 1, j - 1, i))};
+      const std::array<Real, 3> xv_ypzm{
+          vg(b, geom::x1v(), coords.template index<geom::x1v>(k - 1, j + 1, i)),
+          vg(b, geom::x2v(), coords.template index<geom::x2v>(k - 1, j + 1, i)),
+          vg(b, geom::x3v(), coords.template index<geom::x3v>(k - 1, j + 1, i))};
 
-      geometry::Coords<GEOM> coords_zm(cpars, pco, k - 1, j, i);
+      const std::array<Real, 3> xv_zm{
+          vg(b, geom::x1v(), coords.template index<geom::x1v>(k - 1, j, i)),
+          vg(b, geom::x2v(), coords.template index<geom::x2v>(k - 1, j, i)),
+          vg(b, geom::x3v(), coords.template index<geom::x3v>(k - 1, j, i))};
 
-      const auto &xv_xm = coords_xm.GetCellCenter();
-      const auto &xv_xp = coords_xp.GetCellCenter();
-      const auto &xv_xmzm = coords_xmzm.GetCellCenter();
-      const auto &xv_xpzm = coords_xpzm.GetCellCenter();
+      // Scale factors
 
-      const auto &xv_ym = coords_ym.GetCellCenter();
-      const auto &xv_yp = coords_yp.GetCellCenter();
-      const auto &xv_ymzm = coords_ymzm.GetCellCenter();
-      const auto &xv_ypzm = coords_ypzm.GetCellCenter();
+      const std::array<Real, 3> hx_xm{
+          vg(b, geom::hx1v(), coords.template index<geom::hx1v>(k, j, i - 1)),
+          vg(b, geom::hx2v(), coords.template index<geom::hx2v>(k, j, i - 1)),
+          vg(b, geom::hx3v(), coords.template index<geom::hx3v>(k, j, i - 1))};
+      const std::array<Real, 3> hx_xp{
+          vg(b, geom::hx1v(), coords.template index<geom::hx1v>(k, j, i - 1)),
+          vg(b, geom::hx2v(), coords.template index<geom::hx2v>(k, j, i - 1)),
+          vg(b, geom::hx3v(), coords.template index<geom::hx3v>(k, j, i - 1))};
+      const std::array<Real, 3> hx_xmzm{
+          vg(b, geom::hx1v(), coords.template index<geom::hx1v>(k - 1, j, i - 1)),
+          vg(b, geom::hx2v(), coords.template index<geom::hx2v>(k - 1, j, i - 1)),
+          vg(b, geom::hx3v(), coords.template index<geom::hx3v>(k - 1, j, i - 1))};
+      const std::array<Real, 3> hx_xpzm{
+          vg(b, geom::hx1v(), coords.template index<geom::hx1v>(k - 1, j, i - 1)),
+          vg(b, geom::hx2v(), coords.template index<geom::hx2v>(k - 1, j, i - 1)),
+          vg(b, geom::hx3v(), coords.template index<geom::hx3v>(k - 1, j, i - 1))};
 
-      const auto &xv_zm = coords_zm.GetCellCenter();
+      const std::array<Real, 3> hx_ym{
+          vg(b, geom::hx1v(), coords.template index<geom::hx1v>(k, j - 1, i)),
+          vg(b, geom::hx2v(), coords.template index<geom::hx2v>(k, j - 1, i)),
+          vg(b, geom::hx3v(), coords.template index<geom::hx3v>(k, j - 1, i))};
+      const std::array<Real, 3> hx_yp{
+          vg(b, geom::hx1v(), coords.template index<geom::hx1v>(k, j + 1, i)),
+          vg(b, geom::hx2v(), coords.template index<geom::hx2v>(k, j + 1, i)),
+          vg(b, geom::hx3v(), coords.template index<geom::hx3v>(k, j + 1, i))};
+      const std::array<Real, 3> hx_ymzm{
+          vg(b, geom::hx1v(), coords.template index<geom::hx1v>(k - 1, j - 1, i)),
+          vg(b, geom::hx2v(), coords.template index<geom::hx2v>(k - 1, j - 1, i)),
+          vg(b, geom::hx3v(), coords.template index<geom::hx3v>(k - 1, j - 1, i))};
+      const std::array<Real, 3> hx_ypzm{
+          vg(b, geom::hx1v(), coords.template index<geom::hx1v>(k - 1, j + 1, i)),
+          vg(b, geom::hx2v(), coords.template index<geom::hx2v>(k - 1, j + 1, i)),
+          vg(b, geom::hx3v(), coords.template index<geom::hx3v>(k - 1, j + 1, i))};
 
-      const auto &hx_xm = coords_xm.GetScaleFactors();
-      const auto &hx_xp = coords_xp.GetScaleFactors();
-      const auto &hx_xmzm = coords_xmzm.GetScaleFactors();
-      const auto &hx_xpzm = coords_xpzm.GetScaleFactors();
+      const std::array<Real, 3> hx_zm{
+          vg(b, geom::hx1v(), coords.template index<geom::hx1v>(k - 1, j, i)),
+          vg(b, geom::hx2v(), coords.template index<geom::hx2v>(k - 1, j, i)),
+          vg(b, geom::hx3v(), coords.template index<geom::hx3v>(k - 1, j, i))};
 
-      const auto &hx_ym = coords_ym.GetScaleFactors();
-      const auto &hx_yp = coords_yp.GetScaleFactors();
-      const auto &hx_ymzm = coords_ymzm.GetScaleFactors();
-      const auto &hx_ypzm = coords_ypzm.GetScaleFactors();
-
-      const auto &hx_zm = coords_zm.GetScaleFactors();
+      // Connection coeffs
+      const std::array<Real, 3> conn{
+          vg(b, geom::dh3dx1(), coords.template index<geom::dh3dx1>(k, j, i)),
+          vg(b, geom::dh3dx2(), coords.template index<geom::dh3dx2>(k, j, i)),
+          vg(b, geom::dh3dx3(), coords.template index<geom::dh3dx3>(k, j, i))};
+      const std::array<Real, 3> conn_zm{
+          vg(b, geom::dh3dx1(), coords.template index<geom::dh3dx1>(k - 1, j, i)),
+          vg(b, geom::dh3dx2(), coords.template index<geom::dh3dx2>(k - 1, j, i)),
+          vg(b, geom::dh3dx3(), coords.template index<geom::dh3dx3>(k - 1, j, i))};
 
       const Real dx1 = xv_xp[0] - xv_xm[0];
       const Real dx1_zm = xv_xpzm[0] - xv_xmzm[0];
@@ -365,16 +526,14 @@ StrainTensorFace(parthenon::team_mbr_t const &member, const geometry::CoordParam
           v[2] - vprim(b, gas::prim::velocity(VI(n, 2)), k - 1, j, i) / hx_zm[2];
 
       const Real src =
-          vprim(b, gas::prim::velocity(VI(n, 0)), k, j, i) / hx[0] * coords.dh3dx1() +
-          vprim(b, gas::prim::velocity(VI(n, 1)), k, j, i) / hx[1] * coords.dh3dx2() +
-          vprim(b, gas::prim::velocity(VI(n, 2)), k, j, i) / hx[2] * coords.dh3dx3();
+          vprim(b, gas::prim::velocity(VI(n, 0)), k, j, i) / hx[0] * conn[0] +
+          vprim(b, gas::prim::velocity(VI(n, 1)), k, j, i) / hx[1] * conn[1] +
+          vprim(b, gas::prim::velocity(VI(n, 2)), k, j, i) / hx[2] * conn[2];
 
-      const Real src_zm = vprim(b, gas::prim::velocity(VI(n, 0)), k - 1, j, i) /
-                              hx_zm[0] * coords_zm.dh3dx1() +
-                          vprim(b, gas::prim::velocity(VI(n, 1)), k - 1, j, i) /
-                              hx_zm[1] * coords_zm.dh3dx2() +
-                          vprim(b, gas::prim::velocity(VI(n, 2)), k - 1, j, i) /
-                              hx_zm[2] * coords_zm.dh3dx3();
+      const Real src_zm =
+          vprim(b, gas::prim::velocity(VI(n, 0)), k - 1, j, i) / hx_zm[0] * conn_zm[0] +
+          vprim(b, gas::prim::velocity(VI(n, 1)), k - 1, j, i) / hx_zm[1] * conn_zm[1] +
+          vprim(b, gas::prim::velocity(VI(n, 2)), k - 1, j, i) / hx_zm[2] * conn_zm[2];
 
       flx(2, i) = 2 * dv3 / dx3 + 0.5 * (src + src_zm);
     }
@@ -392,14 +551,14 @@ StrainTensorFace(parthenon::team_mbr_t const &member, const geometry::CoordParam
 //! \fn void StressTensorFaceX1
 //! \brief Stress Ttensor X1-Face
 template <Coordinates GEOM, Fluid FLUID_TYPE, typename SparsePackPrim,
-          typename SparsePackFlux>
+          typename SparsePackFlux, typename SparsePackGeom>
 KOKKOS_INLINE_FUNCTION void StressTensorFaceX1(
     DiffCoeffParams dp, parthenon::team_mbr_t const &member,
     const geometry::CoordParams &cpars, const int b, const int n, const int k,
     const int j, const int il, const int iu, const int multi_d, const int three_d,
     const int nspecies, const SparsePackPrim &p, const SparsePackFlux &qf,
-    const parthenon::ScratchPad1D<Real> &divu, const parthenon::ScratchPad1D<Real> &mu,
-    const parthenon::ScratchPad2D<Real> &flx) {
+    const SparsePackGeom &vg, const parthenon::ScratchPad1D<Real> &divu,
+    const parthenon::ScratchPad1D<Real> &mu, const parthenon::ScratchPad2D<Real> &flx) {
   // Fill the flx array with the stress tensor on the specified face
 
   PARTHENON_DEBUG_REQUIRE(FLUID_TYPE == Fluid::gas,
@@ -410,9 +569,14 @@ KOKKOS_INLINE_FUNCTION void StressTensorFaceX1(
   parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, member, il, iu, [&](const int i) {
     //  T_j^i = dv^i/dxj + hj^2/hi^2 dv^j/dxi  + v^k dhi/dxk / hi \delta_j^i
     geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
-    geometry::Coords<GEOM> coords_xm(cpars, pco, k, j, i - 1);
-    const auto &hx = coords.GetScaleFactors();
-    const auto &hx_xm = coords_xm.GetScaleFactors();
+    const std::array<Real, 3> hx{
+        vg(b, geom::hx1v(), coords.template index<geom::hx1v>(k, j, i)),
+        vg(b, geom::hx2v(), coords.template index<geom::hx2v>(k, j, i)),
+        vg(b, geom::hx3v(), coords.template index<geom::hx3v>(k, j, i))};
+    const std::array<Real, 3> hx_xm{
+        vg(b, geom::hx1v(), coords.template index<geom::hx1v>(k, j, i - 1)),
+        vg(b, geom::hx2v(), coords.template index<geom::hx2v>(k, j, i - 1)),
+        vg(b, geom::hx3v(), coords.template index<geom::hx3v>(k, j, i - 1))};
 
     const auto &xf = coords.FaceCenX1(geometry::CellFace::lower);
     const Real hx1f = coords.hx1(xf[0], xf[1], xf[2]);
@@ -453,13 +617,13 @@ KOKKOS_INLINE_FUNCTION void StressTensorFaceX1(
 //! \fn void StressTensorFaceX2
 //! \brief Stress Ttensor X2-Face
 template <Coordinates GEOM, Fluid FLUID_TYPE, typename SparsePackPrim,
-          typename SparsePackFlux>
+          typename SparsePackFlux, typename SparsePackGeom>
 KOKKOS_INLINE_FUNCTION void StressTensorFaceX2(
     DiffCoeffParams dp, parthenon::team_mbr_t const &member,
     const geometry::CoordParams &cpars, const int b, const int n, const int k,
     const int j, const int il, const int iu, const int multi_d, const int three_d,
     const int nspecies, const SparsePackPrim &p, const SparsePackFlux &qf,
-    const parthenon::ScratchPad1D<Real> &divu_jm1,
+    const SparsePackGeom &vg, const parthenon::ScratchPad1D<Real> &divu_jm1,
     const parthenon::ScratchPad1D<Real> &divu,
     const parthenon::ScratchPad1D<Real> &mu_jm1, const parthenon::ScratchPad1D<Real> &mu,
     const parthenon::ScratchPad2D<Real> &flx) {
@@ -472,9 +636,14 @@ KOKKOS_INLINE_FUNCTION void StressTensorFaceX2(
   const bool havg = dp.avg == DiffAvg::harmonic;
   parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, member, il, iu, [&](const int i) {
     geometry::Coords<GEOM> coords(cpars, p.GetCoordinates(b), k, j, i);
-    geometry::Coords<GEOM> coords_ym(cpars, p.GetCoordinates(b), k, j - 1, i);
-    const auto &hx = coords.GetScaleFactors();
-    const auto &hx_ym = coords_ym.GetScaleFactors();
+    const std::array<Real, 3> hx{
+        vg(b, geom::hx1v(), coords.template index<geom::hx1v>(k, j, i)),
+        vg(b, geom::hx2v(), coords.template index<geom::hx2v>(k, j, i)),
+        vg(b, geom::hx3v(), coords.template index<geom::hx3v>(k, j, i))};
+    const std::array<Real, 3> hx_ym{
+        vg(b, geom::hx1v(), coords.template index<geom::hx1v>(k, j - 1, i)),
+        vg(b, geom::hx2v(), coords.template index<geom::hx2v>(k, j - 1, i)),
+        vg(b, geom::hx3v(), coords.template index<geom::hx3v>(k, j - 1, i))};
 
     const auto &xf = coords.FaceCenX2(geometry::CellFace::lower);
     const Real hx2f = coords.hx2(xf[0], xf[1], xf[2]);
@@ -516,13 +685,13 @@ KOKKOS_INLINE_FUNCTION void StressTensorFaceX2(
 //! \fn void StressTensorFaceX3
 //! \brief Stress Ttensor X3-Face
 template <Coordinates GEOM, Fluid FLUID_TYPE, typename SparsePackPrim,
-          typename SparsePackFlux>
+          typename SparsePackFlux, typename SparsePackGeom>
 KOKKOS_INLINE_FUNCTION void StressTensorFaceX3(
     DiffCoeffParams dp, parthenon::team_mbr_t const &member,
     const geometry::CoordParams &cpars, const int b, const int n, const int k,
     const int j, const int il, const int iu, const int multi_d, const int three_d,
     const int nspecies, const SparsePackPrim &p, const SparsePackFlux &qf,
-    const parthenon::ScratchPad1D<Real> &divu_km1,
+    const SparsePackGeom &vg, const parthenon::ScratchPad1D<Real> &divu_km1,
     const parthenon::ScratchPad1D<Real> &divu,
     const parthenon::ScratchPad1D<Real> &mu_km1, const parthenon::ScratchPad1D<Real> &mu,
     const parthenon::ScratchPad2D<Real> &flx) {
@@ -535,9 +704,14 @@ KOKKOS_INLINE_FUNCTION void StressTensorFaceX3(
   const bool havg = dp.avg == DiffAvg::harmonic;
   parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, member, il, iu, [&](const int i) {
     geometry::Coords<GEOM> coords(cpars, p.GetCoordinates(b), k, j, i);
-    geometry::Coords<GEOM> coords_zm(cpars, p.GetCoordinates(b), k - 1, j, i);
-    const auto &hx = coords.GetScaleFactors();
-    const auto &hx_zm = coords_zm.GetScaleFactors();
+    const std::array<Real, 3> hx{
+        vg(b, geom::hx1v(), coords.template index<geom::hx1v>(k, j, i)),
+        vg(b, geom::hx2v(), coords.template index<geom::hx2v>(k, j, i)),
+        vg(b, geom::hx3v(), coords.template index<geom::hx3v>(k, j, i))};
+    const std::array<Real, 3> hx_zm{
+        vg(b, geom::hx1v(), coords.template index<geom::hx1v>(k - 1, j, i)),
+        vg(b, geom::hx2v(), coords.template index<geom::hx2v>(k - 1, j, i)),
+        vg(b, geom::hx3v(), coords.template index<geom::hx3v>(k - 1, j, i))};
 
     const auto &xf = coords.FaceCenX3(geometry::CellFace::lower);
     const Real hx3f = coords.hx3(xf[0], xf[1], xf[2]);
@@ -578,13 +752,14 @@ KOKKOS_INLINE_FUNCTION void StressTensorFaceX3(
 //----------------------------------------------------------------------------------------
 //! \fn void VelocityDivergence
 //! \brief Computes velocity divergence
-template <Coordinates GEOM, Fluid FLUID_TYPE, typename SparsePackPrim>
+template <Coordinates GEOM, Fluid FLUID_TYPE, typename SparsePackPrim,
+          typename SparsePackGeom>
 KOKKOS_INLINE_FUNCTION void
 VelocityDivergence(parthenon::team_mbr_t const &member,
                    const geometry::CoordParams &cpars, const int b, const int n,
                    const int k, const int j, const int il, const int iu,
                    const int multi_d, const int three_d, const SparsePackPrim &q,
-                   const parthenon::ScratchPad1D<Real> &divu) {
+                   const SparsePackGeom &vg, const parthenon::ScratchPad1D<Real> &divu) {
   // Fill the flx array with the stress tensor on the specified face
 
   PARTHENON_DEBUG_REQUIRE(FLUID_TYPE == Fluid::gas,
@@ -593,10 +768,16 @@ VelocityDivergence(parthenon::team_mbr_t const &member,
   parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, member, il, iu, [&](const int i) {
     geometry::Coords<GEOM> coords(cpars, q.GetCoordinates(b), k, j, i);
 
-    const Real vol = coords.Volume();
-    const auto area_x1 = coords.GetFaceAreaX1();
-    const auto area_x2 = (multi_d) ? coords.GetFaceAreaX2() : NewArray<Real, 2>(0.0);
-    const auto area_x3 = (three_d) ? coords.GetFaceAreaX3() : NewArray<Real, 2>(0.0);
+    const Real vol = vg(b, geom::vol(), coords.template index<geom::vol>(k, j, i));
+    const std::array<Real, 2> area_x1{
+        vg(b, geom::ax1(), coords.template index<geom::ax1>(k, j, i)),
+        vg(b, geom::ax1(), coords.template index<geom::ax1>(k, j, i + 1))};
+    const std::array<Real, 2> area_x2{
+        vg(b, geom::ax2(), coords.template index<geom::ax2>(k, j, i)),
+        vg(b, geom::ax2(), coords.template index<geom::ax2>(k, j + multi_d, i))};
+    const std::array<Real, 2> area_x3{
+        vg(b, geom::ax3(), coords.template index<geom::ax3>(k, j, i)),
+        vg(b, geom::ax3(), coords.template index<geom::ax3>(k + three_d, j, i))};
 
     const Real divv = area_x1[1] * (q(b, gas::prim::velocity(3 * n + 0), k, j, i) +
                                     q(b, gas::prim::velocity(3 * n + 0), k, j, i + 1)) -
@@ -644,6 +825,13 @@ TaskStatus MomentumFluxImpl(MeshData<Real> *md, DiffCoeffParams dp, PKG &pkg,
 
   const int scr_level = pkg->template Param<int>("scr_level");
 
+  static auto desc_g = MakePackDescriptor<
+      geom::x1v, geom::x2v, geom::x3v, geom::hx1v, geom::hx2v, geom::hx3v, geom::vol,
+      geom::ax1, geom::ax2, geom::ax3, geom::dh1dx1, geom::dh2dx1, geom::dh3dx1,
+      geom::dh1dx2, geom::dh2dx2, geom::dh3dx2, geom::dh1dx3, geom::dh2dx3, geom::dh3dx3>(
+      (pm->resolved_packages).get());
+  auto vg = desc_g.GetPack(md);
+
   const auto ib = md->GetBoundsI(IndexDomain::interior);
   const auto jb = md->GetBoundsJ(IndexDomain::interior);
   const auto kb = md->GetBoundsK(IndexDomain::interior);
@@ -670,12 +858,13 @@ TaskStatus MomentumFluxImpl(MeshData<Real> *md, DiffCoeffParams dp, PKG &pkg,
         for (int n = 0; n < nspecies; n++) {
 
           // 1. Compute the strain tensor at i-1/2
-          StrainTensorFace<GEOM, FLUID_TYPE, X1DIR>(
-              mbr, cpars, b, n, k, j, il, iu, multi_d, three_d, qshear, om0, vprim, flx);
+          StrainTensorFace<GEOM, FLUID_TYPE, X1DIR>(mbr, cpars, b, n, k, j, il, iu,
+                                                    multi_d, three_d, qshear, om0, vprim,
+                                                    vg, flx);
 
           // 2. Compute div(u) on this pencil
           VelocityDivergence<GEOM, FLUID_TYPE>(mbr, cpars, b, n, k, j, il - 1, iu,
-                                               multi_d, three_d, vprim, divu);
+                                               multi_d, three_d, vprim, vg, divu);
           // 3. Viscosity values. No barrier
           DiffusionCoeff<DIFF, GEOM, FLUID_TYPE> diffcoeff;
           diffcoeff.evaluate(dp, mbr, b, n, k, j, il - 1, iu, vprim, eos_d, mu);
@@ -684,7 +873,7 @@ TaskStatus MomentumFluxImpl(MeshData<Real> *md, DiffCoeffParams dp, PKG &pkg,
 
           // 4. Fill the stress tensor from the strain tensor and viscosity
           StressTensorFaceX1<GEOM, FLUID_TYPE>(dp, mbr, cpars, b, n, k, j, il, iu,
-                                               multi_d, three_d, nspecies, vprim, vf,
+                                               multi_d, three_d, nspecies, vprim, vf, vg,
                                                divu, mu, flx);
         }
       });
@@ -723,10 +912,10 @@ TaskStatus MomentumFluxImpl(MeshData<Real> *md, DiffCoeffParams dp, PKG &pkg,
               // 1. Compute the momentum fluxes at j+1/2
               StrainTensorFace<GEOM, FLUID_TYPE, X2DIR>(mbr, cpars, b, n, k, j, il, iu,
                                                         multi_d, three_d, qshear, om0,
-                                                        vprim, flx);
+                                                        vprim, vg, flx);
               // 2. Compute div(u) on this pencil
               VelocityDivergence<GEOM, FLUID_TYPE>(mbr, cpars, b, n, k, j, il, iu,
-                                                   multi_d, three_d, vprim, divu_jm1);
+                                                   multi_d, three_d, vprim, vg, divu_jm1);
 
               // 2. Viscosity values. No barrier
               DiffusionCoeff<DIFF, GEOM, FLUID_TYPE> diffcoeff;
@@ -734,9 +923,9 @@ TaskStatus MomentumFluxImpl(MeshData<Real> *md, DiffCoeffParams dp, PKG &pkg,
 
               mbr.team_barrier();
               if (j > jl) {
-                StressTensorFaceX2<GEOM, FLUID_TYPE>(dp, mbr, cpars, b, n, k, j, il, iu,
-                                                     multi_d, three_d, nspecies, vprim,
-                                                     vf, divu_jm1, divu, mu_jm1, mu, flx);
+                StressTensorFaceX2<GEOM, FLUID_TYPE>(
+                    dp, mbr, cpars, b, n, k, j, il, iu, multi_d, three_d, nspecies, vprim,
+                    vf, vg, divu_jm1, divu, mu_jm1, mu, flx);
               }
             }
           }
@@ -777,10 +966,10 @@ TaskStatus MomentumFluxImpl(MeshData<Real> *md, DiffCoeffParams dp, PKG &pkg,
               // 1. Compute the momentum fluxes at k-1/2
               StrainTensorFace<GEOM, FLUID_TYPE, X3DIR>(mbr, cpars, b, n, k, j, il, iu,
                                                         multi_d, three_d, qshear, om0,
-                                                        vprim, flx);
+                                                        vprim, vg, flx);
               // 2. Compute div(u) on this pencil
               VelocityDivergence<GEOM, FLUID_TYPE>(mbr, cpars, b, n, k, j, il, iu,
-                                                   multi_d, three_d, vprim, divu_km1);
+                                                   multi_d, three_d, vprim, vg, divu_km1);
 
               // 2. Viscosity values. No barrier
               DiffusionCoeff<DIFF, GEOM, FLUID_TYPE> diffcoeff;
@@ -788,9 +977,9 @@ TaskStatus MomentumFluxImpl(MeshData<Real> *md, DiffCoeffParams dp, PKG &pkg,
 
               mbr.team_barrier();
               if (k > kl) {
-                StressTensorFaceX3<GEOM, FLUID_TYPE>(dp, mbr, cpars, b, n, k, j, il, iu,
-                                                     multi_d, three_d, nspecies, vprim,
-                                                     vf, divu_km1, divu, mu_km1, mu, flx);
+                StressTensorFaceX3<GEOM, FLUID_TYPE>(
+                    dp, mbr, cpars, b, n, k, j, il, iu, multi_d, three_d, nspecies, vprim,
+                    vf, vg, divu_km1, divu, mu_km1, mu, flx);
               }
             }
           }

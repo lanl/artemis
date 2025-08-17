@@ -37,10 +37,22 @@ void EnrollFields(StateDescriptor *pkg, CoordParams &cpars) {
   ADD_FIELD(geom::hx1v);
   ADD_FIELD(geom::hx2v);
   ADD_FIELD(geom::hx3v);
+  ADD_FIELD(geom::dx1);
+  ADD_FIELD(geom::dx2);
+  ADD_FIELD(geom::dx3);
   ADD_FIELD(geom::vol);
   ADD_FIELD(geom::ax1);
   ADD_FIELD(geom::ax2);
   ADD_FIELD(geom::ax3);
+  ADD_FIELD(geom::dh1dx1);
+  ADD_FIELD(geom::dh2dx1);
+  ADD_FIELD(geom::dh3dx1);
+  ADD_FIELD(geom::dh1dx2);
+  ADD_FIELD(geom::dh2dx2);
+  ADD_FIELD(geom::dh3dx2);
+  ADD_FIELD(geom::dh1dx3);
+  ADD_FIELD(geom::dh2dx3);
+  ADD_FIELD(geom::dh3dx3);
 }
 
 //----------------------------------------------------------------------------------------
@@ -102,6 +114,7 @@ void InitBlockGeom(MeshBlock *pmb, ParameterInput *pin) {
         vg(b, geom::x3v(), coords.template index<geom::x3v>(k, j, i)) = xv[2];
 
         const auto dx = coords.GetCellWidths();
+        const int idx = coords.template index<geom::dx1>(k, j, i);
         vg(b, geom::dx1(), coords.template index<geom::dx1>(k, j, i)) = dx[0];
         vg(b, geom::dx2(), coords.template index<geom::dx2>(k, j, i)) = dx[1];
         vg(b, geom::dx3(), coords.template index<geom::dx3>(k, j, i)) = dx[2];

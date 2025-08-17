@@ -104,7 +104,6 @@ struct CoordParams {
     sys = CoordSelect(pin->GetOrAddString("artemis", "coordinates", "cartesian"), ndim);
     dep = {x1dep(sys), x2dep(sys), x3dep(sys)};
   }
-  KOKKOS_INLINE_FUNCTION
   CoordParams() = default;
 
   bool log = false;

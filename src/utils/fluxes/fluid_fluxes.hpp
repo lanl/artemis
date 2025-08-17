@@ -402,6 +402,9 @@ TaskStatus FluxSourceImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, CONS vcons, FAC
           }
 
           // Apply "coordinate source terms" (if not Cartesian)
+          [[maybe_unused]] const auto x1dep_ = x1dep;
+          [[maybe_unused]] const auto x2dep_ = x2dep;
+          [[maybe_unused]] const auto x3dep_ = x3dep;
           if constexpr (G != Coordinates::cartesian) {
             // Extract primitive weighted timestep
             Real wdt = vp_(b, n, k, j, i) * dt;
@@ -421,9 +424,9 @@ TaskStatus FluxSourceImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, CONS vcons, FAC
             const Real t1 = SQR(vp_(b, IVX, k, j, i) + rfv[0]);
             const Real t2 = SQR(vp_(b, IVY, k, j, i) + rfv[1]);
             const Real t3 = SQR(vp_(b, IVZ, k, j, i) + rfv[2]);
-            vc_(b, IMX, k, j, i) += x1dep * wdt * (dh1[0]*t1 + dh1[1]*t2 + dh1[2]*t3);
-            vc_(b, IMY, k, j, i) += x2dep * wdt * (dh2[0]*t1 + dh2[1]*t2 + dh2[2]*t3);
-            vc_(b, IMZ, k, j, i) += x3dep * wdt * (dh3[0]*t1 + dh3[1]*t2 + dh3[2]*t3);
+            vc_(b, IMX, k, j, i) += x1dep_ * wdt * (dh1[0]*t1 + dh1[1]*t2 + dh1[2]*t3);
+            vc_(b, IMY, k, j, i) += x2dep_ * wdt * (dh2[0]*t1 + dh2[1]*t2 + dh2[2]*t3);
+            vc_(b, IMZ, k, j, i) += x3dep_ * wdt * (dh3[0]*t1 + dh3[1]*t2 + dh3[2]*t3);
             // clang-format on
           }
         }

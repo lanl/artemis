@@ -180,7 +180,8 @@ class DiffusionCoeff {
     PARTHENON_FAIL("No default implementation for diffusion coefficient");
   }
   KOKKOS_INLINE_FUNCTION Real Get(const DiffCoeffParams &dp,
-                                  geometry::Coords<GEOM> &coords, const Real dens,
+                                  geometry::Coords<GEOM> &coords,
+                                  const std::array<Real, 3> &xv, const Real dens,
                                   const Real sie, const EOS &eos) const {
     PARTHENON_FAIL("No default implementation for diffusion coefficient");
   }
@@ -204,7 +205,8 @@ class DiffusionCoeff<DiffType::null, GEOM, FLUID_TYPE> {
   }
 
   KOKKOS_INLINE_FUNCTION Real Get(const DiffCoeffParams &dp,
-                                  geometry::Coords<GEOM> &coords, const Real dens,
+                                  geometry::Coords<GEOM> &coords,
+                                  const std::array<Real, 3> &xv, const Real dens,
                                   const Real sie, const EOS &eos) const {
     return 0.0;
   }
@@ -244,7 +246,8 @@ class DiffusionCoeff<DiffType::viscosity_plaw, GEOM, FLUID_TYPE> {
   }
 
   KOKKOS_INLINE_FUNCTION Real Get(const DiffCoeffParams &dp,
-                                  geometry::Coords<GEOM> coords, const Real dens,
+                                  geometry::Coords<GEOM> coords,
+                                  const std::array<Real, 3> &xv, const Real dens,
                                   const Real sie, const EOS &eos) const {
     PARTHENON_DEBUG_REQUIRE(
         dp.type == DiffType::viscosity_plaw,
@@ -252,7 +255,6 @@ class DiffusionCoeff<DiffType::viscosity_plaw, GEOM, FLUID_TYPE> {
     PARTHENON_DEBUG_REQUIRE(FLUID_TYPE == Fluid::gas,
                             "Viscosity only works with the gas fluid");
 
-    const auto &xv = coords.GetCellCenter();
     const auto &xs = coords.ConvertToCyl(xv);
     return dp.nu_s * dens * std::pow(xs[0] / dp.R0, dp.r_exp);
   }
@@ -295,7 +297,8 @@ class DiffusionCoeff<DiffType::viscosity_alpha, GEOM, FLUID_TYPE> {
         });
   }
   KOKKOS_INLINE_FUNCTION Real Get(const DiffCoeffParams &dp,
-                                  geometry::Coords<GEOM> coords, const Real dens,
+                                  geometry::Coords<GEOM> coords,
+                                  const std::array<Real, 3> &xv, const Real dens,
                                   const Real sie, const EOS &eos) const {
     PARTHENON_DEBUG_REQUIRE(
         dp.type == DiffType::viscosity_alpha,
@@ -303,7 +306,6 @@ class DiffusionCoeff<DiffType::viscosity_alpha, GEOM, FLUID_TYPE> {
     PARTHENON_DEBUG_REQUIRE(FLUID_TYPE == Fluid::gas,
                             "Viscosity only works with the gas fluid");
 
-    const auto &xv = coords.GetCellCenter();
     const auto &xs = coords.ConvertToSph(xv);
     const Real Omk = dp.Omega0 * std::pow(xs[0] / dp.R0, -1.5);
 
@@ -345,7 +347,8 @@ class DiffusionCoeff<DiffType::conductivity_plaw, GEOM, FLUID_TYPE> {
         });
   }
   KOKKOS_INLINE_FUNCTION Real Get(const DiffCoeffParams &dp,
-                                  geometry::Coords<GEOM> coords, const Real dens,
+                                  geometry::Coords<GEOM> coords,
+                                  const std::array<Real, 3> &xv, const Real dens,
                                   const Real sie, const EOS &eos) const {
 
     PARTHENON_DEBUG_REQUIRE(
@@ -394,7 +397,8 @@ class DiffusionCoeff<DiffType::thermaldiff_plaw, GEOM, FLUID_TYPE> {
         });
   }
   KOKKOS_INLINE_FUNCTION Real Get(const DiffCoeffParams &dp,
-                                  geometry::Coords<GEOM> coords, const Real dens,
+                                  geometry::Coords<GEOM> coords,
+                                  const std::array<Real, 3> &xv, const Real dens,
                                   const Real sie, const EOS &eos) const {
 
     PARTHENON_DEBUG_REQUIRE(

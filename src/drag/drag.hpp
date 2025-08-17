@@ -271,7 +271,7 @@ TaskStatus SelfDragSourceImpl(MeshData<Real> *md, const Real time, const Real dt
 
             // Get diffusion coefficient
             Diffusion::DiffusionCoeff<DTYP, GEOM, Fluid::gas> dcoeff;
-            const Real mu = dcoeff.Get(dp, coords, dens, sieg, eos_d);
+            const Real mu = dcoeff.Get(dp, coords, xv, dens, sieg, eos_d);
             const Real vR = -1.5 * mu / (xcyl[0] * dens);
             const Real vg[3] = {mom1 / (hx[0] * dens), mom2 / (hx[1] * dens),
                                 mom3 / (hx[2] * dens)};
@@ -463,7 +463,7 @@ TaskStatus SimpleDragSourceImpl(MeshData<Real> *md, const Real time, const Real 
 
         // Target gas velocity
         Diffusion::DiffusionCoeff<DTYP, GEOM, Fluid::gas> dcoeff;
-        const Real mu = dcoeff.Get(dp, coords, dg, sieg, eos_d);
+        const Real mu = dcoeff.Get(dp, coords, xv, dg, sieg, eos_d);
         const Real vR = -1.5 * mu / (xcyl[0] * dg);
         const std::array<Real, 3> vt{ex1[0] * vR, ex2[0] * vR, ex3[0] * vR};
 

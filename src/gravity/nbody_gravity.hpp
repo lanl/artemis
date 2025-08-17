@@ -247,9 +247,9 @@ TaskStatus NBodyGravity(MeshData<Real> *md, const Real time, const Real dt) {
 //! \fn  Real Gravity::NBodyPotential
 //! \brief
 template <Coordinates GEOM>
-KOKKOS_INLINE_FUNCTION Real NBodyPotential(geometry::Coords<GEOM> &coords,
+KOKKOS_INLINE_FUNCTION Real NBodyPotential(const geometry::Coords<GEOM> &coords,
                                            const std::array<Real, 3> &xv,
-                                           ParArray1D<NBody::Particle> particles,
+                                           const ParArray1D<NBody::Particle> particles,
                                            const int npart) {
   const auto &xcart = coords.ConvertToCart(xv);
   Real pot = 0.0;

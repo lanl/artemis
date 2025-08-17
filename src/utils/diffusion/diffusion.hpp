@@ -81,6 +81,7 @@ Real EstimateTimestep(MeshData<Real> *md, DiffCoeffParams &dp, PKG &pkg, const E
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, Real &ldt) {
         geometry::Coords<GEOM> coords(cpars, vprim.GetCoordinates(b), k, j, i);
         const auto &dx = coords.GetCellWidths();
+        const auto &xv = coords.GetCellCenter();
         Real min_dx = Big<Real>();
         for (int d = 0; d < ndim; d++) {
           min_dx = std::min(min_dx, dx[d]);
@@ -92,7 +93,7 @@ Real EstimateTimestep(MeshData<Real> *md, DiffCoeffParams &dp, PKG &pkg, const E
 
           // Get the maximum diffusion coefficient (if there's more than one)
           DiffusionCoeff<DIFF, GEOM, FLUID_TYPE> diffcoeff;
-          Real mu = diffcoeff.Get(dp, coords, dens, sie, eos);
+          Real mu = diffcoeff.Get(dp, coords, xv, dens, sie, eos);
           if constexpr (DIFF == DiffType::conductivity_plaw) {
             mu /= (dens * eos.SpecificHeatFromDensityInternalEnergy(dens, sie));
           } else if constexpr ((DIFF == DiffType::viscosity_plaw) ||

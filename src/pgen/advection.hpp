@@ -177,6 +177,9 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
                          dust::prim::density, dust::prim::velocity>(
           (pmb->resolved_packages).get());
   auto v = desc.GetPack(md.get());
+  static auto desc_g =
+      MakePackDescriptor<geom::x1v, geom::x2v, geom::x3v>((pmb->resolved_packages).get());
+  auto vg = desc_g.GetPack(md.get());
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
@@ -190,11 +193,9 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         // cell-centered coordinates
 
         geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
-        const auto &xv = coords.GetCellCenter();
-
-        const Real x1v = xv[0];
-        const Real x2v = xv[1];
-        const Real x3v = xv[2];
+        const Real x1v = vg(0, geom::x1v(), coords.template index<geom::x1v>(k, j, i));
+        const Real x2v = vg(0, geom::x2v(), coords.template index<geom::x2v>(k, j, i));
+        const Real x3v = vg(0, geom::x3v(), coords.template index<geom::x3v>(k, j, i));
 
         Real x = adv.cos_a2 * (x1v * adv.cos_a3 + x2v * adv.sin_a3) + x3v * adv.sin_a2;
         Real sn = std::sin(adv.k_par * x);
@@ -252,6 +253,9 @@ inline void UserWorkAfterLoop(Mesh *pmesh, ParameterInput *pin, parthenon::SimTi
                          dust::cons::density, dust::cons::momentum>(
           (pmb->resolved_packages).get());
   auto v = desc.GetPack(md.get());
+  static auto desc_g = MakePackDescriptor<geom::vol, geom::x1v, geom::x2v, geom::x3v>(
+      (pmb->resolved_packages).get());
+  auto vg = desc_g.GetPack(md.get());
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
@@ -271,11 +275,10 @@ inline void UserWorkAfterLoop(Mesh *pmesh, ParameterInput *pin, parthenon::SimTi
                     ArtemisUtils::array_type<Real, nvars> &lsum) {
         // Capture coordinates this Meshblock
         geometry::Coords<GEOM> coords(cpars, v.GetCoordinates(b), k, j, i);
-        const auto &xv = coords.GetCellCenter();
-        Real x1v = xv[0];
-        Real x2v = xv[1];
-        Real x3v = xv[2];
-        Real vol = coords.Volume();
+        const Real x1v = vg(b, geom::x1v(), coords.template index<geom::x1v>(k, j, i));
+        const Real x2v = vg(b, geom::x2v(), coords.template index<geom::x2v>(k, j, i));
+        const Real x3v = vg(b, geom::x3v(), coords.template index<geom::x3v>(k, j, i));
+        const Real vol = vg(b, geom::vol(), coords.template index<geom::vol>(k, j, i));
 
         Real x = adv.cos_a2 * (x1v * adv.cos_a3 + x2v * adv.sin_a3) + x3v * adv.sin_a2;
         Real sn = std::sin(adv.k_par * x);

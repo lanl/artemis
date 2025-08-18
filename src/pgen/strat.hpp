@@ -204,7 +204,7 @@ inline void ExtrapInnerX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
       dust::prim::velocity, rad::prim::energy, rad::prim::flux>(mbd);
   auto v = descriptors[coarse].GetPack(mbd.get());
   if (v.GetMaxNumberOfVars() == 0) return;
-  static auto desc_g = ArtemisUtils::GetBoundaryPackDescriptorMap<geom::x1v>(mbd);
+  static auto desc_g = ArtemisUtils::GetPackDescriptorMap<geom::x1v>(mbd);
   auto vg = desc_g[coarse].GetPack(mbd.get());
 
   // Extract artemis package and params
@@ -297,7 +297,7 @@ inline void ExtrapOuterX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
       dust::prim::velocity, rad::prim::energy, rad::prim::flux>(mbd);
   auto v = descriptors[coarse].GetPack(mbd.get());
   if (v.GetMaxNumberOfVars() == 0) return;
-  static auto desc_g = ArtemisUtils::GetBoundaryPackDescriptorMap<geom::x1v>(mbd);
+  static auto desc_g = ArtemisUtils::GetPackDescriptorMap<geom::x1v>(mbd);
   auto vg = desc_g[coarse].GetPack(mbd.get());
 
   // Extract artemis package and params
@@ -405,8 +405,7 @@ inline void ShearInnerX2(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse)
       dust::prim::velocity, rad::prim::energy, rad::prim::flux>(mbd);
   auto v = descriptors[coarse].GetPack(mbd.get());
   if (v.GetMaxNumberOfVars() == 0) return;
-  static auto desc_g =
-      ArtemisUtils::GetBoundaryPackDescriptorMap<geom::x1v, geom::x3v>(mbd);
+  static auto desc_g = ArtemisUtils::GetPackDescriptorMap<geom::x1v, geom::x3v>(mbd);
   auto vg = desc_g[coarse].GetPack(mbd.get());
 
   // Extract artemis package and params
@@ -529,8 +528,7 @@ inline void ShearOuterX2(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse)
       dust::prim::velocity, rad::prim::energy, rad::prim::flux>(mbd);
   auto v = descriptors[coarse].GetPack(mbd.get());
   if (v.GetMaxNumberOfVars() == 0) return;
-  static auto desc_g =
-      ArtemisUtils::GetBoundaryPackDescriptorMap<geom::x1v, geom::x3v>(mbd);
+  static auto desc_g = ArtemisUtils::GetPackDescriptorMap<geom::x1v, geom::x3v>(mbd);
   auto vg = desc_g[coarse].GetPack(mbd.get());
 
   // Extract artemis package and params
@@ -641,7 +639,7 @@ inline void ExtrapInnerX3(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
       dust::prim::velocity, rad::prim::energy, rad::prim::flux>(mbd);
   auto v = descriptors[coarse].GetPack(mbd.get());
   if (v.GetMaxNumberOfVars() == 0) return;
-  static auto desc_g = ArtemisUtils::GetBoundaryPackDescriptorMap<geom::x3v>(mbd);
+  static auto desc_g = ArtemisUtils::GetPackDescriptorMap<geom::x3v>(mbd);
   auto vg = desc_g[coarse].GetPack(mbd.get());
 
   // Extract artemis package and params
@@ -743,7 +741,7 @@ inline void ExtrapOuterX3(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
       dust::prim::velocity, rad::prim::energy, rad::prim::flux>(mbd);
   auto v = descriptors[coarse].GetPack(mbd.get());
   if (v.GetMaxNumberOfVars() == 0) return;
-  static auto desc_g = ArtemisUtils::GetBoundaryPackDescriptorMap<geom::x3v>(mbd);
+  static auto desc_g = ArtemisUtils::GetPackDescriptorMap<geom::x3v>(mbd);
   auto vg = desc_g[coarse].GetPack(mbd.get());
 
   // Extract artemis package and params

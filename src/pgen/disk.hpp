@@ -493,7 +493,7 @@ void DiskBoundaryVisc(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) {
   auto v = descriptors[coarse].GetPack(mbd.get());
   if (v.GetMaxNumberOfVars() == 0) return;
   static auto desc_g =
-      ArtemisUtils::GetBoundaryPackDescriptorMap<geom::x1v, geom::x2v, geom::x3v>(mbd);
+      ArtemisUtils::GetPackDescriptorMap<geom::x1v, geom::x2v, geom::x3v>(mbd);
   auto vg = desc_g[coarse].GetPack(mbd.get());
   // Coordinates and indexing
   const auto &pco = (coarse) ? pmb->pmr->GetCoarseCoords() : pmb->coords;
@@ -697,8 +697,8 @@ void DiskBoundaryIC(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) {
   auto v = descriptors[coarse].GetPack(mbd.get());
   if (v.GetMaxNumberOfVars() == 0) return;
   static auto desc_g =
-      ArtemisUtils::GetBoundaryPackDescriptorMap<geom::x1v, geom::x2v, geom::x3v,
-                                                 geom::dx1, geom::dx2, geom::dx3>(mbd);
+      ArtemisUtils::GetPackDescriptorMap<geom::x1v, geom::x2v, geom::x3v, geom::dx1,
+                                         geom::dx2, geom::dx3>(mbd);
   auto vg = desc_g[coarse].GetPack(mbd.get());
 
   const auto &pco = (coarse) ? pmb->pmr->GetCoarseCoords() : pmb->coords;
@@ -751,7 +751,7 @@ void DiskBoundaryExtrap(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) 
   auto v = descriptors[coarse].GetPack(mbd.get());
   if (v.GetMaxNumberOfVars() == 0) return;
   static auto desc_g =
-      ArtemisUtils::GetBoundaryPackDescriptorMap<geom::x1v, geom::x2v, geom::x3v>(mbd);
+      ArtemisUtils::GetPackDescriptorMap<geom::x1v, geom::x2v, geom::x3v>(mbd);
   auto vg = desc_g[coarse].GetPack(mbd.get());
 
   const auto &pco = (coarse) ? pmb->pmr->GetCoarseCoords() : pmb->coords;

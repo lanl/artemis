@@ -81,6 +81,18 @@ GetBoundaryPackDescriptorMap(std::shared_ptr<MeshBlockData<Real>> &rc) {
   return my_map;
 }
 
+template <class... var_ts>
+map_bc_pack_descriptor_t<var_ts...>
+GetPackDescriptorMap(std::shared_ptr<MeshBlockData<Real>> &rc) {
+  map_bc_pack_descriptor_t<var_ts...> my_map;
+  std::vector<parthenon::MetadataFlag> flags;
+  std::set<PDOpt> opts{PDOpt::Coarse};
+  my_map.emplace(
+      std::make_pair(true, MakePackDescriptor<var_ts...>(rc.get(), flags, opts)));
+  my_map.emplace(std::make_pair(false, MakePackDescriptor<var_ts...>(rc.get())));
+  return my_map;
+}
+
 //----------------------------------------------------------------------------------------
 //! \struct ArtemisUtils::array_type
 //! NOTE(PDM): The following is copied from the open-source Kokkos Custom Reduction Wiki

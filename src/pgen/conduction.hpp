@@ -151,7 +151,7 @@ void CondBoundaryImpl(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) {
   auto v = descriptors[coarse].GetPack(mbd.get());
   if (v.GetMaxNumberOfVars() == 0) return;
   static auto desc_g =
-      ArtemisUtils::GetBoundaryPackDescriptorMap<geom::x1v, geom::x2v, geom::x3v>(mbd);
+      ArtemisUtils::GetPackDescriptorMap<geom::x1v, geom::x2v, geom::x3v>(mbd);
   auto vg = desc_g[coarse].GetPack(mbd.get());
 
   const auto &cpars = artemis_pkg->template Param<geometry::CoordParams>("coord_params");

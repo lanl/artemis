@@ -87,7 +87,7 @@ class Coords<Coordinates::cylindrical>
     } else if constexpr (cyl::is_x3dep<VAR>()) {
       return {1, 1, nx[2]};
     }
-    return {0, 0, 0};
+    return {1, 1, 1};
   }
 
   KOKKOS_INLINE_FUNCTION bool x1dep() const { return true; }

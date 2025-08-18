@@ -102,6 +102,9 @@ void InitBlockGeom(MeshBlock *pmb, ParameterInput *pin) {
   IndexRange jb = md->GetBoundsJ(IndexDomain::entire);
   IndexRange kb = md->GetBoundsK(IndexDomain::entire);
 
+  const bool x1dep_ = x1dep<GEOM>();
+  const bool x2dep_ = x1dep<GEOM>() && (ndim > 1);
+  const bool x3dep_ = x1dep<GEOM>() && (ndim > 2);
   const int b = 0;
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "Geometry::InitBlock", parthenon::DevExecSpace(), kb.s, kb.e,
@@ -133,93 +136,45 @@ void InitBlockGeom(MeshBlock *pmb, ParameterInput *pin) {
           vg(b, geom::ax1(), coords.template index<geom::ax1>(k, j, i + 1)) = ax[1];
         }
         ax = coords.GetFaceAreaX2();
-        vg(b, geom::ax2(), coords.template index<geom::ax2>(k, j, i)) = ax[0];
+        vg(b, geom::ax2(), coords.template index<geom::ax2>(k, j, i)) =
+            (ndim > 1) * ax[0];
         if ((j == jb.e) && (ndim > 1)) {
-          vg(b, geom::ax2(), coords.template index<geom::ax2>(k, j + 1, i)) = ax[1];
+          vg(b, geom::ax2(), coords.template index<geom::ax2>(k, j + 1, i)) =
+              (ndim > 1) * ax[1];
         }
         ax = coords.GetFaceAreaX3();
-        vg(b, geom::ax3(), coords.template index<geom::ax3>(k, j, i)) = ax[0];
+        vg(b, geom::ax3(), coords.template index<geom::ax3>(k, j, i)) =
+            (ndim > 2) * ax[0];
         if ((k == kb.e) && (ndim > 2)) {
-          vg(b, geom::ax3(), coords.template index<geom::ax3>(k + 1, j, i)) = ax[1];
+          vg(b, geom::ax3(), coords.template index<geom::ax3>(k + 1, j, i)) =
+              (ndim > 2) * ax[1];
         }
 
         // connection coeffs
         auto dh = coords.GetConnX1();
-        vg(b, geom::dh1dx1(), coords.template index<geom::dh1dx1>(k, j, i)) = dh[0];
-        vg(b, geom::dh2dx1(), coords.template index<geom::dh2dx1>(k, j, i)) = dh[1];
-        vg(b, geom::dh3dx1(), coords.template index<geom::dh3dx1>(k, j, i)) = dh[2];
+        vg(b, geom::dh1dx1(), coords.template index<geom::dh1dx1>(k, j, i)) =
+            x1dep_ * dh[0];
+        vg(b, geom::dh2dx1(), coords.template index<geom::dh2dx1>(k, j, i)) =
+            x1dep_ * dh[1];
+        vg(b, geom::dh3dx1(), coords.template index<geom::dh3dx1>(k, j, i)) =
+            x1dep_ * dh[2];
 
         dh = coords.GetConnX2();
-        vg(b, geom::dh1dx2(), coords.template index<geom::dh1dx2>(k, j, i)) = dh[0];
-        vg(b, geom::dh2dx2(), coords.template index<geom::dh2dx2>(k, j, i)) = dh[1];
-        vg(b, geom::dh3dx2(), coords.template index<geom::dh3dx2>(k, j, i)) = dh[2];
+        vg(b, geom::dh1dx2(), coords.template index<geom::dh1dx2>(k, j, i)) =
+            x2dep_ * dh[0];
+        vg(b, geom::dh2dx2(), coords.template index<geom::dh2dx2>(k, j, i)) =
+            x2dep_ * dh[1];
+        vg(b, geom::dh3dx2(), coords.template index<geom::dh3dx2>(k, j, i)) =
+            x2dep_ * dh[2];
 
         dh = coords.GetConnX3();
-        vg(b, geom::dh1dx3(), coords.template index<geom::dh1dx3>(k, j, i)) = dh[0];
-        vg(b, geom::dh2dx3(), coords.template index<geom::dh2dx3>(k, j, i)) = dh[1];
-        vg(b, geom::dh3dx3(), coords.template index<geom::dh3dx3>(k, j, i)) = dh[2];
+        vg(b, geom::dh1dx3(), coords.template index<geom::dh1dx3>(k, j, i)) =
+            x3dep_ * dh[0];
+        vg(b, geom::dh2dx3(), coords.template index<geom::dh2dx3>(k, j, i)) =
+            x3dep_ * dh[1];
+        vg(b, geom::dh3dx3(), coords.template index<geom::dh3dx3>(k, j, i)) =
+            x3dep_ * dh[2];
       });
-}
-
-template <Coordinates GEOM>
-parthenon::TaskStatus UpdateGeom(MeshData<Real> *md) {
-  using parthenon::MakePackDescriptor;
-  auto pm = md->GetParentPointer();
-  const int ndim = pm->ndim;
-  auto &artemis_pkg = pm->packages.Get("artemis");
-  const auto &cpars = artemis_pkg->template Param<geometry::CoordParams>("coord_params");
-
-  static auto desc_g =
-      MakePackDescriptor<geom::x1v, geom::x2v, geom::x3v, geom::dx1, geom::dx2, geom::dx3,
-                         geom::vol, geom::ax1, geom::ax2, geom::ax3, geom::hx1v,
-                         geom::hx2v, geom::hx3v>((pm->resolved_packages).get());
-  auto vg = desc_g.GetPack(md);
-  IndexRange ib = md->GetBoundsI(IndexDomain::entire);
-  IndexRange jb = md->GetBoundsJ(IndexDomain::entire);
-  IndexRange kb = md->GetBoundsK(IndexDomain::entire);
-
-  parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "Geometry::UpdateGeom", parthenon::DevExecSpace(), 0,
-      md->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
-      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
-        // Extract coordinates
-        geometry::Coords<GEOM> coords(cpars, vg.GetCoordinates(b), k, j, i);
-        const auto xv = coords.GetCellCenter();
-        vg(b, geom::x1v(), coords.template index<geom::x1v>(k, j, i)) = xv[0];
-        vg(b, geom::x2v(), coords.template index<geom::x2v>(k, j, i)) = xv[1];
-        vg(b, geom::x3v(), coords.template index<geom::x3v>(k, j, i)) = xv[2];
-
-        const auto dx = coords.GetCellWidths();
-        vg(b, geom::dx1(), coords.template index<geom::dx1>(k, j, i)) = dx[0];
-        vg(b, geom::dx2(), coords.template index<geom::dx2>(k, j, i)) = dx[1];
-        vg(b, geom::dx3(), coords.template index<geom::dx3>(k, j, i)) = dx[2];
-
-        const auto hx = coords.GetScaleFactors();
-        vg(b, geom::hx1v(), coords.template index<geom::hx1v>(k, j, i)) = hx[0];
-        vg(b, geom::hx2v(), coords.template index<geom::hx2v>(k, j, i)) = hx[1];
-        vg(b, geom::hx3v(), coords.template index<geom::hx3v>(k, j, i)) = hx[2];
-
-        vg(b, geom::vol(), coords.template index<geom::vol>(k, j, i)) = coords.Volume();
-
-        // Face quantities
-        auto ax = coords.GetFaceAreaX1();
-        vg(b, geom::ax1(), coords.template index<geom::ax1>(k, j, i)) = ax[0];
-        if (i == ib.e) {
-          vg(b, geom::ax1(), coords.template index<geom::ax1>(k, j, i + 1)) = ax[1];
-        }
-        ax = coords.GetFaceAreaX2();
-        vg(b, geom::ax2(), coords.template index<geom::ax2>(k, j, i)) = ax[0];
-        if ((j == jb.e) && (ndim > 1)) {
-          vg(b, geom::ax2(), coords.template index<geom::ax2>(k, j + 1, i)) = ax[1];
-        }
-        ax = coords.GetFaceAreaX3();
-        vg(b, geom::ax3(), coords.template index<geom::ax3>(k, j, i)) = ax[0];
-        if ((k == kb.e) && (ndim > 2)) {
-          vg(b, geom::ax3(), coords.template index<geom::ax3>(k + 1, j, i)) = ax[1];
-        }
-      });
-
-  return TaskStatus::complete;
 }
 
 template void InitBlockGeom<Coordinates::cartesian>(MeshBlock *pmb, ParameterInput *pin);
@@ -233,19 +188,6 @@ template void InitBlockGeom<Coordinates::cylindrical>(MeshBlock *pmb,
                                                       ParameterInput *pin);
 template void InitBlockGeom<Coordinates::axisymmetric>(MeshBlock *pmb,
                                                        ParameterInput *pin);
-
-template parthenon::TaskStatus
-UpdateGeom<Coordinates::cartesian>(parthenon::MeshData<Real> *md);
-template parthenon::TaskStatus
-UpdateGeom<Coordinates::axisymmetric>(parthenon::MeshData<Real> *md);
-template parthenon::TaskStatus
-UpdateGeom<Coordinates::cylindrical>(parthenon::MeshData<Real> *md);
-template parthenon::TaskStatus
-UpdateGeom<Coordinates::spherical1D>(parthenon::MeshData<Real> *md);
-template parthenon::TaskStatus
-UpdateGeom<Coordinates::spherical2D>(parthenon::MeshData<Real> *md);
-template parthenon::TaskStatus
-UpdateGeom<Coordinates::spherical3D>(parthenon::MeshData<Real> *md);
 
 template void EnrollFields<Coordinates::cartesian>(StateDescriptor *pkg,
                                                    CoordParams &cpars);

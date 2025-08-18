@@ -32,8 +32,6 @@ namespace geometry {
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
 template <Coordinates GEOM>
 void InitBlockGeom(MeshBlock *pmb, ParameterInput *pin);
-template <Coordinates GEOM>
-parthenon::TaskStatus UpdateGeom(parthenon::MeshBlockData<Real> *md);
 
 // Face indexing
 enum class CellFace { lower = 0, upper = 1 };

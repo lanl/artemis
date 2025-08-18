@@ -38,7 +38,8 @@ template <class VAR>
 constexpr bool is_x1dep() {
   return (std::is_same_v<VAR, geom::x1v> || std::is_same_v<VAR, geom::dx1> ||
           std::is_same_v<VAR, geom::hx2v> || std::is_same_v<VAR, geom::dx2> ||
-          std::is_same_v<VAR, geom::vol> || std::is_same_v<VAR, geom::dh2dx1>);
+          std::is_same_v<VAR, geom::vol> || std::is_same_v<VAR, geom::ax1> ||
+          std::is_same_v<VAR, geom::ax3> || std::is_same_v<VAR, geom::dh2dx1>);
 }
 template <class VAR>
 constexpr bool is_x2dep() {
@@ -71,9 +72,9 @@ class Coords<Coordinates::cylindrical>
   KOKKOS_INLINE_FUNCTION int index_(const int k, const int j, const int i) const {
     if constexpr (cyl::is_x1dep<VAR>()) {
       return i;
-    } else if constexpr (axi::is_x2dep<VAR>()) {
+    } else if constexpr (cyl::is_x2dep<VAR>()) {
       return j;
-    } else if constexpr (axi::is_x3dep<VAR>()) {
+    } else if constexpr (cyl::is_x3dep<VAR>()) {
       return k;
     }
     return 0;

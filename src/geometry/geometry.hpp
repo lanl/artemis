@@ -246,7 +246,7 @@ class CoordsBase {
   template <class VAR>
   KOKKOS_INLINE_FUNCTION std::array<int, 3> shape_() const {
     if constexpr (cart::is_x1dep<VAR>()) {
-      return {1, 1, nx[0]};
+      return {nx[0], 1, 1};
     } else if constexpr (cart::is_x2dep<VAR>()) {
       return {1, nx[1], 1};
     } else if constexpr (cart::is_x3dep<VAR>()) {

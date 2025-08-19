@@ -111,6 +111,11 @@ TaskStatus RotatingFrameImpl(MeshData<Real> *md, const Real om0, const bool do_g
                                     dust::cons::momentum>(resolved_pkgs.get(), {},
                                                           {parthenon::PDOpt::WithFluxes});
   auto vf = desc_flux.GetPack(md);
+  static auto desc_g =
+      parthenon::MakePackDescriptor<geom::x1v, geom::x2v, geom::x3v, geom::ax1, geom::ax2,
+                                    geom::ax3, geom::vol, geom::rfw1, geom::rfw2,
+                                    geom::rfw3>(resolved_pkgs.get());
+  auto vg = desc_g.GetPack(md);
   const int multi_d = (pm->ndim >= 2);
   const int three_d = (pm->ndim == 3);
 
@@ -135,11 +140,25 @@ TaskStatus RotatingFrameImpl(MeshData<Real> *md, const Real om0, const bool do_g
         // \pm <R^2>_\pm - <R^2>
         const auto &[bx1, bx2, bx3] = coords.GetRFWeights();
 
-        const auto ax1 = coords.GetFaceAreaX1();
-        const auto ax2 = (multi_d) ? coords.GetFaceAreaX2() : NewArray<Real, 2>(0.0);
-        const auto ax3 = (three_d) ? coords.GetFaceAreaX3() : NewArray<Real, 2>(0.0);
+        const std::array<Real, 2> ax1{
+            vg(b, geom::ax1(), coords.template index<geom::ax1>(k, j, i)) *
+                vg(b, geom::rfw1(), coords.template index<geom::rfw1>(k, j, i)),
+            vg(b, geom::ax1(), coords.template index<geom::ax1>(k, j, i + 1)) *
+                vg(b, geom::rfw1(), coords.template index<geom::rfw1>(k, j, i + 1))};
+        const std::array<Real, 2> ax2{
+            vg(b, geom::ax2(), coords.template index<geom::ax2>(k, j, i)) *
+                vg(b, geom::rfw2(), coords.template index<geom::rfw2>(k, j, i)),
+            vg(b, geom::ax2(), coords.template index<geom::ax2>(k, j + multi_d, i)) *
+                vg(b, geom::rfw2(),
+                   coords.template index<geom::rfw2>(k, j + multi_d, i))};
+        const std::array<Real, 2> ax3{
+            vg(b, geom::ax3(), coords.template index<geom::ax3>(k, j, i)) *
+                vg(b, geom::rfw3(), coords.template index<geom::rfw3>(k, j, i)),
+            vg(b, geom::ax3(), coords.template index<geom::ax3>(k + three_d, j, i)) *
+                vg(b, geom::rfw3(),
+                   coords.template index<geom::rfw3>(k + three_d, j, i))};
 
-        const Real vol = coords.Volume();
+        const Real vol = vg(b, geom::vol(), coords.template index<geom::vol>(k, j, i));
         if (do_gas) {
           for (int n = 0; n < vf.GetSize(b, gas::cons::density()); ++n) {
 

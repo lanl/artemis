@@ -108,6 +108,9 @@ ARTEMIS_VARIABLE(geom, dh3dx2);
 ARTEMIS_VARIABLE(geom, dh1dx3);
 ARTEMIS_VARIABLE(geom, dh2dx3);
 ARTEMIS_VARIABLE(geom, dh3dx3);
+ARTEMIS_VARIABLE(geom, rfw1);
+ARTEMIS_VARIABLE(geom, rfw2);
+ARTEMIS_VARIABLE(geom, rfw3);
 } // namespace geom
 
 #undef ARTEMIS_VARIABLE

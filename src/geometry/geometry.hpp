@@ -170,8 +170,11 @@ KOKKOS_INLINE_FUNCTION constexpr bool x3dep() {
 template <int DIR, class VAR>
 constexpr bool staggered_field() {
   return (std::is_same_v<VAR, geom::ax1> && DIR == 1) ||
+         (std::is_same_v<VAR, geom::rfw1> && DIR == 1) ||
          (std::is_same_v<VAR, geom::ax2> && DIR == 2) ||
-         (std::is_same_v<VAR, geom::ax3> && DIR == 3);
+         (std::is_same_v<VAR, geom::rfw2> && DIR == 2) ||
+         (std::is_same_v<VAR, geom::ax3> && DIR == 3) ||
+         (std::is_same_v<VAR, geom::rfw3> && DIR == 3);
 }
 
 // NOTE(@amd)

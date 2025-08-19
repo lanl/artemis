@@ -400,17 +400,17 @@ StrainTensorFace(parthenon::team_mbr_t const &member, const geometry::CoordParam
           vg(b, geom::x2v(), coords.template index<geom::x2v>(k, j, i - 1)),
           vg(b, geom::x3v(), coords.template index<geom::x3v>(k, j, i - 1))};
       const std::array<Real, 3> xv_xp{
-          vg(b, geom::x1v(), coords.template index<geom::x1v>(k, j, i - 1)),
-          vg(b, geom::x2v(), coords.template index<geom::x2v>(k, j, i - 1)),
-          vg(b, geom::x3v(), coords.template index<geom::x3v>(k, j, i - 1))};
+          vg(b, geom::x1v(), coords.template index<geom::x1v>(k, j, i + 1)),
+          vg(b, geom::x2v(), coords.template index<geom::x2v>(k, j, i + 1)),
+          vg(b, geom::x3v(), coords.template index<geom::x3v>(k, j, i + 1))};
       const std::array<Real, 3> xv_xmzm{
           vg(b, geom::x1v(), coords.template index<geom::x1v>(k - 1, j, i - 1)),
           vg(b, geom::x2v(), coords.template index<geom::x2v>(k - 1, j, i - 1)),
           vg(b, geom::x3v(), coords.template index<geom::x3v>(k - 1, j, i - 1))};
       const std::array<Real, 3> xv_xpzm{
-          vg(b, geom::x1v(), coords.template index<geom::x1v>(k - 1, j, i - 1)),
-          vg(b, geom::x2v(), coords.template index<geom::x2v>(k - 1, j, i - 1)),
-          vg(b, geom::x3v(), coords.template index<geom::x3v>(k - 1, j, i - 1))};
+          vg(b, geom::x1v(), coords.template index<geom::x1v>(k - 1, j, i + 1)),
+          vg(b, geom::x2v(), coords.template index<geom::x2v>(k - 1, j, i + 1)),
+          vg(b, geom::x3v(), coords.template index<geom::x3v>(k - 1, j, i + 1))};
 
       const std::array<Real, 3> xv_ym{
           vg(b, geom::x1v(), coords.template index<geom::x1v>(k, j - 1, i)),
@@ -441,17 +441,17 @@ StrainTensorFace(parthenon::team_mbr_t const &member, const geometry::CoordParam
           vg(b, geom::hx2v(), coords.template index<geom::hx2v>(k, j, i - 1)),
           vg(b, geom::hx3v(), coords.template index<geom::hx3v>(k, j, i - 1))};
       const std::array<Real, 3> hx_xp{
-          vg(b, geom::hx1v(), coords.template index<geom::hx1v>(k, j, i - 1)),
-          vg(b, geom::hx2v(), coords.template index<geom::hx2v>(k, j, i - 1)),
-          vg(b, geom::hx3v(), coords.template index<geom::hx3v>(k, j, i - 1))};
+          vg(b, geom::hx1v(), coords.template index<geom::hx1v>(k, j, i + 1)),
+          vg(b, geom::hx2v(), coords.template index<geom::hx2v>(k, j, i + 1)),
+          vg(b, geom::hx3v(), coords.template index<geom::hx3v>(k, j, i + 1))};
       const std::array<Real, 3> hx_xmzm{
           vg(b, geom::hx1v(), coords.template index<geom::hx1v>(k - 1, j, i - 1)),
           vg(b, geom::hx2v(), coords.template index<geom::hx2v>(k - 1, j, i - 1)),
           vg(b, geom::hx3v(), coords.template index<geom::hx3v>(k - 1, j, i - 1))};
       const std::array<Real, 3> hx_xpzm{
-          vg(b, geom::hx1v(), coords.template index<geom::hx1v>(k - 1, j, i - 1)),
-          vg(b, geom::hx2v(), coords.template index<geom::hx2v>(k - 1, j, i - 1)),
-          vg(b, geom::hx3v(), coords.template index<geom::hx3v>(k - 1, j, i - 1))};
+          vg(b, geom::hx1v(), coords.template index<geom::hx1v>(k - 1, j, i + 1)),
+          vg(b, geom::hx2v(), coords.template index<geom::hx2v>(k - 1, j, i + 1)),
+          vg(b, geom::hx3v(), coords.template index<geom::hx3v>(k - 1, j, i + 1))};
 
       const std::array<Real, 3> hx_ym{
           vg(b, geom::hx1v(), coords.template index<geom::hx1v>(k, j - 1, i)),

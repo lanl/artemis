@@ -22,7 +22,7 @@ namespace geometry {
 #define ADD_FIELD(name)                                                                  \
   {                                                                                      \
     const auto shape = coords.template shape<name>();                                    \
-    pkg->AddField<name>(Metadata({Metadata::None, Metadata::OneCopy, Metadata::Restart},                    \
+    pkg->AddField<name>(Metadata({Metadata::None, Metadata::OneCopy, Metadata::Restart}, \
                                  std::vector<int>({shape[0] * shape[1] * shape[2]})));   \
   }
 

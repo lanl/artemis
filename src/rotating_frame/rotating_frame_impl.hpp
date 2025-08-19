@@ -133,13 +133,14 @@ TaskStatus RotatingFrameImpl(MeshData<Real> *md, const Real om0, const bool do_g
       KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
         // Extract coordinates
         geometry::Coords<GEOM> coords(cpars, vf.GetCoordinates(b), k, j, i);
-        const auto &xv = coords.GetCellCenter();
+        const std::array<Real, 3> xv{
+            vg(0, geom::x1v(), coords.template index<geom::x1v>(k, j, i)),
+            vg(0, geom::x2v(), coords.template index<geom::x2v>(k, j, i)),
+            vg(0, geom::x3v(), coords.template index<geom::x3v>(k, j, i))};
         const auto &[xcyl, ex1, ex2, ex3] = coords.ConvertToCylWithVec(xv);
 
         // The geometry dependent flux weighting
         // \pm <R^2>_\pm - <R^2>
-        const auto &[bx1, bx2, bx3] = coords.GetRFWeights();
-
         const std::array<Real, 2> ax1{
             vg(b, geom::ax1(), coords.template index<geom::ax1>(k, j, i)) *
                 vg(b, geom::rfw1(), coords.template index<geom::rfw1>(k, j, i)),

@@ -46,10 +46,9 @@ void WENOZ5(const Real &q_im2, const Real &q_im1, const Real &q_i, const Real &q
                          SQR(tau5 / (beta[2] + Fuzz<Real>()))};
 
   // compute qL_ip1
-  Real f[3];
-  f[0] = 2.0 * q_im2 - 7.0 * q_im1 + 11.0 * q_i;
-  f[1] = -1.0 * q_im1 + 5.0 * q_i + 2.0 * q_ip1;
-  f[2] = 2.0 * q_i + 5.0 * q_ip1 - q_ip2;
+  std::array<Real,3> f{2.0 * q_im2 - 7.0 * q_im1 + 11.0 * q_i,
+                                  -1.0 * q_im1 + 5.0 * q_i + 2.0 * q_ip1,
+                                   2.0 * q_i + 5.0 * q_ip1 - q_ip2};
 
   std::array<Real,3> alpha{
    0.1 * (1.0 + indicator[0]),

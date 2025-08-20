@@ -37,7 +37,7 @@ void WENOZ5(const Real &q_im2, const Real &q_im1, const Real &q_i, const Real &q
             weno_beta_coeff_0 * SQR(q_i - 2 * q_ip1 + q_ip2) +
             weno_beta_coeff_1 * SQR(3 * q_i - 4 * q_ip1 + q_ip2)};
 
-  const Real tau5 = fabs(beta[0] - beta[2]); // [Borges+ 2008]
+  const Real tau5 = std::abs(beta[0] - beta[2]); // [Borges+ 2008]
 
   Real indicator[3]; // [Castro, Costa, & Don 2011]
   indicator[0] = SQR(tau5 / (beta[0] + weno_eps));

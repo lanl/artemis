@@ -12,9 +12,6 @@
 #ifndef UTILS_FLUXES_RECONSTRUCTION_WENOZ_HPP_
 #define UTILS_FLUXES_RECONSTRUCTION_WENOZ_HPP_
 
-#define weno_eps 1.0e-42
-#define weno_beta_coeff_0 13. / 12.
-#define weno_beta_coeff_1 0.25
 
 // Artemis includes
 #include "artemis.hpp"

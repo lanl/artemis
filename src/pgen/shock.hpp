@@ -112,8 +112,8 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       "shock", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
         geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
-        const Real xi = vg(0, geom::x1v(), coords.template index<geom::x1v>(k, j, i));
-        const bool upwind = (xi <= shkp.xdisc);
+        const auto &xi = coords.GetCellCenter(vg,0,k,j,i);
+        const bool upwind = (xi[0] <= shkp.xdisc);
         const Real rho = upwind ? shkp.rhol : shkp.rhor;
         const Real vx = upwind ? shkp.vxl : shkp.vxr;
         const Real T = upwind ? shkp.tl : shkp.tr;

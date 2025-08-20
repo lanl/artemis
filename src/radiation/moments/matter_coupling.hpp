@@ -91,17 +91,14 @@ TaskStatus MatterCouplingSimpleImpl(MeshData<Real> *u0, const Real dt) {
       kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
         geometry::Coords<GEOM> coords(cpars, v0.GetCoordinates(b), k, j, i);
-        const std::array<Real, 3> hx{
-            vg(b, geom::hx1v(), coords.template index<geom::hx1v>(k, j, i)),
-            vg(b, geom::hx2v(), coords.template index<geom::hx2v>(k, j, i)),
-            vg(b, geom::hx3v(), coords.template index<geom::hx3v>(k, j, i))};
+       const auto &hx = coords.GetScaleFactors(vg,b,k,j,i);
         // y = U^(0) + dt S(y)
 
         // U^(0) values
         const Real dens = v0(b, gas::cons::density(), k, j, i);
         Real e0 = v0(b, gas::cons::internal_energy(), k, j, i);
         const auto vb = RotatingFrame::BackgroundVelocity<GEOM>(
-            qshear, om0, vg(b, geom::x1v(), coords.template index<geom::x1v>(k, j, i)));
+            qshear, om0, coords.GetCellCenter(vg,b,k,j,i)[0]);
         std::array<Real, 3> v{
             vb[0] + v0(b, gas::cons::momentum(0), k, j, i) / (hx[0] * dens),
             vb[1] + v0(b, gas::cons::momentum(1), k, j, i) / (hx[1] * dens),
@@ -253,10 +250,7 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
       kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
         geometry::Coords<GEOM> coords(cpars, v0.GetCoordinates(b), k, j, i);
-        const std::array<Real, 3> hx{
-            vg(b, geom::hx1v(), coords.template index<geom::hx1v>(k, j, i)),
-            vg(b, geom::hx2v(), coords.template index<geom::hx2v>(k, j, i)),
-            vg(b, geom::hx3v(), coords.template index<geom::hx3v>(k, j, i))};
+      const auto &hx = coords.GetScaleFactors(vg,b,k,j,i);
         // y = U^(0) + dt S(y)
 
         // U^(0) values

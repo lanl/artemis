@@ -57,7 +57,7 @@ An example input block for a gas could read
   eos = ideal
   gamma = 1.4
   riemann = hllc     # llf, hlle, hllc Riemann solvers
-  reconstruct = plm  # pcm, plm, ppm reconstructions
+  reconstruct = plm  # pcm, plm, ppm, wenoz reconstructions
 
 In order to safely model kinetic energy dominated flows, |code| uses a dual energy formalism controlled by the ``de_switch`` parameter under ``<gas>``.
 When the fraction of the internal energy to the total energy in a cell is less than ``de_switch``, |code| will recover the internal energy from a separately evolved internal energy variable.
@@ -300,7 +300,7 @@ An example dust input block reads:
    cfl = 0.3
    nspecies = 3
    riemann = hlle       # llf, hlle
-   reconstruct = plm    # pcm, plm, ppm
+   reconstruct = plm    # pcm, plm, ppm, wenoz
    grain_density = 1.7  # g/cc
    sizes = 1e-4, 1e-2, 1e-1  # cm
 

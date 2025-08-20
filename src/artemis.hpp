@@ -114,7 +114,7 @@ enum class RSolver { hllc, hlle, llf, null };
 // ... Upwinding (left vs right state)
 enum class Upwind { l, r, null };
 // ...Reconstruction algorithms
-enum class ReconstructionMethod { pcm, plm, ppm, null };
+enum class ReconstructionMethod { pcm, plm, ppm, wenoz, null };
 // ...Fluid types
 enum class Fluid { gas, dust, radiation, null };
 // ...Closure types

@@ -101,6 +101,7 @@ set (SRC_LIST
   utils/fluxes/reconstruction/pcm.hpp
   utils/fluxes/reconstruction/plm.hpp
   utils/fluxes/reconstruction/ppm.hpp
+  utils/fluxes/reconstruction/wenoz.hpp
   utils/fluxes/riemann/hllc.hpp
   utils/fluxes/riemann/hlle.hpp
   utils/fluxes/riemann/llf.hpp

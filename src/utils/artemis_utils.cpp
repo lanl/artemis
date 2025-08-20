@@ -195,6 +195,10 @@ ReconstructionMethod ChooseReconMethod(std::string recon) {
     PARTHENON_REQUIRE(parthenon::Globals::nghost >= 3,
                       "PPM requires at least 3 ghost cells.");
     return ReconstructionMethod::ppm;
+  } else if (recon.compare("wenoz") == 0) {
+    PARTHENON_REQUIRE(parthenon::Globals::nghost >= 3,
+                      "WENO-Z requires at least 3 ghost cells.");
+    return ReconstructionMethod::wenoz;
   }
   PARTHENON_FAIL("Reconstruction method not recognized.");
   return ReconstructionMethod::pcm;

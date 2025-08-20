@@ -23,6 +23,9 @@ rotating_frame:
     ppm:
       _type: opt
       _description: "Piecewise Parabolic"
+    wenoz:
+      _type: opt
+      _description: "Weighted Essentially Non-Oscillatory (Z)"
     cfl:
       _type: Real
       _default: 0.8

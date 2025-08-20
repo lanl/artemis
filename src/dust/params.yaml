@@ -72,6 +72,9 @@ dust:
     ppm:
       _type: opt
       _description: "Piecewise Parabolic"
+    wenoz:
+      _type: opt
+      _description: "Weighted Essentially Non-Oscillatory (Z)"
 
   riemann:
     _type: string

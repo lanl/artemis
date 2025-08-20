@@ -121,6 +121,8 @@ TaskStatus LagrangeRemap(MeshData<Real> *u0, const Real scdt) {
     return LagrangeRemapImpl<ReconstructionMethod::plm>(u0, v0, dwdt);
   } else if (recon == ReconstructionMethod::ppm) {
     return LagrangeRemapImpl<ReconstructionMethod::ppm>(u0, v0, dwdt);
+  } else if (recon == ReconstructionMethod::wenoz) {
+    return LagrangeRemapImpl<ReconstructionMethod::wenoz>(u0, v0, dwdt);
   } else {
     PARTHENON_FAIL("Unsupported reconstruction method in rotating_frame");
   }

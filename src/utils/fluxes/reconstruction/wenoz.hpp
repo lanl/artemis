@@ -12,10 +12,9 @@
 #ifndef UTILS_FLUXES_RECONSTRUCTION_WENOZ_HPP_
 #define UTILS_FLUXES_RECONSTRUCTION_WENOZ_HPP_
 
-#define weno_eps 
+#define weno_eps
 // Artemis includes
 #include "artemis.hpp"
-
 
 namespace ArtemisUtils {
 //----------------------------------------------------------------------------------------
@@ -25,28 +24,31 @@ namespace ArtemisUtils {
 //! reconstruction in any dimension by passing in the appropriate q_im2,...,q _ip2.
 KOKKOS_INLINE_FUNCTION
 void WENOZ5(const Real &q_im2, const Real &q_im1, const Real &q_i, const Real &q_ip1,
-          const Real &q_ip2, Real &ql_ip1, Real &qr_i) {
+            const Real &q_ip2, Real &ql_ip1, Real &qr_i) {
 
   // smoothness indicators for each trial stencil [Jiang & Shu 1996]
-  Real beta_coeff[2]{13./12., 0.25};
+  Real beta_coeff[2]{13. / 12., 0.25};
   Real beta[3];
-  beta[0] = beta_coeff[0] * SQR(q_im2 - 2 * q_im1 + q_i) + beta_coeff[1] * SQR(q_im2 - 4 * q_im1 + 3 * q_i);
-  beta[1] = beta_coeff[0] * SQR(q_im1 - 2 * q_i + q_ip1) + beta_coeff[1] * SQR(q_im1 + q_ip1);
-  beta[2] = beta_coeff[0] * SQR(q_i - 2 * q_ip1 + q_ip2) + beta_coeff[1] * SQR(3 * q_i - 4 * q_ip1 + q_ip2);
+  beta[0] = beta_coeff[0] * SQR(q_im2 - 2 * q_im1 + q_i) +
+            beta_coeff[1] * SQR(q_im2 - 4 * q_im1 + 3 * q_i);
+  beta[1] =
+      beta_coeff[0] * SQR(q_im1 - 2 * q_i + q_ip1) + beta_coeff[1] * SQR(q_im1 + q_ip1);
+  beta[2] = beta_coeff[0] * SQR(q_i - 2 * q_ip1 + q_ip2) +
+            beta_coeff[1] * SQR(3 * q_i - 4 * q_ip1 + q_ip2);
 
   const Real tau5 = fabs(beta[0] - beta[2]) // [Borges+ 2008]
-  const Real epsW = 1.0e-42;
+      const Real epsW = 1.0e-42;
 
   Real indicator[3]; // [Castro, Costa, & Don 2011]
   indicator[0] = SQR(tau5 / (beta[0] + epsW));
   indicator[1] = SQR(tau5 / (beta[1] + epsW));
   indicator[2] = SQR(tau5 / (beta[2] + epsW));
 
-  //compute qL_ip1 
+  // compute qL_ip1
   Real f[3];
-  f[0] = ( 2.0 * q_im2 - 7.0 * q_im1 + 11.0 * q_i  );
-  f[1] = (-1.0 * q_im1 + 5.0 * q_i   + 2.0  * q_ip1);
-  f[2] = ( 2.0 * q_i   + 5.0 * q_ip1 -        q_ip2);
+  f[0] = (2.0 * q_im2 - 7.0 * q_im1 + 11.0 * q_i);
+  f[1] = (-1.0 * q_im1 + 5.0 * q_i + 2.0 * q_ip1);
+  f[2] = (2.0 * q_i + 5.0 * q_ip1 - q_ip2);
 
   Real alpha[3];
   alpha[0] = 0.1 * (1.0 + indicator[0]);
@@ -54,18 +56,18 @@ void WENOZ5(const Real &q_im2, const Real &q_im1, const Real &q_i, const Real &q
   alpha[2] = 0.3 * (1.0 + indicator[2]);
   Real alpha_sum = 6.0 * (alpha[0] + alpha[1] + alpha[2]);
 
-  ql_ip1 = (f[0] * alpha[0] + f[1] * alpha[1] + f[2] * alpha[2])/alpha_sum;
+  ql_ip1 = (f[0] * alpha[0] + f[1] * alpha[1] + f[2] * alpha[2]) / alpha_sum;
 
-  //compute qR_i 
-  f[0] = ( 2.0 * q_ip2 - 7.0 * q_ip1 + 11.0 * q_i  );
-  f[1] = (-1.0 * q_ip1 + 5.0 * q_i   + 2.0  * q_im1);
-  f[2] = ( 2.0 * q_i   + 5.0 * q_im1 -        q_im2);
+  // compute qR_i
+  f[0] = (2.0 * q_ip2 - 7.0 * q_ip1 + 11.0 * q_i);
+  f[1] = (-1.0 * q_ip1 + 5.0 * q_i + 2.0 * q_im1);
+  f[2] = (2.0 * q_i + 5.0 * q_im1 - q_im2);
 
   alpha[0] = 0.1 * (1.0 + indicator[2]);
   alpha[2] = 0.3 * (1.0 + indicator[0]);
   alpha_sum = 6.0 * (alpha[0] + alpha[1] + alpha[2]);
 
-  qr_i = (f[0] * alpha[0] + f[1] * alpha[1] + f[2] * alpha[2])/alpha_sum;
+  qr_i = (f[0] * alpha[0] + f[1] * alpha[1] + f[2] * alpha[2]) / alpha_sum;
 
   return;
 }
@@ -85,7 +87,7 @@ struct Reconstruction<ReconstructionMethod::wenoz, X1DIR, GEOM> {
       parthenon::par_for_inner(
           DEFAULT_INNER_LOOP_PATTERN, member, il, iu, [&](const int i) {
             WENOZ5(q(b, n, k, j, i - 2), q(b, n, k, j, i - 1), q(b, n, k, j, i),
-                 q(b, n, k, j, i + 1), q(b, n, k, j, i + 2), ql(n, i + 1), qr(n, i));
+                   q(b, n, k, j, i + 1), q(b, n, k, j, i + 2), ql(n, i + 1), qr(n, i));
           });
     }
   }
@@ -106,7 +108,7 @@ struct Reconstruction<ReconstructionMethod::wenoz, X2DIR, GEOM> {
       parthenon::par_for_inner(
           DEFAULT_INNER_LOOP_PATTERN, member, il, iu, [&](const int i) {
             WENOZ5(q(b, n, k, j - 2, i), q(b, n, k, j - 1, i), q(b, n, k, j, i),
-                 q(b, n, k, j + 1, i), q(b, n, k, j + 2, i), ql_jp1(n, i), qr_j(n, i));
+                   q(b, n, k, j + 1, i), q(b, n, k, j + 2, i), ql_jp1(n, i), qr_j(n, i));
           });
     }
   }
@@ -127,7 +129,7 @@ struct Reconstruction<ReconstructionMethod::wenoz, X3DIR, GEOM> {
       parthenon::par_for_inner(
           DEFAULT_INNER_LOOP_PATTERN, member, il, iu, [&](const int i) {
             WENOZ5(q(b, n, k - 2, j, i), q(b, n, k - 1, j, i), q(b, n, k, j, i),
-                 q(b, n, k + 1, j, i), q(b, n, k + 2, j, i), ql_kp1(n, i), qr_k(n, i));
+                   q(b, n, k + 1, j, i), q(b, n, k + 2, j, i), ql_kp1(n, i), qr_k(n, i));
           });
     }
   }
@@ -144,17 +146,17 @@ struct ReconGradient<GEOM, ReconstructionMethod::wenoz> {
     Real wl = Null<Real>(), wr = Null<Real>();
 
     WENOZ5(q(b, n, k, j, i - 2), q(b, n, k, j, i - 1), q(b, n, k, j, i),
-         q(b, n, k, j, i + 1), q(b, n, k, j, i + 2), wl, wr);
+           q(b, n, k, j, i + 1), q(b, n, k, j, i + 2), wl, wr);
     dqdx[0] = (wr - wl) / (2.0 * dx[0]);
 
     wl = Null<Real>(), wr = Null<Real>();
     WENOZ5(q(b, n, k, j - 2 * multi_d, i), q(b, n, k, j - multi_d, i), q(b, n, k, j, i),
-         q(b, n, k, j + multi_d, i), q(b, n, k, j + 2 * multi_d, i), wl, wr);
+           q(b, n, k, j + multi_d, i), q(b, n, k, j + 2 * multi_d, i), wl, wr);
     dqdx[1] = (wr - wl) / (2.0 * dx[1]);
 
     wl = Null<Real>(), wr = Null<Real>();
     WENOZ5(q(b, n, k - three_d, j, i), q(b, n, k - 2 * three_d, j, i), q(b, n, k, j, i),
-         q(b, n, k + three_d, j, i), q(b, n, k + 2 * three_d, j, i), wl, wr);
+           q(b, n, k + three_d, j, i), q(b, n, k + 2 * three_d, j, i), wl, wr);
     dqdx[2] = (wr - wl) / (2.0 * dx[2]);
 
     return dqdx;

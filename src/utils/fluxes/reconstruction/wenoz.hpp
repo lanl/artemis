@@ -13,6 +13,9 @@
 #define UTILS_FLUXES_RECONSTRUCTION_WENOZ_HPP_
 
 #define weno_eps 1.0e-42
+#define weno_beta_coeff_0 13. / 12.
+#define weno_beta_coeff_1 0.25
+
 // Artemis includes
 #include "artemis.hpp"
 
@@ -27,14 +30,13 @@ void WENOZ5(const Real &q_im2, const Real &q_im1, const Real &q_i, const Real &q
             const Real &q_ip2, Real &ql_ip1, Real &qr_i) {
 
   // smoothness indicators for each trial stencil [Jiang & Shu 1996]
-  Real beta_coeff[2]{13. / 12., 0.25};
   Real beta[3];
-  beta[0] = beta_coeff[0] * SQR(q_im2 - 2 * q_im1 + q_i) +
-            beta_coeff[1] * SQR(q_im2 - 4 * q_im1 + 3 * q_i);
-  beta[1] =
-      beta_coeff[0] * SQR(q_im1 - 2 * q_i + q_ip1) + beta_coeff[1] * SQR(q_im1 + q_ip1);
-  beta[2] = beta_coeff[0] * SQR(q_i - 2 * q_ip1 + q_ip2) +
-            beta_coeff[1] * SQR(3 * q_i - 4 * q_ip1 + q_ip2);
+  beta[0] = weno_beta_coeff_0 * SQR(q_im2 - 2 * q_im1 + q_i) +
+            weno_beta_coeff_1 * SQR(q_im2 - 4 * q_im1 + 3 * q_i);
+  beta[1] = weno_beta_coeff_0 * SQR(q_im1 - 2 * q_i + q_ip1) +
+            weno_beta_coeff_1 * SQR(q_im1 + q_ip1);
+  beta[2] = weno_beta_coeff_0 * SQR(q_i - 2 * q_ip1 + q_ip2) +
+            weno_beta_coeff_1 * SQR(3 * q_i - 4 * q_ip1 + q_ip2);
 
   const Real tau5 = fabs(beta[0] - beta[2]); // [Borges+ 2008]
 
@@ -45,9 +47,9 @@ void WENOZ5(const Real &q_im2, const Real &q_im1, const Real &q_i, const Real &q
 
   // compute qL_ip1
   Real f[3];
-  f[0] = (2.0 * q_im2 - 7.0 * q_im1 + 11.0 * q_i);
-  f[1] = (-1.0 * q_im1 + 5.0 * q_i + 2.0 * q_ip1);
-  f[2] = (2.0 * q_i + 5.0 * q_ip1 - q_ip2);
+  f[0] = 2.0 * q_im2 - 7.0 * q_im1 + 11.0 * q_i;
+  f[1] = -1.0 * q_im1 + 5.0 * q_i + 2.0 * q_ip1;
+  f[2] = 2.0 * q_i + 5.0 * q_ip1 - q_ip2;
 
   Real alpha[3];
   alpha[0] = 0.1 * (1.0 + indicator[0]);
@@ -58,9 +60,9 @@ void WENOZ5(const Real &q_im2, const Real &q_im1, const Real &q_i, const Real &q
   ql_ip1 = (f[0] * alpha[0] + f[1] * alpha[1] + f[2] * alpha[2]) / alpha_sum;
 
   // compute qR_i
-  f[0] = (2.0 * q_ip2 - 7.0 * q_ip1 + 11.0 * q_i);
-  f[1] = (-1.0 * q_ip1 + 5.0 * q_i + 2.0 * q_im1);
-  f[2] = (2.0 * q_i + 5.0 * q_im1 - q_im2);
+  f[0] = 2.0 * q_ip2 - 7.0 * q_ip1 + 11.0 * q_i;
+  f[1] = -1.0 * q_ip1 + 5.0 * q_i + 2.0 * q_im1;
+  f[2] = 2.0 * q_i + 5.0 * q_im1 - q_im2;
 
   alpha[0] = 0.1 * (1.0 + indicator[2]);
   alpha[2] = 0.3 * (1.0 + indicator[0]);

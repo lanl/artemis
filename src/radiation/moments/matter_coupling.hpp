@@ -270,7 +270,7 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
         const Real eg0 = dens * eos_d.InternalEnergyFromDensityTemperature(dens, T);
 
         const auto vb = RotatingFrame::BackgroundVelocity<GEOM>(
-            qshear, om0, vg(b, geom::x1v(), coords.template index<geom::x1v>(k, j, i)));
+            qshear, om0, coords.GetCellCenter(vg,b,k,j,i)[0]);
         const std::array<Real, 3> p0{
             vb[0] * dens + v0(b, gas::cons::momentum(0), k, j, i) / hx[0],
             vb[1] * dens + v0(b, gas::cons::momentum(1), k, j, i) / hx[1],

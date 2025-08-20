@@ -84,14 +84,8 @@ Real EstimateTimestep(MeshData<Real> *md, DiffCoeffParams &dp, PKG &pkg, const E
       md->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, Real &ldt) {
         geometry::Coords<GEOM> coords(cpars, vprim.GetCoordinates(b), k, j, i);
-        const std::array<Real, 3> dx{
-            vg(b, geom::dx1(), coords.template index<geom::dx1>(k, j, i)),
-            vg(b, geom::dx2(), coords.template index<geom::dx2>(k, j, i)),
-            vg(b, geom::dx3(), coords.template index<geom::dx3>(k, j, i))};
-        const std::array<Real, 3> xv{
-            vg(b, geom::x1v(), coords.template index<geom::x1v>(k, j, i)),
-            vg(b, geom::x2v(), coords.template index<geom::x2v>(k, j, i)),
-            vg(b, geom::x3v(), coords.template index<geom::x3v>(k, j, i))};
+        const auto &dx = coords.GetCellWidths(vg,b,k,j,i);
+        const auto &xv = coords.GetCellCenter(vg,b,k,j,i);
         Real min_dx = Big<Real>();
         for (int d = 0; d < ndim; d++) {
           min_dx = std::min(min_dx, dx[d]);
@@ -159,39 +153,18 @@ TaskStatus DiffusionUpdateImpl(MeshData<Real> *md, PKG &pkg, SparsePackCons v0,
         using parthenon::TopologicalElement;
         geometry::Coords<GEOM> coords(cpars, v0.GetCoordinates(b), k, j, i);
 
-        const std::array<Real, 2> ax1{
-            vg(b, geom::ax1(), coords.template index<geom::ax1>(k, j, i)),
-            vg(b, geom::ax1(), coords.template index<geom::ax1>(k, j, i + 1))};
-        const std::array<Real, 2> ax2{
-            vg(b, geom::ax2(), coords.template index<geom::ax2>(k, j, i)),
-            vg(b, geom::ax2(), coords.template index<geom::ax2>(k, j + multi_d, i))};
-        const std::array<Real, 2> ax3{
-            vg(b, geom::ax3(), coords.template index<geom::ax3>(k, j, i)),
-            vg(b, geom::ax3(), coords.template index<geom::ax3>(k + three_d, j, i))};
+       const auto &ax1 = coords.GetFaceAreaX1(vg,b,k,j,i);
+       const auto &ax2 = coords.GetFaceAreaX2(vg,b,k,j,i);
+       const auto &ax3 = coords.GetFaceAreaX3(vg,b,k,j,i);
 
-        const std::array<Real, 3> dhdx1{
-            vg(b, geom::dh1dx1(), coords.template index<geom::dh1dx1>(k, j, i)),
-            vg(b, geom::dh2dx1(), coords.template index<geom::dh2dx1>(k, j, i)),
-            vg(b, geom::dh3dx1(), coords.template index<geom::dh3dx1>(k, j, i))};
-        const std::array<Real, 3> dhdx2{
-            vg(b, geom::dh1dx2(), coords.template index<geom::dh1dx2>(k, j, i)),
-            vg(b, geom::dh2dx2(), coords.template index<geom::dh2dx2>(k, j, i)),
-            vg(b, geom::dh3dx2(), coords.template index<geom::dh3dx2>(k, j, i))};
-        const std::array<Real, 3> dhdx3{
-            vg(b, geom::dh1dx3(), coords.template index<geom::dh1dx3>(k, j, i)),
-            vg(b, geom::dh2dx3(), coords.template index<geom::dh2dx3>(k, j, i)),
-            vg(b, geom::dh3dx3(), coords.template index<geom::dh3dx3>(k, j, i))};
+        const auto &dhdx1 =  coords.GetConnX1(vg,b,k,j,i);
+        const auto &dhdx2 =  coords.GetConnX2(vg,b,k,j,i);
+        const auto &dhdx3 =  coords.GetConnX3(vg,b,k,j,i);
 
-        const std::array<Real, 3> xv{
-            vg(b, geom::x1v(), coords.template index<geom::x1v>(k, j, i)),
-            vg(b, geom::x2v(), coords.template index<geom::x2v>(k, j, i)),
-            vg(b, geom::x3v(), coords.template index<geom::x3v>(k, j, i))};
-        const std::array<Real, 3> hx{
-            vg(b, geom::hx1v(), coords.template index<geom::hx1v>(k, j, i)),
-            vg(b, geom::hx2v(), coords.template index<geom::hx2v>(k, j, i)),
-            vg(b, geom::hx3v(), coords.template index<geom::hx3v>(k, j, i))};
+       const auto &xv = coords.GetCellCenter(vg,b,k,j,i);
+       const auto &hx = coords.GetScaleFactors(vg,b,k,j,i);
 
-        const Real vol = vg(b, geom::vol(), coords.template index<geom::vol>(k, j, i));
+            const Real vol = coords.GetVolume(vg,b,k,j,i);
         const int nspecies = v0.GetSize(b, gas::cons::total_energy());
         for (int n = 0; n < nspecies; ++n) {
           const int imx1 = VI(n, 0);

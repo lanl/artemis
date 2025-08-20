@@ -133,33 +133,16 @@ TaskStatus RotatingFrameImpl(MeshData<Real> *md, const Real om0, const bool do_g
       KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
         // Extract coordinates
         geometry::Coords<GEOM> coords(cpars, vf.GetCoordinates(b), k, j, i);
-        const std::array<Real, 3> xv{
-            vg(0, geom::x1v(), coords.template index<geom::x1v>(k, j, i)),
-            vg(0, geom::x2v(), coords.template index<geom::x2v>(k, j, i)),
-            vg(0, geom::x3v(), coords.template index<geom::x3v>(k, j, i))};
+       const auto &xv = coords.GetCellCenter(vg,b,k,j,i);
         const auto &[xcyl, ex1, ex2, ex3] = coords.ConvertToCylWithVec(xv);
 
         // The geometry dependent flux weighting
         // \pm <R^2>_\pm - <R^2>
-        const std::array<Real, 2> ax1{
-            vg(b, geom::ax1(), coords.template index<geom::ax1>(k, j, i)) *
-                vg(b, geom::rfw1(), coords.template index<geom::rfw1>(k, j, i)),
-            vg(b, geom::ax1(), coords.template index<geom::ax1>(k, j, i + 1)) *
-                vg(b, geom::rfw1(), coords.template index<geom::rfw1>(k, j, i + 1))};
-        const std::array<Real, 2> ax2{
-            vg(b, geom::ax2(), coords.template index<geom::ax2>(k, j, i)) *
-                vg(b, geom::rfw2(), coords.template index<geom::rfw2>(k, j, i)),
-            vg(b, geom::ax2(), coords.template index<geom::ax2>(k, j + multi_d, i)) *
-                vg(b, geom::rfw2(),
-                   coords.template index<geom::rfw2>(k, j + multi_d, i))};
-        const std::array<Real, 2> ax3{
-            vg(b, geom::ax3(), coords.template index<geom::ax3>(k, j, i)) *
-                vg(b, geom::rfw3(), coords.template index<geom::rfw3>(k, j, i)),
-            vg(b, geom::ax3(), coords.template index<geom::ax3>(k + three_d, j, i)) *
-                vg(b, geom::rfw3(),
-                   coords.template index<geom::rfw3>(k + three_d, j, i))};
-
-        const Real vol = vg(b, geom::vol(), coords.template index<geom::vol>(k, j, i));
+        const auto &[bx1, bx2, bx3] = coords.GetRFWeights(vg,b,k,j,i);
+        const auto &ax1 = coords.GetFaceAreaX1(vg,b,k,j,i);
+        const auto &ax2 = coords.GetFaceAreaX2(vg,b,k,j,i);
+        const auto &ax3 = coords.GetFaceAreaX3(vg,b,k,j,i);
+        const Real vol = coords.GetVolume(vg,b,k,j,i);
         if (do_gas) {
           for (int n = 0; n < vf.GetSize(b, gas::cons::density()); ++n) {
 

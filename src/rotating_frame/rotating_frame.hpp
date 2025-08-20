@@ -70,15 +70,9 @@ struct ReconInfo {
                                    const V2 &vg, const int b, const int n, const int k,
                                    const int j, const int i) {
     geometry::Coords<Coordinates::cartesian> coords(cpar, v0.GetCoordinates(b), k, j, i);
-    const std::array<Real, 3> dx{
-        vg(b, geom::dx1(), coords.template index<geom::dx1>(k, j, i)),
-        vg(b, geom::dx2(), coords.template index<geom::dx2>(k, j, i)),
-        vg(b, geom::dx3(), coords.template index<geom::dx3>(k, j, i))};
-    const std::array<Real, 3> xc{
-        vg(b, geom::x1v(), coords.template index<geom::x1v>(k, j, i)),
-        vg(b, geom::x2v(), coords.template index<geom::x2v>(k, j, i)),
-        vg(b, geom::x3v(), coords.template index<geom::x3v>(k, j, i))};
-    vol = vg(b, geom::vol(), coords.template index<geom::vol>(k, j, i));
+    dx = coords.GetCellWidths(vg,b,k,j,i);
+    xc = coords.GetCellCenter(vg,b,k,j,i);
+    vol = coords.GetVolume(vg,b,k,j,i);
     bnds = coords.bnds;
 
     q = v0(b, n, k, j, i);

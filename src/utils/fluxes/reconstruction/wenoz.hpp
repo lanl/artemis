@@ -27,13 +27,15 @@ void WENOZ5(const Real &q_im2, const Real &q_im1, const Real &q_i, const Real &q
             const Real &q_ip2, Real &ql_ip1, Real &qr_i) {
 
   // smoothness indicators for each trial stencil [Jiang & Shu 1996]
-  Real beta[3];
-  beta[0] = weno_beta_coeff_0 * SQR(q_im2 - 2 * q_im1 + q_i) +
-            weno_beta_coeff_1 * SQR(q_im2 - 4 * q_im1 + 3 * q_i);
-  beta[1] = weno_beta_coeff_0 * SQR(q_im1 - 2 * q_i + q_ip1) +
-            weno_beta_coeff_1 * SQR(q_im1 + q_ip1);
-  beta[2] = weno_beta_coeff_0 * SQR(q_i - 2 * q_ip1 + q_ip2) +
-            weno_beta_coeff_1 * SQR(3 * q_i - 4 * q_ip1 + q_ip2);
+  constexpr Real weno_beta_coeff_0 = 13. / 12.;
+  constexpr Real weno_beta_coeff_1  = 0.25;
+  const std::array<Real,3> beta{
+            weno_beta_coeff_0 * SQR(q_im2 - 2 * q_im1 + q_i) +
+            weno_beta_coeff_1 * SQR(q_im2 - 4 * q_im1 + 3 * q_i),
+            weno_beta_coeff_0 * SQR(q_im1 - 2 * q_i + q_ip1) +
+            weno_beta_coeff_1 * SQR(q_im1 + q_ip1),
+            weno_beta_coeff_0 * SQR(q_i - 2 * q_ip1 + q_ip2) +
+            weno_beta_coeff_1 * SQR(3 * q_i - 4 * q_ip1 + q_ip2)};
 
   const Real tau5 = fabs(beta[0] - beta[2]); // [Borges+ 2008]
 

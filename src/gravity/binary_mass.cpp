@@ -96,18 +96,11 @@ TaskStatus BinaryMassGravity(MeshData<Real> *md, const Real time, const Real dt)
       KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
         // Extract coordinate information
         geometry::Coords<GEOM> coords(cpars, vmesh.GetCoordinates(b), k, j, i);
-        const std::array<Real, 3> dx{
-            vg(b, geom::x1v(), coords.template index<geom::x1v>(k, j, i)),
-            vg(b, geom::x2v(), coords.template index<geom::x2v>(k, j, i)),
-            vg(b, geom::x3v(), coords.template index<geom::x3v>(k, j, i))};
-
+       const auto &dx = coords.GetCellCenter(vg,b,k,j,i);
         const auto &[dxc1_, ex1, ex2, ex3] = coords.ConvertToCartWithVec(dx);
         auto dxc1 = dxc1_;
         auto dxc2 = NewArray<Real, 3>();
-        const std::array<Real, 3> hx{
-            vg(b, geom::hx1v(), coords.template index<geom::hx1v>(k, j, i)),
-            vg(b, geom::hx2v(), coords.template index<geom::hx2v>(k, j, i)),
-            vg(b, geom::hx3v(), coords.template index<geom::hx3v>(k, j, i))};
+        const auto &hx = coords.GetScaleFactors(vg,b,k,j,i);
 
         // Calculate force in Cartesian coordinates
         for (int n = 0; n < 3; n++) {

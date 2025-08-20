@@ -220,14 +220,8 @@ TaskStatus SelfDragSourceImpl(MeshData<Real> *md, const Real time, const Real dt
       KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
         // Extract coordinates
         geometry::Coords<GEOM> coords(cpars, vmesh.GetCoordinates(b), k, j, i);
-        const std::array<Real, 3> xv{
-            vg(b, geom::x1v(), coords.template index<geom::x1v>(k, j, i)),
-            vg(b, geom::x2v(), coords.template index<geom::x2v>(k, j, i)),
-            vg(b, geom::x3v(), coords.template index<geom::x3v>(k, j, i))};
-        const std::array<Real, 3> hx{
-            vg(b, geom::hx1v(), coords.template index<geom::hx1v>(k, j, i)),
-            vg(b, geom::hx2v(), coords.template index<geom::hx2v>(k, j, i)),
-            vg(b, geom::hx3v(), coords.template index<geom::hx3v>(k, j, i))};
+       const auto &xv = coords.GetCellCenter(vg,b,k,j,i);
+       const auto &hx = coords.GetScaleFactors(vg,b,k,j,i);
         const auto &[xcyl, ex1, ex2, ex3] = coords.ConvertToCylWithVec(xv);
 
         // Compute the (gas) ramp for this cell
@@ -397,14 +391,8 @@ TaskStatus SimpleDragSourceImpl(MeshData<Real> *md, const Real time, const Real 
       KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
         // Extract coordinates
         geometry::Coords<GEOM> coords(cpars, vmesh.GetCoordinates(b), k, j, i);
-        const std::array<Real, 3> xv{
-            vg(b, geom::x1v(), coords.template index<geom::x1v>(k, j, i)),
-            vg(b, geom::x2v(), coords.template index<geom::x2v>(k, j, i)),
-            vg(b, geom::x3v(), coords.template index<geom::x3v>(k, j, i))};
-        const std::array<Real, 3> hx{
-            vg(b, geom::hx1v(), coords.template index<geom::hx1v>(k, j, i)),
-            vg(b, geom::hx2v(), coords.template index<geom::hx2v>(k, j, i)),
-            vg(b, geom::hx3v(), coords.template index<geom::hx3v>(k, j, i))};
+        const auto &xv = coords.GetCellCenter(vg,b,k,j,i);
+        const auto &hx = coords.GetScaleFactors(vg,b,k,j,i);
         const auto &[xcyl, ex1, ex2, ex3] = coords.ConvertToCylWithVec(xv);
 
         // Compute the ramp for this cell

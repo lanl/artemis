@@ -88,15 +88,8 @@ TaskStatus ThermalFluxImpl(MeshData<Real> *md, DiffCoeffParams dp, PKG &pkg,
               DEFAULT_INNER_LOOP_PATTERN, mbr, il, iu, [&](const int i) {
                 // F = -K grad(T)
                 geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
-                const std::array<Real, 3> xv{
-                    vg(b, geom::x1v(), coords.template index<geom::x1v>(k, j, i)),
-                    vg(b, geom::x2v(), coords.template index<geom::x2v>(k, j, i)),
-                    vg(b, geom::x3v(), coords.template index<geom::x3v>(k, j, i))};
-                const std::array<Real, 3> xv_m{
-                    vg(b, geom::x1v(), coords.template index<geom::x1v>(k, j, i - 1)),
-                    vg(b, geom::x2v(), coords.template index<geom::x2v>(k, j, i - 1)),
-                    vg(b, geom::x3v(), coords.template index<geom::x3v>(k, j, i - 1))};
-
+                const auto &xv = coords.GetCellCenter(vg,b,k,j,i);
+                const auto &xv_m = coords.GetCellCenter(vg,b,k, j,i-1);
                 const Real dx1 = coords.Distance(xv, xv_m);
 
                 const Real T = eos_d.TemperatureFromDensityInternalEnergy(
@@ -149,17 +142,8 @@ TaskStatus ThermalFluxImpl(MeshData<Real> *md, DiffCoeffParams dp, PKG &pkg,
                     DEFAULT_INNER_LOOP_PATTERN, mbr, il, iu, [&](const int i) {
                       // F = -kappa * cv grad(T)
                       geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
-                      const std::array<Real, 3> xv{
-                          vg(b, geom::x1v(), coords.template index<geom::x1v>(k, j, i)),
-                          vg(b, geom::x2v(), coords.template index<geom::x2v>(k, j, i)),
-                          vg(b, geom::x3v(), coords.template index<geom::x3v>(k, j, i))};
-                      const std::array<Real, 3> xv_m{
-                          vg(b, geom::x1v(),
-                             coords.template index<geom::x1v>(k, j - 1, i)),
-                          vg(b, geom::x2v(),
-                             coords.template index<geom::x2v>(k, j - 1, i)),
-                          vg(b, geom::x3v(),
-                             coords.template index<geom::x3v>(k, j - 1, i))};
+                      const auto &xv = coords.GetCellCenter(vg,b,k,j,i);
+                      const auto &xv_m = coords.GetCellCenter(vg,b,k,j-1,i);
                       const Real dx2 = coords.Distance(xv, xv_m);
 
                       const Real T = eos_d.TemperatureFromDensityInternalEnergy(
@@ -217,17 +201,8 @@ TaskStatus ThermalFluxImpl(MeshData<Real> *md, DiffCoeffParams dp, PKG &pkg,
                     DEFAULT_INNER_LOOP_PATTERN, mbr, il, iu, [&](const int i) {
                       // F = -kappa * cv grad(T)
                       geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
-                      const std::array<Real, 3> xv{
-                          vg(b, geom::x1v(), coords.template index<geom::x1v>(k, j, i)),
-                          vg(b, geom::x2v(), coords.template index<geom::x2v>(k, j, i)),
-                          vg(b, geom::x3v(), coords.template index<geom::x3v>(k, j, i))};
-                      const std::array<Real, 3> xv_m{
-                          vg(b, geom::x1v(),
-                             coords.template index<geom::x1v>(k - 1, j, i)),
-                          vg(b, geom::x2v(),
-                             coords.template index<geom::x2v>(k - 1, j, i)),
-                          vg(b, geom::x3v(),
-                             coords.template index<geom::x3v>(k - 1, j, i))};
+                      const auto &xv = coords.GetCellCenter(vg,b,k,j,i);
+                      const auto &xv_m = coords.GetCellCenter(vg,b,k-1,j,i);
                       const Real dx3 = coords.Distance(xv, xv_m);
 
                       const Real T = eos_d.TemperatureFromDensityInternalEnergy(

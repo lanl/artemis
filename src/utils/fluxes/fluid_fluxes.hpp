@@ -283,29 +283,19 @@ TaskStatus FluxSourceImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, CONS vcons, FAC
       KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
         // Extract coordinates
         geometry::Coords<G> coords(cpars, vp.GetCoordinates(b), k, j, i);
-        const Real hdtv =
-            0.5 * dt / vg(b, geom::vol(), coords.template index<geom::vol>(k, j, i));
+        const Real hdtv  =  0.5 * dt / coords.GetVolume(vg,b,k,j,i);
 
         std::array<Real, 3> dh1{0}, dh2{0}, dh3{0};
         if constexpr (G != Coordinates::cartesian) {
-          dh1 = {vg(b, geom::dh1dx1(), coords.template index<geom::dh1dx1>(k, j, i)),
-                 vg(b, geom::dh2dx1(), coords.template index<geom::dh2dx1>(k, j, i)),
-                 vg(b, geom::dh3dx1(), coords.template index<geom::dh3dx1>(k, j, i))};
-          dh2 = {vg(b, geom::dh1dx2(), coords.template index<geom::dh1dx2>(k, j, i)),
-                 vg(b, geom::dh2dx2(), coords.template index<geom::dh2dx2>(k, j, i)),
-                 vg(b, geom::dh3dx2(), coords.template index<geom::dh3dx2>(k, j, i))};
-          dh3 = {vg(b, geom::dh1dx3(), coords.template index<geom::dh1dx3>(k, j, i)),
-                 vg(b, geom::dh2dx3(), coords.template index<geom::dh2dx3>(k, j, i)),
-                 vg(b, geom::dh3dx3(), coords.template index<geom::dh3dx3>(k, j, i))};
+          dh1 = coords.GetConnX1(vg, b, k, j, i);
+          dh2 = coords.GetConnX2(vg, b, k, j, i);
+          dh3 = coords.GetConnX3(vg, b, k, j, i);
         }
         // Get the rotational velocity
         std::array<Real, 3> rfv{0.0};
         [[maybe_unused]] Real omf_ = omf;
         if constexpr (F != Fluid::radiation) {
-          const std::array<Real, 3> xv{
-              vg(b, geom::x1v(), coords.template index<geom::x1v>(k, j, i)),
-              vg(b, geom::x2v(), coords.template index<geom::x2v>(k, j, i)),
-              vg(b, geom::x3v(), coords.template index<geom::x3v>(k, j, i))};
+          const auto &xv = coords.GetCellCenter(vg, b, k, j, i);
           rfv = RotatingFrame::RotationVelocity<G>(xv, omf_);
         }
 
@@ -369,19 +359,9 @@ TaskStatus FluxSourceImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, CONS vcons, FAC
           // pdV source for gas internal energy equation
           if constexpr (F == Fluid::gas) {
             // pdV source term
-            const std::array<Real, 2> ax1{
-                vg(b, geom::ax1(), coords.template index<geom::ax1>(k, j, i)),
-                vg(b, geom::ax1(), coords.template index<geom::ax1>(k, j, i + 1))};
-
-            const std::array<Real, 2> ax2{
-                multi_d * vg(b, geom::ax2(), coords.template index<geom::ax2>(k, j, i)),
-                multi_d * vg(b, geom::ax2(),
-                             coords.template index<geom::ax2>(k, j + multi_d, i))};
-
-            const std::array<Real, 2> ax3{
-                three_d * vg(b, geom::ax3(), coords.template index<geom::ax3>(k, j, i)),
-                three_d * vg(b, geom::ax3(),
-                             coords.template index<geom::ax3>(k + three_d, j, i))};
+    const auto &ax1 = coords.GetFaceAreaX1(vg, b, k, j, i);
+    const auto &ax2 = coords.GetFaceAreaX2(vg, b, k, j, i);
+    const auto &ax3 = coords.GetFaceAreaX3(vg, b, k, j, i);
             // clang-format off
             vc_(b, IEG, k, j, i) += hdtvol[0] *
                                     (vp_.flux(b, d1, IPR, k, j, i) +

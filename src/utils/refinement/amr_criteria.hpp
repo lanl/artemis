@@ -60,21 +60,11 @@ AmrTag ScalarFirstDerivative(MeshBlockData<Real> *md) {
           geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
 
           // Get stencil widths
-          const Real sdx1 =
-              vg(0, geom::x1v(), coords.template index<geom::x1v>(k, j, i + 1)) -
-              vg(0, geom::x1v(), coords.template index<geom::x1v>(k, j, i - 1));
-          const Real sdx2 =
-              vg(0, geom::x2v(), coords.template index<geom::x2v>(k, j + 1, i)) -
-              vg(0, geom::x2v(), coords.template index<geom::x2v>(k, j - 1, i));
-          const Real sdx3 =
-              vg(0, geom::x3v(), coords.template index<geom::x2v>(k + 1, j, i)) -
-              vg(0, geom::x3v(), coords.template index<geom::x2v>(k - 1, j, i));
-
+          const Real sdx1 = coords.x1v(vg, 0, k, j, i + 1) - coords.x1v(vg, 0, k, j, i - 1) ;
+          const Real sdx2 = coords.x2v(vg, 0, k, j + 1, i) - coords.x2v(vg, 0, k, j - 1, i) ;
+          const Real sdx3 = coords.x3v(vg, 0, k - 1, j, i) - coords.x3v(vg, 0, k - 1, j, i) ;
           // Get scale factors
-          const std::array<Real, 3> hx{
-              vg(0, geom::hx1v(), coords.template index<geom::hx1v>(k, j, i)),
-              vg(0, geom::hx2v(), coords.template index<geom::hx2v>(k, j, i)),
-              vg(0, geom::hx3v(), coords.template index<geom::hx3v>(k, j, i))};
+          const auto &hx = coords.GetScaleFactors(vg, b, k, j, i);
           // NOTE(PDM): here, if passed a SparsePool, we will only be accessing the first
           // entry in the SparsePool.  If more fine-tuned control required, create a
           // user-defined AMR criterion.
@@ -96,17 +86,11 @@ AmrTag ScalarFirstDerivative(MeshBlockData<Real> *md) {
         KOKKOS_LAMBDA(const int j, const int i, Real &lmaxeps) {
           geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
           // Get stencil widths
-          const Real sdx1 =
-              vg(0, geom::x1v(), coords.template index<geom::x1v>(k, j, i + 1)) -
-              vg(0, geom::x1v(), coords.template index<geom::x1v>(k, j, i - 1));
-          const Real sdx2 =
-              vg(0, geom::x2v(), coords.template index<geom::x2v>(k, j + 1, i)) -
-              vg(0, geom::x2v(), coords.template index<geom::x2v>(k, j - 1, i));
+          const Real sdx1 = coords.x1v(vg, b, k, j, i + 1) - coords.x1v(vg, b, k, j, i - 1);
+          const Real sdx2 = coords.x2v(vg, b, k, j + 1, i ) - coords.x2v(vg, b, k, j - 1, i);
           // Get scale factors
 
-          const std::array<Real, 2> hx{
-              vg(0, geom::hx1v(), coords.template index<geom::hx1v>(k, j, i)),
-              vg(0, geom::hx2v(), coords.template index<geom::hx2v>(k, j, i))};
+          const auto &hx = coords.GetScaleFactors(vg, b, k, j, i);
 
           Real eps = std::sqrt(
               SQR((v(0, 0, k, j, i + 1) - v(0, 0, k, j, i - 1)) / sdx1 / hx[0]) +

@@ -12,7 +12,7 @@
 #ifndef UTILS_FLUXES_RECONSTRUCTION_WENOZ_HPP_
 #define UTILS_FLUXES_RECONSTRUCTION_WENOZ_HPP_
 
-#define weno_eps
+#define weno_eps 1.0e-42
 // Artemis includes
 #include "artemis.hpp"
 
@@ -36,13 +36,12 @@ void WENOZ5(const Real &q_im2, const Real &q_im1, const Real &q_i, const Real &q
   beta[2] = beta_coeff[0] * SQR(q_i - 2 * q_ip1 + q_ip2) +
             beta_coeff[1] * SQR(3 * q_i - 4 * q_ip1 + q_ip2);
 
-  const Real tau5 = fabs(beta[0] - beta[2]) // [Borges+ 2008]
-      const Real epsW = 1.0e-42;
+  const Real tau5 = fabs(beta[0] - beta[2]); // [Borges+ 2008]
 
   Real indicator[3]; // [Castro, Costa, & Don 2011]
-  indicator[0] = SQR(tau5 / (beta[0] + epsW));
-  indicator[1] = SQR(tau5 / (beta[1] + epsW));
-  indicator[2] = SQR(tau5 / (beta[2] + epsW));
+  indicator[0] = SQR(tau5 / (beta[0] + weno_eps));
+  indicator[1] = SQR(tau5 / (beta[1] + weno_eps));
+  indicator[2] = SQR(tau5 / (beta[2] + weno_eps));
 
   // compute qL_ip1
   Real f[3];

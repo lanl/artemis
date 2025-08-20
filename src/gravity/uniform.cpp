@@ -60,10 +60,7 @@ TaskStatus UniformGravity(MeshData<Real> *md, const Real time, const Real dt) {
       KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
         // Extract coordinates
         geometry::Coords<GEOM> coords(cpars, vmesh.GetCoordinates(b), k, j, i);
-        const std::array<Real, 3> hx{
-            vg(b, geom::hx1v(), coords.template index<geom::hx1v>(k, j, i)),
-            vg(b, geom::hx2v(), coords.template index<geom::hx2v>(k, j, i)),
-            vg(b, geom::hx3v(), coords.template index<geom::hx3v>(k, j, i))};
+        const auto &hx = coords.GetScaleFactors(vg,b,k,j,i);
 
         if (do_gas) {
           // Gravitational acceleration and energy release

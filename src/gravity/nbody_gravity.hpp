@@ -32,16 +32,10 @@ NBodyGravityImpl(V1 &vmesh, V2 &vg, const geometry::Coords<GEOM> &coords,
                  const Real time, const Real dt) {
   // Extract coordinates
 
-  const std::array<Real, 3> x{
-      vg(b, geom::x1v(), coords.template index<geom::x1v>(k, j, i)),
-      vg(b, geom::x2v(), coords.template index<geom::x2v>(k, j, i)),
-      vg(b, geom::x3v(), coords.template index<geom::x3v>(k, j, i))};
+  const auto &x = coords.GetCellCenter(vg,b,k,j,i);
   const auto &[xcart, ex1, ex2, ex3] = coords.ConvertToCartWithVec(x);
-  const std::array<Real, 3> hx{
-      vg(b, geom::hx1v(), coords.template index<geom::hx1v>(k, j, i)),
-      vg(b, geom::hx2v(), coords.template index<geom::hx2v>(k, j, i)),
-      vg(b, geom::hx3v(), coords.template index<geom::hx3v>(k, j, i))};
-  const Real vol = vg(b, geom::vol(), coords.template index<geom::vol>(k, j, i));
+     const auto &hx = coords.GetScaleFactors(vg,b,k,j,i);
+     const Real vol = coords.GetVolume(vg,b,k,j,i);
 
   // Compute gravitational acceleration
   Real g[3] = {0.0};

@@ -96,12 +96,8 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         // cell-centered coordinates
         geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
 
-        const std::array<Real, 2> xv{
-            vg(0, geom::x1v(), coords.template index<geom::x1v>(k, j, i)),
-            vg(0, geom::x2v(), coords.template index<geom::x2v>(k, j, i))};
-
-        // const auto &xv = coords.GetCellCenter();
-        //  compute cell-centered conserved variables
+                const auto &xv = coords.GetCellCenter(vg,0,k,j,i);
+                // compute cell-centered conserved variables
         if (do_gas) {
           // put in a ball at the center
           const Real dr2 = SQR(xv[0] - 1.0) + SQR(xv[1] - 1.0);

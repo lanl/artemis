@@ -63,6 +63,25 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   artemis->AddParam("units", units);
   artemis->AddParam("constants", constants);
 
+  // Correct x1 coordinate if logarithmic
+  auto x1min = pin->GetReal("parthenon/mesh", "x1min");
+  auto x1max = pin->GetReal("parthenon/mesh", "x1max");
+  auto x2min = pin->GetReal("parthenon/mesh", "x2min");
+  auto x2max = pin->GetReal("parthenon/mesh", "x2max");
+  auto x3min = pin->GetReal("parthenon/mesh", "x3min");
+  auto x3max = pin->GetReal("parthenon/mesh", "x3max");
+  if (pin->GetOrAddString("artemis", "radial_spacing", "uniform") == "logarithmic") {
+    x1min = std::exp(x1min);
+    x1max = std::exp(x1max);
+  }
+
+  artemis->AddParam("x1min", x1min);
+  artemis->AddParam("x1max", x1max);
+  artemis->AddParam("x2min", x2min);
+  artemis->AddParam("x2max", x2max);
+  artemis->AddParam("x3min", x3min);
+  artemis->AddParam("x3max", x3max);
+
   // Add optionally enrollable operator split Metadata flag
   parthenon::MetadataFlag MetadataOperatorSplit =
       parthenon::Metadata::AddUserFlag("OperatorSplit");
@@ -123,6 +142,9 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   Coordinates coords = geometry::CoordSelect(sys, ndim);
   artemis->AddParam("coords", coords);
   artemis->AddParam("coord_sys", sys);
+
+  geometry::CoordParams cpars(pin.get());
+  artemis->AddParam("coord_params", cpars);
 
   // Call package initializers here
   if (do_nbody) packages.Add(NBody::Initialize(pin.get(), constants));

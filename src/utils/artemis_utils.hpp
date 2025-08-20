@@ -36,49 +36,29 @@ KOKKOS_FORCEINLINE_FUNCTION Real VDot(const V1 &a, const V2 &b) {
 }
 
 //----------------------------------------------------------------------------------------
-//! \fn Real ArtemisUtils::DualEnergySIE(vmesh, const int b, const int n,
-//!              const int k, const int j, const int i, const Real de_switch,
-//!              const Real dflr, const Real sieflr, const Real hx[3])
+//! \fn Real ArtemisUtils::DualEnergySIE(vmesh, const int b, const int n, const int k,
+//!                                      const int j, const int i, const Real de_switch,
+//!                                      const Real hx[3])
 //! \brief Returns appropriate specific internal energy variable based on de_switch
+//! NOTE(@pdmullen): Floors should be handled outside this function call
 template <typename T>
 KOKKOS_FORCEINLINE_FUNCTION Real DualEnergySIE(T &vmesh, const int b, const int n,
                                                const int k, const int j, const int i,
-                                               const Real de_switch, const Real dflr,
-                                               const Real sieflr,
+                                               const Real de_switch,
                                                const std::array<Real, 3> &hx) {
-  // Calculate kinetic energy
-  const Real u_d = std::max(vmesh(b, gas::cons::density(n), k, j, i), dflr);
-  const Real invd = 1.0 / u_d;
+  // Extract state vector
+  const Real invd = 1.0 / vmesh(b, gas::cons::density(n), k, j, i);
   const Real &rv1 = vmesh(b, gas::cons::momentum(VI(n, 0)), k, j, i) / hx[0];
   const Real &rv2 = vmesh(b, gas::cons::momentum(VI(n, 1)), k, j, i) / hx[1];
   const Real &rv3 = vmesh(b, gas::cons::momentum(VI(n, 2)), k, j, i) / hx[2];
+  const Real &u_e = vmesh(b, gas::cons::total_energy(n), k, j, i);
+  const Real &u_u = vmesh(b, gas::cons::internal_energy(n), k, j, i);
   const Real ke = 0.5 * invd * (SQR(rv1) + SQR(rv2) + SQR(rv3));
 
   // Calculate conserved representation of internal energy
-  const Real u_e = vmesh(b, gas::cons::total_energy(n), k, j, i);
   const Real ut_sie = invd * (u_e - ke);
   const bool dual_switch = (ut_sie > invd * de_switch * u_e);
-  const Real uu_sie = invd * vmesh(b, gas::cons::internal_energy(n), k, j, i);
-  const Real sie = (dual_switch)*ut_sie + (!dual_switch) * uu_sie;
-
-  return std::max(sie, sieflr);
-}
-
-//----------------------------------------------------------------------------------------
-//! \fn Real ArtemisUtils::DualEnergySIE(vmesh, const int b, const int n,
-//!              const int k, const int j, const int i, const Real de_switch,
-//!              const Real dflr, const Real sieflr)
-//! \brief Returns appropriate specific internal energy variable based on de_switch
-template <Coordinates GEOM, typename T>
-KOKKOS_FORCEINLINE_FUNCTION Real DualEnergySIE(T &vmesh, const int b, const int n,
-                                               const int k, const int j, const int i,
-                                               const Real de_switch, const Real dflr,
-                                               const Real sieflr) {
-  // Get scale factors
-  geometry::Coords<GEOM> coords(vmesh.GetCoordinates(b), k, j, i);
-  const auto &hx = coords.GetScaleFactors();
-
-  return DualEnergySIE(vmesh, b, n, k, j, i, de_switch, dflr, sieflr, hx);
+  return (dual_switch)*ut_sie + (!dual_switch) * invd * u_u;
 }
 
 //----------------------------------------------------------------------------------------
@@ -186,7 +166,8 @@ struct SumMyArray {
 //! Defined in artemis_utils.cpp
 //! NOTE(@pdmullen): We should likely move everything above to implementation file too...
 void PrintArtemisConfiguration(Packages_t &packages);
-void EnrollArtemisRefinementOps(parthenon::Metadata &m, Coordinates coords);
+void EnrollArtemisRefinementOps(parthenon::Metadata &m, Coordinates coords,
+                                const bool log);
 std::vector<std::vector<Real>> loadtxt(std::string fname);
 
 // 4D  outer parallel loop using Kokkos Teams

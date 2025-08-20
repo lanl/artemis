@@ -71,10 +71,23 @@ def analyze():
         for fv in _flux:
             for dv in _de_switch:
                 problem_id = _file_id + "_{}_de{:d}_{}".format(fv, int(10 * dv), cv)
-                time, r, phi, z, [d, u, v, w, T] = analysis.load_level(
+                time, x, phi, z, [d, u, v, w, T], logx = analysis.load_level(
                     "final", dir=artemis.get_data_dir(), base=problem_id + ".out1"
                 )
-                rc = 0.5 * (r[1:] + r[:-1])
+                if logx:
+                    r = np.exp(x)
+                else:
+                    r = x
+
+                rc = (
+                    (2.0 / 3.0)
+                    * (r[1:] ** 3 - r[:-1] ** 3)
+                    / (r[1:] ** 2 - r[:-1] ** 2)
+                )
+                if logx:
+                    xc = np.log(rc)
+                else:
+                    xc = rc
                 pc = 0.5 * (phi[1:] + phi[:-1])
 
                 h = 0.05
@@ -95,8 +108,12 @@ def analyze():
                 axes[0].set_ylim(np.pi - 0.8, np.pi + 0.8)
 
                 # Indices for the inner and outer evalulation rings
-                ii = np.argwhere(rc >= 1 - 0.1)[0][0]
-                io = np.argwhere(rc >= 1 + 0.1)[0][0]
+                if logx:
+                    ii = np.argwhere(xc >= np.log(1 - 0.1))[0][0]
+                    io = np.argwhere(xc >= np.log(1 + 0.1))[0][0]
+                else:
+                    ii = np.argwhere(rc >= 1 - 0.1)[0][0]
+                    io = np.argwhere(rc >= 1 + 0.1)[0][0]
 
                 # the azimuthal locations of the spirals approximated as
                 # where the max occurs

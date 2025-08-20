@@ -255,8 +255,6 @@ TaskCollection ArtemisDriver<GEOM>::StepTasks() {
       if (do_dust) dust_coord_src = tl.AddTask(update, Dust::FluxSource, u0.get(), bdt);
 
       // Apply (gas) diffusion sources
-      // NOTE(@pdmullen): I believe set_flx dependency implicitly inside gas_coord_src,
-      // but included below explicitly for posterity
       TaskID gas_diff_src = gas_coord_src | diff_flx | set_flx;
       if (do_diffusion && do_gas) {
         gas_diff_src = tl.AddTask(gas_coord_src | diff_flx | set_flx,
@@ -278,12 +276,14 @@ TaskCollection ArtemisDriver<GEOM>::StepTasks() {
       }
 
       // Apply drag source term
+      // NOTE(@pdmullen): RK integrated, operator split drag (RHS computed from U)
       TaskID drag_src = rframe_src;
       if (do_drag) {
         drag_src = tl.AddTask(rframe_src, Drag::DragSource<GEOM>, u0.get(), time, bdt);
       }
 
       // Apply cooling source term
+      // NOTE(@pdmullen): RK integrated, operator split cooling (RHS computed from U)
       TaskID cooling_src = drag_src;
       if (do_cooling) {
         cooling_src =

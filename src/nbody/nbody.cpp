@@ -282,6 +282,8 @@ AmrTag DistanceRefinement(MeshBlockData<Real> *md) {
   auto particles = nbody_pkg->Param<ParArray1D<NBody::Particle>>("particles");
   const auto npart = static_cast<int>(particles.size());
   const auto derefine_factor = nbody_pkg->Param<Real>("derefine_factor");
+  const auto &cpars =
+      pm->packages.Get("artemis")->template Param<geometry::CoordParams>("coord_params");
 
   IndexRange ib = md->GetBoundsI(IndexDomain::interior);
   IndexRange jb = md->GetBoundsJ(IndexDomain::interior);
@@ -293,7 +295,7 @@ AmrTag DistanceRefinement(MeshBlockData<Real> *md) {
       kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i, Real &ldist) {
         // Extract coordinates
-        geometry::Coords<GEOM> coords(pco, k, j, i);
+        geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
         const auto &x = coords.GetCellCenter();
 
         const auto &xcart = coords.ConvertToCart(x);

@@ -85,7 +85,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   }
 
   // Problem specific params
-  const Real x1min = pin->GetReal("parthenon/mesh", "x1min");
+  const Real x1min = artemis_pkg->Param<Real>("x1min");
 
   // Packing and capture variables for kernel
   auto &md = pmb->meshblock_data.Get();
@@ -101,12 +101,13 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
   auto &pco = pmb->coords;
   auto pars = cond_params;
+  const auto &cpars = artemis_pkg->template Param<geometry::CoordParams>("coord_params");
 
   pmb->par_for(
       "conduction", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
         if (do_gas) {
-          geometry::Coords<GEOM> coords(pco, k, j, i);
+          geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
           const auto &xv = coords.GetCellCenter();
 
           const Real P0 = eos_d.PressureFromDensityTemperature(pars.g_rho, pars.g_temp);
@@ -147,7 +148,7 @@ void CondBoundaryImpl(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) {
                                                  gas::prim::sie>(mbd);
   auto v = descriptors[coarse].GetPack(mbd.get());
   if (v.GetMaxNumberOfVars() == 0) return;
-
+  const auto &cpars = artemis_pkg->template Param<geometry::CoordParams>("coord_params");
   // Indexing
   const auto &pco = (coarse) ? pmb->pmr->GetCoarseCoords() : pmb->coords;
   auto &dp = cond_params;
@@ -213,11 +214,11 @@ void CondBoundaryImpl(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) {
                            x1dir ? ((BDY == IndexDomain::inner_x1) ? is : ie) : i};
 
         // Extract coordinates at k, j, i
-        geometry::Coords<GEOM> coords(pco, k, j, i);
+        geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
         const auto &xv = coords.GetCellCenter();
 
         // Extract coordinates at ia, im, ic
-        geometry::Coords<GEOM> ca(pco, ia[0], ia[1], ia[2]);
+        geometry::Coords<GEOM> ca(cpars, pco, ia[0], ia[1], ia[2]);
         const auto &xva = ca.GetCellCenter();
 
         const Real xma = (INNER ? -1. : 1.) * coords.Distance(xv, xva);

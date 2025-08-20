@@ -35,6 +35,12 @@ def load_level(n, base, dir="./", off=0):
 
     with h5py.File(fname, "r") as f:
         time = f["Info"].attrs["Time"]
+        logx = False
+        for line in f["Input"].attrs["File"].split("\n"):
+            if len(line.strip()) > 0:
+                if line.strip()[0] != "#":
+                    if "spacing" in line:
+                        logx = line.split("=")[1].split("#")[0].strip() == "logarithmic"
 
         lvl = f["Levels"][...]
         ind = lvl == max(lvl.max() - off, 0)
@@ -99,7 +105,7 @@ def load_level(n, base, dir="./", off=0):
     x = np.linspace(x.min(), x.max(), nx + 1)
     y = np.linspace(y.min(), y.max(), ny + 1)
     z = np.linspace(z.min(), z.max(), nz + 1)
-    return time, x, y, z, [d, u, v, w, p / d]
+    return time, x, y, z, [d, u, v, w, p / d], logx
 
 
 # Associated functions for plotting Artemis data

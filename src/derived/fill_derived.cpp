@@ -52,25 +52,34 @@ TaskStatus SetAuxillaryFields(MeshData<Real> *md) {
   IndexRange jb = md->GetBoundsJ(IndexDomain::interior);
   IndexRange kb = md->GetBoundsK(IndexDomain::interior);
 
+  const auto &cpars = artemis_pkg->template Param<geometry::CoordParams>("coord_params");
+
   // Apply dual energy formalism to sync internal energy and total energy
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "SetAuxillaryFields", parthenon::DevExecSpace(), 0,
       md->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
+        // Extract geometry
+        geometry::Coords<GEOM> coords(cpars, vmesh.GetCoordinates(b), k, j, i);
+
+        const auto &hx = coords.GetScaleFactors();
+
         for (int n = 0; n < vmesh.GetSize(b, gas::cons::density()); ++n) {
-          // Extract conserved density and apply floor
-          Real u_d = vmesh(b, gas::cons::density(n), k, j, i);
+          // Extract state vector
+          Real &u_d = vmesh(b, gas::cons::density(n), k, j, i);
+          Real &u_u = vmesh(b, gas::cons::internal_energy(n), k, j, i);
+
+          // Apply density floor
           const bool dfloor = (u_d > dflr_gas);
           u_d = (dfloor)*u_d + (!dfloor) * dflr_gas;
 
-          // Compute internal energy using dual energy formalism and apply floor
-          const Real utmp =
-              u_d * ArtemisUtils::DualEnergySIE<GEOM>(vmesh, b, n, k, j, i, de_switch,
-                                                      dflr_gas, sieflr_gas);
-          const Real uflr = u_d * sieflr_gas;
-          Real &u_u = vmesh(b, gas::cons::internal_energy(n), k, j, i);
-          const bool ufloor = (u_u > uflr);
-          u_u = (ufloor)*utmp + (!ufloor) * uflr;
+          // Compute SIE via dual energy formalism and apply floor
+          Real sie = ArtemisUtils::DualEnergySIE(vmesh, b, n, k, j, i, de_switch, hx);
+          const Real efloor = (sie > sieflr_gas);
+          sie = (efloor)*sie + (!efloor) * sieflr_gas;
+
+          // Return internal energy
+          u_u = u_d * sie;
         }
       });
   return TaskStatus::complete;
@@ -113,6 +122,7 @@ void ConsToPrim(MeshData<Real> *md) {
     eflr_rad = rad_pkg->template Param<Real>("efloor");
     c = rad_pkg->template Param<Real>("c");
   }
+  const auto &cpars = artemis_pkg->template Param<geometry::CoordParams>("coord_params");
 
   // Packing and indexing
   static auto desc = MakePackDescriptor<
@@ -131,7 +141,7 @@ void ConsToPrim(MeshData<Real> *md) {
       md->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
         // Extract coordinates
-        geometry::Coords<GEOM> coords(vmesh.GetCoordinates(b), k, j, i);
+        geometry::Coords<GEOM> coords(cpars, vmesh.GetCoordinates(b), k, j, i);
         const auto &xv = coords.GetCellCenter();
         const auto &hx = coords.GetScaleFactors();
 
@@ -217,7 +227,6 @@ void PrimToCons(T *md) {
   const bool do_gas = artemis_pkg->template Param<bool>("do_gas");
   const bool do_dust = artemis_pkg->template Param<bool>("do_dust");
   const bool do_rad = artemis_pkg->template Param<bool>("do_moment");
-  const bool do_imc = artemis_pkg->template Param<bool>("do_imc");
 
   // Extract gas parameters
   Real dflr_gas = Null<Real>();
@@ -244,6 +253,7 @@ void PrimToCons(T *md) {
     eflr_rad = rad_pkg->template Param<Real>("efloor");
     c = rad_pkg->template Param<Real>("c");
   }
+  const auto &cpars = artemis_pkg->template Param<geometry::CoordParams>("coord_params");
 
   // Packing and indexing
   static auto desc =
@@ -264,7 +274,7 @@ void PrimToCons(T *md) {
       vmesh.GetNBlocks() - 1, kbe.s, kbe.e, jbe.s, jbe.e, ibe.s, ibe.e,
       KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
         // Extract coordinates
-        geometry::Coords<GEOM> coords(vmesh.GetCoordinates(b), k, j, i);
+        geometry::Coords<GEOM> coords(cpars, vmesh.GetCoordinates(b), k, j, i);
         const auto &xv = coords.GetCellCenter();
         const auto &hx = coords.GetScaleFactors();
 

@@ -69,6 +69,7 @@ struct DiskParams {
   bool do_gas, do_dust, do_moment, do_imc;
   bool nbody_temp;
   bool quiet_start;
+  bool log;
 };
 
 //----------------------------------------------------------------------------------------
@@ -144,7 +145,7 @@ ComputeDiskProfile(const struct DiskParams pgen, const parthenon::Coordinates_t 
                    const bool do_dust, Real &ddens, Real &dvel1, Real &dvel2, Real &dvel3,
                    ParArray1D<NBody::Particle> particles, const int npart) {
   // Extract coordinates
-  geometry::Coords<GEOM> coords(pco, k, j, i);
+  geometry::Coords<GEOM> coords(pgen.log, pco, k, j, i);
   const auto &xv = coords.GetCellCenter();
 
   const auto &[xcyl, ex1, ex2, ex3] = coords.ConvertToCylWithVec(xv);
@@ -261,6 +262,7 @@ inline void InitDiskParams(MeshBlock *pmb, ParameterInput *pin) {
   Params &params = artemis_pkg->AllParams();
   if (!(params.hasKey("disk_params"))) {
     DiskParams disk_params;
+    disk_params.log = artemis_pkg->Param<geometry::CoordParams>("coord_params").log;
     auto &grav_pkg = pmb->packages.Get("gravity");
     auto &gas_pkg = pmb->packages.Get("gas");
 
@@ -512,14 +514,14 @@ void DiskBoundaryVisc(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) {
         const int im1[3] = {k, j, (BDY == IndexDomain::inner_x1) ? is : ie - 1};
 
         // Extract coordinates at k, j, i
-        geometry::Coords<GEOM> coords(pco, k, j, i);
+        geometry::Coords<GEOM> coords(dp.log, pco, k, j, i);
         const auto &xv = coords.GetCellCenter();
         const auto &[xcyl, ex1, ex2, ex3] = coords.ConvertToCylWithVec(xv);
 
         // Extract coordinates at ia, im, ic
-        geometry::Coords<GEOM> ca(pco, ia[0], ia[1], ia[2]);
-        geometry::Coords<GEOM> cp1(pco, ip1[0], ip1[1], ip1[2]);
-        geometry::Coords<GEOM> cm1(pco, im1[0], im1[1], im1[2]);
+        geometry::Coords<GEOM> ca(dp.log, pco, ia[0], ia[1], ia[2]);
+        geometry::Coords<GEOM> cp1(dp.log, pco, ip1[0], ip1[1], ip1[2]);
+        geometry::Coords<GEOM> cm1(dp.log, pco, im1[0], im1[1], im1[2]);
         const auto &xva = ca.GetCellCenter();
         const auto &[xcyla, scr1, scr2, scr3] = ca.ConvertToCylWithVec(xva);
         const Real eRa[3] = {scr1[0], scr2[0], scr3[0]};
@@ -766,14 +768,14 @@ void DiskBoundaryExtrap(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) 
                               x1dir ? ((BDY == IndexDomain::inner_x1) ? is : ie - 1) : i};
 
           // Extract coordinates at k, j, i
-          geometry::Coords<GEOM> coords(pco, k, j, i);
+          geometry::Coords<GEOM> coords(dp.log, pco, k, j, i);
           const auto &xv = coords.GetCellCenter();
           const auto &[xcyl, ex1, ex2, ex3] = coords.ConvertToCylWithVec(xv);
 
           // Extract coordinates at ia, im, ic
-          geometry::Coords<GEOM> ca(pco, ia[0], ia[1], ia[2]);
-          geometry::Coords<GEOM> cp1(pco, ip1[0], ip1[1], ip1[2]);
-          geometry::Coords<GEOM> cm1(pco, im1[0], im1[1], im1[2]);
+          geometry::Coords<GEOM> ca(dp.log, pco, ia[0], ia[1], ia[2]);
+          geometry::Coords<GEOM> cp1(dp.log, pco, ip1[0], ip1[1], ip1[2]);
+          geometry::Coords<GEOM> cm1(dp.log, pco, im1[0], im1[1], im1[2]);
           const auto &xva = ca.GetCellCenter();
           const auto &[xcyla, scr1, scr2, scr3] = ca.ConvertToCylWithVec(xva);
           const Real eRa[3] = {scr1[0], scr2[0], scr3[0]};

@@ -82,12 +82,12 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   Real gx = 0.0;
   Real zmin = Null<Real>(), zmax = Null<Real>();
   if (three_d) {
-    zmin = pin->GetReal("parthenon/mesh", "x3min");
-    zmax = pin->GetReal("parthenon/mesh", "x3max");
+    zmin = artemis_pkg->Param<Real>("x3min");
+    zmax = artemis_pkg->Param<Real>("x3max");
     if (do_grav) gx = grav_pkg->Param<Real>("gx3");
   } else {
-    zmin = pin->GetReal("parthenon/mesh", "x2min");
-    zmax = pin->GetReal("parthenon/mesh", "x2max");
+    zmin = artemis_pkg->Param<Real>("x2min");
+    zmax = artemis_pkg->Param<Real>("x2max");
     if (do_grav) gx = grav_pkg->Param<Real>("gx2");
   }
 

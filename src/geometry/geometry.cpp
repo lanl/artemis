@@ -123,7 +123,6 @@ void InitBlockGeom(MeshBlock *pmb, ParameterInput *pin) {
         vg(b, geom::x3v(), coords.template index<geom::x3v>(k, j, i)) = xv[2];
 
         const auto dx = coords.GetCellWidths();
-        const int idx = coords.template index<geom::dx1>(k, j, i);
         vg(b, geom::dx1(), coords.template index<geom::dx1>(k, j, i)) = dx[0];
         vg(b, geom::dx2(), coords.template index<geom::dx2>(k, j, i)) = dx[1];
         vg(b, geom::dx3(), coords.template index<geom::dx3>(k, j, i)) = dx[2];
@@ -133,7 +132,8 @@ void InitBlockGeom(MeshBlock *pmb, ParameterInput *pin) {
         vg(b, geom::hx2v(), coords.template index<geom::hx2v>(k, j, i)) = hx[1];
         vg(b, geom::hx3v(), coords.template index<geom::hx3v>(k, j, i)) = hx[2];
 
-        vg(b, geom::vol(), coords.template index<geom::vol>(k, j, i)) = coords.Volume();
+        const Real vol = coords.Volume();
+        vg(b, geom::vol(), coords.template index<geom::vol>(k, j, i)) = vol;
 
         // Face quantities
         const auto &[rfw1, rfw2, rfw3] = coords.RFWeights();

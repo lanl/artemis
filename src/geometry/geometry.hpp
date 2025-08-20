@@ -301,6 +301,13 @@ class CoordsBase {
             bnds.x3[static_cast<int>(f)]};
   }
 
+  template <typename V1>
+  KOKKOS_INLINE_FUNCTION Real GetVolume(const V1 &vg, const int b, const int k,
+                                        const int j, const int i) const {
+    // The centroid value of the X3 face
+    return vg(b, geom::vol(), index<geom::vol>(k, j, i));
+  }
+
   KOKKOS_INLINE_FUNCTION Real AreaX1(const Real x1f) const {
     // The X1 face area
     const Real dx2 = bnds.x2[1] - bnds.x2[0];
@@ -440,6 +447,7 @@ class CoordsBase {
   KOKKOS_INLINE_FUNCTION BBox &GetBounds() const {
     return static_cast<const T *>(this)->bnds;
   }
+
   KOKKOS_INLINE_FUNCTION Real GetCellWidthX1() const {
     // The cell width in the X1 direction
     const Real xv[3] = {static_cast<const T *>(this)->x1v(),
@@ -478,16 +486,42 @@ class CoordsBase {
                 (bnds.x3[1] - bnds.x3[0])};
   }
 
+  template <typename V1>
+  KOKKOS_INLINE_FUNCTION std::array<Real, 3>
+  GetCellWidths(const V1 &vg, const int b, const int k, const int j, const int i) const {
+    // Return all cell widths
+    return {vg(b, geom::dx1(), index<geom::dx1>(k, j, i)),
+            vg(b, geom::dx2(), index<geom::dx2>(k, j, i)),
+            vg(b, geom::dx3(), index<geom::dx3>(k, j, i))};
+  }
+
   KOKKOS_INLINE_FUNCTION std::array<Real, 3> GetCellCenter() const {
     // Get the cell centroid
     return {static_cast<const T *>(this)->x1v(), static_cast<const T *>(this)->x2v(),
             static_cast<const T *>(this)->x3v()};
   }
 
+  template <typename V1>
+  KOKKOS_INLINE_FUNCTION std::array<Real, 3>
+  GetCellCenter(const V1 &vg, const int b, const int k, const int j, const int i) const {
+    return {vg(b, geom::x1v(), index<geom::x1v>(k, j, i)),
+            vg(b, geom::x2v(), index<geom::x2v>(k, j, i)),
+            vg(b, geom::x3v(), index<geom::x3v>(k, j, i))};
+  }
+
   KOKKOS_INLINE_FUNCTION std::array<Real, 3> GetScaleFactors() const {
     // Get the volume averaged scale factors
     return {static_cast<const T *>(this)->hx1v(), static_cast<const T *>(this)->hx2v(),
             static_cast<const T *>(this)->hx3v()};
+  }
+
+  template <typename V1>
+  KOKKOS_INLINE_FUNCTION std::array<Real, 3> GetScaleFactors(const V1 &vg, const int b,
+                                                             const int k, const int j,
+                                                             const int i) const {
+    return {vg(b, geom::hx1v(), index<geom::hx1v>(k, j, i)),
+            vg(b, geom::hx2v(), index<geom::hx2v>(k, j, i)),
+            vg(b, geom::hx3v(), index<geom::hx3v>(k, j, i))};
   }
 
   KOKKOS_INLINE_FUNCTION std::array<Real, 2> GetFaceAreaX1() const {
@@ -504,6 +538,28 @@ class CoordsBase {
     // Get the lower and upper face areas in the X3 direction
     return {static_cast<const T *>(this)->AreaX3(bnds.x3[0]),
             static_cast<const T *>(this)->AreaX3(bnds.x3[1])};
+  }
+
+  template <typename V1>
+  KOKKOS_INLINE_FUNCTION std::array<Real, 2>
+  GetFaceAreaX1(const V1 &vg, const int b, const int k, const int j, const int i) const {
+    // Get the lower and upper face areas in the X1 direction
+    return {vg(b, geom::ax1(), index<geom::ax1>(k, j, i)),
+            vg(b, geom::ax1(), index<geom::ax1>(k, j, i + 1))};
+  }
+  template <typename V1>
+  KOKKOS_INLINE_FUNCTION std::array<Real, 2>
+  GetFaceAreaX2(const V1 &vg, const int b, const int k, const int j, const int i) const {
+    // Get the lower and upper face areas in the X1 direction
+    return {vg(b, geom::ax2(), index<geom::ax2>(k, j, i)),
+            vg(b, geom::ax2(), index<geom::ax2>(k, j + 1, i))};
+  }
+  template <typename V1>
+  KOKKOS_INLINE_FUNCTION std::array<Real, 2>
+  GetFaceAreaX3(const V1 &vg, const int b, const int k, const int j, const int i) const {
+    // Get the lower and upper face areas in the X1 direction
+    return {vg(b, geom::ax3(), index<geom::ax3>(k, j, i)),
+            vg(b, geom::ax3(), index<geom::ax3>(k + 1, j, i))};
   }
 
   template <parthenon::CoordinateDirection XDIR>
@@ -549,6 +605,70 @@ class CoordsBase {
     return {static_cast<const T *>(this)->dh1dx3(),
             static_cast<const T *>(this)->dh2dx3(),
             static_cast<const T *>(this)->dh3dx3()};
+  }
+  KOKKOS_INLINE_FUNCTION std::array<Real, 3> GetGradH1() const {
+    // { dh1/dx1, dh2/dx1, dh3/dx1 }
+    return {static_cast<const T *>(this)->dh1dx1(),
+            static_cast<const T *>(this)->dh1dx2(),
+            static_cast<const T *>(this)->dh1dx3()};
+  }
+  KOKKOS_INLINE_FUNCTION std::array<Real, 3> GetGradH2() const {
+    // { dh1/dx2, dh2/dx2, dh3/dx2 }
+    return {static_cast<const T *>(this)->dh2dx1(),
+            static_cast<const T *>(this)->dh2dx2(),
+            static_cast<const T *>(this)->dh2dx3()};
+  }
+  KOKKOS_INLINE_FUNCTION std::array<Real, 3> GetGradH3() const {
+    // { dh1/dx3, dh2/dx3, dh3/dx3 }
+    return {static_cast<const T *>(this)->dh3dx1(),
+            static_cast<const T *>(this)->dh3dx2(),
+            static_cast<const T *>(this)->dh3dx3()};
+  }
+
+  template <typename V1>
+  KOKKOS_INLINE_FUNCTION std::array<Real, 3>
+  GetConnX1(const V1 &vg, const int b, const int k, const int j, const int i) const {
+    // { dh1/dx1, dh2/dx1, dh3/dx1 }
+    return {vg(b, geom::dh1dx1(), index<geom::dh1dx1>(k, j, i)),
+            vg(b, geom::dh2dx1(), index<geom::dh2dx1>(k, j, i)),
+            vg(b, geom::dh3dx1(), index<geom::dh3dx1>(k, j, i))};
+  }
+  template <typename V1>
+  KOKKOS_INLINE_FUNCTION std::array<Real, 3>
+  GetConnX2(const V1 &vg, const int b, const int k, const int j, const int i) const {
+    // { dh1/dx2, dh2/dx2, dh3/dx2 }
+    return {vg(b, geom::dh1dx2(), index<geom::dh1dx2>(k, j, i)),
+            vg(b, geom::dh2dx2(), index<geom::dh2dx2>(k, j, i)),
+            vg(b, geom::dh3dx2(), index<geom::dh3dx2>(k, j, i))};
+  }
+  template <typename V1>
+  KOKKOS_INLINE_FUNCTION std::array<Real, 3>
+  GetConnX3(const V1 &vg, const int b, const int k, const int j, const int i) const {
+    // { dh1/dx3, dh2/dx3, dh3/dx3 }
+    return {vg(b, geom::dh1dx3(), index<geom::dh1dx3>(k, j, i)),
+            vg(b, geom::dh2dx3(), index<geom::dh2dx3>(k, j, i)),
+            vg(b, geom::dh3dx3(), index<geom::dh3dx3>(k, j, i))};
+  }
+  template <typename V1>
+  KOKKOS_INLINE_FUNCTION std::array<Real, 3>
+  GetGradH1(const V1 &vg, const int b, const int k, const int j, const int i) const {
+    return {vg(b, geom::dh1dx1(), index<geom::dh1dx1>(k, j, i)),
+            vg(b, geom::dh1dx2(), index<geom::dh1dx2>(k, j, i)),
+            vg(b, geom::dh1dx3(), index<geom::dh1dx3>(k, j, i))};
+  }
+  template <typename V1>
+  KOKKOS_INLINE_FUNCTION std::array<Real, 3>
+  GetGradH2(const V1 &vg, const int b, const int k, const int j, const int i) const {
+    return {vg(b, geom::dh2dx1(), index<geom::dh2dx1>(k, j, i)),
+            vg(b, geom::dh2dx2(), index<geom::dh2dx2>(k, j, i)),
+            vg(b, geom::dh2dx3(), index<geom::dh2dx3>(k, j, i))};
+  }
+  template <typename V1>
+  KOKKOS_INLINE_FUNCTION std::array<Real, 3>
+  GetGradH3(const V1 &vg, const int b, const int k, const int j, const int i) const {
+    return {vg(b, geom::dh3dx1(), index<geom::dh3dx1>(k, j, i)),
+            vg(b, geom::dh3dx2(), index<geom::dh3dx2>(k, j, i)),
+            vg(b, geom::dh3dx3(), index<geom::dh3dx3>(k, j, i))};
   }
 
   KOKKOS_INLINE_FUNCTION Mat3x3 GetConns() const {
@@ -618,9 +738,7 @@ class CoordsBase {
 //----------------------------------------------------------------------------------------
 //! The derived base coordinates class
 template <Coordinates GEOM>
-class Coords : public CoordsBase<Coords<GEOM>> {
-  static constexpr Coordinates Coordinates_type = GEOM;
-};
+class Coords : public CoordsBase<Coords<GEOM>> {};
 
 //----------------------------------------------------------------------------------------
 //! The derived cartesian specialization

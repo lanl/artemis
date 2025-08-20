@@ -59,6 +59,7 @@ struct DiskParams {
   Real omf;
   Real dust_to_gas;
   Real rexp;
+  Real exp_power;
   Real rcav;
   Real Gamma, gamma_gas;
   Real alpha, nu0, nu_indx;
@@ -78,7 +79,9 @@ Real DenProfile(struct DiskParams pgen, const Real R, const Real z) {
   const Real r = std::sqrt(R * R + z * z);
   const Real h = pgen.h0 * std::pow(R / pgen.r0, pgen.flare);
   const Real sig0 = pgen.rho0; // / (std::sqrt(2.0 * M_PI) * pgen.h0 * pgen.r0);
-  const Real exp_fac = (pgen.rexp == 0.) ? 1. : std::exp(-SQR(R / pgen.rexp));
+  // const Real exp_fac = (pgen.rexp == 0.) ? 1. : std::exp(-SQR(R / pgen.rexp));
+  const Real exp_fac =
+      (pgen.rexp == 0.) ? 1. : std::exp(-std::pow(R / pgen.rexp, pgen.exp_power));
   const Real dmid =
       (sig0 * std::pow(R / pgen.r0, pgen.p)) *
       (1. - pgen.l0 * std::sqrt(pgen.r0 / R)) * // correction for an inner binary
@@ -277,6 +280,7 @@ inline void InitDiskParams(MeshBlock *pmb, ParameterInput *pin) {
     disk_params.dens_min = pin->GetOrAddReal("problem", "dens_min", 1.0e-20);
     disk_params.pres_min = pin->GetOrAddReal("problem", "pres_min", 1.0e-24);
     disk_params.rexp = pin->GetOrAddReal("problem", "rexp", 0.0);
+    disk_params.exp_power = pin->GetOrAddReal("problem", "exp_power", 2.0);
     disk_params.rcav = pin->GetOrAddReal("problem", "rcav", 0.0);
     disk_params.l0 = pin->GetOrAddReal("problem", "l0", 0.0);
     disk_params.dust_to_gas = pin->GetOrAddReal("problem", "dust_to_gas", 0.01);

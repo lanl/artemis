@@ -412,7 +412,7 @@ TaskStatus CoagulationOneStep(MeshData<Real> *md, const Real time, const Real dt
     MPI_Reduce(MPI_IN_PLACE, &maxSize0, 1, MPI_INT, MPI_MAX, 0, MPI_COMM_WORLD);
     MPI_Reduce(MPI_IN_PLACE, &massd0, 1, MPI_PARTHENON_REAL, MPI_SUM, 0, MPI_COMM_WORLD);
 #endif // MPI_PARALLEL
-  }    // end if (info_out_flag)
+  } // end if (info_out_flag)
 
   ArtemisUtils::par_for_outer(
       DEFAULT_OUTER_LOOP_PATTERN, "Dust::Coagulation", parthenon::DevExecSpace(),
@@ -498,7 +498,7 @@ TaskStatus CoagulationOneStep(MeshData<Real> *md, const Real time, const Real dt
                 vmesh(b, dust::cons::density(n), k, j, i) = rhod1 / rho0;
                 for (int d = 0; d < nvel; d++) {
                   vmesh(b, dust::cons::momentum(VI(n, d)), k, j, i) =
-                      rhod1 * vel(VI(n, d)) * hx[d] / vel0;
+                      rhod1 / rho0 * vel(VI(n, d)) * hx[d] / vel0;
                 }
               } else {
                 vmesh(b, dust::cons::density(n), k, j, i) = 0.0;

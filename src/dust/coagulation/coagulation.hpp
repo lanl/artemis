@@ -23,7 +23,7 @@
 #include "utils/artemis_utils.hpp"
 #include "utils/units.hpp"
 
-//#define  COAGULATION_DEBUG
+// #define  COAGULATION_DEBUG
 namespace Dust {
 namespace Coagulation {
 

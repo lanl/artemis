@@ -110,11 +110,11 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
         if (do_gas) {
           geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
-          const Real x1v = vg(0, geom::x1v(), coords.template index<geom::x1v>(k, j, i));
+          const auto &xv = coords.GetCellCenter(vg,0,k,j,i);
 
           const Real P0 = eos_d.PressureFromDensityTemperature(pars.g_rho, pars.g_temp);
           const Real Rgas = P0 / (pars.g_rho * pars.g_temp);
-          const Real P = P0 * std::exp(gx1 * pars.g_rho / P0 * (x1v - x1min));
+        const Real P = P0 * std::exp(gx1 * pars.g_rho / P0 * (xv[0] - x1min));
           const Real dens = P / (Rgas * pars.g_temp);
 
           v(0, gas::prim::density(0), k, j, i) = dens;
@@ -221,16 +221,10 @@ void CondBoundaryImpl(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) {
 
         // Extract coordinates at k, j, i
         geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
-        const std::array<Real, 3> xv{
-            vg(0, geom::x1v(), coords.template index<geom::x1v>(k, j, i)),
-            vg(0, geom::x2v(), coords.template index<geom::x2v>(k, j, i)),
-            vg(0, geom::x3v(), coords.template index<geom::x3v>(k, j, i))};
+        const auto &xv = coords.GetCellCenter(vg,0,k,j,i);
 
         // Extract coordinates at ia, im, ic
-        const std::array<Real, 3> xva{
-            vg(0, geom::x1v(), coords.template index<geom::x1v>(ia[0], ia[1], ia[2])),
-            vg(0, geom::x2v(), coords.template index<geom::x2v>(ia[0], ia[1], ia[2])),
-            vg(0, geom::x3v(), coords.template index<geom::x3v>(ia[0], ia[1], ia[2]))};
+        const auto &xva = coords.GetCellCenter(vg,0,ia[0],ia[1],ia[2]);
 
         const Real xma = (INNER ? -1. : 1.) * coords.Distance(xv, xva);
 

@@ -39,10 +39,11 @@ void WENOZ5(const Real &q_im2, const Real &q_im1, const Real &q_i, const Real &q
 
   const Real tau5 = std::abs(beta[0] - beta[2]); // [Borges+ 2008]
 
-  Real indicator[3]; // [Castro, Costa, & Don 2011]
-  indicator[0] = SQR(tau5 / (beta[0] + weno_eps));
-  indicator[1] = SQR(tau5 / (beta[1] + weno_eps));
-  indicator[2] = SQR(tau5 / (beta[2] + weno_eps));
+  // [Castro, Costa, & Don 2011]
+  const std::array<Real,3> indicator{
+                         SQR(tau5 / (beta[0] + Fuzz<Real>())),
+                         SQR(tau5 / (beta[1] + Fuzz<Real>())),
+                         SQR(tau5 / (beta[2] + Fuzz<Real>()))};
 
   // compute qL_ip1
   Real f[3];

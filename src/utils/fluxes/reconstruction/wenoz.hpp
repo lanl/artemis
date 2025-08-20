@@ -51,10 +51,10 @@ void WENOZ5(const Real &q_im2, const Real &q_im1, const Real &q_i, const Real &q
   f[1] = -1.0 * q_im1 + 5.0 * q_i + 2.0 * q_ip1;
   f[2] = 2.0 * q_i + 5.0 * q_ip1 - q_ip2;
 
-  Real alpha[3];
-  alpha[0] = 0.1 * (1.0 + indicator[0]);
-  alpha[1] = 0.6 * (1.0 + indicator[1]);
-  alpha[2] = 0.3 * (1.0 + indicator[2]);
+  std::array<Real,3> alpha{
+   0.1 * (1.0 + indicator[0]),
+   0.6 * (1.0 + indicator[1]),
+   0.3 * (1.0 + indicator[2])};
   Real alpha_sum = 6.0 * (alpha[0] + alpha[1] + alpha[2]);
 
   ql_ip1 = (f[0] * alpha[0] + f[1] * alpha[1] + f[2] * alpha[2]) / alpha_sum;

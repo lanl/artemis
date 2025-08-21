@@ -37,6 +37,15 @@ void EnrollFields(StateDescriptor *pkg, CoordParams &cpars) {
   ADD_FIELD(geom::hx1v);
   ADD_FIELD(geom::hx2v);
   ADD_FIELD(geom::hx3v);
+  ADD_FIELD(geom::hx1f1);
+  ADD_FIELD(geom::hx2f1);
+  ADD_FIELD(geom::hx3f1);
+  ADD_FIELD(geom::hx1f2);
+  ADD_FIELD(geom::hx2f2);
+  ADD_FIELD(geom::hx3f2);
+  ADD_FIELD(geom::hx1f3);
+  ADD_FIELD(geom::hx2f3);
+  ADD_FIELD(geom::hx3f3);
   ADD_FIELD(geom::dx1);
   ADD_FIELD(geom::dx2);
   ADD_FIELD(geom::dx3);

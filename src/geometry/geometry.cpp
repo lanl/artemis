@@ -24,8 +24,6 @@ namespace geometry {
     const auto shape = coords.template shape<name>();                                    \
     pkg->AddField<name>(Metadata({Metadata::None, Metadata::OneCopy, Metadata::Restart}, \
                                  std::vector<int>({shape[0] * shape[1] * shape[2]})));   \
-    std::cout << #name << " " << shape[0] << ", " << shape[1] << ", " << shape[2]        \
-              << "\n";                                                                   \
   }
 
 template <Coordinates GEOM>

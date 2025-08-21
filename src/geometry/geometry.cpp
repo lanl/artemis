@@ -55,9 +55,12 @@ void EnrollFields(StateDescriptor *pkg, CoordParams &cpars) {
   ADD_FIELD(geom::dh1dx3);
   ADD_FIELD(geom::dh2dx3);
   ADD_FIELD(geom::dh3dx3);
-  ADD_FIELD(geom::rfw1);
-  ADD_FIELD(geom::rfw2);
-  ADD_FIELD(geom::rfw3);
+  ADD_FIELD(geom::rfw1m);
+  ADD_FIELD(geom::rfw1p);
+  ADD_FIELD(geom::rfw2m);
+  ADD_FIELD(geom::rfw2p);
+  ADD_FIELD(geom::rfw3m);
+  ADD_FIELD(geom::rfw3p);
 }
 
 //----------------------------------------------------------------------------------------
@@ -101,7 +104,8 @@ void InitBlockGeom(MeshBlock *pmb, ParameterInput *pin) {
                          geom::vol, geom::ax1, geom::ax2, geom::ax3, geom::hx1v,
                          geom::hx2v, geom::hx3v, geom::dh1dx1, geom::dh2dx1, geom::dh3dx1,
                          geom::dh1dx2, geom::dh2dx2, geom::dh3dx2, geom::dh1dx3,
-                         geom::dh2dx3, geom::dh3dx3, geom::rfw1, geom::rfw2, geom::rfw3>(
+                         geom::dh2dx3, geom::dh3dx3, geom::rfw1m, geom::rfw1p,
+                         geom::rfw2m, geom::rfw2p, geom::rfw3m, geom::rfw3p>(
           (pm->resolved_packages).get());
   auto vg = desc_g.GetPack(md.get());
   IndexRange ib = md->GetBoundsI(IndexDomain::entire);
@@ -118,78 +122,79 @@ void InitBlockGeom(MeshBlock *pmb, ParameterInput *pin) {
         // Extract coordinates
         geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
         const auto xv = coords.GetCellCenter();
-        vg(b, geom::x1v(), coords.template index<geom::x1v>(k, j, i)) = xv[0];
-        vg(b, geom::x2v(), coords.template index<geom::x2v>(k, j, i)) = xv[1];
-        vg(b, geom::x3v(), coords.template index<geom::x3v>(k, j, i)) = xv[2];
+        vg(b, geom::x1v())(coords.template index<geom::x1v>(k, j, i)) = xv[0];
+        vg(b, geom::x2v())(coords.template index<geom::x2v>(k, j, i)) = xv[1];
+        vg(b, geom::x3v())(coords.template index<geom::x3v>(k, j, i)) = xv[2];
 
         const auto dx = coords.GetCellWidths();
-        vg(b, geom::dx1(), coords.template index<geom::dx1>(k, j, i)) = dx[0];
-        vg(b, geom::dx2(), coords.template index<geom::dx2>(k, j, i)) = dx[1];
-        vg(b, geom::dx3(), coords.template index<geom::dx3>(k, j, i)) = dx[2];
+        vg(b, geom::dx1())(coords.template index<geom::dx1>(k, j, i)) = dx[0];
+        vg(b, geom::dx2())(coords.template index<geom::dx2>(k, j, i)) = dx[1];
+        vg(b, geom::dx3())(coords.template index<geom::dx3>(k, j, i)) = dx[2];
 
         const auto hx = coords.GetScaleFactors();
-        vg(b, geom::hx1v(), coords.template index<geom::hx1v>(k, j, i)) = hx[0];
-        vg(b, geom::hx2v(), coords.template index<geom::hx2v>(k, j, i)) = hx[1];
-        vg(b, geom::hx3v(), coords.template index<geom::hx3v>(k, j, i)) = hx[2];
+        vg(b, geom::hx1v())(coords.template index<geom::hx1v>(k, j, i)) = hx[0];
+        vg(b, geom::hx2v())(coords.template index<geom::hx2v>(k, j, i)) = hx[1];
+        vg(b, geom::hx3v())(coords.template index<geom::hx3v>(k, j, i)) = hx[2];
 
         const Real vol = coords.Volume();
-        vg(b, geom::vol(), coords.template index<geom::vol>(k, j, i)) = vol;
+        vg(b, geom::vol())(coords.template index<geom::vol>(k, j, i)) = vol;
+
+        const auto &[rfw1, rfw2, rfw3] = coords.RFWeights();
+        vg(b, geom::rfw1m())(coords.template index<geom::rfw1m>(k, j, i)) = rfw1[0];
+        vg(b, geom::rfw1p())(coords.template index<geom::rfw1p>(k, j, i)) = rfw1[1];
+        vg(b, geom::rfw2m())(coords.template index<geom::rfw2m>(k, j, i)) =
+            (ndim > 1) * rfw2[0];
+        vg(b, geom::rfw2p())(coords.template index<geom::rfw2p>(k, j, i)) =
+            (ndim > 1) * rfw2[1];
+        vg(b, geom::rfw3m())(coords.template index<geom::rfw3m>(k, j, i)) =
+            (ndim > 2) * rfw3[0];
+        vg(b, geom::rfw3p())(coords.template index<geom::rfw3p>(k, j, i)) =
+            (ndim > 2) * rfw3[1];
 
         // Face quantities
-        const auto &[rfw1, rfw2, rfw3] = coords.RFWeights();
         auto ax = coords.GetFaceAreaX1();
-        vg(b, geom::ax1(), coords.template index<geom::ax1>(k, j, i)) = ax[0];
-        vg(b, geom::rfw1(), coords.template index<geom::rfw1>(k, j, i)) = rfw1[0];
+        vg(b, geom::ax1())(coords.template index<geom::ax1>(k, j, i)) = ax[0];
         if (i == ib.e) {
-          vg(b, geom::ax1(), coords.template index<geom::ax1>(k, j, i + 1)) = ax[1];
-          vg(b, geom::rfw1(), coords.template index<geom::rfw1>(k, j, i + 1)) = rfw1[1];
+          vg(b, geom::ax1())(coords.template index<geom::ax1>(k, j, i + 1)) = ax[1];
         }
         ax = coords.GetFaceAreaX2();
-        vg(b, geom::ax2(), coords.template index<geom::ax2>(k, j, i)) =
+        vg(b, geom::ax2())(coords.template index<geom::ax2>(k, j, i)) =
             (ndim > 1) * ax[0];
-        vg(b, geom::rfw2(), coords.template index<geom::rfw2>(k, j, i)) =
-            (ndim > 1) * rfw2[0];
         if ((j == jb.e) && (ndim > 1)) {
-          vg(b, geom::ax2(), coords.template index<geom::ax2>(k, j + 1, i)) =
+          vg(b, geom::ax2())(coords.template index<geom::ax2>(k, j + 1, i)) =
               (ndim > 1) * ax[1];
-          vg(b, geom::rfw2(), coords.template index<geom::rfw2>(k, j + 1, i)) =
-              (ndim > 1) * rfw2[1];
         }
         ax = coords.GetFaceAreaX3();
-        vg(b, geom::ax3(), coords.template index<geom::ax3>(k, j, i)) =
+        vg(b, geom::ax3())(coords.template index<geom::ax3>(k, j, i)) =
             (ndim > 2) * ax[0];
-        vg(b, geom::rfw3(), coords.template index<geom::rfw3>(k, j, i)) =
-            (ndim > 2) * rfw3[0];
         if ((k == kb.e) && (ndim > 2)) {
-          vg(b, geom::ax3(), coords.template index<geom::ax3>(k + 1, j, i)) =
+          vg(b, geom::ax3())(coords.template index<geom::ax3>(k + 1, j, i)) =
               (ndim > 2) * ax[1];
-          vg(b, geom::rfw3(), coords.template index<geom::rfw3>(k + 1, j, i)) =
-              (ndim > 2) * rfw3[1];
         }
 
         // connection coeffs
         auto dh = coords.GetConnX1();
-        vg(b, geom::dh1dx1(), coords.template index<geom::dh1dx1>(k, j, i)) =
+        vg(b, geom::dh1dx1())(coords.template index<geom::dh1dx1>(k, j, i)) =
             x1dep_ * dh[0];
-        vg(b, geom::dh2dx1(), coords.template index<geom::dh2dx1>(k, j, i)) =
+        vg(b, geom::dh2dx1())(coords.template index<geom::dh2dx1>(k, j, i)) =
             x1dep_ * dh[1];
-        vg(b, geom::dh3dx1(), coords.template index<geom::dh3dx1>(k, j, i)) =
+        vg(b, geom::dh3dx1())(coords.template index<geom::dh3dx1>(k, j, i)) =
             x1dep_ * dh[2];
 
         dh = coords.GetConnX2();
-        vg(b, geom::dh1dx2(), coords.template index<geom::dh1dx2>(k, j, i)) =
+        vg(b, geom::dh1dx2())(coords.template index<geom::dh1dx2>(k, j, i)) =
             x2dep_ * dh[0];
-        vg(b, geom::dh2dx2(), coords.template index<geom::dh2dx2>(k, j, i)) =
+        vg(b, geom::dh2dx2())(coords.template index<geom::dh2dx2>(k, j, i)) =
             x2dep_ * dh[1];
-        vg(b, geom::dh3dx2(), coords.template index<geom::dh3dx2>(k, j, i)) =
+        vg(b, geom::dh3dx2())(coords.template index<geom::dh3dx2>(k, j, i)) =
             x2dep_ * dh[2];
 
         dh = coords.GetConnX3();
-        vg(b, geom::dh1dx3(), coords.template index<geom::dh1dx3>(k, j, i)) =
+        vg(b, geom::dh1dx3())(coords.template index<geom::dh1dx3>(k, j, i)) =
             x3dep_ * dh[0];
-        vg(b, geom::dh2dx3(), coords.template index<geom::dh2dx3>(k, j, i)) =
+        vg(b, geom::dh2dx3())(coords.template index<geom::dh2dx3>(k, j, i)) =
             x3dep_ * dh[1];
-        vg(b, geom::dh3dx3(), coords.template index<geom::dh3dx3>(k, j, i)) =
+        vg(b, geom::dh3dx3())(coords.template index<geom::dh3dx3>(k, j, i)) =
             x3dep_ * dh[2];
       });
 }

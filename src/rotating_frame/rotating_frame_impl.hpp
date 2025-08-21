@@ -113,8 +113,9 @@ TaskStatus RotatingFrameImpl(MeshData<Real> *md, const Real om0, const bool do_g
   auto vf = desc_flux.GetPack(md);
   static auto desc_g =
       parthenon::MakePackDescriptor<geom::x1v, geom::x2v, geom::x3v, geom::ax1, geom::ax2,
-                                    geom::ax3, geom::vol, geom::rfw1, geom::rfw2,
-                                    geom::rfw3>(resolved_pkgs.get());
+                                    geom::ax3, geom::vol, geom::rfw1m, geom::rfw1p,
+                                    geom::rfw2m, geom::rfw2p, geom::rfw3m, geom::rfw3p>(
+          resolved_pkgs.get());
   auto vg = desc_g.GetPack(md);
   const int multi_d = (pm->ndim >= 2);
   const int three_d = (pm->ndim == 3);
@@ -138,7 +139,7 @@ TaskStatus RotatingFrameImpl(MeshData<Real> *md, const Real om0, const bool do_g
 
         // The geometry dependent flux weighting
         // \pm <R^2>_\pm - <R^2>
-        const auto &[bx1, bx2, bx3] = coords.GetRFWeights();
+        const auto &[bx1, bx2, bx3] = coords.GetRFWeights(vg, b, k, j, i);
         const auto &ax1 = coords.GetFaceAreaX1(vg, b, k, j, i);
         const auto &ax2 = coords.GetFaceAreaX2(vg, b, k, j, i);
         const auto &ax3 = coords.GetFaceAreaX3(vg, b, k, j, i);

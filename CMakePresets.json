@@ -33,7 +33,7 @@
         "CMAKE_MAKE_PROGRAM": "$env{MAKE_PROGRAM}",
         "CMAKE_C_COMPILER": "gcc",
         "CMAKE_CXX_COMPILER": "g++",
-        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo"
       }
     },
     {
@@ -44,7 +44,7 @@
         "Kokkos_ENABLE_DEBUG_BOUNDS_CHECK": "ON",
         "CMAKE_CXX_COMPILER": "$env{ARTEMIS_HOME}/external/parthenon/external/Kokkos/bin/nvcc_wrapper",
         "ARTEMIS_ENABLE_CUDA": "ON",
-        "Kokkos_ARCH_VOLTA70": "ON",
+        "Kokkos_ARCH_VOLTA70": "ON"
       }
     },
     {
@@ -54,7 +54,7 @@
         "CMAKE_BUILD_TYPE": "Release",
         "CMAKE_CXX_COMPILER": "$env{ARTEMIS_HOME}/external/parthenon/external/Kokkos/bin/nvcc_wrapper",
         "ARTEMIS_ENABLE_CUDA": "ON",
-        "Kokkos_ARCH_VOLTA70": "ON",
+        "Kokkos_ARCH_VOLTA70": "ON"
       }
     },
     {
@@ -64,7 +64,7 @@
         "CMAKE_BUILD_TYPE": "Debug",
         "Kokkos_ENABLE_DEBUG_BOUNDS_CHECK": "ON",
         "CMAKE_CXX_COMPILER": "CC",
-        "HDF5_INCLUDE_DIR": "$env{HDF5_ROOT}/include",
+        "HDF5_INCLUDE_DIR": "$env{HDF5_ROOT}/include"
       }
     },
     {
@@ -73,7 +73,7 @@
         "CMAKE_MAKE_PROGRAM": "$env{MAKE_PROGRAM}",
         "CMAKE_BUILD_TYPE": "RelWithDebInfo",
         "CMAKE_CXX_COMPILER": "CC",
-        "HDF5_INCLUDE_DIR": "$env{HDF5_ROOT}/include",
+        "HDF5_INCLUDE_DIR": "$env{HDF5_ROOT}/include"
       }
     },
     {

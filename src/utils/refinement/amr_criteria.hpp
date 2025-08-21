@@ -60,11 +60,14 @@ AmrTag ScalarFirstDerivative(MeshBlockData<Real> *md) {
           geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
 
           // Get stencil widths
-          const Real sdx1 = coords.x1v(vg, 0, k, j, i + 1) - coords.x1v(vg, 0, k, j, i - 1) ;
-          const Real sdx2 = coords.x2v(vg, 0, k, j + 1, i) - coords.x2v(vg, 0, k, j - 1, i) ;
-          const Real sdx3 = coords.x3v(vg, 0, k - 1, j, i) - coords.x3v(vg, 0, k - 1, j, i) ;
+          const Real sdx1 = coords.GetCellCenter(vg, 0, k, j, i + 1)[0] -
+                            coords.GetCellCenter(vg, 0, k, j, i - 1)[0];
+          const Real sdx2 = coords.GetCellCenter(vg, 0, k, j + 1, i)[1] -
+                            coords.GetCellCenter(vg, 0, k, j - 1, i)[1];
+          const Real sdx3 = coords.GetCellCenter(vg, 0, k - 1, j, i)[2] -
+                            coords.GetCellCenter(vg, 0, k - 1, j, i)[2];
           // Get scale factors
-          const auto &hx = coords.GetScaleFactors(vg, b, k, j, i);
+          const auto &hx = coords.GetScaleFactors(vg, 0, k, j, i);
           // NOTE(PDM): here, if passed a SparsePool, we will only be accessing the first
           // entry in the SparsePool.  If more fine-tuned control required, create a
           // user-defined AMR criterion.
@@ -86,11 +89,13 @@ AmrTag ScalarFirstDerivative(MeshBlockData<Real> *md) {
         KOKKOS_LAMBDA(const int j, const int i, Real &lmaxeps) {
           geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
           // Get stencil widths
-          const Real sdx1 = coords.x1v(vg, b, k, j, i + 1) - coords.x1v(vg, b, k, j, i - 1);
-          const Real sdx2 = coords.x2v(vg, b, k, j + 1, i ) - coords.x2v(vg, b, k, j - 1, i);
+          const Real sdx1 = coords.GetCellCenter(vg, 0, k, j, i + 1)[0] -
+                            coords.GetCellCenter(vg, 0, k, j, i - 1)[0];
+          const Real sdx2 = coords.GetCellCenter(vg, 0, k, j + 1, i)[1] -
+                            coords.GetCellCenter(vg, 0, k, j - 1, i)[1];
           // Get scale factors
 
-          const auto &hx = coords.GetScaleFactors(vg, b, k, j, i);
+          const auto &hx = coords.GetScaleFactors(vg, 0, k, j, i);
 
           Real eps = std::sqrt(
               SQR((v(0, 0, k, j, i + 1) - v(0, 0, k, j, i - 1)) / sdx1 / hx[0]) +

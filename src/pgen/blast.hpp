@@ -180,8 +180,8 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       "blast", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
         geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
-        Real total_vol = coords.GetVolume(vg,0,k,j,i);
-        const auto &xv = coords.GetCellCenter(vg,0,k,j,i);
+        Real total_vol = coords.GetVolume(vg, 0, k, j, i);
+        const auto &xv = coords.GetCellCenter(vg, 0, k, j, i);
         Real den = pars.d0;
         Real e0 = pars.p0 / gm1;
         Real internal_energy = 0.0;

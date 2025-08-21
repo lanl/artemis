@@ -283,7 +283,7 @@ TaskStatus FluxSourceImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, CONS vcons, FAC
       KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
         // Extract coordinates
         geometry::Coords<G> coords(cpars, vp.GetCoordinates(b), k, j, i);
-        const Real hdtv  =  0.5 * dt / coords.GetVolume(vg,b,k,j,i);
+        const Real hdtv = 0.5 * dt / coords.GetVolume(vg, b, k, j, i);
 
         std::array<Real, 3> dh1{0}, dh2{0}, dh3{0};
         if constexpr (G != Coordinates::cartesian) {
@@ -359,9 +359,9 @@ TaskStatus FluxSourceImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, CONS vcons, FAC
           // pdV source for gas internal energy equation
           if constexpr (F == Fluid::gas) {
             // pdV source term
-    const auto &ax1 = coords.GetFaceAreaX1(vg, b, k, j, i);
-    const auto &ax2 = coords.GetFaceAreaX2(vg, b, k, j, i);
-    const auto &ax3 = coords.GetFaceAreaX3(vg, b, k, j, i);
+            const auto &ax1 = coords.GetFaceAreaX1(vg, b, k, j, i);
+            const auto &ax2 = coords.GetFaceAreaX2(vg, b, k, j, i);
+            const auto &ax3 = coords.GetFaceAreaX3(vg, b, k, j, i);
             // clang-format off
             vc_(b, IEG, k, j, i) += hdtvol[0] *
                                     (vp_.flux(b, d1, IPR, k, j, i) +

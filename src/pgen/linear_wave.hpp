@@ -235,10 +235,10 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
         // cell-centered coordinates
         geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
-                const auto &xv = coords.GetCellCenter(vg,0,k,j,i);
-                const Real x1v = xv[0];
-                const Real x2v = xv[1];
-                const Real x3v = xv[2];
+        const auto &xv = coords.GetCellCenter(vg, 0, k, j, i);
+        const Real x1v = xv[0];
+        const Real x2v = xv[1];
+        const Real x3v = xv[2];
         Real x = lin.cos_a2 * (x1v * lin.cos_a3 + x2v * lin.sin_a3) + x3v * lin.sin_a2;
         Real sn = std::sin(lin.k_par * x);
         Real mx = lin.d0 * lin.vflow + lin.amp * sn * lin.rem[1][lin.wave_flag];
@@ -300,11 +300,11 @@ inline void UserWorkAfterLoop(Mesh *pmesh, ParameterInput *pin, parthenon::SimTi
                     ArtemisUtils::array_type<Real, nvars> &lsum) {
         // Capture coordinates this Meshblock
         geometry::Coords<GEOM> coords(cpars, v.GetCoordinates(b), k, j, i);
-        const auto &xv = coords.GetCellCenter(vg,b,k,j,i);
+        const auto &xv = coords.GetCellCenter(vg, b, k, j, i);
         Real x1v = xv[0];
         Real x2v = xv[1];
         Real x3v = xv[2];
-        Real vol = coords.GetVolume(vg,b,k,j,i);
+        Real vol = coords.GetVolume(vg, b, k, j, i);
 
         Real x = lin.cos_a2 * (x1v * lin.cos_a3 + x2v * lin.sin_a3) + x3v * lin.sin_a2;
         Real sn = std::sin(lin.k_par * x);

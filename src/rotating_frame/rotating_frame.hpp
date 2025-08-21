@@ -70,9 +70,9 @@ struct ReconInfo {
                                    const V2 &vg, const int b, const int n, const int k,
                                    const int j, const int i) {
     geometry::Coords<Coordinates::cartesian> coords(cpar, v0.GetCoordinates(b), k, j, i);
-    dx = coords.GetCellWidths(vg,b,k,j,i);
-    xc = coords.GetCellCenter(vg,b,k,j,i);
-    vol = coords.GetVolume(vg,b,k,j,i);
+    dx = coords.GetCellWidths(vg, b, k, j, i);
+    xc = coords.GetCellCenter(vg, b, k, j, i);
+    vol = coords.GetVolume(vg, b, k, j, i);
     bnds = coords.bnds;
 
     q = v0(b, n, k, j, i);

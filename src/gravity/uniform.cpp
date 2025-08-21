@@ -60,7 +60,7 @@ TaskStatus UniformGravity(MeshData<Real> *md, const Real time, const Real dt) {
       KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
         // Extract coordinates
         geometry::Coords<GEOM> coords(cpars, vmesh.GetCoordinates(b), k, j, i);
-        const auto &hx = coords.GetScaleFactors(vg,b,k,j,i);
+        const auto &hx = coords.GetScaleFactors(vg, b, k, j, i);
 
         if (do_gas) {
           // Gravitational acceleration and energy release

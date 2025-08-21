@@ -96,7 +96,8 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       MakePackDescriptor<gas::prim::density, gas::prim::velocity, gas::prim::sie>(
           (pmb->resolved_packages).get());
   auto v = desc.GetPack(md.get());
-  static auto desc_g = MakePackDescriptor<geom::x1v>((pmb->resolved_packages).get());
+  static auto desc_g =
+      MakePackDescriptor<geom::x1v, geom::x2v, geom::x3v>((pmb->resolved_packages).get());
   auto vg = desc_g.GetPack(md.get());
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
@@ -110,11 +111,11 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
         if (do_gas) {
           geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
-          const auto &xv = coords.GetCellCenter(vg,0,k,j,i);
+          const auto &xv = coords.GetCellCenter(vg, 0, k, j, i);
 
           const Real P0 = eos_d.PressureFromDensityTemperature(pars.g_rho, pars.g_temp);
           const Real Rgas = P0 / (pars.g_rho * pars.g_temp);
-        const Real P = P0 * std::exp(gx1 * pars.g_rho / P0 * (xv[0] - x1min));
+          const Real P = P0 * std::exp(gx1 * pars.g_rho / P0 * (xv[0] - x1min));
           const Real dens = P / (Rgas * pars.g_temp);
 
           v(0, gas::prim::density(0), k, j, i) = dens;
@@ -221,10 +222,10 @@ void CondBoundaryImpl(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) {
 
         // Extract coordinates at k, j, i
         geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
-        const auto &xv = coords.GetCellCenter(vg,0,k,j,i);
+        const auto &xv = coords.GetCellCenter(vg, 0, k, j, i);
 
         // Extract coordinates at ia, im, ic
-        const auto &xva = coords.GetCellCenter(vg,0,ia[0],ia[1],ia[2]);
+        const auto &xva = coords.GetCellCenter(vg, 0, ia[0], ia[1], ia[2]);
 
         const Real xma = (INNER ? -1. : 1.) * coords.Distance(xv, xva);
 

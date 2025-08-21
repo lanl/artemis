@@ -83,7 +83,7 @@ Real EstimateTimeStep(parthenon::Mesh *pmesh) {
           KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, Real &ldx_m) {
             // Extract coordinates
             geometry::Coords<GEOM> coords(cpars, vmesh.GetCoordinates(b), k, j, i);
-            const auto &dx = coords.GetCellWidths(vg,b,k,j,i);
+            const auto &dx = coords.GetCellWidths(vg, b, k, j, i);
             for (int d = 0; d < ndim; d++) {
               ldx_m = std::min(ldx_m, dx[d]);
             }

@@ -84,7 +84,7 @@ TaskStatus ApplyUpdate(MeshData<Real> *u0, MeshData<Real> *u1, const Real g0,
         const int d1 = X1DIR;
         const int d2 = d1 + multi_d;
         const int d3 = d2 + three_d;
-        const Real bdt_vol =  beta_dt / coords.GetVolume(vg, b, k, j, i);
+        const Real bdt_vol = beta_dt / coords.GetVolume(vg, b, k, j, i);
         // Advance state vector with flux divergence
         for (int n = v0.GetLowerBound(b); n <= v0.GetUpperBound(b); ++n) {
           Real &v0n = v0(b, n, k, j, i);

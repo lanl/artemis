@@ -588,6 +588,11 @@ class CoordsBase {
     return static_cast<const T *>(this)->RFWeights();
   }
 
+  // template <typename V1>
+  // KOKKOS_INLINE_FUNCTION Mat3x2 GetRFWeights(const V1 &vg, const int b, const int k,
+  //                                            const int j, const int i) const {const
+  //                                            auto}
+
   KOKKOS_INLINE_FUNCTION std::array<Real, 3> GetConnX1() const {
     // { dh1/dx1, dh2/dx1, dh3/dx1 }
     return {static_cast<const T *>(this)->dh1dx1(),

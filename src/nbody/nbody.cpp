@@ -301,7 +301,7 @@ AmrTag DistanceRefinement(MeshBlockData<Real> *md) {
       KOKKOS_LAMBDA(const int k, const int j, const int i, Real &ldist) {
         // Extract coordinates
         geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
-       const auto &x = coords.GetCellCenter(vg,0,k,j,i);
+        const auto &x = coords.GetCellCenter(vg, 0, k, j, i);
 
         const auto &xcart = coords.ConvertToCart(x);
 

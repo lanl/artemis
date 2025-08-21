@@ -109,7 +109,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       "constant", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
         geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
-       const auto &xi = coords.GetCellCenter(vg,0,k,j,i);
+        const auto &xi = coords.GetCellCenter(vg, 0, k, j, i);
 
         auto xo = NewArray<Real, 3>();
         auto ex1 = NewArray<Real, 3>();

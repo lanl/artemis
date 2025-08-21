@@ -465,7 +465,7 @@ Real EstimateTimestepMesh(MeshData<Real> *md) {
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, Real &ldt) {
         // Extract coordinates
         geometry::Coords<GEOM> coords(cpars, vmesh.GetCoordinates(b), k, j, i);
-        const auto &dx = coords.GetCellWidths(vg,b,k,j,i);
+        const auto &dx = coords.GetCellWidths(vg, b, k, j, i);
 
         for (int n = 0; n < vmesh.GetSize(b, gas::prim::density()); ++n) {
           const Real &dens = vmesh(b, gas::prim::density(n), k, j, i);

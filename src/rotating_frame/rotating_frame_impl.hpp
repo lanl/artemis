@@ -133,16 +133,16 @@ TaskStatus RotatingFrameImpl(MeshData<Real> *md, const Real om0, const bool do_g
       KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
         // Extract coordinates
         geometry::Coords<GEOM> coords(cpars, vf.GetCoordinates(b), k, j, i);
-       const auto &xv = coords.GetCellCenter(vg,b,k,j,i);
+        const auto &xv = coords.GetCellCenter(vg, b, k, j, i);
         const auto &[xcyl, ex1, ex2, ex3] = coords.ConvertToCylWithVec(xv);
 
         // The geometry dependent flux weighting
         // \pm <R^2>_\pm - <R^2>
-        const auto &[bx1, bx2, bx3] = coords.GetRFWeights(vg,b,k,j,i);
-        const auto &ax1 = coords.GetFaceAreaX1(vg,b,k,j,i);
-        const auto &ax2 = coords.GetFaceAreaX2(vg,b,k,j,i);
-        const auto &ax3 = coords.GetFaceAreaX3(vg,b,k,j,i);
-        const Real vol = coords.GetVolume(vg,b,k,j,i);
+        const auto &[bx1, bx2, bx3] = coords.GetRFWeights();
+        const auto &ax1 = coords.GetFaceAreaX1(vg, b, k, j, i);
+        const auto &ax2 = coords.GetFaceAreaX2(vg, b, k, j, i);
+        const auto &ax3 = coords.GetFaceAreaX3(vg, b, k, j, i);
+        const Real vol = coords.GetVolume(vg, b, k, j, i);
         if (do_gas) {
           for (int n = 0; n < vf.GetSize(b, gas::cons::density()); ++n) {
 

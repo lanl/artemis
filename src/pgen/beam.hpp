@@ -81,7 +81,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           (pmb->resolved_packages).get());
   auto v = desc.GetPack(md.get());
   static auto desc_g =
-      MakePackDescriptor<geom::x1v, geom::x2v>((pmb->resolved_packages).get());
+      MakePackDescriptor<geom::x1v, geom::x2v, geom::x3v>((pmb->resolved_packages).get());
   auto vg = desc_g.GetPack(md.get());
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
@@ -96,8 +96,8 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         // cell-centered coordinates
         geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
 
-                const auto &xv = coords.GetCellCenter(vg,0,k,j,i);
-                // compute cell-centered conserved variables
+        const auto &xv = coords.GetCellCenter(vg, 0, k, j, i);
+        // compute cell-centered conserved variables
         if (do_gas) {
           // put in a ball at the center
           const Real dr2 = SQR(xv[0] - 1.0) + SQR(xv[1] - 1.0);

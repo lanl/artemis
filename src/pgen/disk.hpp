@@ -367,8 +367,8 @@ KOKKOS_INLINE_FUNCTION void DiskICImpl(V1 v, V2 vg, const int b, const int k, co
                                        const int npart) {
 
   geometry::Coords<GEOM> coords(dp.log, pco, k, j, i);
-    const auto &xv = coords.GetCellCenter(vg,0,k,j,i);
-    const auto &dx = coords.GetCellWidths(vg,0,k,j,i);
+  const auto &xv = coords.GetCellCenter(vg, 0, k, j, i);
+  const auto &dx = coords.GetCellWidths(vg, 0, k, j, i);
 
   const auto res = ComputeDiskProfile<GEOM>(dp, coords, xv, dx, k, j, i, eos_d, dp.do_gas,
                                             dp.do_dust, particles, npart);
@@ -526,24 +526,24 @@ void DiskBoundaryVisc(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) {
 
         // Extract coordinates at k, j, i
         geometry::Coords<GEOM> coords(dp.log, pco, k, j, i);
-        const auto &xv = coords.GetCellCenter(vg,0,k,j,i);
+        const auto &xv = coords.GetCellCenter(vg, 0, k, j, i);
         const auto &[xcyl, ex1, ex2, ex3] = coords.ConvertToCylWithVec(xv);
 
         // Extract coordinates at ia, im, ic
         geometry::Coords<GEOM> ca(dp.log, pco, ia[0], ia[1], ia[2]);
         geometry::Coords<GEOM> cp1(dp.log, pco, ip1[0], ip1[1], ip1[2]);
         geometry::Coords<GEOM> cm1(dp.log, pco, im1[0], im1[1], im1[2]);
-        const auto &xva = coords.GetCellCenter(vg,0,ia[0],ia[1],ia[2]);
+        const auto &xva = coords.GetCellCenter(vg, 0, ia[0], ia[1], ia[2]);
         const auto &[xcyla, scr1, scr2, scr3] = ca.ConvertToCylWithVec(xva);
         const Real eRa[3] = {scr1[0], scr2[0], scr3[0]};
         const Real epa[3] = {scr1[1], scr2[1], scr3[1]};
         const Real eza[3] = {scr1[2], scr2[2], scr3[2]};
 
-        const auto &xvp1 = coords.GetCellCenter(vg,0,ip1[0],ip1[1],ip1[2]);
+        const auto &xvp1 = coords.GetCellCenter(vg, 0, ip1[0], ip1[1], ip1[2]);
         const auto &[xcylp1, scr1p1, scr2p1, scr3p1] = cp1.ConvertToCylWithVec(xvp1);
         const Real epp1[3] = {scr1p1[1], scr2p1[1], scr3p1[1]};
 
-        const auto &xvm1 = coords.GetCellCenter(vg,0,im1[0],im1[1],im1[2]);
+        const auto &xvm1 = coords.GetCellCenter(vg, 0, im1[0], im1[1], im1[2]);
         const auto &[xcylm1, scr1m1, scr2m1, scr3m1] = cm1.ConvertToCylWithVec(xvm1);
         const Real epm1[3] = {scr1m1[1], scr2m1[1], scr3m1[1]};
 
@@ -789,22 +789,22 @@ void DiskBoundaryExtrap(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) 
 
         // Extract coordinates at k, j, i
         geometry::Coords<GEOM> coords(dp.log, pco, k, j, i);
-       const auto &xv = coords.GetCellCenter(vg,0,k,j,i);
+        const auto &xv = coords.GetCellCenter(vg, 0, k, j, i);
         const auto &[xcyl, ex1, ex2, ex3] = coords.ConvertToCylWithVec(xv);
 
         // Extract coordinates at ia, im, ic
-        const auto &xva = coords.GetCellCenter(vg,0,ia[0],ia[1],ia[2]);
+        const auto &xva = coords.GetCellCenter(vg, 0, ia[0], ia[1], ia[2]);
         const auto &[xcyla, scr1, scr2, scr3] = coords.ConvertToCylWithVec(xva);
         const Real eRa[3] = {scr1[0], scr2[0], scr3[0]};
         const Real epa[3] = {scr1[1], scr2[1], scr3[1]};
         const Real eza[3] = {scr1[2], scr2[2], scr3[2]};
 
-        const auto &xvp1 = coords.GetCellCenter(vg,0,ip1[0],ip1[1],ip1[2]);
+        const auto &xvp1 = coords.GetCellCenter(vg, 0, ip1[0], ip1[1], ip1[2]);
         const auto &[xcylp1, scr1p1, scr2p1, scr3p1] = coords.ConvertToCylWithVec(xvp1);
         const Real epp1[3] = {scr1p1[1], scr2p1[1], scr3p1[1]};
 
-        const auto &xvm1 = coords.GetCellCenter(vg,0,im1[0],im1[1],im1[2]);
-           
+        const auto &xvm1 = coords.GetCellCenter(vg, 0, im1[0], im1[1], im1[2]);
+
         const auto &[xcylm1, scr1m1, scr2m1, scr3m1] = coords.ConvertToCylWithVec(xvm1);
         const Real epm1[3] = {scr1m1[1], scr2m1[1], scr3m1[1]};
 

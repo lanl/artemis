@@ -220,8 +220,8 @@ TaskStatus SelfDragSourceImpl(MeshData<Real> *md, const Real time, const Real dt
       KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
         // Extract coordinates
         geometry::Coords<GEOM> coords(cpars, vmesh.GetCoordinates(b), k, j, i);
-       const auto &xv = coords.GetCellCenter(vg,b,k,j,i);
-       const auto &hx = coords.GetScaleFactors(vg,b,k,j,i);
+        const auto &xv = coords.GetCellCenter(vg, b, k, j, i);
+        const auto &hx = coords.GetScaleFactors(vg, b, k, j, i);
         const auto &[xcyl, ex1, ex2, ex3] = coords.ConvertToCylWithVec(xv);
 
         // Compute the (gas) ramp for this cell
@@ -391,8 +391,8 @@ TaskStatus SimpleDragSourceImpl(MeshData<Real> *md, const Real time, const Real 
       KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
         // Extract coordinates
         geometry::Coords<GEOM> coords(cpars, vmesh.GetCoordinates(b), k, j, i);
-        const auto &xv = coords.GetCellCenter(vg,b,k,j,i);
-        const auto &hx = coords.GetScaleFactors(vg,b,k,j,i);
+        const auto &xv = coords.GetCellCenter(vg, b, k, j, i);
+        const auto &hx = coords.GetScaleFactors(vg, b, k, j, i);
         const auto &[xcyl, ex1, ex2, ex3] = coords.ConvertToCylWithVec(xv);
 
         // Compute the ramp for this cell

@@ -72,8 +72,8 @@ StrainTensorFace(parthenon::team_mbr_t const &member, const geometry::CoordParam
   parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, member, il, iu, [&](const int i) {
     geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
     //  T_j^i = dv^i/dxj + hj^2/hi^2 dv^j/dxi  + v^k dhi/dxk / hi \delta_j^i
-    const auto &xv = coords.GetCellCenter(vg,b,k,j,i);
-    const auto &hx = coords.GetScaleFactors(vg,b,k,j,i);
+    const auto &xv = coords.GetCellCenter(vg, b, k, j, i);
+    const auto &hx = coords.GetScaleFactors(vg, b, k, j, i);
 
     const std::array<Real, 3> v{vprim(b, gas::prim::velocity(VI(n, 0)), k, j, i) / hx[0],
                                 vprim(b, gas::prim::velocity(VI(n, 1)), k, j, i) / hx[1],
@@ -96,33 +96,33 @@ StrainTensorFace(parthenon::team_mbr_t const &member, const geometry::CoordParam
       // need xm
       //      ym , yp, xmym, xmyp
       //      zm , zp, xmzm, xmzp
-      const auto &xv_xm = coords.GetCellCenter(vg,b,k,j,i-1);
-      const auto &xv_ym = coords.GetCellCenter(vg,b,k,j - multi_d,i);
-      const auto &xv_yp = coords.GetCellCenter(vg,b,k,j + multi_d,i);
-      const auto &xv_xmym = coords.GetCellCenter(vg,b,k,j - multi_d,i - 1);
-      const auto &xv_xmyp = coords.GetCellCenter(vg,b,k,j + multi_d, i-1);
+      const auto &xv_xm = coords.GetCellCenter(vg, b, k, j, i - 1);
+      const auto &xv_ym = coords.GetCellCenter(vg, b, k, j - multi_d, i);
+      const auto &xv_yp = coords.GetCellCenter(vg, b, k, j + multi_d, i);
+      const auto &xv_xmym = coords.GetCellCenter(vg, b, k, j - multi_d, i - 1);
+      const auto &xv_xmyp = coords.GetCellCenter(vg, b, k, j + multi_d, i - 1);
 
-      const auto &xv_zm = coords.GetCellCenter(vg,b,k - three_d,j,i);
-      const auto &xv_zp = coords.GetCellCenter(vg,b,k + three_d,j,i);
-      const auto &xv_xmzm = coords.GetCellCenter(vg,b,k - three_d,j,i-1);
-      const auto &xv_xmzp = coords.GetCellCenter(vg,b,k + three_d,j,i-1);
+      const auto &xv_zm = coords.GetCellCenter(vg, b, k - three_d, j, i);
+      const auto &xv_zp = coords.GetCellCenter(vg, b, k + three_d, j, i);
+      const auto &xv_xmzm = coords.GetCellCenter(vg, b, k - three_d, j, i - 1);
+      const auto &xv_xmzp = coords.GetCellCenter(vg, b, k + three_d, j, i - 1);
 
       // Scale factors
-            const auto &hx_xm = coords.GetScaleFactors(vg, b, k, j, i - 1);
-            
-            const auto &hx_ym = coords.GetScaleFactors(vg, b, k, j - multi_d, i);
-            const auto &hx_yp = coords.GetScaleFactors(vg, b, k, j + multi_d, i);
-            const auto &hx_xmym = coords.GetScaleFactors(vg, b, k, j - multi_d, i-1);
-            const auto &hx_xmyp = coords.GetScaleFactors(vg, b, k, j + multi_d, i-1);
+      const auto &hx_xm = coords.GetScaleFactors(vg, b, k, j, i - 1);
+
+      const auto &hx_ym = coords.GetScaleFactors(vg, b, k, j - multi_d, i);
+      const auto &hx_yp = coords.GetScaleFactors(vg, b, k, j + multi_d, i);
+      const auto &hx_xmym = coords.GetScaleFactors(vg, b, k, j - multi_d, i - 1);
+      const auto &hx_xmyp = coords.GetScaleFactors(vg, b, k, j + multi_d, i - 1);
 
       const auto &hx_zm = coords.GetScaleFactors(vg, b, k - three_d, j, i);
       const auto &hx_zp = coords.GetScaleFactors(vg, b, k + three_d, j, i);
-      const auto &hx_xmzm = coords.GetScaleFactors(vg, b, k - three_d, j, i -1);
+      const auto &hx_xmzm = coords.GetScaleFactors(vg, b, k - three_d, j, i - 1);
       const auto &hx_xmzp = coords.GetScaleFactors(vg, b, k + three_d, j, i - 1);
 
       // Connection coeffs
       const auto &conn = coords.GetGradH1(vg, b, k, j, i);
-      const auto &conn_xm = coords.GetGradH1(vg, b, k, j, i-1);
+      const auto &conn_xm = coords.GetGradH1(vg, b, k, j, i - 1);
 
       const Real dx1 = xv[0] - xv_xm[0];
       const Real dx2 = multi_d ? (xv_yp[1] - xv_ym[1]) : Fuzz<Real>();
@@ -182,19 +182,17 @@ StrainTensorFace(parthenon::team_mbr_t const &member, const geometry::CoordParam
       // need ym
       //      xm , xp, xpym, xmym
       //      zm , zp, ymzm, ymzp
-      const auto &xv_xm = coords.GetCellCenter(vg, b, k, j , i - 1);
-      const auto &xv_xp = coords.GetCellCenter(vg, b, k, j , i + 1);
-      const auto &xv_xmym = coords.GetCellCenter(vg, b, k, j - 1 , i - 1);
+      const auto &xv_xm = coords.GetCellCenter(vg, b, k, j, i - 1);
+      const auto &xv_xp = coords.GetCellCenter(vg, b, k, j, i + 1);
+      const auto &xv_xmym = coords.GetCellCenter(vg, b, k, j - 1, i - 1);
       const auto &xv_xpym = coords.GetCellCenter(vg, b, k, j - 1, i + 1);
-      
 
       const auto &xv_ym = coords.GetCellCenter(vg, b, k, j - 1, i);
-      
+
       const auto &xv_zm = coords.GetCellCenter(vg, b, k - three_d, j, i);
       const auto &xv_zp = coords.GetCellCenter(vg, b, k + three_d, j, i);
       const auto &xv_ymzm = coords.GetCellCenter(vg, b, k - three_d, j - 1, i);
       const auto &xv_ymzp = coords.GetCellCenter(vg, b, k + three_d, j - 1, i);
-
 
       // Scale factors
       const auto &hx_xm = coords.GetScaleFactors(vg, b, k, j, i - 1);
@@ -203,7 +201,7 @@ StrainTensorFace(parthenon::team_mbr_t const &member, const geometry::CoordParam
       const auto &hx_xpym = coords.GetScaleFactors(vg, b, k, j - 1, i + 1);
 
       const auto &hx_ym = coords.GetScaleFactors(vg, b, k, j - 1, i);
-      
+
       const auto &hx_zm = coords.GetScaleFactors(vg, b, k - three_d, j, i);
       const auto &hx_zp = coords.GetScaleFactors(vg, b, k + three_d, j, i);
       const auto &hx_ymzm = coords.GetScaleFactors(vg, b, k - three_d, j - 1, i);
@@ -275,25 +273,25 @@ StrainTensorFace(parthenon::team_mbr_t const &member, const geometry::CoordParam
       const auto &xv_xmzm = coords.GetCellCenter(vg, b, k - 1, j, i - 1);
       const auto &xv_xpzm = coords.GetCellCenter(vg, b, k - 1, j, i + 1);
 
-     const auto &xv_ym = coords.GetCellCenter(vg, b, k, j - 1, i);
-     const auto &xv_yp = coords.GetCellCenter(vg, b, k, j + 1, i);
-     const auto &xv_ymzm = coords.GetCellCenter(vg, b, k - 1, j - 1, i);
-     const auto &xv_ypzm = coords.GetCellCenter(vg, b, k - 1, j + 1, i);
-     
-     const auto &xv_zm = coords.GetCellCenter(vg, b, k - 1, j, i);
+      const auto &xv_ym = coords.GetCellCenter(vg, b, k, j - 1, i);
+      const auto &xv_yp = coords.GetCellCenter(vg, b, k, j + 1, i);
+      const auto &xv_ymzm = coords.GetCellCenter(vg, b, k - 1, j - 1, i);
+      const auto &xv_ypzm = coords.GetCellCenter(vg, b, k - 1, j + 1, i);
+
+      const auto &xv_zm = coords.GetCellCenter(vg, b, k - 1, j, i);
 
       // Scale factors
 
-      const auto &hx_xm = coords.GetScaleFactors(vg, b, k, j , i - 1);
-      const auto &hx_xp = coords.GetScaleFactors(vg, b, k, j , i + 1);
-      const auto &hx_xmzm = coords.GetScaleFactors(vg, b, k - 1, j , i - 1);
-      const auto &hx_xpzm = coords.GetScaleFactors(vg, b, k -1 , j , i + 1);
+      const auto &hx_xm = coords.GetScaleFactors(vg, b, k, j, i - 1);
+      const auto &hx_xp = coords.GetScaleFactors(vg, b, k, j, i + 1);
+      const auto &hx_xmzm = coords.GetScaleFactors(vg, b, k - 1, j, i - 1);
+      const auto &hx_xpzm = coords.GetScaleFactors(vg, b, k - 1, j, i + 1);
 
-      const auto &hx_ym = coords.GetScaleFactors(vg, b, k, j - 1 , i);
-      const auto &hx_yp = coords.GetScaleFactors(vg, b, k, j + 1 , i);
-      const auto &hx_ymzm = coords.GetScaleFactors(vg, b, k - 1, j - 1 , i);
-      const auto &hx_ypzm = coords.GetScaleFactors(vg, b, k -1 , j + 1 , i);
-      const auto &hx_zm = coords.GetScaleFactors(vg, b, k -1 , j , i);
+      const auto &hx_ym = coords.GetScaleFactors(vg, b, k, j - 1, i);
+      const auto &hx_yp = coords.GetScaleFactors(vg, b, k, j + 1, i);
+      const auto &hx_ymzm = coords.GetScaleFactors(vg, b, k - 1, j - 1, i);
+      const auto &hx_ypzm = coords.GetScaleFactors(vg, b, k - 1, j + 1, i);
+      const auto &hx_zm = coords.GetScaleFactors(vg, b, k - 1, j, i);
 
       // Connection coeffs
       const auto &conn = coords.GetGradH3(vg, b, k, j, i);
@@ -383,8 +381,8 @@ KOKKOS_INLINE_FUNCTION void StressTensorFaceX1(
   parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, member, il, iu, [&](const int i) {
     //  T_j^i = dv^i/dxj + hj^2/hi^2 dv^j/dxi  + v^k dhi/dxk / hi \delta_j^i
     geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
-    const auto &hx = coords.GetScaleFactors(vg,b,k,j,i);
-    const auto &hx_xm = coords.GetScaleFactors(vg,b, k,j,i-1);
+    const auto &hx = coords.GetScaleFactors(vg, b, k, j, i);
+    const auto &hx_xm = coords.GetScaleFactors(vg, b, k, j, i - 1);
 
     const auto &xf = coords.FaceCenX1(geometry::CellFace::lower);
     const Real hx1f = coords.hx1(xf[0], xf[1], xf[2]);
@@ -444,8 +442,8 @@ KOKKOS_INLINE_FUNCTION void StressTensorFaceX2(
   const bool havg = dp.avg == DiffAvg::harmonic;
   parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, member, il, iu, [&](const int i) {
     geometry::Coords<GEOM> coords(cpars, p.GetCoordinates(b), k, j, i);
-     const auto &hx = coords.GetScaleFactors(vg,b,k,j,i);
-    const auto &hx_ym = coords.GetScaleFactors(vg,b,k,j - 1,i);
+    const auto &hx = coords.GetScaleFactors(vg, b, k, j, i);
+    const auto &hx_ym = coords.GetScaleFactors(vg, b, k, j - 1, i);
 
     const auto &xf = coords.FaceCenX2(geometry::CellFace::lower);
     const Real hx2f = coords.hx2(xf[0], xf[1], xf[2]);
@@ -506,8 +504,8 @@ KOKKOS_INLINE_FUNCTION void StressTensorFaceX3(
   const bool havg = dp.avg == DiffAvg::harmonic;
   parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, member, il, iu, [&](const int i) {
     geometry::Coords<GEOM> coords(cpars, p.GetCoordinates(b), k, j, i);
-    const auto &hx = coords.GetScaleFactors(vg,b,k,j,i);
-    const auto &hx_zm = coords.GetScaleFactors(vg,b,k - 1,j,i);
+    const auto &hx = coords.GetScaleFactors(vg, b, k, j, i);
+    const auto &hx_zm = coords.GetScaleFactors(vg, b, k - 1, j, i);
 
     const auto &xf = coords.FaceCenX3(geometry::CellFace::lower);
     const Real hx3f = coords.hx3(xf[0], xf[1], xf[2]);

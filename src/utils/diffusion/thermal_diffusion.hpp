@@ -88,8 +88,8 @@ TaskStatus ThermalFluxImpl(MeshData<Real> *md, DiffCoeffParams dp, PKG &pkg,
               DEFAULT_INNER_LOOP_PATTERN, mbr, il, iu, [&](const int i) {
                 // F = -K grad(T)
                 geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
-                const auto &xv = coords.GetCellCenter(vg,b,k,j,i);
-                const auto &xv_m = coords.GetCellCenter(vg,b,k, j,i-1);
+                const auto &xv = coords.GetCellCenter(vg, b, k, j, i);
+                const auto &xv_m = coords.GetCellCenter(vg, b, k, j, i - 1);
                 const Real dx1 = coords.Distance(xv, xv_m);
 
                 const Real T = eos_d.TemperatureFromDensityInternalEnergy(
@@ -142,8 +142,8 @@ TaskStatus ThermalFluxImpl(MeshData<Real> *md, DiffCoeffParams dp, PKG &pkg,
                     DEFAULT_INNER_LOOP_PATTERN, mbr, il, iu, [&](const int i) {
                       // F = -kappa * cv grad(T)
                       geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
-                      const auto &xv = coords.GetCellCenter(vg,b,k,j,i);
-                      const auto &xv_m = coords.GetCellCenter(vg,b,k,j-1,i);
+                      const auto &xv = coords.GetCellCenter(vg, b, k, j, i);
+                      const auto &xv_m = coords.GetCellCenter(vg, b, k, j - 1, i);
                       const Real dx2 = coords.Distance(xv, xv_m);
 
                       const Real T = eos_d.TemperatureFromDensityInternalEnergy(
@@ -201,8 +201,8 @@ TaskStatus ThermalFluxImpl(MeshData<Real> *md, DiffCoeffParams dp, PKG &pkg,
                     DEFAULT_INNER_LOOP_PATTERN, mbr, il, iu, [&](const int i) {
                       // F = -kappa * cv grad(T)
                       geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
-                      const auto &xv = coords.GetCellCenter(vg,b,k,j,i);
-                      const auto &xv_m = coords.GetCellCenter(vg,b,k-1,j,i);
+                      const auto &xv = coords.GetCellCenter(vg, b, k, j, i);
+                      const auto &xv_m = coords.GetCellCenter(vg, b, k - 1, j, i);
                       const Real dx3 = coords.Distance(xv, xv_m);
 
                       const Real T = eos_d.TemperatureFromDensityInternalEnergy(

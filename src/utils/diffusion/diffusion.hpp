@@ -84,8 +84,8 @@ Real EstimateTimestep(MeshData<Real> *md, DiffCoeffParams &dp, PKG &pkg, const E
       md->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, Real &ldt) {
         geometry::Coords<GEOM> coords(cpars, vprim.GetCoordinates(b), k, j, i);
-        const auto &dx = coords.GetCellWidths(vg,b,k,j,i);
-        const auto &xv = coords.GetCellCenter(vg,b,k,j,i);
+        const auto &dx = coords.GetCellWidths(vg, b, k, j, i);
+        const auto &xv = coords.GetCellCenter(vg, b, k, j, i);
         Real min_dx = Big<Real>();
         for (int d = 0; d < ndim; d++) {
           min_dx = std::min(min_dx, dx[d]);
@@ -153,18 +153,18 @@ TaskStatus DiffusionUpdateImpl(MeshData<Real> *md, PKG &pkg, SparsePackCons v0,
         using parthenon::TopologicalElement;
         geometry::Coords<GEOM> coords(cpars, v0.GetCoordinates(b), k, j, i);
 
-       const auto &ax1 = coords.GetFaceAreaX1(vg,b,k,j,i);
-       const auto &ax2 = coords.GetFaceAreaX2(vg,b,k,j,i);
-       const auto &ax3 = coords.GetFaceAreaX3(vg,b,k,j,i);
+        const auto &ax1 = coords.GetFaceAreaX1(vg, b, k, j, i);
+        const auto &ax2 = coords.GetFaceAreaX2(vg, b, k, j, i);
+        const auto &ax3 = coords.GetFaceAreaX3(vg, b, k, j, i);
 
-        const auto &dhdx1 =  coords.GetConnX1(vg,b,k,j,i);
-        const auto &dhdx2 =  coords.GetConnX2(vg,b,k,j,i);
-        const auto &dhdx3 =  coords.GetConnX3(vg,b,k,j,i);
+        const auto &dhdx1 = coords.GetConnX1(vg, b, k, j, i);
+        const auto &dhdx2 = coords.GetConnX2(vg, b, k, j, i);
+        const auto &dhdx3 = coords.GetConnX3(vg, b, k, j, i);
 
-       const auto &xv = coords.GetCellCenter(vg,b,k,j,i);
-       const auto &hx = coords.GetScaleFactors(vg,b,k,j,i);
+        const auto &xv = coords.GetCellCenter(vg, b, k, j, i);
+        const auto &hx = coords.GetScaleFactors(vg, b, k, j, i);
 
-            const Real vol = coords.GetVolume(vg,b,k,j,i);
+        const Real vol = coords.GetVolume(vg, b, k, j, i);
         const int nspecies = v0.GetSize(b, gas::cons::total_energy());
         for (int n = 0; n < nspecies; ++n) {
           const int imx1 = VI(n, 0);

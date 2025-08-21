@@ -92,8 +92,8 @@ TaskStatus BetaCooling(MeshData<Real> *md, const Real time, const Real dt) {
       KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
         // Extract coordinates
         geometry::Coords<GEOM> coords(cpars, vmesh.GetCoordinates(b), k, j, i);
-        const auto &xv = coords.GetCellCenter(vg,b,k,j,i);
-        const auto &hx = coords.GetScaleFactors(vg,b,k,j,i);
+        const auto &xv = coords.GetCellCenter(vg, b, k, j, i);
+        const auto &hx = coords.GetScaleFactors(vg, b, k, j, i);
         const auto &xcyl = coords.ConvertToCyl(xv);
         const Real rsph2 = xcyl[0] * xcyl[0] + xcyl[2] * xcyl[2];
 

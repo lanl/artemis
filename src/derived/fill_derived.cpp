@@ -65,7 +65,6 @@ TaskStatus SetAuxillaryFields(MeshData<Real> *md) {
         // Extract geometry
         geometry::Coords<GEOM> coords(cpars, vmesh.GetCoordinates(b), k, j, i);
 
-        // const auto &hx = coords.GetScaleFactors();
         const auto &hx = coords.GetScaleFactors(vg, b, k, j, i);
 
         for (int n = 0; n < vmesh.GetSize(b, gas::cons::density()); ++n) {

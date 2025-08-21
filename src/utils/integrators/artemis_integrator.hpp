@@ -85,27 +85,24 @@ TaskStatus ApplyUpdate(MeshData<Real> *u0, MeshData<Real> *u1, const Real g0,
         const int d2 = d1 + multi_d;
         const int d3 = d2 + three_d;
         const Real bdt_vol = beta_dt / coords.GetVolume(vg, b, k, j, i);
+        [[maybe_unused]] std::array<Real, 2> ax1{0}, ax2{0}, ax3{0};
+        if constexpr (include_divf) {
+          ax1 = coords.GetFaceAreaX1(vg, b, k, j, i);
+          ax2 = coords.GetFaceAreaX2(vg, b, k, j, i);
+          ax3 = coords.GetFaceAreaX3(vg, b, k, j, i);
+        }
         // Advance state vector with flux divergence
         for (int n = v0.GetLowerBound(b); n <= v0.GetUpperBound(b); ++n) {
           Real &v0n = v0(b, n, k, j, i);
           Real &v1n = v1(b, n, k, j, i);
           v0n = g0 * v0n + g1 * v1n;
           if constexpr (include_divf) {
-            v0n += bdt_vol *
-                   ((vg(b, geom::ax1(), coords.template index<geom::ax1>(k, j, i)) *
-                         v0.flux(b, d1, n, k, j, i) -
-                     vg(b, geom::ax1(), coords.template index<geom::ax1>(k, j, i + 1)) *
-                         v0.flux(b, d1, n, k, j, i + 1)) +
-                    (vg(b, geom::ax2(), coords.template index<geom::ax2>(k, j, i)) *
-                         v0.flux(b, d2, n, k, j, i) -
-                     vg(b, geom::ax2(),
-                        coords.template index<geom::ax2>(k, j + multi_d, i)) *
-                         v0.flux(b, d2, n, k, j + multi_d, i)) +
-                    (vg(b, geom::ax3(), coords.template index<geom::ax3>(k, j, i)) *
-                         v0.flux(b, d3, n, k, j, i) -
-                     vg(b, geom::ax3(),
-                        coords.template index<geom::ax3>(k + three_d, j, i)) *
-                         v0.flux(b, d3, n, k + three_d, j, i)));
+            v0n += bdt_vol * ((ax1[0] * v0.flux(b, d1, n, k, j, i) -
+                               ax1[1] * v0.flux(b, d1, n, k, j, i + 1)) +
+                              (ax2[0] * v0.flux(b, d2, n, k, j, i) -
+                               ax2[1] * v0.flux(b, d2, n, k, j + multi_d, i)) +
+                              (ax3[0] * v0.flux(b, d3, n, k, j, i) -
+                               ax3[1] * v0.flux(b, d3, n, k + three_d, j, i)));
           }
         }
       });

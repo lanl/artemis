@@ -377,6 +377,9 @@ TaskStatus CoagulationOneStep(MeshData<Real> *md, const Real time, const Real dt
   size_t scr_size = ScratchPad1D<Real>::shmem_size(isize);
 
   auto pmb = md->GetBlockData(0)->GetBlockPointer();
+  const auto &cpars =
+      pm->packages.Get("artemis")->template Param<geometry::CoordParams>("coord_params");
+
   ParArray4D<int> nCalls;
   int maxCalls, maxSize, maxSize0;
   Real massd0, massd;
@@ -398,7 +401,7 @@ TaskStatus CoagulationOneStep(MeshData<Real> *md, const Real time, const Real dt
             {0, kb.s, jb.s, ib.s}, {md->NumBlocks(), kb.e + 1, jb.e + 1, ib.e + 1}),
         KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, Real &lsum,
                       int &lmax) {
-          geometry::Coords<GEOM> coords(vmesh.GetCoordinates(b), k, j, i);
+          geometry::Coords<GEOM> coords(cpars, vmesh.GetCoordinates(b), k, j, i);
           for (int n = 0; n < nspecies; ++n) {
             Real &dens_d = vmesh(b, dust::cons::density(n), k, j, i);
             lsum += dens_d * coords.Volume();
@@ -432,7 +435,7 @@ TaskStatus CoagulationOneStep(MeshData<Real> *md, const Real time, const Real dt
         const Real dens_g = vmesh(b, gas::prim::density(0), k, j, i);
         Real dt_sync = dt * time0;
 
-        geometry::Coords<GEOM> coords(vmesh.GetCoordinates(b), k, j, i);
+        geometry::Coords<GEOM> coords(cpars, vmesh.GetCoordinates(b), k, j, i);
         const auto &hx = coords.GetScaleFactors();
         const auto &xv = coords.GetCellCenter();
         const auto &xcyl = coords.ConvertToCyl(xv);
@@ -523,7 +526,7 @@ TaskStatus CoagulationOneStep(MeshData<Real> *md, const Real time, const Real dt
             {0, kb.s, jb.s, ib.s}, {md->NumBlocks(), kb.e + 1, jb.e + 1, ib.e + 1}),
         KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, Real &lsum,
                       int &lmax1, int &lmax2) {
-          geometry::Coords<GEOM> coords(vmesh.GetCoordinates(b), k, j, i);
+          geometry::Coords<GEOM> coords(cpars, vmesh.GetCoordinates(b), k, j, i);
           const Real vol00 = coords.Volume();
           for (int n = 0; n < nspecies; ++n) {
             Real &dens_d = vmesh(b, dust::cons::density(n), k, j, i);

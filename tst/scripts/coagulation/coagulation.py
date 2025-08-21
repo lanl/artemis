@@ -38,7 +38,7 @@ def run(**kwargs):
         arguments = [
             "parthenon/job/problem_id=" + _file_id,
             "parthenon/time/tlim={:.8f}".format(_tlim),
-            "dust/surface_density_flag=" + _surfden[ii],
+            "dust/coagulation/surface_density_flag=" + _surfden[ii],
             "dust/dfloor=" + _dfloor[ii],
             "problem/rho0=" + im,
         ]

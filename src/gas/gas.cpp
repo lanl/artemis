@@ -538,11 +538,17 @@ TaskStatus CalculateFluxes(MeshData<Real> *md, const bool pcm) {
           resolved_pkgs.get(), {}, {parthenon::PDOpt::WithFluxes});
   static auto desc_face =
       parthenon::MakePackDescriptor<gas::face::velocity>(resolved_pkgs.get());
+  static auto desc_g =
+      parthenon::MakePackDescriptor<geom::x1v, geom::x2v, geom::x3v, geom::dx1, geom::dx2,
+                                    geom::dx3, geom::hx1f1, geom::hx2f1, geom::hx3f1,
+                                    geom::hx1f2, geom::hx2f2, geom::hx3f2, geom::hx1f3,
+                                    geom::hx2f3, geom::hx3f3>(resolved_pkgs.get());
   auto vprim = desc_prim.GetPack(md);
   auto vflux = desc_flux.GetPack(md);
   auto vface = desc_face.GetPack(md);
+  auto vg = desc_g.GetPack(md);
 
-  return ArtemisUtils::CalculateFluxes<Fluid::gas>(md, pkg, vprim, vflux, vface, pcm);
+  return ArtemisUtils::CalculateFluxes<Fluid::gas>(md, pkg, vprim, vflux, vface, vg, pcm);
 }
 
 //----------------------------------------------------------------------------------------

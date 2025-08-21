@@ -521,6 +521,25 @@ class CoordsBase {
             vg(b, geom::hx3v())(index<geom::hx3v>(k, j, i))};
   }
 
+  template <int DIR, typename V1>
+  KOKKOS_INLINE_FUNCTION std::array<Real, 3>
+  GetScaleFactorsFace(const V1 &vg, const int b, const int k, const int j,
+                      const int i) const {
+    PARTHENON_REQUIRE(DIR > 0 && DIR <= 3, "Invalid face direction!");
+    if constexpr (DIR == 1) {
+      return {vg(b, geom::hx1f1())(index<geom::hx1f1>(k, j, i)),
+              vg(b, geom::hx2f1())(index<geom::hx2f1>(k, j, i)),
+              vg(b, geom::hx3f1())(index<geom::hx3f1>(k, j, i))};
+    } else if constexpr (DIR == 2) {
+      return {vg(b, geom::hx1f2())(index<geom::hx1f2>(k, j, i)),
+              vg(b, geom::hx2f2())(index<geom::hx2f2>(k, j, i)),
+              vg(b, geom::hx3f2())(index<geom::hx3f2>(k, j, i))};
+    }
+    return {vg(b, geom::hx1f3())(index<geom::hx1f3>(k, j, i)),
+            vg(b, geom::hx2f3())(index<geom::hx2f3>(k, j, i)),
+            vg(b, geom::hx3f3())(index<geom::hx3f3>(k, j, i))};
+  }
+
   KOKKOS_INLINE_FUNCTION std::array<Real, 2> GetFaceAreaX1() const {
     // Get the lower and upper face areas in the X1 direction
     return {static_cast<const T *>(this)->AreaX1(bnds.x1[0]),

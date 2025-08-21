@@ -164,8 +164,8 @@ TaskListStatus CoagulationDriver(Mesh *pm, parthenon::SimTime &tm) {
   const Real ldt = (*dt_coag);
   *dt_coag = 0.0;
   if (Globals::my_rank == 0) {
-    std::cout << "(Coagulation) " << "cycle=" << tm.ncycle << " time=" << ltime
-              << " dt=" << ldt << std::endl;
+    std::cout << "(Coagulation) "
+              << "cycle=" << tm.ncycle << " time=" << ltime << " dt=" << ldt << std::endl;
   }
 
   // Create MeshData register subset for dust

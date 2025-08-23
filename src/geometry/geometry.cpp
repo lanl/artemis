@@ -22,13 +22,13 @@ namespace geometry {
 #define ADD_FIELD(name)                                                                  \
   {                                                                                      \
     const auto shape = coords.template shape<name>();                                    \
-    pkg->AddField<name>(Metadata({Metadata::None, Metadata::OneCopy, Metadata::Restart}, \
+    pkg->AddField<name>(Metadata({Metadata::None, Metadata::OneCopy},                    \
                                  std::vector<int>({shape[0] * shape[1] * shape[2]})));   \
   }
 
 template <Coordinates GEOM>
 void EnrollFields(StateDescriptor *pkg, CoordParams &cpars) {
-
+  if constexpr (GEOM == Coordinates::cartesian) return;
   Coords<GEOM> coords(cpars);
 
   ADD_FIELD(geom::x1v);
@@ -98,6 +98,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
 template <Coordinates GEOM>
 void InitBlockGeom(MeshBlock *pmb, ParameterInput *pin) {
+  if constexpr (GEOM == Coordinates::cartesian) return;
   using parthenon::MakePackDescriptor;
   auto pm = pmb->pmy_mesh;
   const int ndim = pm->ndim;

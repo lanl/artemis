@@ -200,6 +200,18 @@ constexpr bool is_x3dep() {
   return std::is_same_v<VAR, geom::x3v>;
 }
 } // namespace cart
+
+template <Coordinates GEOM>
+class Coords;
+
+template <typename T>
+struct CoordsTrait;
+
+template <Coordinates GEOM>
+struct CoordsTrait<Coords<GEOM>> {
+  static constexpr Coordinates value = GEOM;
+};
+
 //! \class  geometry::CoordsBase
 //! \brief  The base coordinates class that defines all methods and the default behavior
 //! which is Cartesian.
@@ -311,6 +323,9 @@ class CoordsBase {
   KOKKOS_INLINE_FUNCTION Real GetVolume(const V1 &vg, const int b, const int k,
                                         const int j, const int i) const {
     // The centroid value of the X3 face
+    if constexpr (CoordsTrait<T>::value == Coordinates::cartesian) {
+      return Volume();
+    }
     return vg(b, geom::vol())(index<geom::vol>(k, j, i));
   }
 
@@ -496,6 +511,9 @@ class CoordsBase {
   KOKKOS_INLINE_FUNCTION std::array<Real, 3>
   GetCellWidths(const V1 &vg, const int b, const int k, const int j, const int i) const {
     // Return all cell widths
+    if constexpr (CoordsTrait<T>::value == Coordinates::cartesian) {
+      return GetCellWidths();
+    }
     return {vg(b, geom::dx1())(index<geom::dx1>(k, j, i)),
             vg(b, geom::dx2())(index<geom::dx2>(k, j, i)),
             vg(b, geom::dx3())(index<geom::dx3>(k, j, i))};
@@ -510,6 +528,9 @@ class CoordsBase {
   template <typename V1>
   KOKKOS_INLINE_FUNCTION std::array<Real, 3>
   GetCellCenter(const V1 &vg, const int b, const int k, const int j, const int i) const {
+    if constexpr (CoordsTrait<T>::value == Coordinates::cartesian) {
+      return GetCellCenter();
+    }
     return {vg(b, geom::x1v())(index<geom::x1v>(k, j, i)),
             vg(b, geom::x2v())(index<geom::x2v>(k, j, i)),
             vg(b, geom::x3v())(index<geom::x3v>(k, j, i))};
@@ -525,6 +546,9 @@ class CoordsBase {
   KOKKOS_INLINE_FUNCTION std::array<Real, 3> GetScaleFactors(const V1 &vg, const int b,
                                                              const int k, const int j,
                                                              const int i) const {
+    if constexpr (CoordsTrait<T>::value == Coordinates::cartesian) {
+      return GetScaleFactors();
+    }
     return {vg(b, geom::hx1v())(index<geom::hx1v>(k, j, i)),
             vg(b, geom::hx2v())(index<geom::hx2v>(k, j, i)),
             vg(b, geom::hx3v())(index<geom::hx3v>(k, j, i))};
@@ -535,6 +559,9 @@ class CoordsBase {
   GetScaleFactorsFace(const V1 &vg, const int b, const int k, const int j,
                       const int i) const {
     PARTHENON_REQUIRE(DIR > 0 && DIR <= 3, "Invalid face direction!");
+    if constexpr (CoordsTrait<T>::value == Coordinates::cartesian) {
+      return {1., 1., 1.};
+    }
     if constexpr (DIR == 1) {
       return {vg(b, geom::hx1f1())(index<geom::hx1f1>(k, j, i)),
               vg(b, geom::hx2f1())(index<geom::hx2f1>(k, j, i)),
@@ -569,6 +596,9 @@ class CoordsBase {
   KOKKOS_INLINE_FUNCTION std::array<Real, 2>
   GetFaceAreaX1(const V1 &vg, const int b, const int k, const int j, const int i) const {
     // Get the lower and upper face areas in the X1 direction
+    if constexpr (CoordsTrait<T>::value == Coordinates::cartesian) {
+      return GetFaceAreaX1();
+    }
     return {vg(b, geom::ax1())(index<geom::ax1>(k, j, i)),
             vg(b, geom::ax1())(index<geom::ax1>(k, j, i + 1))};
   }
@@ -576,6 +606,9 @@ class CoordsBase {
   KOKKOS_INLINE_FUNCTION std::array<Real, 2>
   GetFaceAreaX2(const V1 &vg, const int b, const int k, const int j, const int i) const {
     // Get the lower and upper face areas in the X1 direction
+    if constexpr (CoordsTrait<T>::value == Coordinates::cartesian) {
+      return GetFaceAreaX2();
+    }
     return {vg(b, geom::ax2())(index<geom::ax2>(k, j, i)),
             vg(b, geom::ax2())(index<geom::ax2>(k, j + 1, i))};
   }
@@ -583,6 +616,9 @@ class CoordsBase {
   KOKKOS_INLINE_FUNCTION std::array<Real, 2>
   GetFaceAreaX3(const V1 &vg, const int b, const int k, const int j, const int i) const {
     // Get the lower and upper face areas in the X1 direction
+    if constexpr (CoordsTrait<T>::value == Coordinates::cartesian) {
+      return GetFaceAreaX3();
+    }
     return {vg(b, geom::ax3())(index<geom::ax3>(k, j, i)),
             vg(b, geom::ax3())(index<geom::ax3>(k + 1, j, i))};
   }
@@ -616,6 +652,9 @@ class CoordsBase {
   template <typename V1>
   KOKKOS_INLINE_FUNCTION Mat3x2 GetRFWeights(const V1 &vg, const int b, const int k,
                                              const int j, const int i) const {
+    if constexpr (CoordsTrait<T>::value == Coordinates::cartesian) {
+      return GetRFWeights();
+    }
     std::array<Real, 2> rfw1{vg(b, geom::rfw1m())(index<geom::rfw1m>(k, j, i)),
                              vg(b, geom::rfw1p())(index<geom::rfw1p>(k, j, i))};
     std::array<Real, 2> rfw2{vg(b, geom::rfw2m())(index<geom::rfw2m>(k, j, i)),
@@ -666,6 +705,9 @@ class CoordsBase {
   KOKKOS_INLINE_FUNCTION std::array<Real, 3>
   GetConnX1(const V1 &vg, const int b, const int k, const int j, const int i) const {
     // { dh1/dx1, dh2/dx1, dh3/dx1 }
+    if constexpr (CoordsTrait<T>::value == Coordinates::cartesian) {
+      return GetConnX1();
+    }
     return {vg(b, geom::dh1dx1())(index<geom::dh1dx1>(k, j, i)),
             vg(b, geom::dh2dx1())(index<geom::dh2dx1>(k, j, i)),
             vg(b, geom::dh3dx1())(index<geom::dh3dx1>(k, j, i))};
@@ -674,6 +716,9 @@ class CoordsBase {
   KOKKOS_INLINE_FUNCTION std::array<Real, 3>
   GetConnX2(const V1 &vg, const int b, const int k, const int j, const int i) const {
     // { dh1/dx2, dh2/dx2, dh3/dx2 }
+    if constexpr (CoordsTrait<T>::value == Coordinates::cartesian) {
+      return GetConnX2();
+    }
     return {vg(b, geom::dh1dx2())(index<geom::dh1dx2>(k, j, i)),
             vg(b, geom::dh2dx2())(index<geom::dh2dx2>(k, j, i)),
             vg(b, geom::dh3dx2())(index<geom::dh3dx2>(k, j, i))};
@@ -682,6 +727,9 @@ class CoordsBase {
   KOKKOS_INLINE_FUNCTION std::array<Real, 3>
   GetConnX3(const V1 &vg, const int b, const int k, const int j, const int i) const {
     // { dh1/dx3, dh2/dx3, dh3/dx3 }
+    if constexpr (CoordsTrait<T>::value == Coordinates::cartesian) {
+      return GetConnX3();
+    }
     return {vg(b, geom::dh1dx3())(index<geom::dh1dx3>(k, j, i)),
             vg(b, geom::dh2dx3())(index<geom::dh2dx3>(k, j, i)),
             vg(b, geom::dh3dx3())(index<geom::dh3dx3>(k, j, i))};
@@ -689,6 +737,9 @@ class CoordsBase {
   template <typename V1>
   KOKKOS_INLINE_FUNCTION std::array<Real, 3>
   GetGradH1(const V1 &vg, const int b, const int k, const int j, const int i) const {
+    if constexpr (CoordsTrait<T>::value == Coordinates::cartesian) {
+      return GetGradH1();
+    }
     return {vg(b, geom::dh1dx1())(index<geom::dh1dx1>(k, j, i)),
             vg(b, geom::dh1dx2())(index<geom::dh1dx2>(k, j, i)),
             vg(b, geom::dh1dx3())(index<geom::dh1dx3>(k, j, i))};
@@ -696,6 +747,9 @@ class CoordsBase {
   template <typename V1>
   KOKKOS_INLINE_FUNCTION std::array<Real, 3>
   GetGradH2(const V1 &vg, const int b, const int k, const int j, const int i) const {
+    if constexpr (CoordsTrait<T>::value == Coordinates::cartesian) {
+      return GetGradH2();
+    }
     return {vg(b, geom::dh2dx1())(index<geom::dh2dx1>(k, j, i)),
             vg(b, geom::dh2dx2())(index<geom::dh2dx2>(k, j, i)),
             vg(b, geom::dh2dx3())(index<geom::dh2dx3>(k, j, i))};
@@ -703,6 +757,9 @@ class CoordsBase {
   template <typename V1>
   KOKKOS_INLINE_FUNCTION std::array<Real, 3>
   GetGradH3(const V1 &vg, const int b, const int k, const int j, const int i) const {
+    if constexpr (CoordsTrait<T>::value == Coordinates::cartesian) {
+      return GetGradH3();
+    }
     return {vg(b, geom::dh3dx1())(index<geom::dh3dx1>(k, j, i)),
             vg(b, geom::dh3dx2())(index<geom::dh3dx2>(k, j, i)),
             vg(b, geom::dh3dx3())(index<geom::dh3dx3>(k, j, i))};

@@ -322,7 +322,7 @@ class CoordsBase {
   template <typename V1>
   KOKKOS_INLINE_FUNCTION Real GetVolume(const V1 &vg, const int b, const int k,
                                         const int j, const int i) const {
-    // The centroid value of the X3 face
+    // The cell volume
     if constexpr (CoordsTrait<T>::value == Coordinates::cartesian) {
       return Volume();
     }

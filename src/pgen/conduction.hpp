@@ -96,9 +96,6 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       MakePackDescriptor<gas::prim::density, gas::prim::velocity, gas::prim::sie>(
           (pmb->resolved_packages).get());
   auto v = desc.GetPack(md.get());
-  static auto desc_g =
-      MakePackDescriptor<geom::x1v, geom::x2v, geom::x3v>((pmb->resolved_packages).get());
-  auto vg = desc_g.GetPack(md.get());
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
@@ -111,7 +108,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
         if (do_gas) {
           geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
-          const auto &xv = coords.GetCellCenter(vg, 0, k, j, i);
+          const auto &xv = coords.GetCellCenter();
 
           const Real P0 = eos_d.PressureFromDensityTemperature(pars.g_rho, pars.g_temp);
           const Real Rgas = P0 / (pars.g_rho * pars.g_temp);
@@ -151,10 +148,6 @@ void CondBoundaryImpl(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) {
                                                  gas::prim::sie>(mbd);
   auto v = descriptors[coarse].GetPack(mbd.get());
   if (v.GetMaxNumberOfVars() == 0) return;
-  static auto desc_g =
-      ArtemisUtils::GetPackDescriptorMap<geom::x1v, geom::x2v, geom::x3v>(mbd);
-  auto vg = desc_g[coarse].GetPack(mbd.get());
-
   const auto &cpars = artemis_pkg->template Param<geometry::CoordParams>("coord_params");
   // Indexing
   const auto &pco = (coarse) ? pmb->pmr->GetCoarseCoords() : pmb->coords;
@@ -222,10 +215,11 @@ void CondBoundaryImpl(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) {
 
         // Extract coordinates at k, j, i
         geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
-        const auto &xv = coords.GetCellCenter(vg, 0, k, j, i);
+        const auto &xv = coords.GetCellCenter();
 
         // Extract coordinates at ia, im, ic
-        const auto &xva = coords.GetCellCenter(vg, 0, ia[0], ia[1], ia[2]);
+        geometry::Coords<GEOM> ca(cpars, pco, ia[0], ia[1], ia[2]);
+        const auto &xva = ca.GetCellCenter();
 
         const Real xma = (INNER ? -1. : 1.) * coords.Distance(xv, xva);
 
@@ -238,7 +232,7 @@ void CondBoundaryImpl(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) {
           const Real Ta = eos_d.TemperatureFromDensityInternalEnergy(da, siea);
           const Real Pa = eos_d.PressureFromDensityInternalEnergy(da, siea);
 
-          const Real ka = dcoeff.Get(dcp, coords, xva, da, siea, eos_d);
+          const Real ka = dcoeff.Get(dcp, ca, da, siea, eos_d);
           Real Tg = dp.g_temp;
           if (INNER) {
             Tg = Ta - dp.flux * xma / ka;

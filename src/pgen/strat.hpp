@@ -135,9 +135,6 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
                          dust::prim::density, dust::prim::velocity, rad::prim::energy,
                          rad::prim::flux>((pmb->resolved_packages).get());
   auto v = desc.GetPack(md.get());
-  static auto desc_g =
-      MakePackDescriptor<geom::x1v, geom::x3v>((pmb->resolved_packages).get());
-  auto vg = desc_g.GetPack(md.get());
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
@@ -152,6 +149,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
         const Real x = coords.x1v();
         const Real z = coords.x3v();
+
         const Real vx1 = 0.0;
         // const Real vx2 = -pars.q * pars.Om0 * x;
         const Real dvx2 = 0.0; // residual eq evolution
@@ -204,9 +202,6 @@ inline void ExtrapInnerX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
       dust::prim::velocity, rad::prim::energy, rad::prim::flux>(mbd);
   auto v = descriptors[coarse].GetPack(mbd.get());
   if (v.GetMaxNumberOfVars() == 0) return;
-  static auto desc_g =
-      ArtemisUtils::GetPackDescriptorMap<geom::x1v, geom::x2v, geom::x3v>(mbd);
-  auto vg = desc_g[coarse].GetPack(mbd.get());
 
   // Extract artemis package and params
   auto artemis_pkg = pmb->packages.Get("artemis");
@@ -227,9 +222,11 @@ inline void ExtrapInnerX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
       KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
         // Extract coordinates
         geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
-        const Real x = coords.GetCellCenter(vg, 0, k, j, i)[0];
-        const Real x0 = coords.GetCellCenter(vg, 0, k, j, is)[0];
-        const Real x1 = coords.GetCellCenter(vg, 0, k, j, is + 1)[0];
+        geometry::Coords<GEOM> coords_s(cpars, pco, k, j, is);
+        geometry::Coords<GEOM> coords_s1(cpars, pco, k, j, is + 1);
+        const Real x = coords.x1v();
+        const Real x0 = coords_s.x1v();
+        const Real x1 = coords_s1.x1v();
         const Real dx = x1 - x0;
 
         for (int n = 0; n < v.GetSize(0, gas::prim::density()); ++n) {
@@ -297,9 +294,6 @@ inline void ExtrapOuterX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
       dust::prim::velocity, rad::prim::energy, rad::prim::flux>(mbd);
   auto v = descriptors[coarse].GetPack(mbd.get());
   if (v.GetMaxNumberOfVars() == 0) return;
-  static auto desc_g =
-      ArtemisUtils::GetPackDescriptorMap<geom::x1v, geom::x2v, geom::x3v>(mbd);
-  auto vg = desc_g[coarse].GetPack(mbd.get());
 
   // Extract artemis package and params
   auto artemis_pkg = pmb->packages.Get("artemis");
@@ -320,10 +314,12 @@ inline void ExtrapOuterX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
       KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
         // Extract coordinates
         geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
-        const Real x0 = coords.GetCellCenter(vg, 0, k, j, ie)[0];
-        const Real x1 = coords.GetCellCenter(vg, 0, k, j, ie - 1)[0];
+        geometry::Coords<GEOM> coords_e(cpars, pco, k, j, ie);
+        geometry::Coords<GEOM> coords_e1(cpars, pco, k, j, ie - 1);
+        const Real x0 = coords_e.x1v();
+        const Real x1 = coords_e1.x1v();
         const Real dx = x0 - x1;
-        const Real x = coords.GetCellCenter(vg, 0, k, j, i)[0];
+        const Real x = coords.x1v();
 
         for (int n = 0; n < v.GetSize(0, gas::prim::density()); ++n) {
           const Real gv1 = v(0, gas::prim::velocity(VI(n, 0)), k, j, ie);
@@ -405,8 +401,6 @@ inline void ShearInnerX2(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse)
       dust::prim::velocity, rad::prim::energy, rad::prim::flux>(mbd);
   auto v = descriptors[coarse].GetPack(mbd.get());
   if (v.GetMaxNumberOfVars() == 0) return;
-  static auto desc_g = ArtemisUtils::GetPackDescriptorMap<geom::x1v, geom::x3v>(mbd);
-  auto vg = desc_g[coarse].GetPack(mbd.get());
 
   // Extract artemis package and params
   auto artemis_pkg = pmb->packages.Get("artemis");
@@ -528,8 +522,6 @@ inline void ShearOuterX2(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse)
       dust::prim::velocity, rad::prim::energy, rad::prim::flux>(mbd);
   auto v = descriptors[coarse].GetPack(mbd.get());
   if (v.GetMaxNumberOfVars() == 0) return;
-  static auto desc_g = ArtemisUtils::GetPackDescriptorMap<geom::x1v, geom::x3v>(mbd);
-  auto vg = desc_g[coarse].GetPack(mbd.get());
 
   // Extract artemis package and params
   auto artemis_pkg = pmb->packages.Get("artemis");
@@ -639,9 +631,6 @@ inline void ExtrapInnerX3(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
       dust::prim::velocity, rad::prim::energy, rad::prim::flux>(mbd);
   auto v = descriptors[coarse].GetPack(mbd.get());
   if (v.GetMaxNumberOfVars() == 0) return;
-  static auto desc_g =
-      ArtemisUtils::GetPackDescriptorMap<geom::x1v, geom::x2v, geom::x3v>(mbd);
-  auto vg = desc_g[coarse].GetPack(mbd.get());
 
   // Extract artemis package and params
   auto artemis_pkg = pmb->packages.Get("artemis");
@@ -666,9 +655,10 @@ inline void ExtrapInnerX3(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
       KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
         // Extract coordinates
         geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
+        geometry::Coords<GEOM> coords_s(cpars, pco, ks, j, i);
 
         const Real z = coords.x3v();
-        const Real z0 = coords.GetCellCenter(vg, 0, ks, j, i)[2];
+        const Real z0 = coords_s.x3v();
 
         // isothermal through boundary
         const Real Tg = pars.temp0;
@@ -742,9 +732,6 @@ inline void ExtrapOuterX3(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
       dust::prim::velocity, rad::prim::energy, rad::prim::flux>(mbd);
   auto v = descriptors[coarse].GetPack(mbd.get());
   if (v.GetMaxNumberOfVars() == 0) return;
-  static auto desc_g =
-      ArtemisUtils::GetPackDescriptorMap<geom::x1v, geom::x2v, geom::x3v>(mbd);
-  auto vg = desc_g[coarse].GetPack(mbd.get());
 
   // Extract artemis package and params
   auto artemis_pkg = pmb->packages.Get("artemis");
@@ -769,9 +756,10 @@ inline void ExtrapOuterX3(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
       KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
         // Extract coordinates
         geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
+        geometry::Coords<GEOM> coords_e(cpars, pco, ke, j, i);
 
         const Real z = coords.x3v();
-        const Real z0 = coords.GetCellCenter(vg, 0, ke, j, i)[2];
+        const Real z0 = coords_e.x3v();
 
         // isothermal through boundary
         const Real Tg = pars.temp0;

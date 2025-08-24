@@ -80,9 +80,6 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
                          rad::prim::energy, rad::prim::flux>(
           (pmb->resolved_packages).get());
   auto v = desc.GetPack(md.get());
-  static auto desc_g =
-      MakePackDescriptor<geom::x1v, geom::x2v, geom::x3v>((pmb->resolved_packages).get());
-  auto vg = desc_g.GetPack(md.get());
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
@@ -95,8 +92,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
         // cell-centered coordinates
         geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
-
-        const auto &xv = coords.GetCellCenter(vg, 0, k, j, i);
+        const auto &xv = coords.GetCellCenter();
         // compute cell-centered conserved variables
         if (do_gas) {
           // put in a ball at the center

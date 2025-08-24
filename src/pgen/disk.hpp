@@ -360,15 +360,14 @@ inline void InitDiskParams(MeshBlock *pmb, ParameterInput *pin) {
 //! \fn void DiskICImpl
 //! \brief Set the state vectors of cell to the initial conditions
 
-template <Coordinates GEOM, typename V1, typename V2, typename V3>
-KOKKOS_INLINE_FUNCTION void DiskICImpl(V1 v, V2 vg, const int b, const int k, const int j,
-                                       const int i, V3 pco, EOS eos_d, DiskParams dp,
-                                       ParArray1D<NBody::Particle> particles,
-                                       const int npart) {
+template <Coordinates GEOM, typename V1, typename V2>
+KOKKOS_INLINE_FUNCTION void
+DiskICImpl(V1 v, const int b, const int k, const int j, const int i, V2 pco, EOS eos_d,
+           DiskParams dp, ParArray1D<NBody::Particle> particles, const int npart) {
 
   geometry::Coords<GEOM> coords(dp.log, pco, k, j, i);
-  const auto &xv = coords.GetCellCenter(vg, 0, k, j, i);
-  const auto &dx = coords.GetCellWidths(vg, 0, k, j, i);
+  const auto &xv = coords.GetCellCenter();
+  const auto &dx = coords.GetCellWidths();
 
   const auto res = ComputeDiskProfile<GEOM>(dp, coords, xv, dx, k, j, i, eos_d, dp.do_gas,
                                             dp.do_dust, particles, npart);
@@ -430,10 +429,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
                          dust::prim::density, dust::prim::velocity, rad::prim::energy,
                          rad::prim::flux>((pmb->resolved_packages).get());
   auto v = desc.GetPack(md.get());
-  static auto desc_g =
-      MakePackDescriptor<geom::x1v, geom::x2v, geom::x3v, geom::dx1, geom::dx2,
-                         geom::dx3>((pmb->resolved_packages).get());
-  auto vg = desc_g.GetPack(md.get());
+
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
@@ -451,7 +447,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   pmb->par_for(
       "disk", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        DiskICImpl<GEOM>(v, vg, 0, k, j, i, pco, eos_d, dp, particles, npart);
+        DiskICImpl<GEOM>(v, 0, k, j, i, pco, eos_d, dp, particles, npart);
       });
   if (dp.do_imc) jaybenne::InitializeRadiation(md.get(), true);
 }
@@ -486,9 +482,6 @@ void DiskBoundaryVisc(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) {
       dust::prim::velocity, rad::prim::energy, rad::prim::flux>(mbd);
   auto v = descriptors[coarse].GetPack(mbd.get());
   if (v.GetMaxNumberOfVars() == 0) return;
-  static auto desc_g =
-      ArtemisUtils::GetPackDescriptorMap<geom::x1v, geom::x2v, geom::x3v>(mbd);
-  auto vg = desc_g[coarse].GetPack(mbd.get());
   // Coordinates and indexing
   const auto &pco = (coarse) ? pmb->pmr->GetCoarseCoords() : pmb->coords;
   auto &dp = disk_params;
@@ -526,24 +519,24 @@ void DiskBoundaryVisc(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) {
 
         // Extract coordinates at k, j, i
         geometry::Coords<GEOM> coords(dp.log, pco, k, j, i);
-        const auto &xv = coords.GetCellCenter(vg, 0, k, j, i);
+        const auto &xv = coords.GetCellCenter();
         const auto &[xcyl, ex1, ex2, ex3] = coords.ConvertToCylWithVec(xv);
 
         // Extract coordinates at ia, im, ic
         geometry::Coords<GEOM> ca(dp.log, pco, ia[0], ia[1], ia[2]);
         geometry::Coords<GEOM> cp1(dp.log, pco, ip1[0], ip1[1], ip1[2]);
         geometry::Coords<GEOM> cm1(dp.log, pco, im1[0], im1[1], im1[2]);
-        const auto &xva = coords.GetCellCenter(vg, 0, ia[0], ia[1], ia[2]);
+        const auto &xva = ca.GetCellCenter();
         const auto &[xcyla, scr1, scr2, scr3] = ca.ConvertToCylWithVec(xva);
         const Real eRa[3] = {scr1[0], scr2[0], scr3[0]};
         const Real epa[3] = {scr1[1], scr2[1], scr3[1]};
         const Real eza[3] = {scr1[2], scr2[2], scr3[2]};
 
-        const auto &xvp1 = coords.GetCellCenter(vg, 0, ip1[0], ip1[1], ip1[2]);
+        const auto &xvp1 = cp1.GetCellCenter();
         const auto &[xcylp1, scr1p1, scr2p1, scr3p1] = cp1.ConvertToCylWithVec(xvp1);
         const Real epp1[3] = {scr1p1[1], scr2p1[1], scr3p1[1]};
 
-        const auto &xvm1 = coords.GetCellCenter(vg, 0, im1[0], im1[1], im1[2]);
+        const auto &xvm1 = cm1.GetCellCenter();
         const auto &[xcylm1, scr1m1, scr2m1, scr3m1] = cm1.ConvertToCylWithVec(xvm1);
         const Real epm1[3] = {scr1m1[1], scr2m1[1], scr3m1[1]};
 
@@ -678,10 +671,6 @@ void DiskBoundaryIC(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) {
       dust::prim::velocity, rad::prim::energy, rad::prim::flux>(mbd);
   auto v = descriptors[coarse].GetPack(mbd.get());
   if (v.GetMaxNumberOfVars() == 0) return;
-  static auto desc_g =
-      ArtemisUtils::GetPackDescriptorMap<geom::x1v, geom::x2v, geom::x3v, geom::dx1,
-                                         geom::dx2, geom::dx3>(mbd);
-  auto vg = desc_g[coarse].GetPack(mbd.get());
 
   const auto &pco = (coarse) ? pmb->pmr->GetCoarseCoords() : pmb->coords;
   auto &dp = disk_params;
@@ -699,7 +688,7 @@ void DiskBoundaryIC(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) {
   pmb->par_for_bndry(
       "DiskInnerX1", nb, BDY, parthenon::TopologicalElement::CC, coarse, fine,
       KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
-        DiskICImpl<GEOM>(v, vg, 0, k, j, i, pco, eos_d, dp, particles, npart);
+        DiskICImpl<GEOM>(v, 0, k, j, i, pco, eos_d, dp, particles, npart);
       });
 }
 
@@ -732,9 +721,6 @@ void DiskBoundaryExtrap(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) 
 
   auto v = descriptors[coarse].GetPack(mbd.get());
   if (v.GetMaxNumberOfVars() == 0) return;
-  static auto desc_g =
-      ArtemisUtils::GetPackDescriptorMap<geom::x1v, geom::x2v, geom::x3v>(mbd);
-  auto vg = desc_g[coarse].GetPack(mbd.get());
 
   const auto &pco = (coarse) ? pmb->pmr->GetCoarseCoords() : pmb->coords;
   const auto nb = IndexRange{0, 0};
@@ -789,21 +775,24 @@ void DiskBoundaryExtrap(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) 
 
         // Extract coordinates at k, j, i
         geometry::Coords<GEOM> coords(dp.log, pco, k, j, i);
-        const auto &xv = coords.GetCellCenter(vg, 0, k, j, i);
+        geometry::Coords<GEOM> ca(dp.log, pco, ia[0], ia[1], ia[2]);
+        geometry::Coords<GEOM> cp(dp.log, pco, ip1[0], ip1[1], ip1[2]);
+        geometry::Coords<GEOM> cm(dp.log, pco, iim1p1[0], im1[1], im1[2]);
+        const auto &xv = coords.GetCellCenter();
         const auto &[xcyl, ex1, ex2, ex3] = coords.ConvertToCylWithVec(xv);
 
         // Extract coordinates at ia, im, ic
-        const auto &xva = coords.GetCellCenter(vg, 0, ia[0], ia[1], ia[2]);
+        const auto &xva = ca.GetCellCenter();
         const auto &[xcyla, scr1, scr2, scr3] = coords.ConvertToCylWithVec(xva);
         const Real eRa[3] = {scr1[0], scr2[0], scr3[0]};
         const Real epa[3] = {scr1[1], scr2[1], scr3[1]};
         const Real eza[3] = {scr1[2], scr2[2], scr3[2]};
 
-        const auto &xvp1 = coords.GetCellCenter(vg, 0, ip1[0], ip1[1], ip1[2]);
+        const auto &xvp1 = cp.GetCellCenter();
         const auto &[xcylp1, scr1p1, scr2p1, scr3p1] = coords.ConvertToCylWithVec(xvp1);
         const Real epp1[3] = {scr1p1[1], scr2p1[1], scr3p1[1]};
 
-        const auto &xvm1 = coords.GetCellCenter(vg, 0, im1[0], im1[1], im1[2]);
+        const auto &xvm1 = cm.GetCellCenter();
 
         const auto &[xcylm1, scr1m1, scr2m1, scr3m1] = coords.ConvertToCylWithVec(xvm1);
         const Real epm1[3] = {scr1m1[1], scr2m1[1], scr3m1[1]};

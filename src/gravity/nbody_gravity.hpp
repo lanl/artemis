@@ -13,6 +13,7 @@
 #ifndef GRAVITY_NBODY_GRAVITY_HPP_
 #define GRAVITY_NBODY_GRAVITY_HPP_
 
+#include "advection/advection.hpp"
 #include "nbody/nbody.hpp"
 #include "rotating_frame/rotating_frame.hpp"
 #include "utils/artemis_utils.hpp"
@@ -51,7 +52,7 @@ NBodyGravityImpl(V1 vmesh, const geometry::Coords<GEOM> &coords,
     // TODO(AMD): The background velocity should have the frame velocity in it. Only
     // important for non-shearing box
     const auto &vrot = RotatingFrame::RotationVelocity<GEOM>(x, omf);
-    const auto &vback = RotatingFrame::BackgroundVelocity<GEOM>(qshear, omb, x[0]);
+    const auto &vback = Advection::BackgroundVelocity<GEOM>(qshear, omb, x[0]);
     vf[0] = ex1[0] * (vback[0] + vrot[0]) + ex2[0] * (vback[1] + vrot[1]) +
             ex3[0] * (vback[2] + vrot[2]);
     vf[1] = ex1[1] * (vback[0] + vrot[0]) + ex2[1] * (vback[1] + vrot[1]) +

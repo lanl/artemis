@@ -63,6 +63,7 @@ nx3 = 1   # Number of cells in each MeshBlock, X3-dir
 gas = true
 gravity = true
 rotating_frame = true
+advection = true
 
 <gas>
 cfl = 0.3
@@ -86,6 +87,11 @@ z = 0.0
 <rotating_frame>
 omega = 1.0
 qshear = 1.5
+
+<advection>
+omega = 1.0
+qshear = 1.5
+reconstruct = plm
 
 <problem>
 rho0 = 1.0

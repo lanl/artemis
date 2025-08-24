@@ -224,7 +224,6 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
 template <Coordinates GEOM>
 Real EstimateTimestepMesh(MeshData<Real> *md) {
   using parthenon::MakePackDescriptor;
-  using RotatingFrame::BackgroundVelocity;
   auto pm = md->GetParentPointer();
   auto &resolved_pkgs = pm->resolved_packages;
 

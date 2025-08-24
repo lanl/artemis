@@ -13,6 +13,7 @@
 #ifndef RADIATION_MOMENTS_MATTER_COUPLING_HPP_
 #define RADIATION_MOMENTS_MATTER_COUPLING_HPP_
 
+#include "advection/advection.hpp"
 #include "artemis.hpp"
 #include "geometry/geometry.hpp"
 #include "moments.hpp"
@@ -94,8 +95,7 @@ TaskStatus MatterCouplingSimpleImpl(MeshData<Real> *u0, const Real dt) {
         // U^(0) values
         const Real dens = v0(b, gas::cons::density(), k, j, i);
         Real e0 = v0(b, gas::cons::internal_energy(), k, j, i);
-        const auto vb =
-            RotatingFrame::BackgroundVelocity<GEOM>(qshear, om0, coords.x1v());
+        const auto vb = Advection::BackgroundVelocity<GEOM>(qshear, om0, coords.x1v());
         std::array<Real, 3> v{
             vb[0] + v0(b, gas::cons::momentum(0), k, j, i) / (hx[0] * dens),
             vb[1] + v0(b, gas::cons::momentum(1), k, j, i) / (hx[1] * dens),
@@ -263,8 +263,7 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
             dens, v0(b, gas::cons::internal_energy(), k, j, i) / dens);
         const Real eg0 = dens * eos_d.InternalEnergyFromDensityTemperature(dens, T);
 
-        const auto vb =
-            RotatingFrame::BackgroundVelocity<GEOM>(qshear, om0, coords.x1v());
+        const auto vb = Advection::BackgroundVelocity<GEOM>(qshear, om0, coords.x1v());
         const std::array<Real, 3> p0{
             vb[0] * dens + v0(b, gas::cons::momentum(0), k, j, i) / hx[0],
             vb[1] * dens + v0(b, gas::cons::momentum(1), k, j, i) / hx[1],

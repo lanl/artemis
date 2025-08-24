@@ -14,10 +14,10 @@
 #define UTILS_DIFFUSION_MOMENTUM_DIFFUSION_HPP_
 
 // Artemis includes
+#include "advection/advection.hpp"
 #include "artemis.hpp"
 #include "diffusion_coeff.hpp"
 #include "geometry/geometry.hpp"
-#include "rotating_frame/rotating_frame.hpp"
 #include "utils/artemis_utils.hpp"
 #include "utils/eos/eos.hpp"
 
@@ -381,7 +381,7 @@ StrainTensorFace(parthenon::team_mbr_t const &member, const geometry::CoordParam
 
     // Add any strain rate due to the background shear velocity.
     // Uses the analytic expression at the face center
-    const auto Eb = RotatingFrame::StrainRate<GEOM, XDIR>(qshear, om0, xf);
+    const auto Eb = Advection::StrainRate<GEOM, XDIR>(qshear, om0, xf);
     flx(0, i) += Eb[0];
     flx(1, i) += Eb[1];
     flx(2, i) += Eb[2];

@@ -16,20 +16,20 @@
 #include <parthenon/package.hpp>
 
 // Artemis includes
+#include "advection/advection.hpp"
 #include "artemis.hpp"
 #include "derived/fill_derived.hpp"
 #include "geometry/geometry.hpp"
-#include "rotating_frame/rotating_frame.hpp"
 #include "utils/artemis_utils.hpp"
 #include "utils/integrators/artemis_integrator.hpp"
 
 using namespace parthenon::driver::prelude;
 using namespace parthenon::package::prelude;
 
-namespace RotatingFrame {
+namespace Advection {
 
 //----------------------------------------------------------------------------------------
-//! \fn TaskListStatus RotatingFrame::Advect
+//! \fn TaskListStatus Advection::Advect
 //! \brief Executes linear advection term for orbital advection
 TaskListStatus Advect(Mesh *pmesh, const SimTime &tm) {
   // Craft a series of **equal** subsetps that sum to the unsplit step
@@ -86,7 +86,7 @@ TaskCollection LinearAdvectionStep(Mesh *pmesh, const SimTime &tm, const Real sc
 }
 
 //----------------------------------------------------------------------------------------
-//! \fn  TaskStatus RotatingFrame::LagrangeRemap
+//! \fn  TaskStatus Advection::LagrangeRemap
 //! \brief
 TaskStatus LagrangeRemap(MeshData<Real> *u0, const Real scdt) {
   using parthenon::MakePackDescriptor;
@@ -99,10 +99,10 @@ TaskStatus LagrangeRemap(MeshData<Real> *u0, const Real scdt) {
   const bool do_dust = artemis_pkg->template Param<bool>("do_dust");
 
   // Rotating frame package and params
-  auto &rframe_pkg = pm->packages.Get("rotating_frame");
-  const Real qshear = rframe_pkg->template Param<Real>("qshear");
-  const Real om0 = rframe_pkg->template Param<Real>("omega");
-  const auto recon = rframe_pkg->template Param<ReconstructionMethod>("recon");
+  auto &adv_pkg = pm->packages.Get("advection");
+  const Real qshear = adv_pkg->template Param<Real>("qshear");
+  const Real om0 = adv_pkg->template Param<Real>("omega");
+  const auto recon = adv_pkg->template Param<ReconstructionMethod>("recon");
 
   // Extract integrator weights
   const Real dwdt = -qshear * om0 * scdt;
@@ -122,10 +122,10 @@ TaskStatus LagrangeRemap(MeshData<Real> *u0, const Real scdt) {
   } else if (recon == ReconstructionMethod::ppm) {
     return LagrangeRemapImpl<ReconstructionMethod::ppm>(u0, v0, dwdt);
   } else {
-    PARTHENON_FAIL("Unsupported reconstruction method in rotating_frame");
+    PARTHENON_FAIL("Unsupported reconstruction method in advection");
   }
 
   return TaskStatus::complete;
 }
 
-} // namespace RotatingFrame
+} // namespace Advection

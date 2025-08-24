@@ -18,6 +18,10 @@ set (SRC_LIST
   artemis.cpp
   artemis.hpp
 
+  advection/advection_driver.cpp
+  advection/advection.cpp
+  advection/advection.hpp
+
   derived/fill_derived.cpp
   derived/fill_derived.hpp
 
@@ -80,7 +84,6 @@ set (SRC_LIST
   radiation/moments/moments_driver.cpp
   radiation/moments/matter_coupling.hpp
 
-  rotating_frame/advection_driver.cpp
   rotating_frame/rotating_frame.cpp
   rotating_frame/rotating_frame_impl.hpp
   rotating_frame/rotating_frame.hpp

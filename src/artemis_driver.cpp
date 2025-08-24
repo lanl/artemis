@@ -19,6 +19,7 @@
 #include <prolong_restrict/prolong_restrict.hpp>
 
 // Artemis Includes
+#include "advection/advection.hpp"
 #include "artemis.hpp"
 #include "artemis_driver.hpp"
 #include "drag/drag.hpp"
@@ -60,7 +61,7 @@ ArtemisDriver<GEOM>::ArtemisDriver(ParameterInput *pin, ApplicationInput *app_in
   do_dust = artemis_pkg->template Param<bool>("do_dust");
   do_gravity = artemis_pkg->template Param<bool>("do_gravity");
   do_rotating_frame = artemis_pkg->template Param<bool>("do_rotating_frame");
-  do_shear = artemis_pkg->template Param<bool>("do_shear");
+  do_advection = artemis_pkg->template Param<bool>("do_advection");
   do_cooling = artemis_pkg->template Param<bool>("do_cooling");
   do_drag = artemis_pkg->template Param<bool>("do_drag");
   do_viscosity = artemis_pkg->template Param<bool>("do_viscosity");
@@ -120,7 +121,7 @@ TaskListStatus ArtemisDriver<GEOM>::Step() {
   if (status != TaskListStatus::complete) return status;
 
   // Operator split, background linear advection (for shearing box)
-  if (do_shear) status = RotatingFrame::Advect(pmesh, tm);
+  if (do_advection) status = Advection::Advect(pmesh, tm);
   if (status != TaskListStatus::complete) return status;
 
   // Operator split, IMC/DDMC radiation with Jaybenne

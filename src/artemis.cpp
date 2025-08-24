@@ -13,6 +13,7 @@
 
 // Artemis includes
 #include "artemis.hpp"
+#include "advection/advection.hpp"
 #include "artemis_driver.hpp"
 #include "drag/drag.hpp"
 #include "dust/dust.hpp"
@@ -91,6 +92,7 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   const bool do_gravity = pin->GetOrAddBoolean("physics", "gravity", false);
   const bool do_nbody = pin->GetOrAddBoolean("physics", "nbody", false);
   const bool do_rotating_frame = pin->GetOrAddBoolean("physics", "rotating_frame", false);
+  const bool do_advection = pin->GetOrAddBoolean("physics", "advection", false);
   const bool do_cooling = pin->GetOrAddBoolean("physics", "cooling", false);
   const bool do_drag = pin->GetOrAddBoolean("physics", "drag", false);
   const bool do_viscosity = pin->GetOrAddBoolean("physics", "viscosity", false);
@@ -100,9 +102,6 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   // Determine input file specified algorithms
   const bool do_imc = do_radiation && pin->DoesBlockExist("radiation/imc");
   const bool do_moment = do_radiation && pin->DoesBlockExist("radiation/moment");
-  const bool do_shear =
-      do_rotating_frame ? (pin->GetOrAddReal("rotating_frame", "qshear", 0) > 0) : false;
-
   // Check configuration selection compatibility
   PARTHENON_REQUIRE(!(do_cooling) || (do_cooling && do_gas),
                     "Cooling requires the gas package, but there is not gas!");
@@ -121,6 +120,7 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   artemis->AddParam("do_gravity", do_gravity);
   artemis->AddParam("do_nbody", do_nbody);
   artemis->AddParam("do_rotating_frame", do_rotating_frame);
+  artemis->AddParam("do_advection", do_advection);
   artemis->AddParam("do_cooling", do_cooling);
   artemis->AddParam("do_drag", do_drag);
   artemis->AddParam("do_viscosity", do_viscosity);
@@ -129,7 +129,6 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   artemis->AddParam("do_radiation", do_radiation);
   artemis->AddParam("do_imc", do_imc);
   artemis->AddParam("do_moment", do_moment);
-  artemis->AddParam("do_shear", do_shear);
 
   // Set coordinate system
   const int ndim = ProblemDimension(pin.get());
@@ -147,6 +146,7 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   if (do_gas) packages.Add(Gas::Initialize(pin.get(), units, constants, packages));
   if (do_dust) packages.Add(Dust::Initialize(pin.get(), units));
   if (do_rotating_frame) packages.Add(RotatingFrame::Initialize(pin.get()));
+  if (do_advection) packages.Add(Advection::Initialize(pin.get()));
   if (do_cooling) packages.Add(Gas::Cooling::Initialize(pin.get()));
   if (do_drag) packages.Add(Drag::Initialize(pin.get()));
   if (do_radiation) {

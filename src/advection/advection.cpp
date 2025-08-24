@@ -57,7 +57,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   Coordinates coords = geometry::CoordSelect(sys, ndim);
   params.Add("coords", coords);
 
-  // Rotating frame timestep (if do_shear)
+  // Rotating frame timestep
   if (coords == Coordinates::cartesian) {
     adv_pkg->EstimateTimestepMesh = EstimateTimestepMesh<Coordinates::cartesian>;
   } else if (coords == Coordinates::spherical1D) {
@@ -78,13 +78,10 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 }
 //----------------------------------------------------------------------------------------
 //! \fn Real RotatingFrame::EstimateTimestep
-//! \brief Compute multiple of linear advection timestep (if do_shear)
+//! \brief Compute multiple of linear advection timestep
 template <Coordinates GEOM>
 Real EstimateTimestepMesh(MeshData<Real> *md) {
   auto pmesh = md->GetParentPointer();
-  const bool do_shear = pmesh->packages.Get("artemis")->template Param<bool>("do_shear");
-  if (!(do_shear)) return Big<Real>();
-
   auto &adv_pkg = pmesh->packages.Get("advection");
   const Real &dt_ratio = adv_pkg->template Param<Real>("dt_ratio");
   return EstimateTimestep(pmesh, dt_ratio);

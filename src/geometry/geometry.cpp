@@ -28,12 +28,13 @@ namespace geometry {
 
 template <Coordinates GEOM>
 void EnrollFields(StateDescriptor *pkg, CoordParams &cpars) {
-  if constexpr (GEOM == Coordinates::cartesian) return;
   Coords<GEOM> coords(cpars);
 
   ADD_FIELD(geom::x1v);
   ADD_FIELD(geom::x2v);
   ADD_FIELD(geom::x3v);
+  // For cartesian, everything else is independent of i,j,k
+  if constexpr (GEOM == Coordinates::cartesian) return;
   ADD_FIELD(geom::hx1v);
   ADD_FIELD(geom::hx2v);
   ADD_FIELD(geom::hx3v);

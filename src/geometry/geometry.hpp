@@ -528,9 +528,6 @@ class CoordsBase {
   template <typename V1>
   KOKKOS_INLINE_FUNCTION std::array<Real, 3>
   GetCellCenter(const V1 &vg, const int b, const int k, const int j, const int i) const {
-    if constexpr (CoordsTrait<T>::value == Coordinates::cartesian) {
-      return GetCellCenter();
-    }
     return {vg(b, geom::x1v())(index<geom::x1v>(k, j, i)),
             vg(b, geom::x2v())(index<geom::x2v>(k, j, i)),
             vg(b, geom::x3v())(index<geom::x3v>(k, j, i))};

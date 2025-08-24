@@ -777,7 +777,7 @@ void DiskBoundaryExtrap(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) 
         geometry::Coords<GEOM> coords(dp.log, pco, k, j, i);
         geometry::Coords<GEOM> ca(dp.log, pco, ia[0], ia[1], ia[2]);
         geometry::Coords<GEOM> cp(dp.log, pco, ip1[0], ip1[1], ip1[2]);
-        geometry::Coords<GEOM> cm(dp.log, pco, iim1p1[0], im1[1], im1[2]);
+        geometry::Coords<GEOM> cm(dp.log, pco, im1[0], im1[1], im1[2]);
         const auto &xv = coords.GetCellCenter();
         const auto &[xcyl, ex1, ex2, ex3] = coords.ConvertToCylWithVec(xv);
 

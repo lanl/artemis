@@ -232,7 +232,7 @@ void CondBoundaryImpl(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) {
           const Real Ta = eos_d.TemperatureFromDensityInternalEnergy(da, siea);
           const Real Pa = eos_d.PressureFromDensityInternalEnergy(da, siea);
 
-          const Real ka = dcoeff.Get(dcp, ca, da, siea, eos_d);
+          const Real ka = dcoeff.Get(dcp, ca, xva, da, siea, eos_d);
           Real Tg = dp.g_temp;
           if (INNER) {
             Tg = Ta - dp.flux * xma / ka;

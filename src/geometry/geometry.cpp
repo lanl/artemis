@@ -102,7 +102,7 @@ template <Coordinates GEOM>
 void InitBlockGeom(MeshBlock *pmb, ParameterInput *pin) {
   using parthenon::MakePackDescriptor;
   auto pm = pmb->pmy_mesh;
-  const int ndim = pm->ndim;
+  const int ndim_ = pm->ndim;
   auto &md = pmb->meshblock_data.Get();
   auto &artemis_pkg = pmb->packages.Get("artemis");
   auto &pco = pmb->coords;
@@ -122,8 +122,8 @@ void InitBlockGeom(MeshBlock *pmb, ParameterInput *pin) {
   IndexRange kb = md->GetBoundsK(IndexDomain::entire);
 
   const bool x1dep_ = x1dep<GEOM>();
-  const bool x2dep_ = x1dep<GEOM>() && (ndim > 1);
-  const bool x3dep_ = x1dep<GEOM>() && (ndim > 2);
+  const bool x2dep_ = x1dep<GEOM>() && (ndim_ > 1);
+  const bool x3dep_ = x1dep<GEOM>() && (ndim_ > 2);
   const int b = 0;
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "Geometry::InitBlock", parthenon::DevExecSpace(), kb.s, kb.e,
@@ -137,6 +137,13 @@ void InitBlockGeom(MeshBlock *pmb, ParameterInput *pin) {
         Kokkos::atomic_store(&x1v, xv[0]);
         Kokkos::atomic_store(&x2v, xv[1]);
         Kokkos::atomic_store(&x3v, xv[2]);
+        [[maybe_unused]] const auto ndim = ndim_;
+        [[maybe_unused]] const auto x1dep = x1dep_;
+        [[maybe_unused]] const auto x2dep = x2dep_;
+        [[maybe_unused]] const auto x3dep = x3dep_;
+        [[maybe_unused]] const bool x1end = (i == ib.e);
+        [[maybe_unused]] const bool x2end = (j == jb.e) && (ndim > 1);
+        [[maybe_unused]] const bool x3end = (k == kb.e) && (ndim > 2);
         if constexpr (GEOM != Coordinates::cartesian) {
           const auto dx = coords.GetCellWidths();
           Real &dx1 = vg(b, geom::dx1())(coords.template index<geom::dx1>(k, j, i));
@@ -189,7 +196,7 @@ void InitBlockGeom(MeshBlock *pmb, ParameterInput *pin) {
             Kokkos::atomic_store(&hx2f, coords.hx2(xf[0], xf[1], xf[2]));
             Kokkos::atomic_store(&hx3f, coords.hx3(xf[0], xf[1], xf[2]));
 
-            if (i == ib.e) {
+            if (x1end) {
               Real &ax1 =
                   vg(b, geom::ax1())(coords.template index<geom::ax1>(k, j, i + 1));
               Kokkos::atomic_store(&ax1, ax[1]);
@@ -219,7 +226,7 @@ void InitBlockGeom(MeshBlock *pmb, ParameterInput *pin) {
             Kokkos::atomic_store(&hx1f, coords.hx1(xf[0], xf[1], xf[2]));
             Kokkos::atomic_store(&hx2f, coords.hx2(xf[0], xf[1], xf[2]));
             Kokkos::atomic_store(&hx3f, coords.hx3(xf[0], xf[1], xf[2]));
-            if ((j == jb.e) && (ndim > 1)) {
+            if (x2end) {
               Real &ax2 =
                   vg(b, geom::ax2())(coords.template index<geom::ax2>(k, j + 1, i));
               Kokkos::atomic_store(&ax2, (ndim > 1) * ax[1]);
@@ -249,7 +256,7 @@ void InitBlockGeom(MeshBlock *pmb, ParameterInput *pin) {
             Kokkos::atomic_store(&hx1f, coords.hx1(xf[0], xf[1], xf[2]));
             Kokkos::atomic_store(&hx2f, coords.hx2(xf[0], xf[1], xf[2]));
             Kokkos::atomic_store(&hx3f, coords.hx3(xf[0], xf[1], xf[2]));
-            if ((k == kb.e) && (ndim > 2)) {
+            if (x3end) {
               Real &ax3 =
                   vg(b, geom::ax3())(coords.template index<geom::ax3>(k + 1, j, i));
               Kokkos::atomic_store(&ax3, (ndim > 2) * ax[1]);
@@ -275,9 +282,9 @@ void InitBlockGeom(MeshBlock *pmb, ParameterInput *pin) {
                 vg(b, geom::dh2dx1())(coords.template index<geom::dh2dx1>(k, j, i));
             Real &dh3 =
                 vg(b, geom::dh3dx1())(coords.template index<geom::dh3dx1>(k, j, i));
-            Kokkos::atomic_store(&dh1, x1dep_ * dh[0]);
-            Kokkos::atomic_store(&dh2, x1dep_ * dh[1]);
-            Kokkos::atomic_store(&dh3, x1dep_ * dh[2]);
+            Kokkos::atomic_store(&dh1, x1dep * dh[0]);
+            Kokkos::atomic_store(&dh2, x1dep * dh[1]);
+            Kokkos::atomic_store(&dh3, x1dep * dh[2]);
           }
           {
             auto dh = coords.GetConnX2();
@@ -287,9 +294,9 @@ void InitBlockGeom(MeshBlock *pmb, ParameterInput *pin) {
                 vg(b, geom::dh2dx2())(coords.template index<geom::dh2dx2>(k, j, i));
             Real &dh3 =
                 vg(b, geom::dh3dx2())(coords.template index<geom::dh3dx2>(k, j, i));
-            Kokkos::atomic_store(&dh1, x2dep_ * dh[0]);
-            Kokkos::atomic_store(&dh2, x2dep_ * dh[1]);
-            Kokkos::atomic_store(&dh3, x2dep_ * dh[2]);
+            Kokkos::atomic_store(&dh1, x2dep * dh[0]);
+            Kokkos::atomic_store(&dh2, x2dep * dh[1]);
+            Kokkos::atomic_store(&dh3, x2dep * dh[2]);
           }
           {
             auto dh = coords.GetConnX3();
@@ -299,9 +306,9 @@ void InitBlockGeom(MeshBlock *pmb, ParameterInput *pin) {
                 vg(b, geom::dh2dx3())(coords.template index<geom::dh2dx3>(k, j, i));
             Real &dh3 =
                 vg(b, geom::dh3dx3())(coords.template index<geom::dh3dx3>(k, j, i));
-            Kokkos::atomic_store(&dh1, x3dep_ * dh[0]);
-            Kokkos::atomic_store(&dh2, x3dep_ * dh[1]);
-            Kokkos::atomic_store(&dh3, x3dep_ * dh[2]);
+            Kokkos::atomic_store(&dh1, x3dep * dh[0]);
+            Kokkos::atomic_store(&dh2, x3dep * dh[1]);
+            Kokkos::atomic_store(&dh3, x3dep * dh[2]);
           }
         } // GEOM != cartesian
       });

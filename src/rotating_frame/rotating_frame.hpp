@@ -59,15 +59,17 @@ struct ReconInfo {
 
   ReconInfo() = default;
   template <typename V1>
-  KOKKOS_INLINE_FUNCTION ReconInfo(const V1 &v0, const int b, const int n, const int k,
-                                   const int j, const int i) {
-    fill(v0, b, n, k, j, i);
+  KOKKOS_INLINE_FUNCTION ReconInfo(const geometry::CoordParams &cpar, const V1 &v0,
+                                   const int b, const int n, const int k, const int j,
+                                   const int i) {
+    fill(cpar, v0, b, n, k, j, i);
   }
 
   template <typename V1>
-  KOKKOS_INLINE_FUNCTION void fill(const V1 &v0, const int b, const int n, const int k,
-                                   const int j, const int i) {
-    geometry::Coords<Coordinates::cartesian> coords(v0.GetCoordinates(b), k, j, i);
+  KOKKOS_INLINE_FUNCTION void fill(const geometry::CoordParams &cpar, const V1 &v0,
+                                   const int b, const int n, const int k, const int j,
+                                   const int i) {
+    geometry::Coords<Coordinates::cartesian> coords(cpar, v0.GetCoordinates(b), k, j, i);
     dx = coords.GetCellWidths();
     xc = coords.GetCellCenter();
     vol = coords.Volume();
@@ -148,7 +150,7 @@ RemapUpdate(const V1 &v0, const ReconInfo &rp, const ReconInfo &r, const Real vb
   const std::array<Real, 3> I1{
       flip * fac * dxcub * dz,
       flip * (0.5 * SQR(fac) * dxcub * dz + y0 * dwdt * r.xc[0] * r.dx[0] * dz),
-      three_d * flip * dz * I0};
+      three_d * r.xc[2] * I0};
 
   const Real dq =
       (rp.q - ArtemisUtils::VDot(rp.grad, rp.xc)) * I0 + ArtemisUtils::VDot(rp.grad, I1);
@@ -160,11 +162,13 @@ RemapUpdate(const V1 &v0, const ReconInfo &rp, const ReconInfo &r, const Real vb
 //! \fn  RemapCons
 //! \brief
 template <Upwind UDIR, ReconstructionMethod R, typename V1>
-KOKKOS_INLINE_FUNCTION void RemapCons(const V1 &v0, const int multi_d, const int three_d,
+KOKKOS_INLINE_FUNCTION void RemapCons(const geometry::CoordParams &cpars, const V1 &v0,
+                                      const int multi_d, const int three_d,
                                       const Real dwdt, const int b, const int k,
                                       IndexRange jb, const int i) {
   // Extract coordinates
-  const geometry::Coords<Coordinates::cartesian> coords(v0.GetCoordinates(b), k, jb.s, i);
+  const geometry::Coords<Coordinates::cartesian> coords(cpars, v0.GetCoordinates(b), k,
+                                                        jb.s, i);
   const Real vb = dwdt * (coords.bnds.x1[0] + coords.bnds.x1[1]) * 0.5;
 
   // Integer gymnastics
@@ -183,17 +187,17 @@ KOKKOS_INLINE_FUNCTION void RemapCons(const V1 &v0, const int multi_d, const int
   const auto compare = (UDIR == Upwind::r) ? [](int j, int end) { return j >= end; }
                                            : [](int j, int end) { return j <= end; };
 
-  ArtemisUtils::ReconGradient<R> recon;
+  ArtemisUtils::ReconGradient<Coordinates::cartesian, R> recon;
   ReconInfo rd, rc, ru;
   for (int n = v0.GetLowerBound(b); n <= v0.GetUpperBound(b); ++n) {
-    ru.fill(v0, b, n, k, jstart + joff, i);
-    rc.fill(v0, b, n, k, jstart, i);
+    ru.fill(cpars, v0, b, n, k, jstart + joff, i);
+    rc.fill(cpars, v0, b, n, k, jstart, i);
     // Correct the centroid of the cell due to the motion
     ru.xc[1] += dwdt * ru.xc[0];
     rc.xc[1] += dwdt * rc.xc[0];
-    ru.grad = recon(v0, ru.dx, multi_d, three_d, b, n, k, jstart + joff, i);
+    ru.grad = recon(cpars, v0, ru.dx, multi_d, three_d, b, n, k, jstart + joff, i);
     const auto qu = v0(b, n, k, jstart + joff, i);
-    rc.grad = recon(v0, rc.dx, multi_d, three_d, b, n, k, jstart, i);
+    rc.grad = recon(cpars, v0, rc.dx, multi_d, three_d, b, n, k, jstart, i);
     const auto qc = v0(b, n, k, jstart, i);
     // Correct the gradients due to the skew
     ru.grad[1] += dwdt * ru.grad[0];
@@ -203,9 +207,9 @@ KOKKOS_INLINE_FUNCTION void RemapCons(const V1 &v0, const int multi_d, const int
     for (int j = jstart; compare(j, jend); j -= joff) {
       const int jd = j - joff;
       if (compare(jd, jend)) {
-        rd.fill(v0, b, n, k, jd, i);
+        rd.fill(cpars, v0, b, n, k, jd, i);
         rd.xc[1] += dwdt * rd.xc[0];
-        rd.grad = recon(v0, rd.dx, multi_d, three_d, b, n, k, jd, i);
+        rd.grad = recon(cpars, v0, rd.dx, multi_d, three_d, b, n, k, jd, i);
         rd.grad[1] += dwdt * rd.grad[0];
       }
       RemapUpdate(v0, ru, rc, vb, dwdt, three_d, b, n, k, j, j + joff, i);
@@ -224,6 +228,9 @@ TaskStatus LagrangeRemapImpl(MeshData<Real> *u0, const V1 &v0, const Real dwdt) 
   PARTHENON_REQUIRE(multi_d, "Linear advection does not work in 1D");
   const int three_d = u0->GetNDim() == 3;
 
+  const auto &cpars = u0->GetParentPointer()
+                          ->packages.Get("artemis")
+                          ->template Param<geometry::CoordParams>("coord_params");
   IndexRange ib = u0->GetBoundsI(IndexDomain::interior);
   IndexRange jb = u0->GetBoundsJ(IndexDomain::interior);
   IndexRange kb = u0->GetBoundsK(IndexDomain::interior);
@@ -231,12 +238,13 @@ TaskStatus LagrangeRemapImpl(MeshData<Real> *u0, const V1 &v0, const Real dwdt) 
       DEFAULT_LOOP_PATTERN, "LagrangeRemap", parthenon::DevExecSpace(), 0,
       u0->NumBlocks() - 1, kb.s, kb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int &b, const int &k, const int &i) {
-        geometry::Coords<Coordinates::cartesian> coords(v0.GetCoordinates(b), k, jb.s, i);
+        geometry::Coords<Coordinates::cartesian> coords(cpars, v0.GetCoordinates(b), k,
+                                                        jb.s, i);
         const Real vb = dwdt * 0.5 * (coords.bnds.x1[0] + coords.bnds.x1[1]);
         if (vb < 0.0) {
-          RemapCons<Upwind::r, R>(v0, multi_d, three_d, dwdt, b, k, jb, i);
+          RemapCons<Upwind::r, R>(cpars, v0, multi_d, three_d, dwdt, b, k, jb, i);
         } else if (vb > 0.0) {
-          RemapCons<Upwind::l, R>(v0, multi_d, three_d, dwdt, b, k, jb, i);
+          RemapCons<Upwind::l, R>(cpars, v0, multi_d, three_d, dwdt, b, k, jb, i);
         }
       });
   return TaskStatus::complete;

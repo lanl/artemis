@@ -182,13 +182,14 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
   auto &pco = pmb->coords;
   auto adv = av;
+  const auto &cpars = artemis_pkg->template Param<geometry::CoordParams>("coord_params");
 
   pmb->par_for(
       "pgen_linwave1", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
         // cell-centered coordinates
 
-        geometry::Coords<GEOM> coords(pco, k, j, i);
+        geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
         const auto &xv = coords.GetCellCenter();
 
         const Real x1v = xv[0];
@@ -260,6 +261,7 @@ inline void UserWorkAfterLoop(Mesh *pmesh, ParameterInput *pin, parthenon::SimTi
   auto artemis_pkg = pmb->packages.Get("artemis");
   const bool do_gas = artemis_pkg->Param<bool>("do_gas");
   const bool do_dust = artemis_pkg->Param<bool>("do_dust");
+  const auto &cpars = artemis_pkg->template Param<geometry::CoordParams>("coord_params");
 
   ArtemisUtils::array_type<Real, nvars> l1_err;
   parthenon::par_reduce(
@@ -268,7 +270,7 @@ inline void UserWorkAfterLoop(Mesh *pmesh, ParameterInput *pin, parthenon::SimTi
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i,
                     ArtemisUtils::array_type<Real, nvars> &lsum) {
         // Capture coordinates this Meshblock
-        geometry::Coords<GEOM> coords(v.GetCoordinates(b), k, j, i);
+        geometry::Coords<GEOM> coords(cpars, v.GetCoordinates(b), k, j, i);
         const auto &xv = coords.GetCellCenter();
         Real x1v = xv[0];
         Real x2v = xv[1];

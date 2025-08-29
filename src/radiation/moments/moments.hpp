@@ -67,6 +67,9 @@ Real EstimateTimeStep(parthenon::Mesh *pmesh) {
       IndexRange jb = md->GetBoundsJ(IndexDomain::interior);
       IndexRange kb = md->GetBoundsK(IndexDomain::interior);
       const auto ndim = pmesh->ndim;
+      const auto &cpars =
+          pmesh->packages.Get("artemis")->template Param<geometry::CoordParams>(
+              "coord_params");
 
       // Compute minimum dx
       Real min_dx = Big<Real>();
@@ -75,7 +78,7 @@ Real EstimateTimeStep(parthenon::Mesh *pmesh) {
           DevExecSpace(), 0, md->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
           KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, Real &ldx_m) {
             // Extract coordinates
-            geometry::Coords<GEOM> coords(vmesh.GetCoordinates(b), k, j, i);
+            geometry::Coords<GEOM> coords(cpars, vmesh.GetCoordinates(b), k, j, i);
             const auto &dx = coords.GetCellWidths();
             for (int d = 0; d < ndim; d++) {
               ldx_m = std::min(ldx_m, dx[d]);
@@ -97,15 +100,15 @@ Real EstimateTimeStep(parthenon::Mesh *pmesh) {
 }
 
 //----------------------------------------------------------------------------------------
-//! \fn Real Moments::EddingtonFactor
-//! \brief Computes Eddington factor given closure model
+//! \fn Real Moments::ThriceEddingtonFactor
+//! \brief Computes 3x the Eddington factor given closure model
 template <Closure CTYP>
-KOKKOS_INLINE_FUNCTION Real EddingtonFactor(const Real f) {
+KOKKOS_INLINE_FUNCTION Real ThriceEddingtonFactor(const Real f) {
   if constexpr (CTYP == Closure::p1) {
-    return ONE_3RD;
+    return 1.0;
   } else if (CTYP == Closure::m1) {
     const Real f2 = f * f;
-    return (3. + 4. * f2) / (5. + 2. * std::sqrt(4. - 3. * f2));
+    return 3. * (3. + 4. * f2) / (5. + 2. * std::sqrt(4. - 3. * f2));
   } else {
     PARTHENON_FAIL("Closure model not recognized!");
     return 0;
@@ -127,9 +130,9 @@ EddingtonTensor(const std::array<Real, 3> fred) {
                           fred[2] / (fmag + Fuzz<Real>())};
     fmag = std::min(1.0, fmag);
     const std::array<Real, 3> f{n[0] * fmag, n[1] * fmag, n[2] * fmag};
-    const Real chi = EddingtonFactor<CTYP>(fmag);
-    const Real ca = 0.5 * (1. - chi);
-    const Real cb = 0.5 * (3 * chi - 1.);
+    const Real chi = ThriceEddingtonFactor<CTYP>(fmag);
+    const Real ca = (3. - chi) / 6.0;
+    const Real cb = 0.5 * (chi - 1.);
     return {ca + cb * n[0] * n[0], ca + cb * n[1] * n[1], ca + cb * n[2] * n[2],
             cb * n[1] * n[2],      cb * n[0] * n[2],      cb * n[0] * n[1]};
   } else {

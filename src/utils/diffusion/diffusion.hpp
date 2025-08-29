@@ -71,12 +71,15 @@ Real EstimateTimestep(MeshData<Real> *md, DiffCoeffParams &dp, PKG &pkg, const E
   IndexRange kb = md->GetBoundsK(IndexDomain::interior);
   const int ndim = pm->ndim;
 
+  const auto &cpars =
+      pm->packages.Get("artemis")->template Param<geometry::CoordParams>("coord_params");
+
   Real min_dt = Big<Real>();
   parthenon::par_reduce(
       parthenon::loop_pattern_mdrange_tag, PARTHENON_AUTO_LABEL, DevExecSpace(), 0,
       md->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, Real &ldt) {
-        geometry::Coords<GEOM> coords(vprim.GetCoordinates(b), k, j, i);
+        geometry::Coords<GEOM> coords(cpars, vprim.GetCoordinates(b), k, j, i);
         const auto &dx = coords.GetCellWidths();
         Real min_dx = Big<Real>();
         for (int d = 0; d < ndim; d++) {
@@ -118,6 +121,8 @@ TaskStatus DiffusionUpdateImpl(MeshData<Real> *md, PKG &pkg, SparsePackCons v0,
                           "Momentum diffusion only works with a gas fluid");
 
   auto pm = md->GetParentPointer();
+  const auto &cpars =
+      pm->packages.Get("artemis")->template Param<geometry::CoordParams>("coord_params");
 
   const auto ib = md->GetBoundsI(IndexDomain::interior);
   const auto jb = md->GetBoundsJ(IndexDomain::interior);
@@ -134,7 +139,7 @@ TaskStatus DiffusionUpdateImpl(MeshData<Real> *md, PKG &pkg, SparsePackCons v0,
       KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
         // extract coordinate information
         using parthenon::TopologicalElement;
-        geometry::Coords<GEOM> coords(v0.GetCoordinates(b), k, j, i);
+        geometry::Coords<GEOM> coords(cpars, v0.GetCoordinates(b), k, j, i);
 
         const auto ax1 = coords.GetFaceAreaX1();
         const auto ax2 = (multi_d) ? coords.GetFaceAreaX2() : NewArray<Real, 2>(0.0);

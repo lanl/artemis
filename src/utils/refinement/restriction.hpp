@@ -38,7 +38,7 @@ namespace ArtemisUtils {
 //----------------------------------------------------------------------------------------
 //! \struct  ArtemisUtils::RestrictAverage
 //! \brief
-template <Coordinates GEOM>
+template <Coordinates GEOM, bool log_space>
 struct RestrictAverage {
   static constexpr bool OperationRequired(TopologicalElement fel,
                                           TopologicalElement cel) {
@@ -86,7 +86,7 @@ struct RestrictAverage {
     for (int ok = 0; ok < 1 + INCLUDE_X3; ++ok) {
       for (int oj = 0; oj < 1 + INCLUDE_X2; ++oj) {
         for (int oi = 0; oi < 1 + INCLUDE_X1; ++oi) {
-          geometry::Coords<GEOM> coords(pco, k + ok, j + oj, i + oi);
+          geometry::Coords<GEOM> coords(log_space, pco, k + ok, j + oj, i + oi);
           if constexpr (el == TE::CC) {
             vol[ok][oj][oi] = coords.Volume();
           } else if constexpr (el == TE::F1) {

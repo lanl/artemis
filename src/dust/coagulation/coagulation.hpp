@@ -78,8 +78,9 @@ struct CoagParams {
 //! \fn  void Dust::Coagulation::PreCoagulationDiagnostics
 //  \brief Gather pre-coagulation diagnostics
 template <Coordinates GEOM, typename T>
-static void PreCoagulationDiagnostics(MeshData<Real> *md, T &vmesh, const Real &dfloor,
-                                      Real &mass_d0, int &max_size0) {
+static void PreCoagulationDiagnostics(MeshData<Real> *md, T &vmesh,
+                                      const geometry::CoordParams &cpars,
+                                      const Real &dfloor, Real &mass_d0, int &max_size0) {
   // Indexing
   IndexRange ib = md->GetBoundsI(IndexDomain::interior);
   IndexRange jb = md->GetBoundsJ(IndexDomain::interior);
@@ -94,7 +95,7 @@ static void PreCoagulationDiagnostics(MeshData<Real> *md, T &vmesh, const Real &
           {0, kb.s, jb.s, ib.s}, {md->NumBlocks(), kb.e + 1, jb.e + 1, ib.e + 1}),
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, Real &lsum,
                     int &lmax) {
-        geometry::Coords<GEOM> coords(vmesh.GetCoordinates(b), k, j, i);
+        geometry::Coords<GEOM> coords(cpars, vmesh.GetCoordinates(b), k, j, i);
         const Real &vol = coords.Volume();
 
         // Sum over nspecies
@@ -128,8 +129,10 @@ static void PreCoagulationDiagnostics(MeshData<Real> *md, T &vmesh, const Real &
 //! \fn  void Dust::Coagulation::PostCoagulationDiagnostics
 //  \brief Gather post-coagulation diagnostics
 template <Coordinates GEOM, typename T>
-static void PostCoagulationDiagnostics(MeshData<Real> *md, T &vmesh, const Real &dfloor,
-                                       Real &mass_d1, int &max_size1, int &max_calls) {
+static void PostCoagulationDiagnostics(MeshData<Real> *md, T &vmesh,
+                                       const geometry::CoordParams &cpars,
+                                       const Real &dfloor, Real &mass_d1, int &max_size1,
+                                       int &max_calls) {
   // Indexing
   IndexRange ib = md->GetBoundsI(IndexDomain::interior);
   IndexRange jb = md->GetBoundsJ(IndexDomain::interior);
@@ -145,7 +148,7 @@ static void PostCoagulationDiagnostics(MeshData<Real> *md, T &vmesh, const Real 
           {0, kb.s, jb.s, ib.s}, {md->NumBlocks(), kb.e + 1, jb.e + 1, ib.e + 1}),
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, Real &lsum,
                     int &lmax1, int &lmax2) {
-        geometry::Coords<GEOM> coords(vmesh.GetCoordinates(b), k, j, i);
+        geometry::Coords<GEOM> coords(cpars, vmesh.GetCoordinates(b), k, j, i);
         const Real &vol = coords.Volume();
 
         // Sum over nspecies

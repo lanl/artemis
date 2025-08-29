@@ -94,26 +94,55 @@ void PrintArtemisConfiguration(Packages_t &packages) {
 //----------------------------------------------------------------------------------------
 //! \fn void ArtemisUtils::EnrollArtemisRefinementOps
 //! \brief Registers custom prolongation and restriction operators on provided Metadata
-void EnrollArtemisRefinementOps(parthenon::Metadata &m, Coordinates coords) {
+void EnrollArtemisRefinementOps(parthenon::Metadata &m, Coordinates coords,
+                                const bool log) {
   typedef Coordinates G;
+
+  // log space
   if (coords == G::cartesian) {
-    m.RegisterRefinementOps<ArtemisUtils::ProlongateSharedMinMod<G::cartesian>,
-                            ArtemisUtils::RestrictAverage<G::cartesian>>();
+    m.RegisterRefinementOps<ArtemisUtils::ProlongateSharedMinMod<G::cartesian, false>,
+                            ArtemisUtils::RestrictAverage<G::cartesian, false>>();
   } else if (coords == G::spherical1D) {
-    m.RegisterRefinementOps<ArtemisUtils::ProlongateSharedMinMod<G::spherical1D>,
-                            ArtemisUtils::RestrictAverage<G::spherical1D>>();
+    if (log) {
+      m.RegisterRefinementOps<ArtemisUtils::ProlongateSharedMinMod<G::spherical1D, true>,
+                              ArtemisUtils::RestrictAverage<G::spherical1D, true>>();
+    } else {
+      m.RegisterRefinementOps<ArtemisUtils::ProlongateSharedMinMod<G::spherical1D, false>,
+                              ArtemisUtils::RestrictAverage<G::spherical1D, false>>();
+    }
   } else if (coords == G::spherical2D) {
-    m.RegisterRefinementOps<ArtemisUtils::ProlongateSharedMinMod<G::spherical2D>,
-                            ArtemisUtils::RestrictAverage<G::spherical2D>>();
+    if (log) {
+      m.RegisterRefinementOps<ArtemisUtils::ProlongateSharedMinMod<G::spherical2D, true>,
+                              ArtemisUtils::RestrictAverage<G::spherical2D, true>>();
+    } else {
+      m.RegisterRefinementOps<ArtemisUtils::ProlongateSharedMinMod<G::spherical2D, false>,
+                              ArtemisUtils::RestrictAverage<G::spherical2D, false>>();
+    }
   } else if (coords == G::spherical3D) {
-    m.RegisterRefinementOps<ArtemisUtils::ProlongateSharedMinMod<G::spherical3D>,
-                            ArtemisUtils::RestrictAverage<G::spherical3D>>();
+    if (log) {
+      m.RegisterRefinementOps<ArtemisUtils::ProlongateSharedMinMod<G::spherical3D, true>,
+                              ArtemisUtils::RestrictAverage<G::spherical3D, true>>();
+    } else {
+      m.RegisterRefinementOps<ArtemisUtils::ProlongateSharedMinMod<G::spherical3D, false>,
+                              ArtemisUtils::RestrictAverage<G::spherical3D, false>>();
+    }
   } else if (coords == G::cylindrical) {
-    m.RegisterRefinementOps<ArtemisUtils::ProlongateSharedMinMod<G::cylindrical>,
-                            ArtemisUtils::RestrictAverage<G::cylindrical>>();
+    if (log) {
+      m.RegisterRefinementOps<ArtemisUtils::ProlongateSharedMinMod<G::cylindrical, true>,
+                              ArtemisUtils::RestrictAverage<G::cylindrical, true>>();
+    } else {
+      m.RegisterRefinementOps<ArtemisUtils::ProlongateSharedMinMod<G::cylindrical, false>,
+                              ArtemisUtils::RestrictAverage<G::cylindrical, false>>();
+    }
   } else if (coords == G::axisymmetric) {
-    m.RegisterRefinementOps<ArtemisUtils::ProlongateSharedMinMod<G::axisymmetric>,
-                            ArtemisUtils::RestrictAverage<G::axisymmetric>>();
+    if (log) {
+      m.RegisterRefinementOps<ArtemisUtils::ProlongateSharedMinMod<G::axisymmetric, true>,
+                              ArtemisUtils::RestrictAverage<G::axisymmetric, true>>();
+    } else {
+      m.RegisterRefinementOps<
+          ArtemisUtils::ProlongateSharedMinMod<G::axisymmetric, false>,
+          ArtemisUtils::RestrictAverage<G::axisymmetric, false>>();
+    }
   } else {
     PARTHENON_FAIL("Invalid artemis/coordinate system!");
   }

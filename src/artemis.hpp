@@ -111,6 +111,7 @@ enum class Coordinates {
   axisymmetric,
   null
 };
+
 // ...Riemann solvers
 enum class RSolver { hllc, hlle, llf, null };
 // ... Upwinding (left vs right state)

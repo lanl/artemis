@@ -41,90 +41,92 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin, Params &dust_pa
   Params &params = coag->AllParams();
 
   // Assign CoagParams
-  CoagParams cpars;
+  CoagParams dcpars;
 
   // Units
-  cpars.rho0 = units.GetMassDensityCodeToPhysical();
-  cpars.length0 = units.GetLengthCodeToPhysical();
+  dcpars.rho0 = units.GetMassDensityCodeToPhysical();
+  dcpars.length0 = units.GetLengthCodeToPhysical();
   PARTHENON_REQUIRE(units.GetPhysicalUnits() == ArtemisUtils::PhysicalUnits::cgs,
                     "Coagulation physics requires physical_units = cgs");
 
   // Species and properties
-  cpars.nm = dust_params.Get<int>("nspecies");
-  cpars.dfloor = cpars.rho0 * dust_params.Get<Real>("dfloor");
-  cpars.rho_p = cpars.rho0 * dust_params.Get<Real>("grain_density");
-  cpars.vfrag = pin->GetOrAddReal("dust/coagulation", "vfrag", 1.e3); // cm/s
-  cpars.integrator = pin->GetOrAddInteger("dust/coagulation", "coag_int", 3);
-  cpars.use_adaptive =
+  dcpars.nm = dust_params.Get<int>("nspecies");
+  dcpars.dfloor = dcpars.rho0 * dust_params.Get<Real>("dfloor");
+  dcpars.rho_p = dcpars.rho0 * dust_params.Get<Real>("grain_density");
+  dcpars.vfrag = pin->GetOrAddReal("dust/coagulation", "vfrag", 1.e3); // cm/s
+  dcpars.integrator = pin->GetOrAddInteger("dust/coagulation", "coag_int", 3);
+  dcpars.use_adaptive =
       pin->GetOrAddBoolean("dust/coagulation", "coag_use_adaptive_step", true);
-  cpars.mom_coag = pin->GetOrAddBoolean("dust/coagulation", "coag_mom_preserve", true);
-  cpars.ncall_max = pin->GetOrAddInteger("dust/coagulation", "coag_nsteps_max", 1000);
-  cpars.const_omega = pin->GetOrAddBoolean("dust/coagulation", "const_coag_omega", false);
-  cpars.ibounce = pin->GetOrAddBoolean("dust/coagulation", "coag_bounce", false);
-  cpars.err_eps = pin->GetOrAddReal("dust/coagulation", "err_eps", 0.1);
-  cpars.S = pin->GetOrAddReal("dust/coagulation", "S", 0.9);
-  cpars.cfl = pin->GetOrAddReal("dust/coagulation", "cfl_coag", 0.1);
-  cpars.chi = pin->GetOrAddReal("dust/coagulation", "chi", 1.0);
+  dcpars.mom_coag = pin->GetOrAddBoolean("dust/coagulation", "coag_mom_preserve", true);
+  dcpars.ncall_max = pin->GetOrAddInteger("dust/coagulation", "coag_nsteps_max", 1000);
+  dcpars.const_omega =
+      pin->GetOrAddBoolean("dust/coagulation", "const_coag_omega", false);
+  dcpars.ibounce = pin->GetOrAddBoolean("dust/coagulation", "coag_bounce", false);
+  dcpars.err_eps = pin->GetOrAddReal("dust/coagulation", "err_eps", 0.1);
+  dcpars.S = pin->GetOrAddReal("dust/coagulation", "S", 0.9);
+  dcpars.cfl = pin->GetOrAddReal("dust/coagulation", "cfl_coag", 0.1);
+  dcpars.chi = pin->GetOrAddReal("dust/coagulation", "chi", 1.0);
 
   // Coordinate type
   // NOTE(@pdmullen): Following @sli's earlier implementation, rho_p and dfloor use solely
   // the density unit in construction, not the one weighted by length unit
-  cpars.coord = pin->GetOrAddBoolean("dust/coagulation", "surface_density_flag", true);
-  if (cpars.coord) cpars.rho0 *= cpars.length0;
+  dcpars.coord = pin->GetOrAddBoolean("dust/coagulation", "surface_density_flag", true);
+  if (dcpars.coord) dcpars.rho0 *= dcpars.length0;
 
   // Adaptivity
-  if (cpars.use_adaptive) {
-    if (cpars.integrator == 3) {
-      cpars.pgrow = -0.5;
-      cpars.pshrink = -1.0;
-    } else if (cpars.integrator == 5) {
-      cpars.pgrow = -0.2;
-      cpars.pshrink = -0.25;
+  if (dcpars.use_adaptive) {
+    if (dcpars.integrator == 3) {
+      dcpars.pgrow = -0.5;
+      dcpars.pshrink = -1.0;
+    } else if (dcpars.integrator == 5) {
+      dcpars.pgrow = -0.2;
+      dcpars.pshrink = -0.25;
     } else {
       std::stringstream msg;
       msg << "### FATAL ERROR in dust coagulation initialization: " << std::endl
           << "###   You can not use this integrator with adaptive step sizing: "
-          << cpars.integrator << std::endl;
+          << dcpars.integrator << std::endl;
       PARTHENON_FAIL(msg);
     }
-    cpars.errcon = std::pow((5. / cpars.S), (1. / cpars.pgrow));
+    dcpars.errcon = std::pow((5. / dcpars.S), (1. / dcpars.pgrow));
   }
 
   // Dust sizes
-  ParArray1D<Real> dust_size("dsize", cpars.nm);
+  ParArray1D<Real> dust_size("dsize", dcpars.nm);
   auto sizes = dust_params.Get<ParArray1D<Real>>("sizes");
   parthenon::par_for(
       parthenon::loop_pattern_flatrange_tag, "code2phys", parthenon::DevExecSpace(), 0,
-      cpars.nm - 1,
-      KOKKOS_LAMBDA(const int i) { dust_size(i) = sizes(i) * cpars.length0; });
+      dcpars.nm - 1,
+      KOKKOS_LAMBDA(const int i) { dust_size(i) = sizes(i) * dcpars.length0; });
 
   // Cheeck if sizes are compatibile with coagulation model
   auto h_sizes = dust_size.GetHostMirrorAndCopy();
-  if (std::exp(3.0 / (1.0 - cpars.nm) * std::log(h_sizes(0) / h_sizes(cpars.nm - 1))) >
+  if (std::exp(3.0 / (1.0 - dcpars.nm) * std::log(h_sizes(0) / h_sizes(dcpars.nm - 1))) >
       std::sqrt(2.0)) {
     std::stringstream msg;
     msg << "### FATAL ERROR in dust with coagulation: using nspecies >"
-        << 3.0 * std::log(h_sizes(cpars.nm - 1) / h_sizes(0)) /
+        << 3.0 * std::log(h_sizes(dcpars.nm - 1) / h_sizes(0)) /
                    (std::log(std::sqrt(2.0))) +
                1.
-        << " instead of " << cpars.nm << std::endl;
+        << " instead of " << dcpars.nm << std::endl;
     PARTHENON_FAIL(msg);
   }
 
   // Allocate CoagParam arrays
-  const Real a = 3.0 * std::log10(h_sizes(0) / h_sizes(cpars.nm - 1)) /
-                 static_cast<Real>(1 - cpars.nm);
+  const Real a = 3.0 * std::log10(h_sizes(0) / h_sizes(dcpars.nm - 1)) /
+                 static_cast<Real>(1 - dcpars.nm);
   const int n2drv = coag2drv::last2;
-  cpars.klf = ParArray2D<int>("klf", cpars.nm, cpars.nm);
-  cpars.mass_grid = ParArray1D<Real>("mass_grid", cpars.nm);
-  cpars.coagR3D = ParArray3D<Real>("coagReal3D", n2drv, cpars.nm, cpars.nm);
-  cpars.cpod_notzero = ParArray3D<int>("idx_nzcpod", cpars.nm, cpars.nm, 4);
-  cpars.cpod_short = ParArray3D<Real>("nzcpod", cpars.nm, cpars.nm, 4);
-  InitializeArray(cpars.nm, cpars.pgrid, cpars.rho_p, cpars.chi, a, dust_size, cpars.klf,
-                  cpars.mass_grid, cpars.coagR3D, cpars.cpod_notzero, cpars.cpod_short);
+  dcpars.klf = ParArray2D<int>("klf", dcpars.nm, dcpars.nm);
+  dcpars.mass_grid = ParArray1D<Real>("mass_grid", dcpars.nm);
+  dcpars.coagR3D = ParArray3D<Real>("coagReal3D", n2drv, dcpars.nm, dcpars.nm);
+  dcpars.cpod_notzero = ParArray3D<int>("idx_nzcpod", dcpars.nm, dcpars.nm, 4);
+  dcpars.cpod_short = ParArray3D<Real>("nzcpod", dcpars.nm, dcpars.nm, 4);
+  InitializeArray(dcpars.nm, dcpars.pgrid, dcpars.rho_p, dcpars.chi, a, dust_size,
+                  dcpars.klf, dcpars.mass_grid, dcpars.coagR3D, dcpars.cpod_notzero,
+                  dcpars.cpod_short);
 
   // Stash CoagParams
-  params.Add("coag_pars", cpars);
+  params.Add("coag_pars", dcpars);
 
   // Remaining parameters for coagulation package
   params.Add("nstep_coag", pin->GetOrAddInteger("dust/coagulation", "nstep_coag", 50));
@@ -229,8 +231,9 @@ TaskStatus CoagulationStep(MeshData<Real> *md, const Real time, const Real dt) {
   const int scr_level = coag_pkg->template Param<int>("coag_scr_level");
   const bool info_out_flag = coag_pkg->template Param<bool>("coag_info_out");
 
-  // Extract units
+  // Extract geometry params and units
   auto &artemis_pkg = pm->packages.Get("artemis");
+  const auto &cpars = artemis_pkg->template Param<geometry::CoordParams>("coord_params");
   const auto &units = artemis_pkg->template Param<ArtemisUtils::Units>("units");
   const Real time0 = units.GetTimeCodeToPhysical();
   const Real length0 = units.GetLengthCodeToPhysical();
@@ -254,7 +257,7 @@ TaskStatus CoagulationStep(MeshData<Real> *md, const Real time, const Real dt) {
   Real mass_d0 = Null<Real>();
   int max_size0 = Null<int>();
   if (info_out_flag) {
-    PreCoagulationDiagnostics<GEOM>(md, vmesh, dfloor, mass_d0, max_size0);
+    PreCoagulationDiagnostics<GEOM>(md, vmesh, cpars, dfloor, mass_d0, max_size0);
   }
 
   // Coagulation
@@ -279,7 +282,7 @@ TaskStatus CoagulationStep(MeshData<Real> *md, const Real time, const Real dt) {
         const int nm = vmesh.GetSize(b, dust::prim::density());
 
         // Extract geometry
-        geometry::Coords<GEOM> coords(vmesh.GetCoordinates(b), k, j, i);
+        geometry::Coords<GEOM> coords(cpars, vmesh.GetCoordinates(b), k, j, i);
         const auto &hx = coords.GetScaleFactors();
         const auto &xv = coords.GetCellCenter();
         const auto &xcyl = coords.ConvertToCyl(xv);
@@ -347,7 +350,8 @@ TaskStatus CoagulationStep(MeshData<Real> *md, const Real time, const Real dt) {
   int max_size1 = Null<int>();
   int max_calls = Null<int>();
   if (info_out_flag) {
-    PostCoagulationDiagnostics<GEOM>(md, vmesh, dfloor, mass_d1, max_size1, max_calls);
+    PostCoagulationDiagnostics<GEOM>(md, vmesh, cpars, dfloor, mass_d1, max_size1,
+                                     max_calls);
     WriteCoagulationDiagnostics(md, time, dt, max_calls, max_size1, max_size0, mass_d1,
                                 mass_d0);
   }

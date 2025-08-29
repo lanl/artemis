@@ -33,6 +33,7 @@ namespace ArtemisUtils {
 //! \brief Scales the momentum fluxes by scale factors associated with relevant coord sys
 template <Coordinates G, Fluid F, int DIR, typename V3>
 KOKKOS_INLINE_FUNCTION void ScaleMomentumFlux(parthenon::team_mbr_t const &member,
+                                              const geometry::CoordParams &cpars,
                                               const int b, const int k, const int j,
                                               const int il, const int iu, const V3 &q) {
   // Immediately return if Cartesian (i.e., do not scale momentum flux)
@@ -56,7 +57,7 @@ KOKKOS_INLINE_FUNCTION void ScaleMomentumFlux(parthenon::team_mbr_t const &membe
     const int IVZ = nspecies + VI(n, 2);
     parthenon::par_for_inner(
         DEFAULT_INNER_LOOP_PATTERN, member, il, iu, [&](const int i) {
-          geometry::Coords<G> coords(q.GetCoordinates(b), k, j, i);
+          geometry::Coords<G> coords(cpars, q.GetCoordinates(b), k, j, i);
           auto xf = NewArray<Real, 3>();
           if constexpr (DIR == X1DIR) {
             xf = coords.FaceCenX1(geometry::CellFace::lower);
@@ -97,6 +98,9 @@ TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, FLUX vflx,
     eos = pkg->template Param<EOS>("eos_d");
   }
 
+  const auto &cpars =
+      pm->packages.Get("artemis")->template Param<geometry::CoordParams>("coord_params");
+
   // Speed of light (and reduced), if used
   Real chat = Null<Real>();
   Real c = Null<Real>();
@@ -124,7 +128,7 @@ TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, FLUX vflx,
 
         // Reconstruct qR[i] and qL[i+1]
         Reconstruction<RECON, X1DIR, G> recon;
-        recon(mbr, b, k, j, il - 1, iu, vp, wl, wr);
+        recon(mbr, cpars, b, k, j, il - 1, iu, vp, wl, wr);
         mbr.team_barrier();
 
         // NOTE(@adempsey): Moments radiation currently requires zeroing of reconstructed
@@ -141,7 +145,7 @@ TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, FLUX vflx,
         mbr.team_barrier();
 
         // Scale X1-momentum flux by appropriate scale factor for coord system
-        ScaleMomentumFlux<G, F, X1DIR>(mbr, b, k, j, il, iu, vflx);
+        ScaleMomentumFlux<G, F, X1DIR>(mbr, cpars, b, k, j, il, iu, vflx);
       });
 
   // X2-Flux
@@ -169,7 +173,7 @@ TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, FLUX vflx,
 
             // Reconstruct qR[j] and qL[j+1]
             Reconstruction<RECON, X2DIR, G> recon;
-            recon(mbr, b, k, j, il, iu, vp, wl_jp1, wr);
+            recon(mbr, cpars, b, k, j, il, iu, vp, wl_jp1, wr);
             mbr.team_barrier();
 
             // NOTE(@adempsey): See comments above
@@ -185,7 +189,7 @@ TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, FLUX vflx,
               mbr.team_barrier();
 
               // Scale X2-momentum flux by appropriate scale factor for coord system
-              ScaleMomentumFlux<G, F, X2DIR>(mbr, b, k, j, il, iu, vflx);
+              ScaleMomentumFlux<G, F, X2DIR>(mbr, cpars, b, k, j, il, iu, vflx);
             }
           }
         });
@@ -216,7 +220,7 @@ TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, FLUX vflx,
 
             // Reconstruct qR[k] and qL[k+1]
             Reconstruction<RECON, X3DIR, G> recon;
-            recon(mbr, b, k, j, il, iu, vp, wl_kp1, wr);
+            recon(mbr, cpars, b, k, j, il, iu, vp, wl_kp1, wr);
             mbr.team_barrier();
 
             // NOTE(@adempsey): See comments above
@@ -232,7 +236,7 @@ TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, FLUX vflx,
               mbr.team_barrier();
 
               // Scale X3-momentum flux by appropriate scale factor for coord system
-              ScaleMomentumFlux<G, F, X3DIR>(mbr, b, k, j, il, iu, vflx);
+              ScaleMomentumFlux<G, F, X3DIR>(mbr, cpars, b, k, j, il, iu, vflx);
             }
           }
         });
@@ -268,6 +272,9 @@ TaskStatus FluxSourceImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, CONS vcons, FAC
   if constexpr (F == Fluid::radiation) {
     hcchat = 0.5 * pkg->template Param<Real>("c") * pkg->template Param<Real>("chat");
   }
+  const auto &cpars = md->GetParentPointer()
+                          ->packages.Get("artemis")
+                          ->template Param<geometry::CoordParams>("coord_params");
 
   // Apply flux sources
   parthenon::par_for(
@@ -275,7 +282,7 @@ TaskStatus FluxSourceImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, CONS vcons, FAC
       md->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
         // Extract coordinates
-        geometry::Coords<G> coords(vp.GetCoordinates(b), k, j, i);
+        geometry::Coords<G> coords(cpars, vp.GetCoordinates(b), k, j, i);
         const auto ax1 = coords.GetFaceAreaX1();
         const auto ax2 = (multi_d) ? coords.GetFaceAreaX2() : NewArray<Real, 2>(0.0);
         const auto ax3 = (three_d) ? coords.GetFaceAreaX3() : NewArray<Real, 2>(0.0);
@@ -284,7 +291,11 @@ TaskStatus FluxSourceImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, CONS vcons, FAC
         const auto dh3 = (x3dep) ? coords.GetConnX3() : NewArray<Real, 3>(0.0);
 
         // Get the rotational velocity
-        const auto rfv = RotatingFrame::RotationVelocity<G>(coords.GetCellCenter(), omf);
+        std::array<Real, 3> rfv{0.0};
+        [[maybe_unused]] Real omf_ = omf;
+        if constexpr (F != Fluid::radiation) {
+          rfv = RotatingFrame::RotationVelocity<G>(coords.GetCellCenter(), omf_);
+        }
 
         // Timestep weighted by dx
         geometry::BBox bnds = coords.bnds;
@@ -377,8 +388,8 @@ TaskStatus FluxSourceImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, CONS vcons, FAC
               const Real &fy = vp_(b, IVY, k, j, i);
               const Real &fz = vp_(b, IVZ, k, j, i);
               const Real ff = std::sqrt(SQR(fx) + SQR(fy) + SQR(fz));
-              const Real chi = Moments::EddingtonFactor<C>(ff);
-              wdt *= (3.0 * chi - 1.0) * hcchat_ / (ff + Fuzz<Real>());
+              const Real chi = Moments::ThriceEddingtonFactor<C>(ff);
+              wdt *= ((chi - 1.) / (ff + Fuzz<Real>())) * hcchat_;
             }
 
             // Update momenta

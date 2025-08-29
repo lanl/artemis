@@ -86,11 +86,12 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   auto &pars = artemis_pkg->Param<BeamParams>("beam_params");
   auto &pco = pmb->coords;
+  const auto &cpars = artemis_pkg->template Param<geometry::CoordParams>("coord_params");
   pmb->par_for(
       "pgen_beam", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
         // cell-centered coordinates
-        geometry::Coords<GEOM> coords(pco, k, j, i);
+        geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
         const auto &xv = coords.GetCellCenter();
         // compute cell-centered conserved variables
         if (do_gas) {
@@ -149,12 +150,13 @@ inline void BeamInnerX2(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) 
   const auto &bounds = coarse ? pmb->c_cellbounds : pmb->cellbounds;
   const auto &range = bounds.GetBoundsJ(IndexDomain::interior, TE::CC);
   const int js = range.s;
+  const auto &cpars = artemis_pkg->template Param<geometry::CoordParams>("coord_params");
 
   pmb->par_for_bndry(
       "BeamInnerX2", nb, IndexDomain::inner_x2, parthenon::TopologicalElement::CC, coarse,
       fine, KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
         // Extract coordinates
-        geometry::Coords<GEOM> coords(pco, k, j, i);
+        geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
         const Real xf = coords.bnds.x1[0];
 
         // Gas Inner X2 BC
@@ -225,11 +227,12 @@ inline void BeamInnerX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) 
   const int is = range.s;
 
   auto &pars = artemis_pkg->Param<BeamParams>("beam_params");
+  const auto &cpars = artemis_pkg->template Param<geometry::CoordParams>("coord_params");
   pmb->par_for_bndry(
       "BeamInnerX1", nb, IndexDomain::inner_x1, parthenon::TopologicalElement::CC, coarse,
       fine, KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
         // Extract coordinates
-        geometry::Coords<GEOM> coords(pco, k, j, i);
+        geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
         const Real yf = coords.bnds.x2[0];
 
         // Gas Inner X1 BC

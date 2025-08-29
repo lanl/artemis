@@ -154,10 +154,14 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   if (do_rotating_frame) packages.Add(RotatingFrame::Initialize(pin.get()));
   if (do_cooling) packages.Add(Gas::Cooling::Initialize(pin.get()));
   if (do_drag) packages.Add(Drag::Initialize(pin.get()));
+
+  // Operator split dust coagulation
   if (do_coagulation) {
-    auto &dustPars = packages.Get("dust")->AllParams();
-    packages.Add(Dust::Coagulation::Initialize(pin.get(), dustPars, units, constants));
+    auto &dust_params = packages.Get("dust")->AllParams();
+    packages.Add(Dust::Coagulation::Initialize(pin.get(), dust_params, units, constants));
   }
+
+  // Operator split radiation
   if (do_radiation) {
     // Top-level radiation package
     packages.Add(Radiation::Initialize(pin.get(), constants, do_imc));

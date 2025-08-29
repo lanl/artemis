@@ -22,6 +22,7 @@
 #include "artemis.hpp"
 #include "artemis_driver.hpp"
 #include "drag/drag.hpp"
+#include "dust/coagulation/coagulation.hpp"
 #include "dust/dust.hpp"
 #include "gas/cooling/cooling.hpp"
 #include "gas/gas.hpp"
@@ -132,7 +133,8 @@ TaskListStatus ArtemisDriver<GEOM>::Step() {
   if (do_moment) status = Moments::MomentsDriver<GEOM>(pmesh, tm, rad_integrator.get());
   if (status != TaskListStatus::complete) return status;
 
-  if (do_coagulation) status = Dust::OperatorSplitDust<GEOM>(pmesh, tm);
+  // Operator split, dust coagulation
+  if (do_coagulation) status = Dust::Coagulation::CoagulationDriver<GEOM>(pmesh, tm);
   if (status != TaskListStatus::complete) return status;
 
   // Compute new dt, (de)refine, and handle sparse (if enabled)

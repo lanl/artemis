@@ -67,6 +67,9 @@ namespace prim {
 ARTEMIS_VARIABLE(dust.prim, density);
 ARTEMIS_VARIABLE(dust.prim, velocity);
 } // namespace prim
+namespace coag {
+ARTEMIS_VARIABLE(dust.coag, ncalls);
+}
 } // namespace dust
 
 namespace rad {

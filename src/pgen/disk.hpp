@@ -80,7 +80,6 @@ Real DenProfile(struct DiskParams pgen, const Real R, const Real z) {
   const Real r = std::sqrt(R * R + z * z);
   const Real h = pgen.h0 * std::pow(R / pgen.r0, pgen.flare);
   const Real sig0 = pgen.rho0; // / (std::sqrt(2.0 * M_PI) * pgen.h0 * pgen.r0);
-  // const Real exp_fac = (pgen.rexp == 0.) ? 1. : std::exp(-SQR(R / pgen.rexp));
   const Real exp_fac =
       (pgen.rexp == 0.) ? 1. : std::exp(-std::pow(R / pgen.rexp, pgen.exp_power));
   const Real dmid =

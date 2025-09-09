@@ -12,7 +12,7 @@
 //========================================================================================
 // NOTE(@sli):
 // The dust coagulation code is modified from public available Dustpy package
-//          https://github.com/stammler/dustpy
+//          httgit@github.com:parthenon-hpc-lab/parthenon.gitps://github.com/stammler/dustpy
 //   and from their paper (Stammler and Birnstiel (2022) ApJ 935:35)
 //          "DustPy: A Python Package for Dust Evolution in Protoplanetary Disks"
 //========================================================================================
@@ -78,19 +78,19 @@ struct CoagParams {
 //! \fn  void Dust::Coagulation::PreCoagulationDiagnostics
 //  \brief Gather pre-coagulation diagnostics
 template <Coordinates GEOM, typename T>
-static void PreCoagulationDiagnostics(MeshData<Real> *md, T &vmesh,
-                                      const geometry::CoordParams &cpars,
-                                      const Real &dfloor, Real &mass_d0, int &max_size0) {
+static void CoagulationDiagnostics(MeshData<Real> *md, T &vmesh,
+                                   const geometry::CoordParams &cpars, const Real &dfloor,
+                                   Real &mass_d, int &max_size) {
   // Indexing
   IndexRange ib = md->GetBoundsI(IndexDomain::interior);
   IndexRange jb = md->GetBoundsJ(IndexDomain::interior);
   IndexRange kb = md->GetBoundsK(IndexDomain::interior);
 
   // Reduction
-  Real lmass_d0 = 0.0;
-  int lmax_size0 = 1;
+  Real lmass_d = 0.0;
+  int lmax_size = 1;
   Kokkos::parallel_reduce(
-      "coag::pre-diag",
+      "coag::diag",
       Kokkos::MDRangePolicy<Kokkos::Rank<4>>(
           {0, kb.s, jb.s, ib.s}, {md->NumBlocks(), kb.e + 1, jb.e + 1, ib.e + 1}),
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, Real &lsum,
@@ -112,85 +112,26 @@ static void PreCoagulationDiagnostics(MeshData<Real> *md, T &vmesh,
           }
         }
       },
-      lmass_d0, Kokkos::Max<int>(lmax_size0));
+      lmass_d, Kokkos::Max<int>(lmax_size));
   Kokkos::fence();
 
 #ifdef MPI_PARALLEL
   // Sum over all processors
-  MPI_Allreduce(MPI_IN_PLACE, &lmax_size0, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
-  MPI_Allreduce(MPI_IN_PLACE, &lmass_d0, 1, MPI_PARTHENON_REAL, MPI_SUM, MPI_COMM_WORLD);
+  MPI_Allreduce(MPI_IN_PLACE, &lmax_size, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
+  MPI_Allreduce(MPI_IN_PLACE, &lmass_d, 1, MPI_PARTHENON_REAL, MPI_SUM, MPI_COMM_WORLD);
 #endif // MPI_PARALLEL
 
-  mass_d0 = lmass_d0;
-  max_size0 = lmax_size0;
-}
-
-//----------------------------------------------------------------------------------------
-//! \fn  void Dust::Coagulation::PostCoagulationDiagnostics
-//  \brief Gather post-coagulation diagnostics
-template <Coordinates GEOM, typename T>
-static void PostCoagulationDiagnostics(MeshData<Real> *md, T &vmesh,
-                                       const geometry::CoordParams &cpars,
-                                       const Real &dfloor, Real &mass_d1, int &max_size1,
-                                       int &max_calls) {
-  // Indexing
-  IndexRange ib = md->GetBoundsI(IndexDomain::interior);
-  IndexRange jb = md->GetBoundsJ(IndexDomain::interior);
-  IndexRange kb = md->GetBoundsK(IndexDomain::interior);
-
-  // Reduction
-  Real lmass_d1 = 0.0;
-  int lmax_size1 = 1;
-  int lmax_calls = 1;
-  Kokkos::parallel_reduce(
-      "coag::post-diag",
-      Kokkos::MDRangePolicy<Kokkos::Rank<4>>(
-          {0, kb.s, jb.s, ib.s}, {md->NumBlocks(), kb.e + 1, jb.e + 1, ib.e + 1}),
-      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, Real &lsum,
-                    int &lmax1, int &lmax2) {
-        geometry::Coords<GEOM> coords(cpars, vmesh.GetCoordinates(b), k, j, i);
-        const Real &vol = coords.Volume();
-
-        // Sum over nspecies
-        for (int n = 0; n < vmesh.GetSize(b, dust::cons::density()); ++n) {
-          const Real &dens_d = vmesh(b, dust::cons::density(n), k, j, i);
-          lsum += dens_d * vol;
-        }
-
-        // Maxes
-        for (int n = vmesh.GetSize(b, dust::cons::density()) - 1; n >= 0; --n) {
-          const Real &dens_d = vmesh(b, dust::cons::density(n), k, j, i);
-          if (dens_d > dfloor) {
-            lmax1 = std::max(lmax1, n);
-            break;
-          }
-        }
-        lmax2 =
-            std::max(lmax2, static_cast<int>(vmesh(b, dust::coag::ncalls(), k, j, i)));
-      },
-      Kokkos::Sum<Real>(lmass_d1), Kokkos::Max<int>(lmax_size1),
-      Kokkos::Max<int>(lmax_calls));
-  Kokkos::fence();
-
-#ifdef MPI_PARALLEL
-  // over all processors
-  MPI_Allreduce(MPI_IN_PLACE, &lmass_d1, 1, MPI_PARTHENON_REAL, MPI_SUM, MPI_COMM_WORLD);
-  MPI_Allreduce(MPI_IN_PLACE, &lmax_size1, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
-  MPI_Allreduce(MPI_IN_PLACE, &lmax_calls, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
-#endif // MPI_PARALLEL
-
-  mass_d1 = lmass_d1;
-  max_size1 = lmax_size1;
-  max_calls = lmax_calls;
+  mass_d = lmass_d;
+  max_size = lmax_size;
 }
 
 //----------------------------------------------------------------------------------------
 //! \fn  void Dust::Coagulation::WriteCoagulationDiagnostics
 //  \brief Write coagulation diagnostics to file
 static void WriteCoagulationDiagnostics(MeshData<Real> *md, const Real time,
-                                        const Real dt, const int max_calls,
-                                        const int max_size1, const int max_size0,
-                                        const Real mass_d1, const Real mass_d0) {
+                                        const Real dt, const int max_size1,
+                                        const int max_size0, const Real mass_d1,
+                                        const Real mass_d0) {
   if (parthenon::Globals::my_rank == 0) {
     auto pm = md->GetParentPointer();
     auto &artemis_pkg = pm->packages.Get("artemis");
@@ -210,14 +151,13 @@ static void WriteCoagulationDiagnostics(MeshData<Real> *md, const Real time,
         if ((pfile = std::fopen(fname.c_str(), "w")) == nullptr) {
           PARTHENON_FAIL("Error output file could not be opened");
         }
-        std::string label = "# time dt max_calls max_size1 max_size0 ";
-        label.append("mass_d1 mass_d0 delta \n");
+        std::string label = "# time dt max_size1 max_size0 mass_d1 mass_d0 delta \n";
         std::fprintf(pfile, "%s", label.c_str());
       }
     }
     std::fprintf(pfile, "  %24.16e ", time);
     std::fprintf(pfile, "  %24.16e ", dt);
-    std::fprintf(pfile, "  %d  %d  %d ", max_calls, max_size1, max_size0);
+    std::fprintf(pfile, "  %d  %d ", max_size1, max_size0);
     std::fprintf(pfile, "  %24.16e  %24.16e  %24.16e", mass_d1, mass_d0,
                  1.0 - mass_d0 / mass_d1);
     std::fprintf(pfile, "\n");
@@ -1021,15 +961,21 @@ void CoagulationOneCell(parthenon::team_mbr_t const &mbr, const int cell_i,
       }
     }
 
+    // Update time and increment ncall
     time_dummy += dt;
     nCall++;
 
-    if (coag.use_adaptive == 1) {
+    // Adaptivity
+    if (coag.use_adaptive) {
       dt_sync = std::max(hnext, dt_sync);
       hnext = std::min(hnext, time_goal - time_dummy);
     }
 
-    if (nCall > coag.ncall_max) break;
+    // Warn and break upon reaching ncall_max
+    if (nCall > coag.ncall_max) {
+      PARTHENON_WARN("(Coagulation): Reach ncall_max in coagulation kernel!");
+      break;
+    }
   } // end of internal timestep
 
   // from number density to volume density

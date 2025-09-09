@@ -115,9 +115,9 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   PARTHENON_REQUIRE(!(do_radiation) || (do_radiation && do_gas),
                     "Radiation requires the gas package, but there is not gas!");
   PARTHENON_REQUIRE(!(do_imc && do_moment),
-                    "Cannot simultaneously evolve IMC and moments radiation");
-  PARTHENON_REQUIRE(!(do_coagulation) || (do_coagulation && do_dust),
-                    "Coagulation requires the dust package, but there is not dust!");
+                    "Cannot simultaneously evolve IMC and moments radiation!");
+  PARTHENON_REQUIRE(!(do_coagulation) || (do_coagulation && (do_gas && do_dust)),
+                    "Coagulation requires gas and dust packages, at least one missing!");
 
   // Store configuration choices in params
   artemis->AddParam("do_gas", do_gas);

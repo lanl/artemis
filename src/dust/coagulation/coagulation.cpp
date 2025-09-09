@@ -138,10 +138,6 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin, Params &dust_pa
   // Fields for stashing solver diagnostics
   const bool info_out = pin->GetOrAddBoolean("dust/coagulation", "coag_info_out", false);
   params.Add("coag_info_out", info_out);
-  if (info_out) {
-    Metadata m = Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy});
-    coag->AddField<dust::coag::ncalls>(m);
-  }
 
   return coag;
 }
@@ -249,15 +245,15 @@ TaskStatus CoagulationStep(MeshData<Real> *md, const Real time, const Real dt) {
   auto &resolved_pkgs = pm->resolved_packages;
   static auto desc =
       MakePackDescriptor<gas::prim::density, gas::prim::sie, dust::cons::density,
-                         dust::cons::momentum, dust::prim::density, dust::prim::velocity,
-                         dust::coag::ncalls>(resolved_pkgs.get());
+                         dust::cons::momentum, dust::prim::density, dust::prim::velocity>(
+          resolved_pkgs.get());
   auto vmesh = desc.GetPack(md);
 
   // Global reduction of sizes (max) and dust mass (sum) before coagulation
   Real mass_d0 = Null<Real>();
   int max_size0 = Null<int>();
   if (info_out_flag) {
-    PreCoagulationDiagnostics<GEOM>(md, vmesh, cpars, dfloor, mass_d0, max_size0);
+    CoagulationDiagnostics<GEOM>(md, vmesh, cpars, dfloor, mass_d0, max_size0);
   }
 
   // Coagulation
@@ -319,11 +315,12 @@ TaskStatus CoagulationStep(MeshData<Real> *md, const Real time, const Real dt) {
         mbr.team_barrier();
 
         // Coagulation Kernel
-        int ncall = 0;
+        // NOTE(@pdmullen): mbr.team_barrier() included at end of CoagulationOneCell
+        // NOTE(@pdmullen): ncall could be stored or reduced (see 0a5d72b)
+        int ncall = Null<int>();
         Coagulation::CoagulationOneCell(mbr, i, time1, dt_sync, gdens1, rhod, stime, vel,
                                         nvel, Q, nQs, alpha, cs1, omega1, coag, source,
                                         ncall, Q2);
-        // NOTE(@pdmullen): mbr.team_barrier() included at end of CoagulationOneCell...
 
         // Update dust density and momentum after coagulation
         parthenon::par_for_inner(
@@ -336,24 +333,14 @@ TaskStatus CoagulationStep(MeshData<Real> *md, const Real time, const Real dt) {
                     gt0 * rhod(n) * vel(vidx) * hx[d] / (rho0 * vel0);
               }
             });
-
-        // Diagnostics
-        if (info_out_flag) {
-          Kokkos::single(Kokkos::PerTeam(mbr),
-                         [&]() { vmesh(b, dust::coag::ncalls(), k, j, i) = ncall; });
-        }
       });
 
-  // Global reduction of sizes (max) and dust mass (sum) before coagulation. Report
-  // diagnostics to file, including max_ncalls
-  Real mass_d1 = Null<Real>();
-  int max_size1 = Null<int>();
-  int max_calls = Null<int>();
+  // Global reduction of sizes (max) and dust mass (sum) after coagulation
   if (info_out_flag) {
-    PostCoagulationDiagnostics<GEOM>(md, vmesh, cpars, dfloor, mass_d1, max_size1,
-                                     max_calls);
-    WriteCoagulationDiagnostics(md, time, dt, max_calls, max_size1, max_size0, mass_d1,
-                                mass_d0);
+    Real mass_d1 = Null<Real>();
+    int max_size1 = Null<int>();
+    CoagulationDiagnostics<GEOM>(md, vmesh, cpars, dfloor, mass_d1, max_size1);
+    WriteCoagulationDiagnostics(md, time, dt, max_size1, max_size0, mass_d1, mass_d0);
   }
 
   return TaskStatus::complete;

@@ -63,7 +63,7 @@ def analyze():
         unpack=True,
     )
 
-    data_ref = np.hstack([dat_sden[2:5, :], dat_den[2:5, :]])
+    data_ref = np.hstack([dat_sden[2:4, :], dat_den[2:4, :]])
 
     fname = os.path.join(artemis.get_data_dir(), _file_id + "_info.dat")
     data_tst = np.loadtxt(
@@ -71,7 +71,7 @@ def analyze():
         unpack=True,
     )
 
-    errs = data_ref - data_tst[2:5, :]
+    errs = data_ref - data_tst[2:4, :]
     errors = np.array(errs).ravel()
     fail = np.any(errors > 0)
     return not fail

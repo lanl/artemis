@@ -38,6 +38,9 @@ struct ParticleWeights {
       : x2min(x2min), x2max(x2max), x3min(x3min), x3max(x3max) {};
 };
 
+//----------------------------------------------------------------------------------------
+//! \fn  StateDescriptor RT::GetIndices
+//! \brief Map x1,x2,x3 to i,j,k
 KOKKOS_FORCEINLINE_FUNCTION std::array<int, 3>
 GetIndices(const parthenon::Coordinates_t &pco, std::array<Real, 3> x) {
   return {
@@ -46,6 +49,9 @@ GetIndices(const parthenon::Coordinates_t &pco, std::array<Real, 3> x) {
       static_cast<int>(std::floor((x[2] - pco.Xf<3>(0)) / pco.CellWidth<3>(0, 0, 0)))};
 }
 
+//----------------------------------------------------------------------------------------
+//! \fn  StateDescriptor RT::PushParticlesImpl
+//! \brief Implementation for pushing particles
 template <Coordinates GEOM, bool LOGR>
 TaskStatus PushParticlesImpl(MeshData<Real> *md) {
   auto pm = md->GetParentPointer();
@@ -151,6 +157,9 @@ TaskStatus PushParticlesImpl(MeshData<Real> *md) {
   return TaskStatus::complete;
 }
 
+//----------------------------------------------------------------------------------------
+//! \fn  StateDescriptor RT::SourceParticlesImpl
+//! \brief Implementation for sourcing particles
 template <Coordinates GEOM, bool LOGR>
 TaskStatus SourceParticlesImpl(MeshData<Real> *md, const ParticleWeights &pwght) {
   // Create SwarmPacks

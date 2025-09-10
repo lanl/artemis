@@ -9,6 +9,9 @@
 
 namespace RT {
 
+//----------------------------------------------------------------------------------------
+//! \fn  StateDescriptor RT::Initialize
+//! \brief Initialize the Raytrace package
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
                                             ArtemisUtils::Units &units,
                                             ArtemisUtils::Constants &constants) {
@@ -81,6 +84,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
 }
 
 // Taken from jaybenne
+//----------------------------------------------------------------------------------------
+//! \fn  StateDescriptor RT::MeshResetCommunication
+//! \brief Reset comm buffers
 TaskStatus MeshResetCommunication(MeshData<Real> *md) {
   const int nblocks = md->NumBlocks();
   for (int n = 0; n < nblocks; n++) {
@@ -92,6 +98,9 @@ TaskStatus MeshResetCommunication(MeshData<Real> *md) {
   return TaskStatus::complete;
 }
 
+//----------------------------------------------------------------------------------------
+//! \fn  StateDescriptor RT::MeshSend
+//! \brief Send boundary comms
 TaskStatus MeshSend(MeshData<Real> *md) {
   const int nblocks = md->NumBlocks();
   for (int n = 0; n < nblocks; n++) {
@@ -103,6 +112,9 @@ TaskStatus MeshSend(MeshData<Real> *md) {
   return TaskStatus::complete;
 }
 
+//----------------------------------------------------------------------------------------
+//! \fn  StateDescriptor RT::MeshRecieve
+//! \brief Recieve comm buffers
 TaskStatus MeshReceive(MeshData<Real> *md) {
   TaskStatus status = TaskStatus::complete;
   const int nblocks = md->NumBlocks();
@@ -118,6 +130,9 @@ TaskStatus MeshReceive(MeshData<Real> *md) {
   return status;
 }
 
+//----------------------------------------------------------------------------------------
+//! \fn  StateDescriptor RT::SourceParticles
+//! \brief Create new particles for the radiation source
 TaskStatus SourceParticles(MeshData<Real> *md, const ParticleWeights &pwght) {
   auto pm = md->GetParentPointer();
   auto &artemis_pkg = pm->packages.Get("artemis");
@@ -151,6 +166,9 @@ TaskStatus SourceParticles(MeshData<Real> *md, const ParticleWeights &pwght) {
   return TaskStatus::complete;
 }
 
+//----------------------------------------------------------------------------------------
+//! \fn  StateDescriptor RT::PushParticles
+//! \brief Push the particles through the mesh
 TaskStatus PushParticles(MeshData<Real> *md) {
 
   auto pm = md->GetParentPointer();
@@ -185,6 +203,9 @@ TaskStatus PushParticles(MeshData<Real> *md) {
   return TaskStatus::complete;
 }
 
+//----------------------------------------------------------------------------------------
+//! \fn  StateDescriptor RT::RemoveParticles
+//! \brief Remove particles that have been marked for removal
 TaskStatus RemoveParticles(MeshData<Real> *md) {
 
   for (int b = 0; b < md->NumBlocks(); ++b) {
@@ -194,6 +215,9 @@ TaskStatus RemoveParticles(MeshData<Real> *md) {
   return TaskStatus::complete;
 }
 
+//----------------------------------------------------------------------------------------
+//! \fn  StateDescriptor RT::CheckCompletion
+//! \brief Determine how many particles are still left to push
 TaskStatus CheckCompletion(MeshData<Real> *md) {
   // Taken from jaybenne
   auto pm = md->GetParentPointer();
@@ -227,6 +251,9 @@ TaskStatus CheckCompletion(MeshData<Real> *md) {
   return (keep_going) ? TaskStatus::iterate : TaskStatus::complete;
 }
 
+//----------------------------------------------------------------------------------------
+//! \fn  StateDescriptor RT::EvalOpac
+//! \brief Evaluate the opacity used for the raytraced radiation
 TaskStatus EvalOpac(MeshData<Real> *md) {
   using parthenon::MakePackDescriptor;
   auto pm = md->GetParentPointer();
@@ -264,6 +291,9 @@ TaskStatus EvalOpac(MeshData<Real> *md) {
   return TaskStatus::complete;
 }
 
+//----------------------------------------------------------------------------------------
+//! \fn  StateDescriptor RT::RaytraceDriverTasks
+//! \brief The driver for the raytrace step
 TaskCollection RaytraceDriverTasks(Mesh *pmesh, const ParticleWeights &pwght) {
   using TQ = TaskQualifier;
   auto &rt_pkg = pmesh->packages.Get("raytrace");
@@ -304,6 +334,9 @@ TaskCollection RaytraceDriverTasks(Mesh *pmesh, const ParticleWeights &pwght) {
   return tc;
 }
 
+//----------------------------------------------------------------------------------------
+//! \fn  StateDescriptor RT::RaytraceDriver
+//! \brief Pepare to call the TaskCollection for raytracing
 TaskListStatus RaytraceDriver(Mesh *pmesh) {
   auto &artemis_pkg = pmesh->packages.Get("artemis");
   auto geom = artemis_pkg->Param<Coordinates>("coords");

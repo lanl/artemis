@@ -141,7 +141,7 @@ TaskStatus PushParticlesImpl(MeshData<Real> *md) {
             // move the particle to the next face;
             i += 1;
             if constexpr (LOGR) {
-              xp = pco.Xf<X1DIR>(i);
+              xp = pco.template Xf<X1DIR>(i);
             } else {
               xp = coords.bnds.x1[1];
             }
@@ -256,7 +256,7 @@ TaskStatus SourceParticlesImpl(MeshData<Real> *md, const ParticleWeights &pwght)
               ppack_i(b, rad::part::ijk(2), n) = k;
               Real x = Null<Real>();
               if constexpr (LOGR) {
-                x = pco.Xf<X1DIR>(ib.s);
+                x = pco.template Xf<X1DIR>(ib.s);
               } else {
                 x = coords.bnds.x1[0];
               }

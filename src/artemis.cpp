@@ -157,8 +157,10 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
 
   // Operator split dust coagulation
   if (do_coagulation) {
+    auto &gas_params = packages.Get("gas")->AllParams();
     auto &dust_params = packages.Get("dust")->AllParams();
-    packages.Add(Dust::Coagulation::Initialize(pin.get(), dust_params, units, constants));
+    packages.Add(Dust::Coagulation::Initialize(pin.get(), gas_params, dust_params, units,
+                                               constants));
   }
 
   // Operator split radiation

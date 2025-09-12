@@ -25,7 +25,8 @@
 namespace Dust {
 namespace Coagulation {
 
-std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin, Params &dustPars,
+std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin, Params &gas_params,
+                                            Params &dust_params,
                                             ArtemisUtils::Units &units,
                                             ArtemisUtils::Constants &constants);
 
@@ -62,6 +63,9 @@ struct CoagParams {
   Real cfl;         // CFL number
   Real errcon;      // Needed for increasing step size
   bool const_omega; // for shearing-box or testing
+
+  Real mmw;           // mean molecular weight (mu * amu in CGS)
+  Real cross_section; // cross section of gas species
 
   Real rho0;    // physical-to-code unit conversion density
   Real length0; // physical-to-code unit conversion length
@@ -432,7 +436,7 @@ Real CoagulationRate(const int i, const int j, const Real kernel4[],
   const Real &mass_gride = coag.mass_grid(coag.nm - 1);
   if (mass_gridi + mass_gridj >= mass_gride) return 0.0;
 
-  const Real &gasdens = kernel4[0];
+  const Real &gdens = kernel4[0];
   const Real &alpha = kernel4[1];
   const Real &cs = kernel4[2];
   const Real &omega = kernel4[3];
@@ -441,13 +445,12 @@ Real CoagulationRate(const int i, const int j, const Real kernel4[],
   const Real *vel_i = &vel(3 * i);
   const Real *vel_j = &vel(3 * j);
 
-  const Real sig_h2 = 2.0e-15;    //! cross section of H2
-  const Real mu = 2.3;            //! mean molecular mass in proton masses
-  const Real m_p = 1.6726231e-24; //! proton mass in g
+  const Real &sig = coag.cross_section; //! cross section of gas species
+  const Real &mmw = coag.mmw;           //! mean molecular weight (mu * mp)
 
   // Calculate some basic properties
   const Real hg = cs / omega;
-  Real re = alpha * sig_h2 * gasdens / (2.0 * mu * m_p);
+  Real re = alpha * sig * gdens / (2.0 * mmw);
   if (!(coag.coord)) re *= std::sqrt(2.0 * M_PI) * hg;
 
   const Real tn = 1.0 / omega;
@@ -456,7 +459,7 @@ Real CoagulationRate(const int i, const int j, const Real kernel4[],
   const Real vs = vn * std::pow(re, -0.25);
 
   // Calculate the relative velocities
-  const Real c1 = 8.0 / M_PI * cs * cs * mu * m_p;
+  const Real c1 = 8.0 / M_PI * cs * cs * mmw;
 
   // Calculate Stokes number
   const Real stokes_i = tau_i * omega;
@@ -834,7 +837,7 @@ void Coagulation_nQs3(parthenon::team_mbr_t const &mbr, const Real &dt,
 //  \brief
 KOKKOS_FORCEINLINE_FUNCTION
 void CoagulationOneCell(parthenon::team_mbr_t const &mbr, const int cell_i,
-                        const Real &time, Real &dt_sync, const Real &gasdens,
+                        const Real &time, Real &dt_sync, const Real &gdens,
                         ScratchPad1D<Real> &dustdens, ScratchPad1D<Real> &stime,
                         ScratchPad1D<Real> &vel, const int nvel, ScratchPad1D<Real> &Q,
                         ScratchPad1D<Real> &nQs, const Real &alpha, const Real &cs,
@@ -860,7 +863,7 @@ void CoagulationOneCell(parthenon::team_mbr_t const &mbr, const int cell_i,
   dt_sync = 1e-15; // works H5
 
   Real kernel[4];
-  kernel[0] = gasdens;
+  kernel[0] = gdens;
   kernel[1] = alpha;
   kernel[2] = cs;
   kernel[3] = omega;

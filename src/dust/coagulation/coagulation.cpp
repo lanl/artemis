@@ -34,7 +34,8 @@ namespace Coagulation {
 //----------------------------------------------------------------------------------------
 //! \fn  StateDescriptor Coagulalation::Initialize
 //! \brief Adds intialization function for coagulation package
-std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin, Params &dust_params,
+std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin, Params &gas_params,
+                                            Params &dust_params,
                                             ArtemisUtils::Units &units,
                                             ArtemisUtils::Constants &constants) {
   auto coag = std::make_shared<StateDescriptor>("coagulation");
@@ -66,6 +67,10 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin, Params &dust_pa
   dcpars.S = pin->GetOrAddReal("dust/coagulation", "S", 0.9);
   dcpars.cfl = pin->GetOrAddReal("dust/coagulation", "cfl_coag", 0.1);
   dcpars.chi = pin->GetOrAddReal("dust/coagulation", "chi", 1.0);
+
+  // Gas properties
+  dcpars.mmw = gas_params.Get<Real>("mu") * constants.GetAMUPhysical();
+  dcpars.cross_section = pin->GetOrAddReal("dust/coagulation", "cross_section", 2.0e-15);
 
   // Coordinate type
   // NOTE(@pdmullen): Following @sli's earlier implementation, rho_p and dfloor use solely

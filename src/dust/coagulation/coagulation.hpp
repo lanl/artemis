@@ -12,7 +12,7 @@
 //========================================================================================
 // NOTE(@sli):
 // The dust coagulation code is modified from public available Dustpy package
-//          httgit@github.com:parthenon-hpc-lab/parthenon.gitps://github.com/stammler/dustpy
+//          https://github.com/stammler/dustpy
 //   and from their paper (Stammler and Birnstiel (2022) ApJ 935:35)
 //          "DustPy: A Python Package for Dust Evolution in Protoplanetary Disks"
 //========================================================================================
@@ -39,6 +39,15 @@ TaskStatus CoagulationStep(MeshData<Real> *md, const Real time, const Real dt);
 
 // Constants that enumerate coagulation kernel
 enum coag2drv { dpod, afrag, phifrag, epsfrag, dalp, kdelta, coef_fett, last2 };
+
+// Coagulation Kernel Parameters
+// NOTE(@pdmullen): Shared between various inline function calls
+struct KernelParams {
+  Real gdens = Null<Real>();
+  Real alpha = Null<Real>();
+  Real cs = Null<Real>();
+  Real omega = Null<Real>();
+};
 
 // Struct that holds coagulation parameters
 struct CoagParams {
@@ -427,7 +436,7 @@ Real Qplus(Real m1, Real Q1, Real m2, Real Q2) { return (m1 * Q1 + m2 * Q2) / (m
 //! \fn  Real Dust::Coagulation::CoagulationRate
 //  \brief
 KOKKOS_FORCEINLINE_FUNCTION
-Real CoagulationRate(const int i, const int j, const Real kernel4[],
+Real CoagulationRate(const int i, const int j, const KernelParams &kernel4,
                      const ScratchPad1D<Real> &vel,
                      const ScratchPad1D<Real> &stoppingTime, const CoagParams &coag,
                      const int itype) {
@@ -436,10 +445,10 @@ Real CoagulationRate(const int i, const int j, const Real kernel4[],
   const Real &mass_gride = coag.mass_grid(coag.nm - 1);
   if (mass_gridi + mass_gridj >= mass_gride) return 0.0;
 
-  const Real &gdens = kernel4[0];
-  const Real &alpha = kernel4[1];
-  const Real &cs = kernel4[2];
-  const Real &omega = kernel4[3];
+  const Real &gdens = kernel4.gdens;
+  const Real &alpha = kernel4.alpha;
+  const Real &cs = kernel4.cs;
+  const Real &omega = kernel4.omega;
   const Real &tau_i = stoppingTime(i);
   const Real &tau_j = stoppingTime(j);
   const Real *vel_i = &vel(3 * i);
@@ -529,7 +538,7 @@ Real CoagulationRate(const int i, const int j, const Real kernel4[],
 KOKKOS_FORCEINLINE_FUNCTION
 void CoagulationSource(parthenon::team_mbr_t const &mbr, ScratchPad1D<Real> &source,
                        const ScratchPad1D<Real> &distri, const int mimax,
-                       const Real kernel4[], const ScratchPad1D<Real> &vel,
+                       const KernelParams &kernel4, const ScratchPad1D<Real> &vel,
                        const ScratchPad1D<Real> &stoppingTime, const CoagParams &coag) {
   // Initialize source(*)
   parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, mbr, 0, coag.nm - 1,
@@ -622,8 +631,9 @@ void CoagulationSource(parthenon::team_mbr_t const &mbr, ScratchPad1D<Real> &sou
 KOKKOS_FORCEINLINE_FUNCTION
 void Coagulation_nQ(parthenon::team_mbr_t const &mbr, ScratchPad1D<Real> &nQs,
                     const ScratchPad1D<Real> &Q, const ScratchPad1D<Real> &distri,
-                    const int mimax, const Real kernel4[], const ScratchPad1D<Real> &vel,
-                    const ScratchPad1D<Real> &stoppingTime, const CoagParams &coag) {
+                    const int mimax, const KernelParams &kernel4,
+                    const ScratchPad1D<Real> &vel, const ScratchPad1D<Real> &stoppingTime,
+                    const CoagParams &coag) {
   // Adding coagulation source terms
   const int iafrag = coag2drv::afrag;
   const int iphifrag = coag2drv::phifrag;
@@ -741,7 +751,7 @@ KOKKOS_FORCEINLINE_FUNCTION
 void Coagulation_nQs(parthenon::team_mbr_t const &mbr, const Real &dt,
                      ScratchPad1D<Real> &Q, ScratchPad1D<Real> &nQs,
                      ScratchPad1D<Real> &distri, const int mimax, const int nvel,
-                     const Real kernel4[], ScratchPad1D<Real> &vel,
+                     const KernelParams &kernel4, ScratchPad1D<Real> &vel,
                      const ScratchPad1D<Real> &stoppingTime, const CoagParams &coag,
                      ScratchPad1D<Real> &source) {
   const Real mom_scale = 1.0e10;
@@ -780,7 +790,7 @@ KOKKOS_FORCEINLINE_FUNCTION
 void Coagulation_nQs3(parthenon::team_mbr_t const &mbr, const Real &dt,
                       ScratchPad1D<Real> &Q, ScratchPad1D<Real> &nQs,
                       ScratchPad1D<Real> &distri, const int mimax, const int nvel,
-                      const Real kernel4[], ScratchPad1D<Real> &vel,
+                      const KernelParams &kernel4, ScratchPad1D<Real> &vel,
                       const ScratchPad1D<Real> &stoppingTime, const CoagParams &coag,
                       ScratchPad1D<Real> &source, ScratchPad1D<Real> &Q2,
                       const int mimax2) {
@@ -862,11 +872,7 @@ void CoagulationOneCell(parthenon::team_mbr_t const &mbr, const int cell_i,
   Real hnext = dt;
   dt_sync = 1e-15; // works H5
 
-  Real kernel[4];
-  kernel[0] = gdens;
-  kernel[1] = alpha;
-  kernel[2] = cs;
-  kernel[3] = omega;
+  const KernelParams kernel{gdens, alpha, cs, omega};
   while (std::abs(time_dummy - time_goal) > 1e-6 * dt) {
     int mimax = 0;
     Kokkos::parallel_reduce(

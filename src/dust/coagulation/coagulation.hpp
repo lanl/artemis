@@ -205,10 +205,10 @@ static void InitializeArray(const int nm, int &pgrid, const Real &rho_p, const R
   // Set fragmentation variables
   const Real ten_a = std::pow(10.0, a);
   const Real ten_ma = 1.0 / ten_a;
-  const int ce = int(-1.0 / a * std::log10(1.0 - ten_ma)) + 1;
+  const int ce = static_cast<int>( std::floor(-1.0 / a * std::log10(1.0 - ten_ma)))  + 1;
 
   // Used in integration
-  pgrid = floor(1.0 / a);
+  pgrid = static_cast<int>(std::floor(1.0 / a));
 
   // Initialization Part II
   const int iphifrag = coag2drv::phifrag;

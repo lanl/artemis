@@ -214,7 +214,7 @@ static void InitializeArray(const int nm, int &pgrid, const Real &rho_p, const R
   const int iphifrag = coag2drv::phifrag;
   const int iepsfrag = coag2drv::epsfrag;
   const int iafrag = coag2drv::afrag;
-  const Real frag_slope = 2.0 - 11.0 / 6.0;
+  const Real frag_slope = 1.0/6.0; // = 2.0 - 11.0 / 6.0;
   parthenon::par_for(
       parthenon::loop_pattern_flatrange_tag, "initializeCoag2", parthenon::DevExecSpace(),
       0, nm - 1, KOKKOS_LAMBDA(const int i) {

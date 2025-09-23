@@ -85,10 +85,6 @@ TaskStatus MatterCouplingSimpleImpl(MeshData<Real> *u0, const Real dt) {
   const auto jb = u0->GetBoundsJ(IndexDomain::interior);
   const auto kb = u0->GetBoundsK(IndexDomain::interior);
 
-  // Prepare scratch pad memory
-  // const int ncells1 = ib.e - ib.s + 1 + 2 * parthenon::Globals::nghost;
-  // int scr_size = ScratchPad1D<Real>::shmem_size(ncells1) * 12;
-  // const int scr_level = moments_pkg->template Param<int>("scr_level");
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "MatterCoupling", DevExecSpace(), 0, u0->NumBlocks() - 1,
       kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
@@ -250,10 +246,6 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
   const auto jb = u0->GetBoundsJ(IndexDomain::interior);
   const auto kb = u0->GetBoundsK(IndexDomain::interior);
 
-  // Prepare scratch pad memory
-  // const int ncells1 = ib.e - ib.s + 1 + 2 * parthenon::Globals::nghost;
-  // int scr_size = ScratchPad1D<Real>::shmem_size(ncells1) * 12;
-  // const int scr_level = moments_pkg->template Param<int>("scr_level");
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "MatterCoupling", DevExecSpace(), 0, u0->NumBlocks() - 1,
       kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
@@ -388,16 +380,6 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
               break;
             }
 
-            // if ((inner_iter == inner_max) || (inner_err != inner_err)) {
-            //   // Didn't converge
-            //   printf("(%d,%d,%d,%d,%d): "
-            //          "E=%lg,B=%lg,T=%lg,dE=%lg,dB=%lg,Enew=%lg,Bnew=%lg,idet=%lg,Fr=%lg,"
-            //          "Fi=%lg,G0=%lg,ca=%lg,cb=%lg,cd=%lg,sp=%lg,ss=%lg,sf=%lg,Q=%lg,Cv=%"
-            //          "lg,fleck=%lg,et=%lg,E0=%lg,et0=%lg,floor=(%lg,%lg),err=%lg\n",
-            //          b, k, j, i, outer_iter, E, B, T, dE, dB, Enew, Bnew,
-            //          1. / (dfac + ca), Fr, Fi, G0, ca, cb, cd, sigp, sigs, sigf, Q, Cv,
-            //          fleck, et, E0, et0, efloor, Bfloor, inner_err);
-            // }
           } // inner_iter
           if ((inner_iter > inner_max) && (fatal_if_unconverged)) {
             printf("(%d,%d,%d,%d)  %lg > %lg after %d iterations\n", b, k, j, i,

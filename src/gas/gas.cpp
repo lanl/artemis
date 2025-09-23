@@ -704,7 +704,7 @@ TaskStatus DepositEnergy(MeshData<Real> *md, const Real dt) {
   IndexRange jb = md->GetBoundsJ(IndexDomain::entire);
   IndexRange kb = md->GetBoundsK(IndexDomain::entire);
 
-  // Set opacities
+  // Add additional energy sources
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "DepositEnergy", parthenon::DevExecSpace(), 0,
       md->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,

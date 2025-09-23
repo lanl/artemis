@@ -53,6 +53,10 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   params.Add("luminosity_cgs", luminosity_cgs);
   params.Add("stellar_temp", stellar_temp * units.GetTemperaturePhysicalToCode());
   params.Add("stellar_radius", stellar_radius * units.GetLengthPhysicalToCode());
+
+  const Real radius_factor = pin->GetOrAddReal("radiation/raytrace", "radius_factor", 6.);
+  params.Add("radius_factor", radius_factor);
+
   params.Add("max_iterations",
              pin->GetOrAddInteger("radiation/raytrace", "max_iterations", 1000));
 
@@ -72,12 +76,12 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   parthenon::Metadata swarm_metadata({Metadata::None});
   rt->AddSwarm("star", swarm_metadata);
   parthenon::Metadata mreal({parthenon::Metadata::Real});
-  rt->AddSwarmValue(rad::part::flux::name(), "star", mreal);
+  rt->AddSwarmValue(rad::star::flux::name(), "star", mreal);
   parthenon::Metadata mintv({Metadata::Integer, Metadata::Vector}, std::vector<int>{3});
-  rt->AddSwarmValue(rad::part::ijk::name(), "star", mintv);
+  rt->AddSwarmValue(rad::star::ijk::name(), "star", mintv);
 
   Metadata m = Metadata({Metadata::Cell});
-  rt->AddField<rad::opac::cross_section>(m);
+  rt->AddField<rad::star::absorption>(m);
   rt->AddField<gas::src::energy>(m);
 
   return rt;
@@ -223,7 +227,7 @@ TaskStatus CheckCompletion(MeshData<Real> *md) {
   auto pm = md->GetParentPointer();
   // Create SwarmPacks
   static auto pdesc_r =
-      MakeSwarmPackDescriptor<swarm_position::x, rad::part::flux>("star");
+      MakeSwarmPackDescriptor<swarm_position::x, rad::star::flux>("star");
   auto ppack_r = pdesc_r.GetPack(md);
   const int &nparticles_per_pack = ppack_r.GetMaxFlatIndex();
 
@@ -238,7 +242,7 @@ TaskStatus CheckCompletion(MeshData<Real> *md) {
         const auto &swarm_d = ppack_r.GetContext(b);
         if (swarm_d.IsActive(n)) {
           const Real &xp = ppack_r(b, swarm_position::x(), n);
-          const bool alive = ppack_r(b, rad::part::flux(), n) > 0.0;
+          const bool alive = ppack_r(b, rad::star::flux(), n) > 0.0;
           const bool outside =
               (xp >= x1max) ||
               (std::abs(xp - x1max) < 10 * std::numeric_limits<Real>::epsilon());
@@ -266,7 +270,7 @@ TaskStatus EvalOpac(MeshData<Real> *md) {
       rt_pkg->template Param<ArtemisUtils::Opacity>("opacity_d");
 
   static auto desc =
-      MakePackDescriptor<gas::prim::density, gas::prim::sie, rad::opac::cross_section>(
+      MakePackDescriptor<gas::prim::density, gas::prim::sie, rad::star::absorption>(
           resolved_pkgs.get());
   auto vmesh = desc.GetPack(md);
   IndexRange ib = md->GetBoundsI(IndexDomain::entire);
@@ -284,8 +288,8 @@ TaskStatus EvalOpac(MeshData<Real> *md) {
         // Evaluated at T*
         //%%%%%%%%%%%%%%%%
         const Real temp = eos_d.TemperatureFromDensityInternalEnergy(rho, sie);
-        const Real kappa = opacity_d.AbsorptionCoefficient(rho, temp, 1.0);
-        vmesh(b, rad::opac::cross_section(), k, j, i) = kappa;
+        vmesh(b, rad::star::absorption(), k, j, i) =
+            opacity_d.AbsorptionCoefficient(rho, temp, 1.0);
       });
 
   return TaskStatus::complete;

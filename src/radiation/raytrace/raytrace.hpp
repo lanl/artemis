@@ -60,17 +60,18 @@ TaskStatus PushParticlesImpl(MeshData<Real> *md) {
   const auto efloor = rt_pkg->template Param<Real>("efloor");
   const auto x1max = rt_pkg->template Param<Real>("x1max");
   const auto x1min = rt_pkg->template Param<Real>("x1min");
-  const auto rstar = rt_pkg->template Param<Real>("stellar_radius");
+  const auto zero_rad = rt_pkg->template Param<Real>("stellar_radius") *
+                        rt_pkg->template Param<Real>("radius_factor");
   // Create SparsePack
   static auto desc =
-      MakePackDescriptor<rad::opac::cross_section, gas::src::energy>(resolved_pkgs.get());
+      MakePackDescriptor<rad::star::absorption, gas::src::energy>(resolved_pkgs.get());
   auto vmesh = desc.GetPack(md);
 
   // Create SwarmPacks
   static auto pdesc_r =
       MakeSwarmPackDescriptor<swarm_position::x, swarm_position::y, swarm_position::z,
-                              rad::part::flux>("star");
-  static auto pdesc_i = MakeSwarmPackDescriptor<rad::part::ijk>("star");
+                              rad::star::flux>("star");
+  static auto pdesc_i = MakeSwarmPackDescriptor<rad::star::ijk>("star");
   auto ppack_r = pdesc_r.GetPack(md);
   auto ppack_i = pdesc_i.GetPack(md);
 
@@ -86,19 +87,21 @@ TaskStatus PushParticlesImpl(MeshData<Real> *md) {
 
   const int ngh = parthenon::Globals::nghost;
 
+  const Real rmin = (LOGR) ? std::exp(x1min) : x1min;
+
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "TransportPhotons", DevExecSpace(), 0, nparticles_per_pack,
       KOKKOS_LAMBDA(const int idx) {
         auto [b, n] = ppack_r.GetBlockParticleIndices(idx);
         const auto &swarm_d = ppack_r.GetContext(b);
         if (swarm_d.IsActive(n)) {
-          Real &ee = ppack_r(b, rad::part::flux(), n);
+          Real &ee = ppack_r(b, rad::star::flux(), n);
           Real &xp = ppack_r(b, swarm_position::x(), n);
           const Real &yp = ppack_r(b, swarm_position::y(), n);
           const Real &zp = ppack_r(b, swarm_position::z(), n);
-          int &i = ppack_i(b, rad::part::ijk(0), n);
-          int &j = ppack_i(b, rad::part::ijk(1), n);
-          int &k = ppack_i(b, rad::part::ijk(2), n);
+          int &i = ppack_i(b, rad::star::ijk(0), n);
+          int &j = ppack_i(b, rad::star::ijk(1), n);
+          int &k = ppack_i(b, rad::star::ijk(2), n);
           const auto &pco = vmesh.GetCoordinates(b);
           const auto inds = GetIndices(pco, {xp, yp, zp});
           i = ib.s + inds[0] - ngh;
@@ -110,15 +113,11 @@ TaskStatus PushParticlesImpl(MeshData<Real> *md) {
 
             // Deposit energy for this cell and decrement the photon energy
             const auto dx = coords.bnds.x1[1] - coords.bnds.x1[0];
-            Real dtau = vmesh(b, rad::opac::cross_section(), k, j, i);
+            Real dtau = vmesh(b, rad::star::absorption(), k, j, i);
+
+            // Corrections for additional extinction inside the inner boundary
             if (xp <= x1min + 1e-10) {
-              Real dtau_i = dtau;
-              const Real zero_rad = 6 * rstar;
-              if constexpr (LOGR) {
-                dtau_i *= (std::exp(x1min) - zero_rad);
-              } else {
-                dtau_i *= (x1min - zero_rad);
-              }
+              Real dtau_i = dtau * (rmin - zero_rad);
               const Real efac = (dtau_i > 100.) ? 0.0 : std::exp(-dtau_i);
               ee *= efac;
               if (ee < efloor) ee = 0.0;
@@ -180,8 +179,6 @@ TaskStatus SourceParticlesImpl(MeshData<Real> *md, const ParticleWeights &pwght)
   const auto &cpars =
       pm->packages.Get("artemis")->template Param<geometry::CoordParams>("coord_params");
 
-  // auto newParticlesContext = swarm->AddEmptyParticles(pwght.np2 * pwght.np3);
-
   // Reset energy exchange
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "SourceParticles::Reset", parthenon::DevExecSpace(), 0,
@@ -221,12 +218,11 @@ TaskStatus SourceParticlesImpl(MeshData<Real> *md, const ParticleWeights &pwght)
   new_contexts.DeepCopy(new_contexts_h);
   new_parts.DeepCopy(new_parts_h);
   new_part_per_cell.DeepCopy(new_part_per_cell_h);
-  Kokkos::fence();
 
   static auto pdesc_r =
       MakeSwarmPackDescriptor<swarm_position::x, swarm_position::y, swarm_position::z,
-                              rad::part::flux>("star");
-  static auto pdesc_i = MakeSwarmPackDescriptor<rad::part::ijk>("star");
+                              rad::star::flux>("star");
+  static auto pdesc_i = MakeSwarmPackDescriptor<rad::star::ijk>("star");
   auto ppack_r = pdesc_r.GetPack(md);
   auto ppack_i = pdesc_i.GetPack(md);
 
@@ -236,8 +232,9 @@ TaskStatus SourceParticlesImpl(MeshData<Real> *md, const ParticleWeights &pwght)
   const int multi_d = pm->ndim >= 2;
   const auto luminosity = rt_pkg->template Param<Real>("luminosity");
   parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "SourcePhotons2", parthenon::DevExecSpace(), 0, nblocks - 1,
-      kb.s, kb.e, jb.s, jb.e, KOKKOS_LAMBDA(const int &b, const int &k, const int &j) {
+      DEFAULT_LOOP_PATTERN, "SourceParticles::Source", parthenon::DevExecSpace(), 0,
+      nblocks - 1, kb.s, kb.e, jb.s, jb.e,
+      KOKKOS_LAMBDA(const int &b, const int &k, const int &j) {
         const int tot = new_parts(b);
         if (tot > 0) {
           const auto &pco = vmesh.GetCoordinates(b);
@@ -251,9 +248,9 @@ TaskStatus SourceParticlesImpl(MeshData<Real> *md, const ParticleWeights &pwght)
             for (int jp = 0; jp < nper_cell; jp++) {
               const int np = offset + jp + nper_cell * kp;
               const int &n = new_contexts(b).GetNewParticleIndex(np);
-              ppack_i(b, rad::part::ijk(0), n) = ib.s;
-              ppack_i(b, rad::part::ijk(1), n) = j;
-              ppack_i(b, rad::part::ijk(2), n) = k;
+              ppack_i(b, rad::star::ijk(0), n) = ib.s;
+              ppack_i(b, rad::star::ijk(1), n) = j;
+              ppack_i(b, rad::star::ijk(2), n) = k;
               Real x = Null<Real>();
               if constexpr (LOGR) {
                 x = pco.template Xf<X1DIR>(ib.s);
@@ -272,7 +269,7 @@ TaskStatus SourceParticlesImpl(MeshData<Real> *md, const ParticleWeights &pwght)
               ppack_r(b, swarm_position::x(), n) = x;
               ppack_r(b, swarm_position::y(), n) = 0.5 * (ym + yp);
               ppack_r(b, swarm_position::z(), n) = z;
-              ppack_r(b, rad::part::flux(), n) = flux;
+              ppack_r(b, rad::star::flux(), n) = flux;
             }
           }
         }

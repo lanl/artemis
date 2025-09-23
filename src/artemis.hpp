@@ -85,14 +85,14 @@ ARTEMIS_VARIABLE(rad.prim, flux);
 namespace opac {
 ARTEMIS_VARIABLE(rad.opac, absorption);
 ARTEMIS_VARIABLE(rad.opac, scattering);
-ARTEMIS_VARIABLE(rad.opac, cross_section);
 } // namespace opac
-namespace part {
-SWARM_VARIABLE(Real, rad.part, flux);
-SWARM_VARIABLE(Real, rad.part, v);
-SWARM_VARIABLE(Real, rad.part, x);
-SWARM_VARIABLE(int, rad.part, ijk);
-} // namespace part
+namespace star {
+ARTEMIS_VARIABLE(rad.star, absorption);
+SWARM_VARIABLE(Real, rad.star, flux);
+SWARM_VARIABLE(Real, rad.star, v);
+SWARM_VARIABLE(Real, rad.star, x);
+SWARM_VARIABLE(int, rad.star, ijk);
+} // namespace star
 } // namespace rad
 
 #undef ARTEMIS_VARIABLE

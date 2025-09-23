@@ -96,7 +96,7 @@ radiation:
       _description: "Threshold for derefinement"
     fatal_if_unconverged:
       _type: bool
-      _description: "Crash the code if the matter coupling step does not converge."
+      _description: "Crash the code if the matter-coupling step does not converge."
       _default: true
   imc:
     _description: "IMC radiation model from the Jaybenne library"

@@ -101,4 +101,4 @@ physics:
   raytrace:
     _type: bool
     _default: false
-    _description: "Turn on raytraced radiation"
+    _description: "Turn on raytraced stellar irradiation"

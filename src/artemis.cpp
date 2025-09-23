@@ -144,8 +144,10 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   geometry::CoordParams cpars(pin.get());
   artemis->AddParam("coord_params", cpars);
 
-  PARTHENON_REQUIRE(geometry::is_spherical(coords) && do_raytrace,
-                    "Raytracing requires spherical coordinates.");
+  if (do_raytrace) {
+    PARTHENON_REQUIRE(geometry::is_spherical(coords),
+                      "Raytracing requires spherical coordinates.");
+  }
 
   // Call package initializers here
   if (do_nbody) packages.Add(NBody::Initialize(pin.get(), constants));

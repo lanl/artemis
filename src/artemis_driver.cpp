@@ -116,7 +116,7 @@ template <Coordinates GEOM>
 TaskListStatus ArtemisDriver<GEOM>::Step() {
   // Prepare registers
   PreStepTasks();
-  TaskListStatus status;
+  TaskListStatus status = TaskListStatus::complete;
   // Execute explicit, unsplit physics
   if (do_raytrace) {
     status = RT::RaytraceDriver(pmesh);

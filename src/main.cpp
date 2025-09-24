@@ -52,7 +52,7 @@ parthenon::DriverStatus LaunchWorkFlow(parthenon::ParthenonManager &pman,
         ArtemisDerived::PostInitialization<Coordinates::cartesian>;
     pman.ParthenonInitPackagesAndMesh();
     ArtemisDriver<Coordinates::cartesian> driver(pin, pman.app_input.get(),
-                                                 pman.pmesh.get(), pman.IsRestart());
+                                                 pman.pmesh.get(), Globals::is_restart);
     return driver.Execute();
   } else if (sys == "spherical") { // (r,theta,phi)
     if (one_d) {
@@ -63,8 +63,8 @@ parthenon::DriverStatus LaunchWorkFlow(parthenon::ParthenonManager &pman,
       pman.app_input->PostInitialization =
           ArtemisDerived::PostInitialization<Coordinates::spherical1D>;
       pman.ParthenonInitPackagesAndMesh();
-      ArtemisDriver<Coordinates::spherical1D> driver(pin, pman.app_input.get(),
-                                                     pman.pmesh.get(), pman.IsRestart());
+      ArtemisDriver<Coordinates::spherical1D> driver(
+          pin, pman.app_input.get(), pman.pmesh.get(), Globals::is_restart);
       return driver.Execute();
     } else if (two_d) {
       pman.app_input->InitMeshBlockUserData =
@@ -74,8 +74,8 @@ parthenon::DriverStatus LaunchWorkFlow(parthenon::ParthenonManager &pman,
       pman.app_input->PostInitialization =
           ArtemisDerived::PostInitialization<Coordinates::spherical2D>;
       pman.ParthenonInitPackagesAndMesh();
-      ArtemisDriver<Coordinates::spherical2D> driver(pin, pman.app_input.get(),
-                                                     pman.pmesh.get(), pman.IsRestart());
+      ArtemisDriver<Coordinates::spherical2D> driver(
+          pin, pman.app_input.get(), pman.pmesh.get(), Globals::is_restart);
       return driver.Execute();
     } else {
       pman.app_input->InitMeshBlockUserData =
@@ -85,8 +85,8 @@ parthenon::DriverStatus LaunchWorkFlow(parthenon::ParthenonManager &pman,
       pman.app_input->PostInitialization =
           ArtemisDerived::PostInitialization<Coordinates::spherical3D>;
       pman.ParthenonInitPackagesAndMesh();
-      ArtemisDriver<Coordinates::spherical3D> driver(pin, pman.app_input.get(),
-                                                     pman.pmesh.get(), pman.IsRestart());
+      ArtemisDriver<Coordinates::spherical3D> driver(
+          pin, pman.app_input.get(), pman.pmesh.get(), Globals::is_restart);
 
       return driver.Execute();
     }
@@ -102,7 +102,7 @@ parthenon::DriverStatus LaunchWorkFlow(parthenon::ParthenonManager &pman,
         ArtemisDerived::PostInitialization<Coordinates::cylindrical>;
     pman.ParthenonInitPackagesAndMesh();
     ArtemisDriver<Coordinates::cylindrical> driver(pin, pman.app_input.get(),
-                                                   pman.pmesh.get(), pman.IsRestart());
+                                                   pman.pmesh.get(), Globals::is_restart);
     return driver.Execute();
   } else if (sys == "axisymmetric") { // (R,z,phi)
     PARTHENON_REQUIRE(!three_d, "axisymmetric is only valid for 1D & 2D. To run 3D, "
@@ -114,8 +114,8 @@ parthenon::DriverStatus LaunchWorkFlow(parthenon::ParthenonManager &pman,
     pman.app_input->PostInitialization =
         ArtemisDerived::PostInitialization<Coordinates::axisymmetric>;
     pman.ParthenonInitPackagesAndMesh();
-    ArtemisDriver<Coordinates::axisymmetric> driver(pin, pman.app_input.get(),
-                                                    pman.pmesh.get(), pman.IsRestart());
+    ArtemisDriver<Coordinates::axisymmetric> driver(
+        pin, pman.app_input.get(), pman.pmesh.get(), Globals::is_restart);
     return driver.Execute();
   } else {
     PARTHENON_FAIL("Invalid artemis/coordinate system!");

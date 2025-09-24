@@ -76,6 +76,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   }
 }
 
+//----------------------------------------------------------------------------------------
+//! \fn  StateDescriptor artemis::InitMeshBlockData
+//! \brief Driver routine to initialize meshblock data when meshblocks are created
 template <Coordinates GEOM>
 void InitMeshBlockData(MeshBlock *pmb, ParameterInput *pin) {
 

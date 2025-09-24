@@ -26,6 +26,9 @@ namespace geometry {
                                  std::vector<int>({shape[0] * shape[1] * shape[2]})));   \
   }
 
+//----------------------------------------------------------------------------------------
+//! \fn  StateDescriptor geometry::EnrollFields
+//! \brief Adds the geometry meshblocks fields to the geometry package
 template <Coordinates GEOM>
 void EnrollFields(StateDescriptor *pkg, CoordParams &cpars) {
   Coords<GEOM> coords(cpars);
@@ -73,8 +76,8 @@ void EnrollFields(StateDescriptor *pkg, CoordParams &cpars) {
 }
 
 //----------------------------------------------------------------------------------------
-//! \fn  StateDescriptor RotatingFrame::Initialize
-//! \brief Adds intialization function for rotating frame package
+//! \fn  StateDescriptor geometry::Initialize
+//! \brief Enrolls geometry meshblock data
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   auto geom = std::make_shared<StateDescriptor>("geometry");
   Params &params = geom->AllParams();
@@ -98,6 +101,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   return geom;
 }
 
+//----------------------------------------------------------------------------------------
+//! \fn  StateDescriptor geometry::InitBlockGeom
+//! \brief Initializes the geometry meshblock data
 template <Coordinates GEOM>
 void InitBlockGeom(MeshBlock *pmb, ParameterInput *pin) {
   using parthenon::MakePackDescriptor;

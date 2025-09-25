@@ -67,8 +67,7 @@ TaskStatus PushParticlesImpl(MeshData<Real> *md, const geometry::CoordParams &cp
       MakePackDescriptor<rad::star::absorption, gas::src::energy>(resolved_pkgs.get());
   auto vmesh = desc.GetPack(md);
 
-  static auto desc_g =
-      MakePackDescriptor<geom::vol>(resolved_pkgs.get());
+  static auto desc_g = MakePackDescriptor<geom::vol>(resolved_pkgs.get());
   auto vg = desc_g.GetPack(md);
 
   // Create SwarmPacks
@@ -164,7 +163,8 @@ TaskStatus PushParticlesImpl(MeshData<Real> *md, const geometry::CoordParams &cp
 //! \fn  StateDescriptor RT::SourceParticlesImpl
 //! \brief Implementation for sourcing particles
 template <Coordinates GEOM, bool LOGR>
-TaskStatus SourceParticlesImpl(MeshData<Real> *md, const geometry::CoordParams &cpars, const ParticleWeights &pwght) {
+TaskStatus SourceParticlesImpl(MeshData<Real> *md, const geometry::CoordParams &cpars,
+                               const ParticleWeights &pwght) {
   // Create SwarmPacks
 
   // Create pack

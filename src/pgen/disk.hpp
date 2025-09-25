@@ -889,22 +889,22 @@ void DiskBoundaryExtrap(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) 
         // Moments
         if (do_rad) {
           for (int n = 0; n < v.GetSize(0, rad::prim::energy()); ++n) {
-              const Real er0 = v(0, rad::prim::energy(n), ia[0], ia[1], ia[2]);
-              Real der = std::log(v(0, rad::prim::energy(n), ip1[0], ip1[1], ip1[2]) /
-                                  v(0, rad::prim::energy(n), im1[0], im1[1], im1[2]));
-              const Real erg = er0 * std::exp(der * xmadx);
-              v(0, rad::prim::energy(n), k, j, i) = erg;
+            const Real er0 = v(0, rad::prim::energy(n), ia[0], ia[1], ia[2]);
+            Real der = std::log(v(0, rad::prim::energy(n), ip1[0], ip1[1], ip1[2]) /
+                                v(0, rad::prim::energy(n), im1[0], im1[1], im1[2]));
+            const Real erg = er0 * std::exp(der * xmadx);
+            v(0, rad::prim::energy(n), k, j, i) = erg;
 
-              const Real fx1 = v(0, rad::prim::flux(VI(n, ix1)), ia[0], ia[1], ia[2]);
-              const bool inflow = (inner) ? fx1 > 0.0 : fx1 < 0.0;
-              v(0, rad::prim::flux(VI(n, ix1)), k, j, i) =
-                  (inflow) ? 0.0 : fx1 * erg / (er0 + Fuzz<Real>());
-              v(0, rad::prim::flux(VI(n, ix2)), k, j, i) =
-                  v(0, rad::prim::flux(VI(n, ix2)), ia[0], ia[1], ia[2]) * erg /
-                  (er0 + Fuzz<Real>());
-              v(0, rad::prim::flux(VI(n, ix3)), k, j, i) =
-                  v(0, rad::prim::flux(VI(n, ix3)), ia[0], ia[1], ia[2]) * erg /
-                  (er0 + Fuzz<Real>());
+            const Real fx1 = v(0, rad::prim::flux(VI(n, ix1)), ia[0], ia[1], ia[2]);
+            const bool inflow = (inner) ? fx1 > 0.0 : fx1 < 0.0;
+            v(0, rad::prim::flux(VI(n, ix1)), k, j, i) =
+                (inflow) ? 0.0 : fx1 * erg / (er0 + Fuzz<Real>());
+            v(0, rad::prim::flux(VI(n, ix2)), k, j, i) =
+                v(0, rad::prim::flux(VI(n, ix2)), ia[0], ia[1], ia[2]) * erg /
+                (er0 + Fuzz<Real>());
+            v(0, rad::prim::flux(VI(n, ix3)), k, j, i) =
+                v(0, rad::prim::flux(VI(n, ix3)), ia[0], ia[1], ia[2]) * erg /
+                (er0 + Fuzz<Real>());
           }
         }
       });

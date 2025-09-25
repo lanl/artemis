@@ -67,6 +67,10 @@ TaskStatus PushParticlesImpl(MeshData<Real> *md) {
       MakePackDescriptor<rad::star::absorption, gas::src::energy>(resolved_pkgs.get());
   auto vmesh = desc.GetPack(md);
 
+  static auto desc_g =
+      MakePackDescriptor<geom::vol>(resolved_pkgs.get());
+  auto vg = desc_g.GetPack(md);
+
   // Create SwarmPacks
   static auto pdesc_r =
       MakeSwarmPackDescriptor<swarm_position::x, swarm_position::y, swarm_position::z,
@@ -135,7 +139,7 @@ TaskStatus PushParticlesImpl(MeshData<Real> *md) {
             if (ee < efloor) ee = 0.0;
 
             Kokkos::atomic_add(&(vmesh(b, gas::src::energy(), k, j, i)),
-                               dE / coords.Volume());
+                               dE / vg(b,geom::vol(),k,j,i));
 
             // move the particle to the next face;
             i += 1;

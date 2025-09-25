@@ -53,7 +53,7 @@ GetIndices(const parthenon::Coordinates_t &pco, std::array<Real, 3> x) {
 //! \fn  StateDescriptor RT::PushParticlesImpl
 //! \brief Implementation for pushing particles
 template <Coordinates GEOM, bool LOGR>
-TaskStatus PushParticlesImpl(MeshData<Real> *md) {
+TaskStatus PushParticlesImpl(MeshData<Real> *md, const geometry::CoordParams &cpars) {
   auto pm = md->GetParentPointer();
   auto &resolved_pkgs = pm->resolved_packages;
   auto &rt_pkg = pm->packages.Get("raytrace");
@@ -113,7 +113,7 @@ TaskStatus PushParticlesImpl(MeshData<Real> *md) {
           if (three_d) k = kb.s + inds[2] - ngh;
 
           while ((i <= ib.e) && (ee > 0.0)) {
-            geometry::Coords<GEOM> coords(LOGR, pco, k, j, i);
+            geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
 
             // Deposit energy for this cell and decrement the photon energy
             const auto dx = coords.bnds.x1[1] - coords.bnds.x1[0];
@@ -139,7 +139,7 @@ TaskStatus PushParticlesImpl(MeshData<Real> *md) {
             if (ee < efloor) ee = 0.0;
 
             Kokkos::atomic_add(&(vmesh(b, gas::src::energy(), k, j, i)),
-                               dE / vg(b,geom::vol(),k,j,i));
+                               dE / coords.GetVolume(vg, b, k, j, i));
 
             // move the particle to the next face;
             i += 1;
@@ -164,7 +164,7 @@ TaskStatus PushParticlesImpl(MeshData<Real> *md) {
 //! \fn  StateDescriptor RT::SourceParticlesImpl
 //! \brief Implementation for sourcing particles
 template <Coordinates GEOM, bool LOGR>
-TaskStatus SourceParticlesImpl(MeshData<Real> *md, const ParticleWeights &pwght) {
+TaskStatus SourceParticlesImpl(MeshData<Real> *md, const geometry::CoordParams &cpars, const ParticleWeights &pwght) {
   // Create SwarmPacks
 
   // Create pack
@@ -180,8 +180,6 @@ TaskStatus SourceParticlesImpl(MeshData<Real> *md, const ParticleWeights &pwght)
 
   auto &rt_pkg = pm->packages.Get("raytrace");
   const auto x1min = rt_pkg->template Param<Real>("x1min");
-  const auto &cpars =
-      pm->packages.Get("artemis")->template Param<geometry::CoordParams>("coord_params");
 
   // Reset energy exchange
   parthenon::par_for(

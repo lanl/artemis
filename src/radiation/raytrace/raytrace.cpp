@@ -145,23 +145,23 @@ TaskStatus SourceParticles(MeshData<Real> *md, const ParticleWeights &pwght) {
   switch (geom) {
   case Coordinates::spherical1D: {
     if (cpars.log) {
-      return SourceParticlesImpl<Coordinates::spherical1D, true>(md, pwght);
+      return SourceParticlesImpl<Coordinates::spherical1D, true>(md, cpars, pwght);
     } else {
-      return SourceParticlesImpl<Coordinates::spherical1D, false>(md, pwght);
+      return SourceParticlesImpl<Coordinates::spherical1D, false>(md, cpars, pwght);
     }
   }
   case Coordinates::spherical2D: {
     if (cpars.log) {
-      return SourceParticlesImpl<Coordinates::spherical2D, true>(md, pwght);
+      return SourceParticlesImpl<Coordinates::spherical2D, true>(md, cpars, pwght);
     } else {
-      return SourceParticlesImpl<Coordinates::spherical2D, false>(md, pwght);
+      return SourceParticlesImpl<Coordinates::spherical2D, false>(md, cpars, pwght);
     }
   }
   case Coordinates::spherical3D: {
     if (cpars.log) {
-      return SourceParticlesImpl<Coordinates::spherical3D, true>(md, pwght);
+      return SourceParticlesImpl<Coordinates::spherical3D, true>(md, cpars, pwght);
     } else {
-      return SourceParticlesImpl<Coordinates::spherical3D, false>(md, pwght);
+      return SourceParticlesImpl<Coordinates::spherical3D, false>(md, cpars, pwght);
     }
   }
   default:
@@ -182,23 +182,23 @@ TaskStatus PushParticles(MeshData<Real> *md) {
   switch (geom) {
   case Coordinates::spherical1D: {
     if (cpars.log) {
-      return PushParticlesImpl<Coordinates::spherical1D, true>(md);
+      return PushParticlesImpl<Coordinates::spherical1D, true>(md, cpars);
     } else {
-      return PushParticlesImpl<Coordinates::spherical1D, false>(md);
+      return PushParticlesImpl<Coordinates::spherical1D, false>(md, cpars);
     }
   }
   case Coordinates::spherical2D: {
     if (cpars.log) {
-      return PushParticlesImpl<Coordinates::spherical2D, true>(md);
+      return PushParticlesImpl<Coordinates::spherical2D, true>(md, cpars);
     } else {
-      return PushParticlesImpl<Coordinates::spherical2D, false>(md);
+      return PushParticlesImpl<Coordinates::spherical2D, false>(md, cpars);
     }
   }
   case Coordinates::spherical3D: {
     if (cpars.log) {
-      return PushParticlesImpl<Coordinates::spherical3D, true>(md);
+      return PushParticlesImpl<Coordinates::spherical3D, true>(md, cpars);
     } else {
-      return PushParticlesImpl<Coordinates::spherical3D, false>(md);
+      return PushParticlesImpl<Coordinates::spherical3D, false>(md, cpars);
     }
   }
   default:

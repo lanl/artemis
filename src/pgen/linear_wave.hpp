@@ -219,6 +219,9 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       MakePackDescriptor<gas::prim::density, gas::prim::velocity, gas::prim::sie>(
           (pmb->resolved_packages).get());
   auto v = desc.GetPack(md.get());
+  static auto desc_g =
+      MakePackDescriptor<geom::x1v, geom::x2v, geom::x3v>((pmb->resolved_packages).get());
+  auto vg = desc_g.GetPack(md.get());
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
@@ -232,7 +235,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
         // cell-centered coordinates
         geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
-        const auto &xv = coords.GetCellCenter();
+        const auto &xv = coords.GetCellCenter(vg, 0, k, j, i);
         const Real x1v = xv[0];
         const Real x2v = xv[1];
         const Real x3v = xv[2];
@@ -278,6 +281,9 @@ inline void UserWorkAfterLoop(Mesh *pmesh, ParameterInput *pin, parthenon::SimTi
       MakePackDescriptor<gas::cons::density, gas::cons::momentum,
                          gas::cons::total_energy>((pmb->resolved_packages).get());
   auto v = desc.GetPack(md.get());
+  static auto desc_g = MakePackDescriptor<geom::vol, geom::x1v, geom::x2v, geom::x3v>(
+      (pmb->resolved_packages).get());
+  auto vg = desc_g.GetPack(md.get());
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
@@ -294,11 +300,11 @@ inline void UserWorkAfterLoop(Mesh *pmesh, ParameterInput *pin, parthenon::SimTi
                     ArtemisUtils::array_type<Real, nvars> &lsum) {
         // Capture coordinates this Meshblock
         geometry::Coords<GEOM> coords(cpars, v.GetCoordinates(b), k, j, i);
-        const auto &xv = coords.GetCellCenter();
+        const auto &xv = coords.GetCellCenter(vg, b, k, j, i);
         Real x1v = xv[0];
         Real x2v = xv[1];
         Real x3v = xv[2];
-        Real vol = coords.Volume();
+        Real vol = coords.GetVolume(vg, b, k, j, i);
 
         Real x = lin.cos_a2 * (x1v * lin.cos_a3 + x2v * lin.sin_a3) + x3v * lin.sin_a2;
         Real sn = std::sin(lin.k_par * x);

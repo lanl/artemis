@@ -29,17 +29,12 @@ using Mat4x3 = std::tuple<std::array<Real, 3>, std::array<Real, 3>, std::array<R
 
 namespace geometry {
 
+std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
+template <Coordinates GEOM>
+void InitBlockGeom(MeshBlock *pmb, ParameterInput *pin);
+
 // Face indexing
 enum class CellFace { lower = 0, upper = 1 };
-
-struct CoordParams {
-  CoordParams(ParameterInput *pin) {
-    log = (pin->GetOrAddString("artemis", "radial_spacing", "uniform") == "logarithmic");
-  }
-  CoordParams() = default;
-
-  bool log = false;
-};
 
 //----------------------------------------------------------------------------------------
 //! \fn  Coordinates geometry::CoordSelect
@@ -63,6 +58,57 @@ inline Coordinates CoordSelect(std::string sys, const int ndim) {
     return Coordinates::null;
   }
 }
+
+KOKKOS_INLINE_FUNCTION bool is_spherical(Coordinates T) {
+  return (T == Coordinates::spherical3D) || (T == Coordinates::spherical1D) ||
+         (T == Coordinates::spherical2D);
+}
+KOKKOS_INLINE_FUNCTION bool is_cylindrical(Coordinates T) {
+  return (T == Coordinates::cylindrical);
+}
+KOKKOS_INLINE_FUNCTION bool is_axisymmetric(Coordinates T) {
+  return (T == Coordinates::axisymmetric) || (T == Coordinates::spherical1D) ||
+         (T == Coordinates::spherical2D);
+}
+KOKKOS_INLINE_FUNCTION bool is_cartesian(Coordinates T) {
+  return (T == Coordinates::cartesian);
+}
+
+KOKKOS_INLINE_FUNCTION
+bool x1dep(Coordinates T) {
+  return is_spherical(T) || is_cylindrical(T) || (T == Coordinates::axisymmetric);
+}
+KOKKOS_INLINE_FUNCTION
+bool x2dep(Coordinates T) {
+  return (T == Coordinates::spherical3D) || (T == Coordinates::spherical2D);
+}
+KOKKOS_INLINE_FUNCTION
+bool x3dep(Coordinates T) { return false; }
+
+struct CoordParams {
+  CoordParams(ParameterInput *pin) {
+    log = (pin->GetOrAddString("artemis", "radial_spacing", "uniform") == "logarithmic");
+    nx = {pin->GetInteger("parthenon/meshblock", "nx1"),
+          pin->GetInteger("parthenon/meshblock", "nx2"),
+          pin->GetInteger("parthenon/meshblock", "nx3")};
+    int ndim = 0;
+    for (int i = 0; i < 3; i++) {
+      if (nx[i] > 1) {
+        nx[i] += 2 * Globals::nghost;
+        ndim += 1;
+      }
+    }
+
+    sys = CoordSelect(pin->GetOrAddString("artemis", "coordinates", "cartesian"), ndim);
+    dep = {x1dep(sys), x2dep(sys), x3dep(sys)};
+  }
+  CoordParams() = default;
+
+  bool log = false;
+  std::array<bool, 3> dep;
+  std::array<int, 3> nx;
+  Coordinates sys;
+};
 
 //----------------------------------------------------------------------------------------
 //! \struct  geometry::BBox
@@ -121,33 +167,51 @@ KOKKOS_INLINE_FUNCTION constexpr bool x3dep() {
   return false;
 }
 
-KOKKOS_INLINE_FUNCTION bool is_spherical(Coordinates T) {
-  return (T == Coordinates::spherical3D) || (T == Coordinates::spherical1D) ||
-         (T == Coordinates::spherical2D);
-}
-KOKKOS_INLINE_FUNCTION bool is_cylindrical(Coordinates T) {
-  return (T == Coordinates::cylindrical);
-}
-KOKKOS_INLINE_FUNCTION bool is_axisymmetric(Coordinates T) {
-  return (T == Coordinates::axisymmetric) || (T == Coordinates::spherical1D) ||
-         (T == Coordinates::spherical2D);
-}
-KOKKOS_INLINE_FUNCTION bool is_cartesian(Coordinates T) {
-  return (T == Coordinates::cartesian);
+template <int DIR, class VAR>
+constexpr bool staggered_field() {
+  return (std::is_same_v<VAR, geom::ax1> && DIR == 1) ||
+         (std::is_same_v<VAR, geom::hx1f1> && DIR == 1) ||
+         (std::is_same_v<VAR, geom::hx2f1> && DIR == 1) ||
+         (std::is_same_v<VAR, geom::hx3f1> && DIR == 1) ||
+         (std::is_same_v<VAR, geom::ax2> && DIR == 2) ||
+         (std::is_same_v<VAR, geom::hx1f2> && DIR == 2) ||
+         (std::is_same_v<VAR, geom::hx2f2> && DIR == 2) ||
+         (std::is_same_v<VAR, geom::hx3f2> && DIR == 2) ||
+         (std::is_same_v<VAR, geom::hx1f3> && DIR == 3) ||
+         (std::is_same_v<VAR, geom::hx2f3> && DIR == 3) ||
+         (std::is_same_v<VAR, geom::hx3f3> && DIR == 3) ||
+         (std::is_same_v<VAR, geom::ax3> && DIR == 3);
 }
 
-KOKKOS_INLINE_FUNCTION
-bool x1dep(Coordinates T) {
-  return is_spherical(T) || is_cylindrical(T) || (T == Coordinates::axisymmetric);
+// NOTE(@amd)
+// This is a dirty trick because I am running into constexpr issues with actual member
+// functions of the CRTP classes
+namespace cart {
+template <class VAR>
+constexpr bool is_x1dep() {
+  return std::is_same_v<VAR, geom::x1v>;
 }
-KOKKOS_INLINE_FUNCTION
-bool x2dep(Coordinates T) {
-  return (T == Coordinates::spherical3D) || (T == Coordinates::spherical2D);
+template <class VAR>
+constexpr bool is_x2dep() {
+  return std::is_same_v<VAR, geom::x2v>;
 }
-KOKKOS_INLINE_FUNCTION
-bool x3dep(Coordinates T) { return false; }
+template <class VAR>
+constexpr bool is_x3dep() {
+  return std::is_same_v<VAR, geom::x3v>;
+}
+} // namespace cart
 
-//----------------------------------------------------------------------------------------
+template <Coordinates GEOM>
+class Coords;
+
+template <typename T>
+struct CoordsTrait;
+
+template <Coordinates GEOM>
+struct CoordsTrait<Coords<GEOM>> {
+  static constexpr Coordinates value = GEOM;
+};
+
 //! \class  geometry::CoordsBase
 //! \brief  The base coordinates class that defines all methods and the default behavior
 //! which is Cartesian.
@@ -155,14 +219,16 @@ template <class T>
 class CoordsBase {
  public:
   BBox bnds;
+  std::array<int, 3> nx;
   KOKKOS_INLINE_FUNCTION
   CoordsBase(const parthenon::Coordinates_t &pco, const int k, const int j, const int i)
-      : bnds(pco, k, j, i) {};
+      : bnds(pco, k, j, i), nx{1, 1, 1} {};
 
-  KOKKOS_INLINE_FUNCTION
-  CoordsBase(const CoordParams &cpars, const parthenon::Coordinates_t &pco, const int k,
-             const int j, const int i)
+  template <typename PAR>
+  KOKKOS_INLINE_FUNCTION CoordsBase(const PAR &cpars, const parthenon::Coordinates_t &pco,
+                                    const int k, const int j, const int i)
       : bnds(pco, k, j, i) {
+    nx = cpars.nx;
     if (cpars.log) {
       bnds.x1[0] = std::exp(bnds.x1[0]);
       bnds.x1[1] = std::exp(bnds.x1[1]);
@@ -171,7 +237,7 @@ class CoordsBase {
   KOKKOS_INLINE_FUNCTION
   CoordsBase(const bool log, const parthenon::Coordinates_t &pco, const int k,
              const int j, const int i)
-      : bnds(pco, k, j, i) {
+      : bnds(pco, k, j, i), nx{1, 1, 1} {
     if (log) {
       bnds.x1[0] = std::exp(bnds.x1[0]);
       bnds.x1[1] = std::exp(bnds.x1[1]);
@@ -180,7 +246,35 @@ class CoordsBase {
 
   // This constructor allows us to easily access the coordinate conversion routines
   KOKKOS_INLINE_FUNCTION
-  CoordsBase() : bnds() {}
+  CoordsBase() : bnds(), nx{1, 1, 1} {}
+
+  template <typename PAR>
+  CoordsBase(const PAR &cpars) : bnds() {
+    nx = cpars.nx;
+  }
+
+  template <class VAR>
+  KOKKOS_INLINE_FUNCTION int index_(const int k, const int j, const int i) const {
+    if constexpr (cart::is_x1dep<VAR>()) {
+      return i;
+    } else if constexpr (cart::is_x2dep<VAR>()) {
+      return j;
+    } else if constexpr (cart::is_x3dep<VAR>()) {
+      return k;
+    }
+    return 0;
+  }
+  template <class VAR>
+  KOKKOS_INLINE_FUNCTION std::array<int, 3> shape_() const {
+    if constexpr (cart::is_x1dep<VAR>()) {
+      return {nx[0], 1, 1};
+    } else if constexpr (cart::is_x2dep<VAR>()) {
+      return {1, nx[1], 1};
+    } else if constexpr (cart::is_x3dep<VAR>()) {
+      return {1, 1, nx[2]};
+    }
+    return {1, 1, 1};
+  }
 
   // Is the metric x1, x2, and/or x3 dependent?
   KOKKOS_INLINE_FUNCTION bool x1dep() const { return false; }
@@ -223,6 +317,16 @@ class CoordsBase {
     // The centroid value of the X3 face
     return {static_cast<const T *>(this)->x1v(), static_cast<const T *>(this)->x2v(),
             bnds.x3[static_cast<int>(f)]};
+  }
+
+  template <typename V1>
+  KOKKOS_INLINE_FUNCTION Real GetVolume(const V1 &vg, const int b, const int k,
+                                        const int j, const int i) const {
+    // The cell volume
+    if constexpr (CoordsTrait<T>::value == Coordinates::cartesian) {
+      return Volume();
+    }
+    return vg(b, geom::vol())(index<geom::vol>(k, j, i));
   }
 
   KOKKOS_INLINE_FUNCTION Real AreaX1(const Real x1f) const {
@@ -351,10 +455,20 @@ class CoordsBase {
   // The following methods are helper functions to return aggregate data
   // We use static_cast<T*>(this)-> to access the methods in order to call
   // the correct derived variants. This is the key to static polymorphism and CRTP.
+  //
+  template <class VAR>
+  KOKKOS_INLINE_FUNCTION int index(const int k, const int j, const int i) const {
+    return static_cast<const T *>(this)->template index_<VAR>(k, j, i);
+  }
+  template <class VAR>
+  std::array<int, 3> shape() const {
+    return static_cast<const T *>(this)->template shape_<VAR>();
+  }
 
   KOKKOS_INLINE_FUNCTION BBox &GetBounds() const {
     return static_cast<const T *>(this)->bnds;
   }
+
   KOKKOS_INLINE_FUNCTION Real GetCellWidthX1() const {
     // The cell width in the X1 direction
     const Real xv[3] = {static_cast<const T *>(this)->x1v(),
@@ -393,16 +507,70 @@ class CoordsBase {
                 (bnds.x3[1] - bnds.x3[0])};
   }
 
+  template <typename V1>
+  KOKKOS_INLINE_FUNCTION std::array<Real, 3>
+  GetCellWidths(const V1 &vg, const int b, const int k, const int j, const int i) const {
+    // Return all cell widths
+    if constexpr (CoordsTrait<T>::value == Coordinates::cartesian) {
+      return GetCellWidths();
+    }
+    return {vg(b, geom::dx1())(index<geom::dx1>(k, j, i)),
+            vg(b, geom::dx2())(index<geom::dx2>(k, j, i)),
+            vg(b, geom::dx3())(index<geom::dx3>(k, j, i))};
+  }
+
   KOKKOS_INLINE_FUNCTION std::array<Real, 3> GetCellCenter() const {
     // Get the cell centroid
     return {static_cast<const T *>(this)->x1v(), static_cast<const T *>(this)->x2v(),
             static_cast<const T *>(this)->x3v()};
   }
 
+  template <typename V1>
+  KOKKOS_INLINE_FUNCTION std::array<Real, 3>
+  GetCellCenter(const V1 &vg, const int b, const int k, const int j, const int i) const {
+    return {vg(b, geom::x1v())(index<geom::x1v>(k, j, i)),
+            vg(b, geom::x2v())(index<geom::x2v>(k, j, i)),
+            vg(b, geom::x3v())(index<geom::x3v>(k, j, i))};
+  }
+
   KOKKOS_INLINE_FUNCTION std::array<Real, 3> GetScaleFactors() const {
     // Get the volume averaged scale factors
     return {static_cast<const T *>(this)->hx1v(), static_cast<const T *>(this)->hx2v(),
             static_cast<const T *>(this)->hx3v()};
+  }
+
+  template <typename V1>
+  KOKKOS_INLINE_FUNCTION std::array<Real, 3> GetScaleFactors(const V1 &vg, const int b,
+                                                             const int k, const int j,
+                                                             const int i) const {
+    if constexpr (CoordsTrait<T>::value == Coordinates::cartesian) {
+      return GetScaleFactors();
+    }
+    return {vg(b, geom::hx1v())(index<geom::hx1v>(k, j, i)),
+            vg(b, geom::hx2v())(index<geom::hx2v>(k, j, i)),
+            vg(b, geom::hx3v())(index<geom::hx3v>(k, j, i))};
+  }
+
+  template <int DIR, typename V1>
+  KOKKOS_INLINE_FUNCTION std::array<Real, 3>
+  GetScaleFactorsFace(const V1 &vg, const int b, const int k, const int j,
+                      const int i) const {
+    PARTHENON_REQUIRE(DIR > 0 && DIR <= 3, "Invalid face direction!");
+    if constexpr (CoordsTrait<T>::value == Coordinates::cartesian) {
+      return {1., 1., 1.};
+    }
+    if constexpr (DIR == 1) {
+      return {vg(b, geom::hx1f1())(index<geom::hx1f1>(k, j, i)),
+              vg(b, geom::hx2f1())(index<geom::hx2f1>(k, j, i)),
+              vg(b, geom::hx3f1())(index<geom::hx3f1>(k, j, i))};
+    } else if constexpr (DIR == 2) {
+      return {vg(b, geom::hx1f2())(index<geom::hx1f2>(k, j, i)),
+              vg(b, geom::hx2f2())(index<geom::hx2f2>(k, j, i)),
+              vg(b, geom::hx3f2())(index<geom::hx3f2>(k, j, i))};
+    }
+    return {vg(b, geom::hx1f3())(index<geom::hx1f3>(k, j, i)),
+            vg(b, geom::hx2f3())(index<geom::hx2f3>(k, j, i)),
+            vg(b, geom::hx3f3())(index<geom::hx3f3>(k, j, i))};
   }
 
   KOKKOS_INLINE_FUNCTION std::array<Real, 2> GetFaceAreaX1() const {
@@ -419,6 +587,37 @@ class CoordsBase {
     // Get the lower and upper face areas in the X3 direction
     return {static_cast<const T *>(this)->AreaX3(bnds.x3[0]),
             static_cast<const T *>(this)->AreaX3(bnds.x3[1])};
+  }
+
+  template <typename V1>
+  KOKKOS_INLINE_FUNCTION std::array<Real, 2>
+  GetFaceAreaX1(const V1 &vg, const int b, const int k, const int j, const int i) const {
+    // Get the lower and upper face areas in the X1 direction
+    if constexpr (CoordsTrait<T>::value == Coordinates::cartesian) {
+      return GetFaceAreaX1();
+    }
+    return {vg(b, geom::ax1())(index<geom::ax1>(k, j, i)),
+            vg(b, geom::ax1())(index<geom::ax1>(k, j, i + 1))};
+  }
+  template <typename V1>
+  KOKKOS_INLINE_FUNCTION std::array<Real, 2>
+  GetFaceAreaX2(const V1 &vg, const int b, const int k, const int j, const int i) const {
+    // Get the lower and upper face areas in the X1 direction
+    if constexpr (CoordsTrait<T>::value == Coordinates::cartesian) {
+      return GetFaceAreaX2();
+    }
+    return {vg(b, geom::ax2())(index<geom::ax2>(k, j, i)),
+            vg(b, geom::ax2())(index<geom::ax2>(k, j + 1, i))};
+  }
+  template <typename V1>
+  KOKKOS_INLINE_FUNCTION std::array<Real, 2>
+  GetFaceAreaX3(const V1 &vg, const int b, const int k, const int j, const int i) const {
+    // Get the lower and upper face areas in the X1 direction
+    if constexpr (CoordsTrait<T>::value == Coordinates::cartesian) {
+      return GetFaceAreaX3();
+    }
+    return {vg(b, geom::ax3())(index<geom::ax3>(k, j, i)),
+            vg(b, geom::ax3())(index<geom::ax3>(k + 1, j, i))};
   }
 
   template <parthenon::CoordinateDirection XDIR>
@@ -447,6 +646,21 @@ class CoordsBase {
     return static_cast<const T *>(this)->RFWeights();
   }
 
+  template <typename V1>
+  KOKKOS_INLINE_FUNCTION Mat3x2 GetRFWeights(const V1 &vg, const int b, const int k,
+                                             const int j, const int i) const {
+    if constexpr (CoordsTrait<T>::value == Coordinates::cartesian) {
+      return GetRFWeights();
+    }
+    std::array<Real, 2> rfw1{vg(b, geom::rfw1m())(index<geom::rfw1m>(k, j, i)),
+                             vg(b, geom::rfw1p())(index<geom::rfw1p>(k, j, i))};
+    std::array<Real, 2> rfw2{vg(b, geom::rfw2m())(index<geom::rfw2m>(k, j, i)),
+                             vg(b, geom::rfw2p())(index<geom::rfw2p>(k, j, i))};
+    std::array<Real, 2> rfw3{vg(b, geom::rfw3m())(index<geom::rfw3m>(k, j, i)),
+                             vg(b, geom::rfw3p())(index<geom::rfw3p>(k, j, i))};
+    return {rfw1, rfw2, rfw3};
+  }
+
   KOKKOS_INLINE_FUNCTION std::array<Real, 3> GetConnX1() const {
     // { dh1/dx1, dh2/dx1, dh3/dx1 }
     return {static_cast<const T *>(this)->dh1dx1(),
@@ -464,6 +678,88 @@ class CoordsBase {
     return {static_cast<const T *>(this)->dh1dx3(),
             static_cast<const T *>(this)->dh2dx3(),
             static_cast<const T *>(this)->dh3dx3()};
+  }
+  KOKKOS_INLINE_FUNCTION std::array<Real, 3> GetGradH1() const {
+    // { dh1/dx1, dh2/dx1, dh3/dx1 }
+    return {static_cast<const T *>(this)->dh1dx1(),
+            static_cast<const T *>(this)->dh1dx2(),
+            static_cast<const T *>(this)->dh1dx3()};
+  }
+  KOKKOS_INLINE_FUNCTION std::array<Real, 3> GetGradH2() const {
+    // { dh1/dx2, dh2/dx2, dh3/dx2 }
+    return {static_cast<const T *>(this)->dh2dx1(),
+            static_cast<const T *>(this)->dh2dx2(),
+            static_cast<const T *>(this)->dh2dx3()};
+  }
+  KOKKOS_INLINE_FUNCTION std::array<Real, 3> GetGradH3() const {
+    // { dh1/dx3, dh2/dx3, dh3/dx3 }
+    return {static_cast<const T *>(this)->dh3dx1(),
+            static_cast<const T *>(this)->dh3dx2(),
+            static_cast<const T *>(this)->dh3dx3()};
+  }
+
+  template <typename V1>
+  KOKKOS_INLINE_FUNCTION std::array<Real, 3>
+  GetConnX1(const V1 &vg, const int b, const int k, const int j, const int i) const {
+    // { dh1/dx1, dh2/dx1, dh3/dx1 }
+    if constexpr (CoordsTrait<T>::value == Coordinates::cartesian) {
+      return GetConnX1();
+    }
+    return {vg(b, geom::dh1dx1())(index<geom::dh1dx1>(k, j, i)),
+            vg(b, geom::dh2dx1())(index<geom::dh2dx1>(k, j, i)),
+            vg(b, geom::dh3dx1())(index<geom::dh3dx1>(k, j, i))};
+  }
+  template <typename V1>
+  KOKKOS_INLINE_FUNCTION std::array<Real, 3>
+  GetConnX2(const V1 &vg, const int b, const int k, const int j, const int i) const {
+    // { dh1/dx2, dh2/dx2, dh3/dx2 }
+    if constexpr (CoordsTrait<T>::value == Coordinates::cartesian) {
+      return GetConnX2();
+    }
+    return {vg(b, geom::dh1dx2())(index<geom::dh1dx2>(k, j, i)),
+            vg(b, geom::dh2dx2())(index<geom::dh2dx2>(k, j, i)),
+            vg(b, geom::dh3dx2())(index<geom::dh3dx2>(k, j, i))};
+  }
+  template <typename V1>
+  KOKKOS_INLINE_FUNCTION std::array<Real, 3>
+  GetConnX3(const V1 &vg, const int b, const int k, const int j, const int i) const {
+    // { dh1/dx3, dh2/dx3, dh3/dx3 }
+    if constexpr (CoordsTrait<T>::value == Coordinates::cartesian) {
+      return GetConnX3();
+    }
+    return {vg(b, geom::dh1dx3())(index<geom::dh1dx3>(k, j, i)),
+            vg(b, geom::dh2dx3())(index<geom::dh2dx3>(k, j, i)),
+            vg(b, geom::dh3dx3())(index<geom::dh3dx3>(k, j, i))};
+  }
+  template <typename V1>
+  KOKKOS_INLINE_FUNCTION std::array<Real, 3>
+  GetGradH1(const V1 &vg, const int b, const int k, const int j, const int i) const {
+    if constexpr (CoordsTrait<T>::value == Coordinates::cartesian) {
+      return GetGradH1();
+    }
+    return {vg(b, geom::dh1dx1())(index<geom::dh1dx1>(k, j, i)),
+            vg(b, geom::dh1dx2())(index<geom::dh1dx2>(k, j, i)),
+            vg(b, geom::dh1dx3())(index<geom::dh1dx3>(k, j, i))};
+  }
+  template <typename V1>
+  KOKKOS_INLINE_FUNCTION std::array<Real, 3>
+  GetGradH2(const V1 &vg, const int b, const int k, const int j, const int i) const {
+    if constexpr (CoordsTrait<T>::value == Coordinates::cartesian) {
+      return GetGradH2();
+    }
+    return {vg(b, geom::dh2dx1())(index<geom::dh2dx1>(k, j, i)),
+            vg(b, geom::dh2dx2())(index<geom::dh2dx2>(k, j, i)),
+            vg(b, geom::dh2dx3())(index<geom::dh2dx3>(k, j, i))};
+  }
+  template <typename V1>
+  KOKKOS_INLINE_FUNCTION std::array<Real, 3>
+  GetGradH3(const V1 &vg, const int b, const int k, const int j, const int i) const {
+    if constexpr (CoordsTrait<T>::value == Coordinates::cartesian) {
+      return GetGradH3();
+    }
+    return {vg(b, geom::dh3dx1())(index<geom::dh3dx1>(k, j, i)),
+            vg(b, geom::dh3dx2())(index<geom::dh3dx2>(k, j, i)),
+            vg(b, geom::dh3dx3())(index<geom::dh3dx3>(k, j, i))};
   }
 
   KOKKOS_INLINE_FUNCTION Mat3x3 GetConns() const {
@@ -540,9 +836,9 @@ class Coords : public CoordsBase<Coords<GEOM>> {};
 template <>
 class Coords<Coordinates::cartesian> : public CoordsBase<Coords<Coordinates::cartesian>> {
  public:
-  KOKKOS_INLINE_FUNCTION
-  Coords(const CoordParams &cpars, const parthenon::Coordinates_t &pco, const int k,
-         const int j, const int i)
+  template <typename PAR>
+  KOKKOS_INLINE_FUNCTION Coords(const PAR &cpars, const parthenon::Coordinates_t &pco,
+                                const int k, const int j, const int i)
       : CoordsBase<Coords<Coordinates::cartesian>>(cpars, pco, k, j, i) {}
   KOKKOS_INLINE_FUNCTION
   Coords(const bool log, const parthenon::Coordinates_t &pco, const int k, const int j,
@@ -550,6 +846,8 @@ class Coords<Coordinates::cartesian> : public CoordsBase<Coords<Coordinates::car
       : CoordsBase<Coords<Coordinates::cartesian>>(log, pco, k, j, i) {}
   KOKKOS_INLINE_FUNCTION
   Coords() : CoordsBase<Coords<Coordinates::cartesian>>() {}
+  template <typename PAR>
+  Coords(const PAR &cpars) : CoordsBase<Coords<Coordinates::cartesian>>(cpars) {}
 };
 
 } // namespace geometry

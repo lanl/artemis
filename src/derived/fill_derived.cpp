@@ -48,6 +48,9 @@ TaskStatus SetAuxillaryFields(MeshData<Real> *md) {
       MakePackDescriptor<gas::cons::density, gas::cons::momentum, gas::cons::total_energy,
                          gas::cons::internal_energy>(resolved_pkgs.get());
   auto vmesh = desc.GetPack(md);
+  static auto desc_g =
+      MakePackDescriptor<geom::hx1v, geom::hx2v, geom::hx3v>(resolved_pkgs.get());
+  auto vg = desc_g.GetPack(md);
   IndexRange ib = md->GetBoundsI(IndexDomain::interior);
   IndexRange jb = md->GetBoundsJ(IndexDomain::interior);
   IndexRange kb = md->GetBoundsK(IndexDomain::interior);
@@ -62,7 +65,7 @@ TaskStatus SetAuxillaryFields(MeshData<Real> *md) {
         // Extract geometry
         geometry::Coords<GEOM> coords(cpars, vmesh.GetCoordinates(b), k, j, i);
 
-        const auto &hx = coords.GetScaleFactors();
+        const auto &hx = coords.GetScaleFactors(vg, b, k, j, i);
 
         for (int n = 0; n < vmesh.GetSize(b, gas::cons::density()); ++n) {
           // Extract state vector
@@ -131,6 +134,9 @@ void ConsToPrim(MeshData<Real> *md) {
       dust::cons::momentum, dust::prim::density, dust::prim::velocity, rad::cons::energy,
       rad::cons::flux, rad::prim::energy, rad::prim::flux>(resolved_pkgs.get());
   auto vmesh = desc.GetPack(md);
+  static auto desc_g = MakePackDescriptor<geom::x1v, geom::x2v, geom::x3v, geom::hx1v,
+                                          geom::hx2v, geom::hx3v>(resolved_pkgs.get());
+  auto vg = desc_g.GetPack(md);
   const int nblocks = md->NumBlocks();
   IndexRange ib = md->GetBoundsI(IndexDomain::interior);
   IndexRange jb = md->GetBoundsJ(IndexDomain::interior);
@@ -142,8 +148,8 @@ void ConsToPrim(MeshData<Real> *md) {
       KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
         // Extract coordinates
         geometry::Coords<GEOM> coords(cpars, vmesh.GetCoordinates(b), k, j, i);
-        const auto &xv = coords.GetCellCenter();
-        const auto &hx = coords.GetScaleFactors();
+        const auto &xv = coords.GetCellCenter(vg, b, k, j, i);
+        const auto &hx = coords.GetScaleFactors(vg, b, k, j, i);
 
         if (do_gas) {
           for (int n = 0; n < vmesh.GetSize(b, gas::prim::density()); ++n) {
@@ -265,6 +271,9 @@ void PrimToCons(T *md) {
                          rad::prim::energy, rad::prim::flux, rad::prim::pressure>(
           resolved_pkgs.get());
   auto vmesh = desc.GetPack(md);
+  static auto desc_g = MakePackDescriptor<geom::x1v, geom::x2v, geom::x3v, geom::hx1v,
+                                          geom::hx2v, geom::hx3v>(resolved_pkgs.get());
+  auto vg = desc_g.GetPack(md);
   IndexRange ibe = md->GetBoundsI(IndexDomain::entire);
   IndexRange jbe = md->GetBoundsJ(IndexDomain::entire);
   IndexRange kbe = md->GetBoundsK(IndexDomain::entire);
@@ -275,8 +284,8 @@ void PrimToCons(T *md) {
       KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
         // Extract coordinates
         geometry::Coords<GEOM> coords(cpars, vmesh.GetCoordinates(b), k, j, i);
-        const auto &xv = coords.GetCellCenter();
-        const auto &hx = coords.GetScaleFactors();
+        const auto &xv = coords.GetCellCenter(vg, b, k, j, i);
+        const auto &hx = coords.GetScaleFactors(vg, b, k, j, i);
 
         if (do_gas) {
           Real lambda[ArtemisUtils::lambda_max_vals] = {Null<Real>()};

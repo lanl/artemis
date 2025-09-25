@@ -71,6 +71,18 @@ struct DiskParams {
   bool log;
 };
 
+struct State {
+  Real gdens = Null<Real>();
+  Real gtemp = Null<Real>();
+  Real gvel1 = Null<Real>();
+  Real gvel2 = Null<Real>();
+  Real gvel3 = Null<Real>();
+  Real ddens = Null<Real>();
+  Real dvel1 = Null<Real>();
+  Real dvel2 = Null<Real>();
+  Real dvel3 = Null<Real>();
+};
+
 //----------------------------------------------------------------------------------------
 //! \fn Real DenProfile
 //! \brief Computes density profile at cylindrical R and z
@@ -135,25 +147,22 @@ Real ViscosityProfile(struct DiskParams pgen, EOS eos, const Real R, const Real 
 //! \brief Initialize vertical hydrostatic and radial centrifugal equilibrium disk profile
 //! at a specified index/coordinate
 template <Coordinates GEOM>
-KOKKOS_INLINE_FUNCTION void
-ComputeDiskProfile(const struct DiskParams pgen, const parthenon::Coordinates_t &pco,
-                   const int k, const int j, const int i, EOS eos_d, Real &gdens,
-                   Real &gtemp, Real &gvel1, Real &gvel2, Real &gvel3, const bool do_gas,
-                   const bool do_dust, Real &ddens, Real &dvel1, Real &dvel2, Real &dvel3,
-                   ParArray1D<NBody::Particle> particles, const int npart) {
+KOKKOS_INLINE_FUNCTION State ComputeDiskProfile(
+    const struct DiskParams pgen, const geometry::Coords<GEOM> &coords,
+    const std::array<Real, 3> &xv, const std::array<Real, 3> &dx, const int k,
+    const int j, const int i, EOS eos_d, const bool do_gas, const bool do_dust,
+    ParArray1D<NBody::Particle> particles, const int npart) {
   // Extract coordinates
-  geometry::Coords<GEOM> coords(pgen.log, pco, k, j, i);
-  const auto &xv = coords.GetCellCenter();
 
   const auto &[xcyl, ex1, ex2, ex3] = coords.ConvertToCylWithVec(xv);
-
+  State res;
   // compute Keplerian solution
-  gdens = DenProfile(pgen, xcyl[0], xcyl[2]);
+  res.gdens = DenProfile(pgen, xcyl[0], xcyl[2]);
   const Real rt =
       pgen.nbody_temp
           ? -pgen.gm / Gravity::NBodyPotential<GEOM>(coords, xv, particles, npart)
           : xcyl[0];
-  gtemp = TempProfile(pgen, rt, xcyl[2]);
+  res.gtemp = TempProfile(pgen, rt, xcyl[2]);
 
   // Construct grad(P) for this zone
   const std::array<Real, 3> fx1m{coords.bnds.x1[0], xv[1], xv[2]};
@@ -180,7 +189,7 @@ ComputeDiskProfile(const struct DiskParams pgen, const parthenon::Coordinates_t 
   pfp =
       (pfm = pgen.pres_min) ? pgen.pres_min : PresProfile(pgen, eos_d, tfp, xf[0], xf[2]);
   pfm = (pfp == pgen.pres_min) ? pgen.pres_min : pfm;
-  pgrad[0] = (pfp - pfm) / coords.GetCellWidthX1();
+  pgrad[0] = (pfp - pfm) / dx[0];
 
   // X2 Faces
   xf = coords.ConvertToCyl(fx2m);
@@ -197,7 +206,7 @@ ComputeDiskProfile(const struct DiskParams pgen, const parthenon::Coordinates_t 
   pfp =
       (pfm = pgen.pres_min) ? pgen.pres_min : PresProfile(pgen, eos_d, tfp, xf[0], xf[2]);
   pfm = (pfp == pgen.pres_min) ? pgen.pres_min : pfm;
-  pgrad[1] = (pfp - pfm) / coords.GetCellWidthX2();
+  pgrad[1] = (pfp - pfm) / dx[1];
 
   // X3 Faces
   xf = coords.ConvertToCyl(fx3m);
@@ -214,7 +223,7 @@ ComputeDiskProfile(const struct DiskParams pgen, const parthenon::Coordinates_t 
   pfp =
       (pfm = pgen.pres_min) ? pgen.pres_min : PresProfile(pgen, eos_d, tfp, xf[0], xf[2]);
   pfm = (pfp == pgen.pres_min) ? pgen.pres_min : pfm;
-  pgrad[2] = (pfp - pfm) / coords.GetCellWidthX3();
+  pgrad[2] = (pfp - pfm) / dx[2];
 
   // Convert to the cylindrical radial gradient
   const Real eR[3] = {ex1[0], ex2[0], ex3[0]};
@@ -225,7 +234,7 @@ ComputeDiskProfile(const struct DiskParams pgen, const parthenon::Coordinates_t 
   const Real r = pgen.nbody_temp ? rt : std::sqrt(SQR(xcyl[0]) + SQR(xcyl[2]));
   const Real omk2 = pgen.gm / (r * r * r);
   const Real vk2 = omk2 * SQR(xcyl[0]);
-  const Real vp = std::sqrt(vk2 + dpdr * xcyl[0] / gdens);
+  const Real vp = std::sqrt(vk2 + dpdr * xcyl[0] / res.gdens);
   const Real nu = ViscosityProfile(pgen, eos_d, rt, xcyl[2]);
   const Real vr = pgen.quiet_start ? 0.0 : -1.5 * nu / xcyl[0];
 
@@ -233,20 +242,20 @@ ComputeDiskProfile(const struct DiskParams pgen, const parthenon::Coordinates_t 
   const Real vcyl[3] = {vr, vp - pgen.omf * xcyl[0], 0.0};
 
   // and convert it to the problem geometry
-  gvel1 = ArtemisUtils::VDot(vcyl, ex1);
-  gvel2 = ArtemisUtils::VDot(vcyl, ex2);
-  gvel3 = ArtemisUtils::VDot(vcyl, ex3);
+  res.gvel1 = ArtemisUtils::VDot(vcyl, ex1);
+  res.gvel2 = ArtemisUtils::VDot(vcyl, ex2);
+  res.gvel3 = ArtemisUtils::VDot(vcyl, ex3);
 
-  if (!(do_dust)) return;
+  if (!(do_dust)) return res;
 
   // Dust is just Keplerian
-  ddens = pgen.dust_to_gas * gdens;
+  res.ddens = pgen.dust_to_gas * res.gdens;
   const Real vkep[3] = {0.0, std::sqrt(vk2) - pgen.omf * xcyl[0], 0.0};
-  dvel1 = ArtemisUtils::VDot(vkep, ex1);
-  dvel2 = ArtemisUtils::VDot(vkep, ex2);
-  dvel3 = ArtemisUtils::VDot(vkep, ex3);
+  res.dvel1 = ArtemisUtils::VDot(vkep, ex1);
+  res.dvel2 = ArtemisUtils::VDot(vkep, ex2);
+  res.dvel3 = ArtemisUtils::VDot(vkep, ex3);
 
-  return;
+  return res;
 }
 
 //----------------------------------------------------------------------------------------
@@ -350,42 +359,41 @@ inline void InitDiskParams(MeshBlock *pmb, ParameterInput *pin) {
 //----------------------------------------------------------------------------------------
 //! \fn void DiskICImpl
 //! \brief Set the state vectors of cell to the initial conditions
+
 template <Coordinates GEOM, typename V1, typename V2>
 KOKKOS_INLINE_FUNCTION void
 DiskICImpl(V1 v, const int b, const int k, const int j, const int i, V2 pco, EOS eos_d,
            DiskParams dp, ParArray1D<NBody::Particle> particles, const int npart) {
-  // gas
-  Real gdens = Null<Real>(), gtemp = Null<Real>();
-  Real gvel1 = Null<Real>(), gvel2 = Null<Real>(), gvel3 = Null<Real>();
-  // dust
-  Real ddens = Null<Real>();
-  Real dvel1 = Null<Real>(), dvel2 = Null<Real>(), dvel3 = Null<Real>();
-  ComputeDiskProfile<GEOM>(dp, pco, k, j, i, eos_d, gdens, gtemp, gvel1, gvel2, gvel3,
-                           dp.do_gas, dp.do_dust, ddens, dvel1, dvel2, dvel3, particles,
-                           npart);
+
+  geometry::Coords<GEOM> coords(dp.log, pco, k, j, i);
+  const auto &xv = coords.GetCellCenter();
+  const auto &dx = coords.GetCellWidths();
+
+  const auto res = ComputeDiskProfile<GEOM>(dp, coords, xv, dx, k, j, i, eos_d, dp.do_gas,
+                                            dp.do_dust, particles, npart);
 
   // Set state vector
   if (dp.do_gas) {
     for (int n = 0; n < v.GetSize(b, gas::prim::density()); ++n) {
-      v(b, gas::prim::density(n), k, j, i) = gdens;
-      v(b, gas::prim::velocity(VI(n, 0)), k, j, i) = gvel1;
-      v(b, gas::prim::velocity(VI(n, 1)), k, j, i) = gvel2;
-      v(b, gas::prim::velocity(VI(n, 2)), k, j, i) = gvel3;
+      v(b, gas::prim::density(n), k, j, i) = res.gdens;
+      v(b, gas::prim::velocity(VI(n, 0)), k, j, i) = res.gvel1;
+      v(b, gas::prim::velocity(VI(n, 1)), k, j, i) = res.gvel2;
+      v(b, gas::prim::velocity(VI(n, 2)), k, j, i) = res.gvel3;
       v(b, gas::prim::sie(n), k, j, i) =
-          eos_d.InternalEnergyFromDensityTemperature(gdens, gtemp);
+          eos_d.InternalEnergyFromDensityTemperature(res.gdens, res.gtemp);
     }
   }
   if (dp.do_dust) {
     for (int n = 0; n < v.GetSize(b, dust::prim::density()); ++n) {
-      v(b, dust::prim::density(n), k, j, i) = ddens;
-      v(b, dust::prim::velocity(VI(n, 0)), k, j, i) = dvel1;
-      v(b, dust::prim::velocity(VI(n, 1)), k, j, i) = dvel2;
-      v(b, dust::prim::velocity(VI(n, 2)), k, j, i) = dvel3;
+      v(b, dust::prim::density(n), k, j, i) = res.ddens;
+      v(b, dust::prim::velocity(VI(n, 0)), k, j, i) = res.dvel1;
+      v(b, dust::prim::velocity(VI(n, 1)), k, j, i) = res.dvel2;
+      v(b, dust::prim::velocity(VI(n, 2)), k, j, i) = res.dvel3;
     }
   }
   if (dp.do_moment) {
     for (int n = 0; n < v.GetSize(b, rad::prim::energy()); ++n) {
-      v(b, rad::prim::energy(n), k, j, i) = dp.ar * SQR(SQR(gtemp));
+      v(b, rad::prim::energy(n), k, j, i) = dp.ar * SQR(SQR(res.gtemp));
       v(b, rad::prim::flux(VI(n, 0)), k, j, i) = 0.0;
       v(b, rad::prim::flux(VI(n, 1)), k, j, i) = 0.0;
       v(b, rad::prim::flux(VI(n, 2)), k, j, i) = 0.0;
@@ -421,6 +429,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
                          dust::prim::density, dust::prim::velocity, rad::prim::energy,
                          rad::prim::flux>((pmb->resolved_packages).get());
   auto v = desc.GetPack(md.get());
+
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
@@ -473,7 +482,6 @@ void DiskBoundaryVisc(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) {
       dust::prim::velocity, rad::prim::energy, rad::prim::flux>(mbd);
   auto v = descriptors[coarse].GetPack(mbd.get());
   if (v.GetMaxNumberOfVars() == 0) return;
-
   // Coordinates and indexing
   const auto &pco = (coarse) ? pmb->pmr->GetCoarseCoords() : pmb->coords;
   auto &dp = disk_params;
@@ -523,9 +531,11 @@ void DiskBoundaryVisc(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) {
         const Real eRa[3] = {scr1[0], scr2[0], scr3[0]};
         const Real epa[3] = {scr1[1], scr2[1], scr3[1]};
         const Real eza[3] = {scr1[2], scr2[2], scr3[2]};
+
         const auto &xvp1 = cp1.GetCellCenter();
         const auto &[xcylp1, scr1p1, scr2p1, scr3p1] = cp1.ConvertToCylWithVec(xvp1);
         const Real epp1[3] = {scr1p1[1], scr2p1[1], scr3p1[1]};
+
         const auto &xvm1 = cm1.GetCellCenter();
         const auto &[xcylm1, scr1m1, scr2m1, scr3m1] = cm1.ConvertToCylWithVec(xvm1);
         const Real epm1[3] = {scr1m1[1], scr2m1[1], scr3m1[1]};
@@ -710,6 +720,7 @@ void DiskBoundaryExtrap(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) 
       dust::prim::velocity, rad::prim::energy, rad::prim::flux>(mbd);
 
   auto v = descriptors[coarse].GetPack(mbd.get());
+  if (v.GetMaxNumberOfVars() == 0) return;
 
   const auto &pco = (coarse) ? pmb->pmr->GetCoarseCoords() : pmb->coords;
   const auto nb = IndexRange{0, 0};
@@ -746,144 +757,138 @@ void DiskBoundaryExtrap(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) 
       ((BDY == IndexDomain::inner_x1) || (BDY == IndexDomain::inner_x2) ||
        (BDY == IndexDomain::inner_x3));
 
-  if (v.GetMaxNumberOfVars() > 0) {
-    pmb->par_for_bndry(
-        "DiskExtrap", nb, BDY, parthenon::TopologicalElement::CC, coarse, fine,
-        KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
-          // We are extrapolating into the ghost zone. Extrapolation is done on cylinders.
-          //   dP/dz = - rho grad(Phi)
-          //   rho vp^2/R = rho vk^2/R + dP/dR
-          // We estimate the pressure gradients as grad(P).eR and grad(P).ez
-          // Vertical hydrostatic balance sets rho
-          // Radial centrifugal balance sets vp
-          const int ia[3] = {x3dir ? ((BDY == IndexDomain::inner_x3) ? ks : ke) : k,
-                             x2dir ? ((BDY == IndexDomain::inner_x2) ? js : je) : j,
-                             x1dir ? ((BDY == IndexDomain::inner_x1) ? is : ie) : i};
-          const int ip1[3] = {x3dir ? ((BDY == IndexDomain::inner_x3) ? ks + 1 : ke) : k,
-                              x2dir ? ((BDY == IndexDomain::inner_x2) ? js + 1 : je) : j,
-                              x1dir ? ((BDY == IndexDomain::inner_x1) ? is + 1 : ie) : i};
-          const int im1[3] = {x3dir ? ((BDY == IndexDomain::inner_x3) ? ks : ke - 1) : k,
-                              x2dir ? ((BDY == IndexDomain::inner_x2) ? js : je - 1) : j,
-                              x1dir ? ((BDY == IndexDomain::inner_x1) ? is : ie - 1) : i};
+  pmb->par_for_bndry(
+      "DiskExtrap", nb, BDY, parthenon::TopologicalElement::CC, coarse, fine,
+      KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
+        // We are extrapolating into the ghost zone. Extrapolation is done on cylinders.
+        //   dP/dz = - rho grad(Phi)
+        //   rho vp^2/R = rho vk^2/R + dP/dR
+        // We estimate the pressure gradients as grad(P).eR and grad(P).ez
+        // Vertical hydrostatic balance sets rho
+        // Radial centrifugal balance sets vp
+        const int ia[3] = {x3dir ? ((BDY == IndexDomain::inner_x3) ? ks : ke) : k,
+                           x2dir ? ((BDY == IndexDomain::inner_x2) ? js : je) : j,
+                           x1dir ? ((BDY == IndexDomain::inner_x1) ? is : ie) : i};
+        const int ip1[3] = {x3dir ? ((BDY == IndexDomain::inner_x3) ? ks + 1 : ke) : k,
+                            x2dir ? ((BDY == IndexDomain::inner_x2) ? js + 1 : je) : j,
+                            x1dir ? ((BDY == IndexDomain::inner_x1) ? is + 1 : ie) : i};
+        const int im1[3] = {x3dir ? ((BDY == IndexDomain::inner_x3) ? ks : ke - 1) : k,
+                            x2dir ? ((BDY == IndexDomain::inner_x2) ? js : je - 1) : j,
+                            x1dir ? ((BDY == IndexDomain::inner_x1) ? is : ie - 1) : i};
 
-          // Extract coordinates at k, j, i
-          geometry::Coords<GEOM> coords(dp.log, pco, k, j, i);
-          const auto &xv = coords.GetCellCenter();
-          const auto &[xcyl, ex1, ex2, ex3] = coords.ConvertToCylWithVec(xv);
+        // Extract coordinates at k, j, i
+        geometry::Coords<GEOM> coords(dp.log, pco, k, j, i);
+        geometry::Coords<GEOM> ca(dp.log, pco, ia[0], ia[1], ia[2]);
+        geometry::Coords<GEOM> cp(dp.log, pco, ip1[0], ip1[1], ip1[2]);
+        geometry::Coords<GEOM> cm(dp.log, pco, im1[0], im1[1], im1[2]);
+        const auto &xv = coords.GetCellCenter();
+        const auto &[xcyl, ex1, ex2, ex3] = coords.ConvertToCylWithVec(xv);
 
-          // Extract coordinates at ia, im, ic
-          geometry::Coords<GEOM> ca(dp.log, pco, ia[0], ia[1], ia[2]);
-          geometry::Coords<GEOM> cp1(dp.log, pco, ip1[0], ip1[1], ip1[2]);
-          geometry::Coords<GEOM> cm1(dp.log, pco, im1[0], im1[1], im1[2]);
-          const auto &xva = ca.GetCellCenter();
-          const auto &[xcyla, scr1, scr2, scr3] = ca.ConvertToCylWithVec(xva);
-          const Real eRa[3] = {scr1[0], scr2[0], scr3[0]};
-          const Real epa[3] = {scr1[1], scr2[1], scr3[1]};
-          const Real eza[3] = {scr1[2], scr2[2], scr3[2]};
-          const auto &xvp1 = cp1.GetCellCenter();
-          const auto &[xcylp1, scr1p1, scr2p1, scr3p1] = cp1.ConvertToCylWithVec(xvp1);
-          const Real epp1[3] = {scr1p1[1], scr2p1[1], scr3p1[1]};
-          const auto &xvm1 = cm1.GetCellCenter();
-          const auto &[xcylm1, scr1m1, scr2m1, scr3m1] = cm1.ConvertToCylWithVec(xvm1);
-          const Real epm1[3] = {scr1m1[1], scr2m1[1], scr3m1[1]};
+        // Extract coordinates at ia, im, ic
+        const auto &xva = ca.GetCellCenter();
+        const auto &[xcyla, scr1, scr2, scr3] = coords.ConvertToCylWithVec(xva);
+        const Real eRa[3] = {scr1[0], scr2[0], scr3[0]};
+        const Real epa[3] = {scr1[1], scr2[1], scr3[1]};
+        const Real eza[3] = {scr1[2], scr2[2], scr3[2]};
 
-          // Compute cell separations (using logarithmics if necessary)
-          const Real xma = (lnx) ? std::log(xv[ix1] / xva[ix1]) : xv[ix1] - xva[ix1];
-          const Real dx = (lnx) ? std::log(xvp1[ix1] / xvm1[ix1]) : xvp1[ix1] - xvm1[ix1];
-          const Real xmadx = xma / dx;
+        const auto &xvp1 = cp.GetCellCenter();
+        const auto &[xcylp1, scr1p1, scr2p1, scr3p1] = coords.ConvertToCylWithVec(xvp1);
+        const Real epp1[3] = {scr1p1[1], scr2p1[1], scr3p1[1]};
 
-          // Extrapolate gas density and specific internal energy
-          if (do_gas) {
-            for (int n = 0; n < v.GetSize(0, gas::prim::density()); ++n) {
-              Real dgrho = std::log(v(0, gas::prim::density(n), ip1[0], ip1[1], ip1[2]) /
-                                    v(0, gas::prim::density(n), im1[0], im1[1], im1[2]));
-              Real dgsie = std::log(v(0, gas::prim::sie(n), ip1[0], ip1[1], ip1[2]) /
-                                    v(0, gas::prim::sie(n), im1[0], im1[1], im1[2]));
-              const Real grhoexp = std::exp(dgrho * xmadx);
-              const Real gsieexp = std::exp(dgsie * xmadx);
-              const Real rhog =
-                  v(0, gas::prim::density(n), ia[0], ia[1], ia[2]) * grhoexp;
-              const Real sieg = v(0, gas::prim::sie(n), ia[0], ia[1], ia[2]) * gsieexp;
+        const auto &xvm1 = cm.GetCellCenter();
 
-              // Extrapolate gas velocity
-              Real gva[3] = {v(0, gas::prim::velocity(VI(n, 0)), ia[0], ia[1], ia[2]),
-                             v(0, gas::prim::velocity(VI(n, 1)), ia[0], ia[1], ia[2]),
-                             v(0, gas::prim::velocity(VI(n, 2)), ia[0], ia[1], ia[2])};
-              Real gvp1[3] = {
-                  v(0, gas::prim::velocity(VI(n, 0)), ip1[0], ip1[1], ip1[2]),
-                  v(0, gas::prim::velocity(VI(n, 1)), ip1[0], ip1[1], ip1[2]),
-                  v(0, gas::prim::velocity(VI(n, 2)), ip1[0], ip1[1], ip1[2])};
-              Real gvm1[3] = {
-                  v(0, gas::prim::velocity(VI(n, 0)), im1[0], im1[1], im1[2]),
-                  v(0, gas::prim::velocity(VI(n, 1)), im1[0], im1[1], im1[2]),
-                  v(0, gas::prim::velocity(VI(n, 2)), im1[0], im1[1], im1[2])};
-              const Real gvp = ArtemisUtils::VDot(gva, epa) + dp.omf * xcyla[0];
-              const Real gvR = ArtemisUtils::VDot(gva, eRa);
-              const Real gvz = ArtemisUtils::VDot(gva, eza);
-              const Real gvp1p = ArtemisUtils::VDot(gvp1, epp1) + dp.omf * xcylp1[0];
-              const Real gvm1p = ArtemisUtils::VDot(gvm1, epm1) + dp.omf * xcylm1[0];
-              const Real dgvp = std::log(gvp1p / gvm1p);
-              const Real gvcyl[3] = {gvR, gvp * std::exp(dgvp * xmadx) - dp.omf * xcyl[0],
-                                     gvz};
-              const Real gvel[3] = {ArtemisUtils::VDot(gvcyl, ex1),
-                                    ArtemisUtils::VDot(gvcyl, ex2),
-                                    ArtemisUtils::VDot(gvcyl, ex3)};
+        const auto &[xcylm1, scr1m1, scr2m1, scr3m1] = coords.ConvertToCylWithVec(xvm1);
+        const Real epm1[3] = {scr1m1[1], scr2m1[1], scr3m1[1]};
+        // Compute cell separations (using logarithmics if necessary)
+        const Real xma = (lnx) ? std::log(xv[ix1] / xva[ix1]) : xv[ix1] - xva[ix1];
+        const Real dx = (lnx) ? std::log(xvp1[ix1] / xvm1[ix1]) : xvp1[ix1] - xvm1[ix1];
+        const Real xmadx = xma / dx;
 
-              // Set extrapolated values
-              v(0, gas::prim::density(n), k, j, i) = rhog;
-              v(0, gas::prim::sie(n), k, j, i) = sieg;
+        // Extrapolate gas density and specific internal energy
+        if (do_gas) {
+          for (int n = 0; n < v.GetSize(0, gas::prim::density()); ++n) {
+            Real dgrho = std::log(v(0, gas::prim::density(n), ip1[0], ip1[1], ip1[2]) /
+                                  v(0, gas::prim::density(n), im1[0], im1[1], im1[2]));
+            Real dgsie = std::log(v(0, gas::prim::sie(n), ip1[0], ip1[1], ip1[2]) /
+                                  v(0, gas::prim::sie(n), im1[0], im1[1], im1[2]));
+            const Real grhoexp = std::exp(dgrho * xmadx);
+            const Real gsieexp = std::exp(dgsie * xmadx);
+            const Real rhog = v(0, gas::prim::density(n), ia[0], ia[1], ia[2]) * grhoexp;
+            const Real sieg = v(0, gas::prim::sie(n), ia[0], ia[1], ia[2]) * gsieexp;
 
-              const bool inflow = (inner) ? gva[ix1] > 0.0 : gva[ix1] < 0.0;
-              v(0, gas::prim::velocity(VI(n, ix1)), k, j, i) = (inflow) ? 0.0 : gvel[ix1];
-              v(0, gas::prim::velocity(VI(n, ix2)), k, j, i) = gvel[ix2];
-              v(0, gas::prim::velocity(VI(n, ix3)), k, j, i) = gvel[ix3];
-            }
+            // Extrapolate gas velocity
+            Real gva[3] = {v(0, gas::prim::velocity(VI(n, 0)), ia[0], ia[1], ia[2]),
+                           v(0, gas::prim::velocity(VI(n, 1)), ia[0], ia[1], ia[2]),
+                           v(0, gas::prim::velocity(VI(n, 2)), ia[0], ia[1], ia[2])};
+            Real gvp1[3] = {v(0, gas::prim::velocity(VI(n, 0)), ip1[0], ip1[1], ip1[2]),
+                            v(0, gas::prim::velocity(VI(n, 1)), ip1[0], ip1[1], ip1[2]),
+                            v(0, gas::prim::velocity(VI(n, 2)), ip1[0], ip1[1], ip1[2])};
+            Real gvm1[3] = {v(0, gas::prim::velocity(VI(n, 0)), im1[0], im1[1], im1[2]),
+                            v(0, gas::prim::velocity(VI(n, 1)), im1[0], im1[1], im1[2]),
+                            v(0, gas::prim::velocity(VI(n, 2)), im1[0], im1[1], im1[2])};
+            const Real gvp = ArtemisUtils::VDot(gva, epa) + dp.omf * xcyla[0];
+            const Real gvR = ArtemisUtils::VDot(gva, eRa);
+            const Real gvz = ArtemisUtils::VDot(gva, eza);
+            const Real gvp1p = ArtemisUtils::VDot(gvp1, epp1) + dp.omf * xcylp1[0];
+            const Real gvm1p = ArtemisUtils::VDot(gvm1, epm1) + dp.omf * xcylm1[0];
+            const Real dgvp = std::log(gvp1p / gvm1p);
+            const Real gvcyl[3] = {gvR, gvp * std::exp(dgvp * xmadx) - dp.omf * xcyl[0],
+                                   gvz};
+            const Real gvel[3] = {ArtemisUtils::VDot(gvcyl, ex1),
+                                  ArtemisUtils::VDot(gvcyl, ex2),
+                                  ArtemisUtils::VDot(gvcyl, ex3)};
+
+            // Set extrapolated values
+            v(0, gas::prim::density(n), k, j, i) = rhog;
+            v(0, gas::prim::sie(n), k, j, i) = sieg;
+            const bool inflow = (inner) ? gva[ix1] > 0.0 : gva[ix1] < 0.0;
+            v(0, gas::prim::velocity(VI(n, ix1)), k, j, i) = (inflow) ? 0.0 : gvel[ix1];
+            v(0, gas::prim::velocity(VI(n, ix2)), k, j, i) = gvel[ix2];
+            v(0, gas::prim::velocity(VI(n, ix3)), k, j, i) = gvel[ix3];
           }
+        }
 
-          // Extrapolate dust density
-          if (do_dust) {
-            for (int n = 0; n < v.GetSize(0, dust::prim::density()); ++n) {
-              Real ddrho = std::log(v(0, dust::prim::density(n), ip1[0], ip1[1], ip1[2]) /
-                                    v(0, dust::prim::density(n), im1[0], im1[1], im1[2]));
-              const Real drhoexp = std::exp(ddrho * xmadx);
-              const Real rhod =
-                  v(0, dust::prim::density(n), ia[0], ia[1], ia[2]) * drhoexp;
+        // Extrapolate dust density
+        if (do_dust) {
+          for (int n = 0; n < v.GetSize(0, dust::prim::density()); ++n) {
+            Real ddrho = std::log(v(0, dust::prim::density(n), ip1[0], ip1[1], ip1[2]) /
+                                  v(0, dust::prim::density(n), im1[0], im1[1], im1[2]));
+            const Real drhoexp = std::exp(ddrho * xmadx);
+            const Real rhod = v(0, dust::prim::density(n), ia[0], ia[1], ia[2]) * drhoexp;
 
-              // Extrapolate dust velocity
-              Real dva[3] = {v(0, dust::prim::velocity(VI(n, 0)), ia[0], ia[1], ia[2]),
-                             v(0, dust::prim::velocity(VI(n, 1)), ia[0], ia[1], ia[2]),
-                             v(0, dust::prim::velocity(VI(n, 2)), ia[0], ia[1], ia[2])};
-              Real dvp1[3] = {
-                  v(0, dust::prim::velocity(VI(n, 0)), ip1[0], ip1[1], ip1[2]),
-                  v(0, dust::prim::velocity(VI(n, 1)), ip1[0], ip1[1], ip1[2]),
-                  v(0, dust::prim::velocity(VI(n, 2)), ip1[0], ip1[1], ip1[2])};
-              Real dvm1[3] = {
-                  v(0, dust::prim::velocity(VI(n, 0)), im1[0], im1[1], im1[2]),
-                  v(0, dust::prim::velocity(VI(n, 1)), im1[0], im1[1], im1[2]),
-                  v(0, dust::prim::velocity(VI(n, 2)), im1[0], im1[1], im1[2])};
-              const Real dvp = ArtemisUtils::VDot(dva, epa) + dp.omf * xcyla[0];
-              const Real dvR = ArtemisUtils::VDot(dva, eRa);
-              const Real dvz = ArtemisUtils::VDot(dva, eza);
-              const Real dvp1p = ArtemisUtils::VDot(dvp1, epp1) + dp.omf * xcylp1[0];
-              const Real dvm1p = ArtemisUtils::VDot(dvm1, epm1) + dp.omf * xcylm1[0];
-              const Real ddvp = std::log(dvp1p / dvm1p);
-              const Real dvcyl[3] = {dvR, dvp * std::exp(ddvp * xmadx) - dp.omf * xcyl[0],
-                                     dvz};
-              const Real dvel[3] = {ArtemisUtils::VDot(dvcyl, ex1),
-                                    ArtemisUtils::VDot(dvcyl, ex2),
-                                    ArtemisUtils::VDot(dvcyl, ex3)};
+            // Extrapolate dust velocity
+            Real dva[3] = {v(0, dust::prim::velocity(VI(n, 0)), ia[0], ia[1], ia[2]),
+                           v(0, dust::prim::velocity(VI(n, 1)), ia[0], ia[1], ia[2]),
+                           v(0, dust::prim::velocity(VI(n, 2)), ia[0], ia[1], ia[2])};
+            Real dvp1[3] = {v(0, dust::prim::velocity(VI(n, 0)), ip1[0], ip1[1], ip1[2]),
+                            v(0, dust::prim::velocity(VI(n, 1)), ip1[0], ip1[1], ip1[2]),
+                            v(0, dust::prim::velocity(VI(n, 2)), ip1[0], ip1[1], ip1[2])};
+            Real dvm1[3] = {v(0, dust::prim::velocity(VI(n, 0)), im1[0], im1[1], im1[2]),
+                            v(0, dust::prim::velocity(VI(n, 1)), im1[0], im1[1], im1[2]),
+                            v(0, dust::prim::velocity(VI(n, 2)), im1[0], im1[1], im1[2])};
+            const Real dvp = ArtemisUtils::VDot(dva, epa) + dp.omf * xcyla[0];
+            const Real dvR = ArtemisUtils::VDot(dva, eRa);
+            const Real dvz = ArtemisUtils::VDot(dva, eza);
+            const Real dvp1p = ArtemisUtils::VDot(dvp1, epp1) + dp.omf * xcylp1[0];
+            const Real dvm1p = ArtemisUtils::VDot(dvm1, epm1) + dp.omf * xcylm1[0];
+            const Real ddvp = std::log(dvp1p / dvm1p);
+            const Real dvcyl[3] = {dvR, dvp * std::exp(ddvp * xmadx) - dp.omf * xcyl[0],
+                                   dvz};
+            const Real dvel[3] = {ArtemisUtils::VDot(dvcyl, ex1),
+                                  ArtemisUtils::VDot(dvcyl, ex2),
+                                  ArtemisUtils::VDot(dvcyl, ex3)};
 
-              // Set extrapolated values
-              v(0, dust::prim::density(n), k, j, i) = rhod;
-              v(0, dust::prim::velocity(VI(n, ix1)), k, j, i) = dvel[ix1];
-              v(0, dust::prim::velocity(VI(n, ix2)), k, j, i) = dvel[ix2];
-              v(0, dust::prim::velocity(VI(n, ix3)), k, j, i) = dvel[ix3];
-            }
+            // Set extrapolated values
+            v(0, dust::prim::density(n), k, j, i) = rhod;
+            v(0, dust::prim::velocity(VI(n, ix1)), k, j, i) = dvel[ix1];
+            v(0, dust::prim::velocity(VI(n, ix2)), k, j, i) = dvel[ix2];
+            v(0, dust::prim::velocity(VI(n, ix3)), k, j, i) = dvel[ix3];
           }
+        }
 
-          // Moments
-          if (do_rad) {
-            for (int n = 0; n < v.GetSize(0, rad::prim::energy()); ++n) {
+        // Moments
+        if (do_rad) {
+          for (int n = 0; n < v.GetSize(0, rad::prim::energy()); ++n) {
               const Real er0 = v(0, rad::prim::energy(n), ia[0], ia[1], ia[2]);
               Real der = std::log(v(0, rad::prim::energy(n), ip1[0], ip1[1], ip1[2]) /
                                   v(0, rad::prim::energy(n), im1[0], im1[1], im1[2]));
@@ -900,10 +905,9 @@ void DiskBoundaryExtrap(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) 
               v(0, rad::prim::flux(VI(n, ix3)), k, j, i) =
                   v(0, rad::prim::flux(VI(n, ix3)), ia[0], ia[1], ia[2]) * erg /
                   (er0 + Fuzz<Real>());
-            }
           }
-        });
-  }
+        }
+      });
 }
 
 //----------------------------------------------------------------------------------------

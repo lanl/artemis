@@ -150,6 +150,7 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   }
 
   // Call package initializers here
+  packages.Add(geometry::Initialize(pin.get()));
   if (do_nbody) packages.Add(NBody::Initialize(pin.get(), constants));
   if (do_gravity) packages.Add(Gravity::Initialize(pin.get(), constants, packages));
   if (do_gas) packages.Add(Gas::Initialize(pin.get(), units, constants, packages));

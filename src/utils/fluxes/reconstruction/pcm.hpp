@@ -29,11 +29,11 @@ namespace ArtemisUtils {
 //! \brief The piecewise constant reconstruction method in the X1 direction
 template <Coordinates GEOM>
 struct Reconstruction<ReconstructionMethod::pcm, X1DIR, GEOM> {
-  template <typename V>
+  template <typename V1, typename V2>
   KOKKOS_INLINE_FUNCTION void
   operator()(parthenon::team_mbr_t const &member, const geometry::CoordParams &cpars,
              const int b, const int k, const int j, const int il, const int iu,
-             const V &q, parthenon::ScratchPad2D<Real> &ql,
+             const V1 &q, const V2 &vg, parthenon::ScratchPad2D<Real> &ql,
              parthenon::ScratchPad2D<Real> &qr) const {
     for (int n = q.GetLowerBound(b); n <= q.GetUpperBound(b); ++n) {
       parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, member, il, iu,
@@ -50,11 +50,11 @@ struct Reconstruction<ReconstructionMethod::pcm, X1DIR, GEOM> {
 //! \brief The piecewise constant reconstruction method in the X2 direction
 template <Coordinates GEOM>
 struct Reconstruction<ReconstructionMethod::pcm, X2DIR, GEOM> {
-  template <typename V>
+  template <typename V1, typename V2>
   KOKKOS_INLINE_FUNCTION void
   operator()(parthenon::team_mbr_t const &member, const geometry::CoordParams &cpars,
              const int b, const int k, const int j, const int il, const int iu,
-             const V &q, parthenon::ScratchPad2D<Real> &ql_jp1,
+             const V1 &q, const V2 &vg, parthenon::ScratchPad2D<Real> &ql_jp1,
              parthenon::ScratchPad2D<Real> &qr_j) const {
     for (int n = q.GetLowerBound(b); n <= q.GetUpperBound(b); ++n) {
       parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, member, il, iu,
@@ -71,11 +71,11 @@ struct Reconstruction<ReconstructionMethod::pcm, X2DIR, GEOM> {
 //! \brief The piecewise constant reconstruction method in the X3 direction
 template <Coordinates GEOM>
 struct Reconstruction<ReconstructionMethod::pcm, X3DIR, GEOM> {
-  template <typename V>
+  template <typename V1, typename V2>
   KOKKOS_INLINE_FUNCTION void
   operator()(parthenon::team_mbr_t const &member, const geometry::CoordParams &cpars,
              const int b, const int k, const int j, const int il, const int iu,
-             const V &q, parthenon::ScratchPad2D<Real> &ql_kp1,
+             const V1 &q, const V2 &vg, parthenon::ScratchPad2D<Real> &ql_kp1,
              parthenon::ScratchPad2D<Real> &qr_k) const {
     for (int n = q.GetLowerBound(b); n <= q.GetUpperBound(b); ++n) {
       parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, member, il, iu,

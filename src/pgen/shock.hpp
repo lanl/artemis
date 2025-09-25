@@ -96,6 +96,8 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
                          rad::prim::energy, rad::prim::flux>(
           (pmb->resolved_packages).get());
   auto v = desc.GetPack(md.get());
+  static auto desc_g = MakePackDescriptor<geom::x1v>((pmb->resolved_packages).get());
+  auto vg = desc_g.GetPack(md.get());
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
@@ -110,8 +112,8 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       "shock", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
         geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
-        const auto &xi = coords.GetCellCenter();
-        const bool upwind = (xi[0] <= shkp.xdisc);
+        const auto xi = coords.x1v();
+        const bool upwind = (xi <= shkp.xdisc);
         const Real rho = upwind ? shkp.rhol : shkp.rhor;
         const Real vx = upwind ? shkp.vxl : shkp.vxr;
         const Real T = upwind ? shkp.tl : shkp.tr;

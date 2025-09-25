@@ -80,6 +80,9 @@ TaskStatus BinaryMassGravity(MeshData<Real> *md, const Real time, const Real dt)
                          gas::prim::velocity, gas::prim::sie, dust::prim::density,
                          dust::prim::velocity>(resolved_pkgs.get());
   auto vmesh = desc.GetPack(md);
+  static auto desc_g = MakePackDescriptor<geom::x1v, geom::x2v, geom::x3v, geom::hx1v,
+                                          geom::hx2v, geom::hx3v>(resolved_pkgs.get());
+  auto vg = desc_g.GetPack(md);
   const auto ib = md->GetBoundsI(IndexDomain::interior);
   const auto jb = md->GetBoundsJ(IndexDomain::interior);
   const auto kb = md->GetBoundsK(IndexDomain::interior);
@@ -93,11 +96,11 @@ TaskStatus BinaryMassGravity(MeshData<Real> *md, const Real time, const Real dt)
       KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
         // Extract coordinate information
         geometry::Coords<GEOM> coords(cpars, vmesh.GetCoordinates(b), k, j, i);
-        const auto &dx = coords.GetCellCenter();
+        const auto &dx = coords.GetCellCenter(vg, b, k, j, i);
         const auto &[dxc1_, ex1, ex2, ex3] = coords.ConvertToCartWithVec(dx);
         auto dxc1 = dxc1_;
         auto dxc2 = NewArray<Real, 3>();
-        const auto &hx = coords.GetScaleFactors();
+        const auto &hx = coords.GetScaleFactors(vg, b, k, j, i);
 
         // Calculate force in Cartesian coordinates
         for (int n = 0; n < 3; n++) {

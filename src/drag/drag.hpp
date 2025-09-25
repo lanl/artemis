@@ -207,6 +207,9 @@ TaskStatus SelfDragSourceImpl(MeshData<Real> *md, const Real time, const Real dt
                          gas::cons::internal_energy, dust::cons::momentum,
                          dust::cons::density>(resolved_pkgs.get());
   auto vmesh = desc.GetPack(md);
+  static auto desc_g = MakePackDescriptor<geom::x1v, geom::x2v, geom::x3v, geom::hx1v,
+                                          geom::hx2v, geom::hx3v>(resolved_pkgs.get());
+  auto vg = desc_g.GetPack(md);
   const auto ib = md->GetBoundsI(IndexDomain::interior);
   const auto jb = md->GetBoundsJ(IndexDomain::interior);
   const auto kb = md->GetBoundsK(IndexDomain::interior);
@@ -217,8 +220,8 @@ TaskStatus SelfDragSourceImpl(MeshData<Real> *md, const Real time, const Real dt
       KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
         // Extract coordinates
         geometry::Coords<GEOM> coords(cpars, vmesh.GetCoordinates(b), k, j, i);
-        const auto &xv = coords.GetCellCenter();
-        const auto &hx = coords.GetScaleFactors();
+        const auto &xv = coords.GetCellCenter(vg, b, k, j, i);
+        const auto &hx = coords.GetScaleFactors(vg, b, k, j, i);
         const auto &[xcyl, ex1, ex2, ex3] = coords.ConvertToCylWithVec(xv);
 
         // Compute the (gas) ramp for this cell
@@ -262,7 +265,7 @@ TaskStatus SelfDragSourceImpl(MeshData<Real> *md, const Real time, const Real dt
 
             // Get diffusion coefficient
             Diffusion::DiffusionCoeff<DTYP, GEOM, Fluid::gas> dcoeff;
-            const Real mu = dcoeff.Get(dp, coords, dens, sieg, eos_d);
+            const Real mu = dcoeff.Get(dp, coords, xv, dens, sieg, eos_d);
             const Real vR = -1.5 * mu / (xcyl[0] * dens);
             const Real vg[3] = {mom1 / (hx[0] * dens), mom2 / (hx[1] * dens),
                                 mom3 / (hx[2] * dens)};
@@ -375,6 +378,9 @@ TaskStatus SimpleDragSourceImpl(MeshData<Real> *md, const Real time, const Real 
                          gas::cons::internal_energy, dust::cons::momentum,
                          dust::cons::density>(resolved_pkgs.get());
   auto vmesh = desc.GetPack(md);
+  static auto desc_g = MakePackDescriptor<geom::x1v, geom::x2v, geom::x3v, geom::hx1v,
+                                          geom::hx2v, geom::hx3v>(resolved_pkgs.get());
+  auto vg = desc_g.GetPack(md);
   const auto ib = md->GetBoundsI(IndexDomain::interior);
   const auto jb = md->GetBoundsJ(IndexDomain::interior);
   const auto kb = md->GetBoundsK(IndexDomain::interior);
@@ -385,8 +391,8 @@ TaskStatus SimpleDragSourceImpl(MeshData<Real> *md, const Real time, const Real 
       KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
         // Extract coordinates
         geometry::Coords<GEOM> coords(cpars, vmesh.GetCoordinates(b), k, j, i);
-        const auto &xv = coords.GetCellCenter();
-        const auto &hx = coords.GetScaleFactors();
+        const auto &xv = coords.GetCellCenter(vg, b, k, j, i);
+        const auto &hx = coords.GetScaleFactors(vg, b, k, j, i);
         const auto &[xcyl, ex1, ex2, ex3] = coords.ConvertToCylWithVec(xv);
 
         // Compute the ramp for this cell
@@ -445,7 +451,7 @@ TaskStatus SimpleDragSourceImpl(MeshData<Real> *md, const Real time, const Real 
 
         // Target gas velocity
         Diffusion::DiffusionCoeff<DTYP, GEOM, Fluid::gas> dcoeff;
-        const Real mu = dcoeff.Get(dp, coords, dg, sieg, eos_d);
+        const Real mu = dcoeff.Get(dp, coords, xv, dg, sieg, eos_d);
         const Real vR = -1.5 * mu / (xcyl[0] * dg);
         const std::array<Real, 3> vt{ex1[0] * vR, ex2[0] * vR, ex3[0] * vR};
 

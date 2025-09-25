@@ -63,6 +63,10 @@ Real EstimateTimeStep(parthenon::Mesh *pmesh) {
       // Packing and Indexing
       auto desc = MakeDefaultPackDescriptor();
       auto vmesh = desc.GetPack(md);
+      static auto desc_g = MakePackDescriptor<geom::dx1, geom::dx2, geom::dx3>(
+          (pmesh->resolved_packages).get());
+      auto vg = desc_g.GetPack(md);
+
       IndexRange ib = md->GetBoundsI(IndexDomain::interior);
       IndexRange jb = md->GetBoundsJ(IndexDomain::interior);
       IndexRange kb = md->GetBoundsK(IndexDomain::interior);
@@ -79,7 +83,7 @@ Real EstimateTimeStep(parthenon::Mesh *pmesh) {
           KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, Real &ldx_m) {
             // Extract coordinates
             geometry::Coords<GEOM> coords(cpars, vmesh.GetCoordinates(b), k, j, i);
-            const auto &dx = coords.GetCellWidths();
+            const auto &dx = coords.GetCellWidths(vg, b, k, j, i);
             for (int d = 0; d < ndim; d++) {
               ldx_m = std::min(ldx_m, dx[d]);
             }

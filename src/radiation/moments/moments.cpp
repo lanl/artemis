@@ -274,18 +274,24 @@ TaskStatus CalculateFluxes(MeshData<Real> *md) {
   static auto desc_flux =
       parthenon::MakePackDescriptor<rad::cons::energy, rad::cons::flux>(
           resolved_pkgs.get(), {}, {parthenon::PDOpt::WithFluxes});
+  static auto desc_g =
+      parthenon::MakePackDescriptor<geom::x1v, geom::x2v, geom::x3v, geom::dx1, geom::dx2,
+                                    geom::dx3, geom::hx1f1, geom::hx2f1, geom::hx3f1,
+                                    geom::hx1f2, geom::hx2f2, geom::hx3f2, geom::hx1f3,
+                                    geom::hx2f3, geom::hx3f3>(resolved_pkgs.get());
   auto vprim = desc_prim.GetPack(md);
   auto vflux = desc_flux.GetPack(md);
   SparsePack vface;
+  auto vg = desc_g.GetPack(md);
 
   // Call CalculateFluxes with appropriate Fluid and Closure type
   auto closure_type = pkg->Param<Closure>("closure_type");
   if (closure_type == Closure::m1) {
     return ArtemisUtils::CalculateFluxes<Fluid::radiation, Closure::m1>(
-        md, pkg, vprim, vflux, vface, false);
+        md, pkg, vprim, vflux, vface, vg, false);
   } else if (closure_type == Closure::p1) {
     return ArtemisUtils::CalculateFluxes<Fluid::radiation, Closure::p1>(
-        md, pkg, vprim, vflux, vface, false);
+        md, pkg, vprim, vflux, vface, vg, false);
   }
   return TaskStatus::complete;
 }
@@ -305,18 +311,24 @@ TaskStatus FluxSource(MeshData<Real> *md, const Real dt) {
                                                          {parthenon::PDOpt::WithFluxes});
   static auto desc_cons =
       parthenon::MakePackDescriptor<rad::cons::flux>(resolved_pkgs.get());
+  static auto desc_g =
+      parthenon::MakePackDescriptor<geom::vol, geom::dh1dx1, geom::dh2dx1, geom::dh3dx1,
+                                    geom::dh1dx2, geom::dh2dx2, geom::dh3dx2,
+                                    geom::dh1dx3, geom::dh2dx3, geom::dh3dx3>(
+          resolved_pkgs.get());
   auto vprim = desc_prim.GetPack(md);
   auto vcons = desc_cons.GetPack(md);
+  auto vg = desc_g.GetPack(md);
   SparsePack vface;
 
   // Call FluxSource with appropriate Fluid and Closure type
   auto closure_type = pkg->Param<Closure>("closure_type");
   if (closure_type == Closure::m1) {
     return ArtemisUtils::FluxSource<Fluid::radiation, Closure::m1>(md, pkg, vprim, vcons,
-                                                                   vface, dt);
+                                                                   vface, vg, dt);
   } else if (closure_type == Closure::p1) {
     return ArtemisUtils::FluxSource<Fluid::radiation, Closure::p1>(md, pkg, vprim, vcons,
-                                                                   vface, dt);
+                                                                   vface, vg, dt);
   }
   return TaskStatus::complete;
 }

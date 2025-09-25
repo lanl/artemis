@@ -165,6 +165,9 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
                          dust::prim::density, dust::prim::velocity>(
           (pmb->resolved_packages).get());
   auto v = desc.GetPack(md.get());
+  static auto desc_g = MakePackDescriptor<geom::vol, geom::x1v, geom::x2v, geom::x3v>(
+      (pmb->resolved_packages).get());
+  auto vg = desc_g.GetPack(md.get());
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
@@ -177,8 +180,8 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       "blast", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
         geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
-        Real total_vol = coords.Volume();
-        const auto &xv = coords.GetCellCenter();
+        Real total_vol = coords.GetVolume(vg, 0, k, j, i);
+        const auto &xv = coords.GetCellCenter(vg, 0, k, j, i);
         Real den = pars.d0;
         Real e0 = pars.p0 / gm1;
         Real internal_energy = 0.0;

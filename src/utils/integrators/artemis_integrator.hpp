@@ -63,8 +63,10 @@ TaskStatus ApplyUpdate(MeshData<Real> *u0, MeshData<Real> *u1, const Real g0,
   // Packing and indexing
   std::vector<MetadataFlag> flags({Metadata::Conserved});
   static auto desc = MakePackDescriptor<any>(u0, flags, {parthenon::PDOpt::WithFluxes});
+  static auto desc_g = MakePackDescriptor<geom::vol, geom::ax1, geom::ax2, geom::ax3>(u0);
   const auto v0 = desc.GetPack(u0);
   const auto v1 = desc.GetPack(u1);
+  const auto vg = desc_g.GetPack(u1);
   const auto ib = u0->GetBoundsI(IndexDomain::interior);
   const auto jb = u0->GetBoundsJ(IndexDomain::interior);
   const auto kb = u0->GetBoundsK(IndexDomain::interior);
@@ -79,14 +81,16 @@ TaskStatus ApplyUpdate(MeshData<Real> *u0, MeshData<Real> *u1, const Real g0,
       KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
         // Extract coordinates
         geometry::Coords<GEOM> coords(cpars, v0.GetCoordinates(b), k, j, i);
-        const auto ax1 = coords.GetFaceAreaX1();
-        const auto ax2 = (multi_d) ? coords.GetFaceAreaX2() : NewArray<Real, 2>(0.0);
-        const auto ax3 = (three_d) ? coords.GetFaceAreaX3() : NewArray<Real, 2>(0.0);
         const int d1 = X1DIR;
         const int d2 = d1 + multi_d;
         const int d3 = d2 + three_d;
-        const Real bdt_vol = beta_dt / coords.Volume();
-
+        const Real bdt_vol = beta_dt / coords.GetVolume(vg, b, k, j, i);
+        [[maybe_unused]] std::array<Real, 2> ax1{0}, ax2{0}, ax3{0};
+        if constexpr (include_divf) {
+          ax1 = coords.GetFaceAreaX1(vg, b, k, j, i);
+          ax2 = coords.GetFaceAreaX2(vg, b, k, j, i);
+          ax3 = coords.GetFaceAreaX3(vg, b, k, j, i);
+        }
         // Advance state vector with flux divergence
         for (int n = v0.GetLowerBound(b); n <= v0.GetUpperBound(b); ++n) {
           Real &v0n = v0(b, n, k, j, i);

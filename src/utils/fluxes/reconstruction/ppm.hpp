@@ -70,11 +70,11 @@ void PPM4(const Real &q_im2, const Real &q_im1, const Real &q_i, const Real &q_i
 //! \brief The piecewise parabolic reconstruction method in the X1 direction
 template <Coordinates GEOM>
 struct Reconstruction<ReconstructionMethod::ppm, X1DIR, GEOM> {
-  template <typename V>
+  template <typename V1, typename V2>
   KOKKOS_INLINE_FUNCTION void
   operator()(parthenon::team_mbr_t const &member, const geometry::CoordParams &cpars,
              const int b, const int k, const int j, const int il, const int iu,
-             const V &q, parthenon::ScratchPad2D<Real> &ql,
+             const V1 &q, const V2 &vg, parthenon::ScratchPad2D<Real> &ql,
              parthenon::ScratchPad2D<Real> &qr) const {
     for (int n = q.GetLowerBound(b); n <= q.GetUpperBound(b); ++n) {
       parthenon::par_for_inner(
@@ -91,11 +91,11 @@ struct Reconstruction<ReconstructionMethod::ppm, X1DIR, GEOM> {
 //! \brief The piecewise parabolic reconstruction method in the X2 direction
 template <Coordinates GEOM>
 struct Reconstruction<ReconstructionMethod::ppm, X2DIR, GEOM> {
-  template <typename V>
+  template <typename V1, typename V2>
   KOKKOS_INLINE_FUNCTION void
   operator()(parthenon::team_mbr_t const &member, const geometry::CoordParams &cpars,
              const int b, const int k, const int j, const int il, const int iu,
-             const V &q, parthenon::ScratchPad2D<Real> &ql_jp1,
+             const V1 &q, const V2 &vg, parthenon::ScratchPad2D<Real> &ql_jp1,
              parthenon::ScratchPad2D<Real> &qr_j) const {
     for (int n = q.GetLowerBound(b); n <= q.GetUpperBound(b); ++n) {
       parthenon::par_for_inner(
@@ -112,11 +112,11 @@ struct Reconstruction<ReconstructionMethod::ppm, X2DIR, GEOM> {
 //! \brief The piecewise parabolic reconstruction method in the X3 direction
 template <Coordinates GEOM>
 struct Reconstruction<ReconstructionMethod::ppm, X3DIR, GEOM> {
-  template <typename V>
+  template <typename V1, typename V2>
   KOKKOS_INLINE_FUNCTION void
   operator()(parthenon::team_mbr_t const &member, const geometry::CoordParams &cpars,
              const int b, const int k, const int j, const int il, const int iu,
-             const V &q, parthenon::ScratchPad2D<Real> &ql_kp1,
+             const V1 &q, const V2 &vg, parthenon::ScratchPad2D<Real> &ql_kp1,
              parthenon::ScratchPad2D<Real> &qr_k) const {
     for (int n = q.GetLowerBound(b); n <= q.GetUpperBound(b); ++n) {
       parthenon::par_for_inner(

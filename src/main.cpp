@@ -42,7 +42,10 @@ parthenon::DriverStatus LaunchWorkFlow(parthenon::ParthenonManager &pman,
   const bool two_d = (nx[1] > 1) && (!three_d);
   const bool one_d = (!two_d) && (!three_d);
   using namespace artemis;
+
   if (sys == "cartesian") { // (x,y,z)
+    pman.app_input->InitMeshBlockUserData =
+        artemis::InitMeshBlockData<Coordinates::cartesian>;
     ProblemModifier<Coordinates::cartesian>(&pman);
     pman.app_input->ProblemGenerator = ProblemGenerator<Coordinates::cartesian>;
     pman.app_input->PostInitialization =
@@ -53,6 +56,8 @@ parthenon::DriverStatus LaunchWorkFlow(parthenon::ParthenonManager &pman,
     return driver.Execute();
   } else if (sys == "spherical") { // (r,theta,phi)
     if (one_d) {
+      pman.app_input->InitMeshBlockUserData =
+          artemis::InitMeshBlockData<Coordinates::spherical1D>;
       ProblemModifier<Coordinates::spherical1D>(&pman);
       pman.app_input->ProblemGenerator = ProblemGenerator<Coordinates::spherical1D>;
       pman.app_input->PostInitialization =
@@ -62,6 +67,8 @@ parthenon::DriverStatus LaunchWorkFlow(parthenon::ParthenonManager &pman,
           pin, pman.app_input.get(), pman.pmesh.get(), Globals::is_restart);
       return driver.Execute();
     } else if (two_d) {
+      pman.app_input->InitMeshBlockUserData =
+          artemis::InitMeshBlockData<Coordinates::spherical2D>;
       ProblemModifier<Coordinates::spherical2D>(&pman);
       pman.app_input->ProblemGenerator = ProblemGenerator<Coordinates::spherical2D>;
       pman.app_input->PostInitialization =
@@ -71,6 +78,8 @@ parthenon::DriverStatus LaunchWorkFlow(parthenon::ParthenonManager &pman,
           pin, pman.app_input.get(), pman.pmesh.get(), Globals::is_restart);
       return driver.Execute();
     } else {
+      pman.app_input->InitMeshBlockUserData =
+          artemis::InitMeshBlockData<Coordinates::spherical3D>;
       ProblemModifier<Coordinates::spherical3D>(&pman);
       pman.app_input->ProblemGenerator = ProblemGenerator<Coordinates::spherical3D>;
       pman.app_input->PostInitialization =
@@ -85,6 +94,8 @@ parthenon::DriverStatus LaunchWorkFlow(parthenon::ParthenonManager &pman,
     PARTHENON_REQUIRE(
         (nx[1] > 1),
         "nx2 = 1. To run an axisymmetric, please use axisymmetric coordinates")
+    pman.app_input->InitMeshBlockUserData =
+        artemis::InitMeshBlockData<Coordinates::cylindrical>;
     ProblemModifier<Coordinates::cylindrical>(&pman);
     pman.app_input->ProblemGenerator = ProblemGenerator<Coordinates::cylindrical>;
     pman.app_input->PostInitialization =
@@ -96,6 +107,8 @@ parthenon::DriverStatus LaunchWorkFlow(parthenon::ParthenonManager &pman,
   } else if (sys == "axisymmetric") { // (R,z,phi)
     PARTHENON_REQUIRE(!three_d, "axisymmetric is only valid for 1D & 2D. To run 3D, "
                                 "please use cylindrical coordinates!");
+    pman.app_input->InitMeshBlockUserData =
+        artemis::InitMeshBlockData<Coordinates::axisymmetric>;
     ProblemModifier<Coordinates::axisymmetric>(&pman);
     pman.app_input->ProblemGenerator = ProblemGenerator<Coordinates::axisymmetric>;
     pman.app_input->PostInitialization =

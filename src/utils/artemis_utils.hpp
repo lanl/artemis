@@ -80,7 +80,6 @@ GetBoundaryPackDescriptorMap(std::shared_ptr<MeshBlockData<Real>> &rc) {
   my_map.emplace(std::make_pair(false, MakePackDescriptor<var_ts...>(rc.get(), flags)));
   return my_map;
 }
-
 //----------------------------------------------------------------------------------------
 //! \struct ArtemisUtils::array_type
 //! NOTE(PDM): The following is copied from the open-source Kokkos Custom Reduction Wiki

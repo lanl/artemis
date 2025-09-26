@@ -111,6 +111,49 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
     params.Add("eos_d", eos_device);
     // TODO This needs to be removed when we convert everything to EOS calls
     params.Add("adiabatic_index", gamma);
+#ifdef SPINER_USE_HDF
+  } else if (eos_name == "h-he") {
+    const std::string save_to_file = pin->GetOrAddString("gas", "save_to_file", "");
+    const Real X = pin->GetReal("gas", "x");
+    const Real Y = pin->GetReal("gas", "y");
+    const Real ltmin = pin->GetOrAddReal("gas", "ltmin", 0);
+    const Real ltmax = pin->GetOrAddReal("gas", "ltmax", 6);
+    const Real ldmin = pin->GetOrAddReal("gas", "ldmin", -15);
+    const Real ldmax = pin->GetOrAddReal("gas", "ldmax", -3);
+    const int nd = pin->GetOrAddInteger("gas", "nd", 100);
+    const int nt = pin->GetOrAddInteger("gas", "nt", 100);
+    EOS eos_host = singularity::UnitSystem<ArtemisEOS::IdealHHe>(
+        ArtemisEOS::IdealHHe(X, Y, ltmin, ltmax, nt, ldmin, ldmax, nd, save_to_file,
+                             true),
+        singularity::eos_units_init::LengthTimeUnitsInit(), units.GetTimeCodeToPhysical(),
+        units.GetMassCodeToPhysical(), units.GetLengthCodeToPhysical(),
+        units.GetTemperatureCodeToPhysical());
+    EOS eos_device = eos_host.GetOnDevice();
+    params.Add("eos_h", eos_host);
+    params.Add("eos_d", eos_device);
+  } else if (eos_name == "table_re") {
+    std::string filename = pin->GetString("gas", "eos_file");
+    EOS eos_host = singularity::UnitSystem<singularity::SpinerEOSDependsRhoSie>(
+        singularity::SpinerEOSDependsRhoSie(filename, "gas"),
+        singularity::eos_units_init::LengthTimeUnitsInit(), units.GetTimeCodeToPhysical(),
+        units.GetMassCodeToPhysical(), units.GetLengthCodeToPhysical(),
+        units.GetTemperatureCodeToPhysical());
+    EOS eos_device = eos_host.GetOnDevice();
+    params.Add("eos_h", eos_host);
+    params.Add("eos_d", eos_device);
+  } else if (eos_name == "table_rt") {
+    std::string filename = pin->GetString("gas", "eos_file");
+    EOS eos_host = singularity::UnitSystem<singularity::SpinerEOSDependsRhoT>(
+        singularity::SpinerEOSDependsRhoT(filename, "gas"),
+        singularity::eos_units_init::LengthTimeUnitsInit(), units.GetTimeCodeToPhysical(),
+        units.GetMassCodeToPhysical(), units.GetLengthCodeToPhysical(),
+        units.GetTemperatureCodeToPhysical());
+    EOS eos_device = eos_host.GetOnDevice();
+    params.Add("eos_h", eos_host);
+    params.Add("eos_d", eos_device);
+#endif
+  } else {
+    PARTHENON_FAIL("Invalid eos type");
   }
 
   // Opacity models

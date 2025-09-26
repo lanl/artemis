@@ -10,10 +10,12 @@
 // license in this material to reproduce, prepare derivative works, distribute copies to
 // the public, perform publicly and display publicly, and to permit others to do so.
 //========================================================================================
-#ifndef UTILS_EOS_HPP_
-#define UTILS_EOS_HPP_
+#ifndef UTILS_EOS_EOS_HPP_
+#define UTILS_EOS_EOS_HPP_
 
 #include "artemis.hpp"
+
+#include "ideal_h_he.hpp"
 
 namespace ArtemisUtils {
 
@@ -26,6 +28,7 @@ static constexpr int lambda_max_vals = 1;
 using EOS =
     singularity::Variant<singularity::UnitSystem<singularity::IdealGas>,
 #ifdef SPINER_USE_HDF
+                         singularity::UnitSystem<ArtemisEOS::IdealHHe>,
                          singularity::UnitSystem<singularity::SpinerEOSDependsRhoT>,
                          singularity::UnitSystem<singularity::SpinerEOSDependsRhoSie>
 #endif
@@ -33,4 +36,4 @@ using EOS =
 
 } // namespace ArtemisUtils
 
-#endif // UTILS_EOS_HPP_
+#endif // UTILS_EOS_EOS_HPP_

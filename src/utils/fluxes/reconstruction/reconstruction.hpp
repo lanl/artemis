@@ -21,11 +21,11 @@ namespace ArtemisUtils {
 //! \brief Class that wraps templated Reconstruction method to allow for partial
 template <ReconstructionMethod R, CoordinateDirection DIR, Coordinates GEOM>
 struct Reconstruction {
-  template <typename V>
+  template <typename V1, typename V2>
   KOKKOS_INLINE_FUNCTION void
   operator()(parthenon::team_mbr_t const &member, const geometry::CoordParams &cpars,
              const int b, const int k, const int j, const int il, const int iu,
-             const V &q, parthenon::ScratchPad2D<Real> &ql,
+             const V1 &q, const V2 &vg, parthenon::ScratchPad2D<Real> &ql,
              parthenon::ScratchPad2D<Real> &qr) const {
     PARTHENON_FAIL("No default implementation!");
   }

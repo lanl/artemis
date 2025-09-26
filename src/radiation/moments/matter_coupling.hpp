@@ -75,6 +75,9 @@ TaskStatus MatterCouplingSimpleImpl(MeshData<Real> *u0, const Real dt) {
                                     gas::cons::internal_energy, gas::cons::total_energy>(
           resolved_pkgs.get());
   const auto v0 = desc.GetPack(u0);
+  static auto desc_g = MakePackDescriptor<geom::x1v, geom::x2v, geom::x3v, geom::hx1v,
+                                          geom::hx2v, geom::hx3v>(resolved_pkgs.get());
+  auto vg = desc_g.GetPack(u0);
   const auto ib = u0->GetBoundsI(IndexDomain::interior);
   const auto jb = u0->GetBoundsJ(IndexDomain::interior);
   const auto kb = u0->GetBoundsK(IndexDomain::interior);
@@ -88,14 +91,14 @@ TaskStatus MatterCouplingSimpleImpl(MeshData<Real> *u0, const Real dt) {
       kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
         geometry::Coords<GEOM> coords(cpars, v0.GetCoordinates(b), k, j, i);
-        const auto &hx = coords.GetScaleFactors();
+        const auto &hx = coords.GetScaleFactors(vg, b, k, j, i);
         // y = U^(0) + dt S(y)
 
         // U^(0) values
         const Real dens = v0(b, gas::cons::density(), k, j, i);
         Real e0 = v0(b, gas::cons::internal_energy(), k, j, i);
-        const auto vb =
-            RotatingFrame::BackgroundVelocity<GEOM>(qshear, om0, coords.x1v());
+        const auto vb = RotatingFrame::BackgroundVelocity<GEOM>(
+            qshear, om0, coords.GetCellCenter(vg, b, k, j, i)[0]);
         std::array<Real, 3> v{
             vb[0] + v0(b, gas::cons::momentum(0), k, j, i) / (hx[0] * dens),
             vb[1] + v0(b, gas::cons::momentum(1), k, j, i) / (hx[1] * dens),
@@ -231,6 +234,9 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
           resolved_pkgs.get());
 
   const auto v0 = desc.GetPack(u0);
+  static auto desc_g = MakePackDescriptor<geom::x1v, geom::x2v, geom::x3v, geom::hx1v,
+                                          geom::hx2v, geom::hx3v>(resolved_pkgs.get());
+  auto vg = desc_g.GetPack(u0);
   const auto ib = u0->GetBoundsI(IndexDomain::interior);
   const auto jb = u0->GetBoundsJ(IndexDomain::interior);
   const auto kb = u0->GetBoundsK(IndexDomain::interior);
@@ -244,7 +250,7 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
       kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
         geometry::Coords<GEOM> coords(cpars, v0.GetCoordinates(b), k, j, i);
-        const auto &hx = coords.GetScaleFactors();
+        const auto &hx = coords.GetScaleFactors(vg, b, k, j, i);
         // y = U^(0) + dt S(y)
 
         // U^(0) values
@@ -263,8 +269,8 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
             dens, v0(b, gas::cons::internal_energy(), k, j, i) / dens);
         const Real eg0 = dens * eos_d.InternalEnergyFromDensityTemperature(dens, T);
 
-        const auto vb =
-            RotatingFrame::BackgroundVelocity<GEOM>(qshear, om0, coords.x1v());
+        const auto vb = RotatingFrame::BackgroundVelocity<GEOM>(
+            qshear, om0, coords.GetCellCenter(vg, b, k, j, i)[0]);
         const std::array<Real, 3> p0{
             vb[0] * dens + v0(b, gas::cons::momentum(0), k, j, i) / hx[0],
             vb[1] * dens + v0(b, gas::cons::momentum(1), k, j, i) / hx[1],

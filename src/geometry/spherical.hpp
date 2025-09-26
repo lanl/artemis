@@ -32,15 +32,46 @@ namespace geometry {
 //!
 //!  We have special handling for 1D and 2D that drops the angle dependence
 
+namespace sph {
+template <class VAR>
+constexpr bool is_x1dep() {
+  return std::is_same_v<VAR, geom::x1v> || std::is_same_v<VAR, geom::dx1> ||
+         std::is_same_v<VAR, geom::hx2v> || std::is_same_v<VAR, geom::dx2> ||
+         std::is_same_v<VAR, geom::hx3v> || std::is_same_v<VAR, geom::dx3> ||
+         std::is_same_v<VAR, geom::vol> || std::is_same_v<VAR, geom::dh2dx1> ||
+         std::is_same_v<VAR, geom::dh3dx1> || std::is_same_v<VAR, geom::ax1> ||
+         std::is_same_v<VAR, geom::ax2> || std::is_same_v<VAR, geom::ax3> ||
+         std::is_same_v<VAR, geom::rfw1m> || std::is_same_v<VAR, geom::rfw1p> ||
+         std::is_same_v<VAR, geom::rfw2m> || std::is_same_v<VAR, geom::rfw2p> ||
+         std::is_same_v<VAR, geom::hx2f1> || std::is_same_v<VAR, geom::hx2f2> ||
+         std::is_same_v<VAR, geom::hx2f3> || std::is_same_v<VAR, geom::hx3f1> ||
+         std::is_same_v<VAR, geom::hx3f2> || std::is_same_v<VAR, geom::hx3f3>;
+}
+template <class VAR>
+constexpr bool is_x2dep() {
+  return std::is_same_v<VAR, geom::x2v> || std::is_same_v<VAR, geom::hx3v> ||
+         std::is_same_v<VAR, geom::dx3> || std::is_same_v<VAR, geom::vol> ||
+         std::is_same_v<VAR, geom::dh3dx2> || std::is_same_v<VAR, geom::ax1> ||
+         std::is_same_v<VAR, geom::ax2> || std::is_same_v<VAR, geom::rfw1m> ||
+         std::is_same_v<VAR, geom::rfw1p> || std::is_same_v<VAR, geom::rfw2m> ||
+         std::is_same_v<VAR, geom::rfw2p> || std::is_same_v<VAR, geom::hx3f1> ||
+         std::is_same_v<VAR, geom::hx3f2> || std::is_same_v<VAR, geom::hx3f3>;
+}
+template <class VAR>
+constexpr bool is_x3dep() {
+  return std::is_same_v<VAR, geom::x3v>;
+}
+} // namespace sph
+
 template <>
 class Coords<Coordinates::spherical3D>
     : public CoordsBase<Coords<Coordinates::spherical3D>> {
   // the derived  specialization
 
  public:
-  KOKKOS_INLINE_FUNCTION
-  Coords(const CoordParams &cpars, const parthenon::Coordinates_t &pco, const int k,
-         const int j, const int i)
+  template <typename PAR>
+  KOKKOS_INLINE_FUNCTION Coords(const PAR &cpars, const parthenon::Coordinates_t &pco,
+                                const int k, const int j, const int i)
       : CoordsBase<Coords<Coordinates::spherical3D>>(cpars, pco, k, j, i) {}
   KOKKOS_INLINE_FUNCTION
   Coords(const bool log, const parthenon::Coordinates_t &pco, const int k, const int j,
@@ -48,6 +79,38 @@ class Coords<Coordinates::spherical3D>
       : CoordsBase<Coords<Coordinates::spherical3D>>(log, pco, k, j, i) {}
   KOKKOS_INLINE_FUNCTION
   Coords() : CoordsBase<Coords<Coordinates::spherical3D>>() {}
+  template <typename PAR>
+  Coords(const PAR &cpars) : CoordsBase<Coords<Coordinates::spherical3D>>(cpars) {}
+
+  template <class VAR>
+  KOKKOS_INLINE_FUNCTION std::array<int, 3> shape_() const {
+    if constexpr (sph::is_x1dep<VAR>()) {
+      if constexpr (sph::is_x2dep<VAR>()) {
+        return {nx[0] + staggered_field<X1DIR, VAR>(),
+                nx[1] + staggered_field<X2DIR, VAR>(), 1};
+      }
+      return {nx[0] + staggered_field<X1DIR, VAR>(), 1, 1};
+    } else if constexpr (sph::is_x2dep<VAR>()) {
+      return {1, nx[1] + staggered_field<X2DIR, VAR>(), 1};
+    } else if constexpr (sph::is_x3dep<VAR>()) {
+      return {1, 1, nx[2]};
+    }
+    return {1, 1, 1};
+  }
+  template <class VAR>
+  KOKKOS_INLINE_FUNCTION int index_(const int k, const int j, const int i) const {
+    if constexpr (sph::is_x1dep<VAR>()) {
+      if constexpr (sph::is_x2dep<VAR>()) {
+        return i + shape_<VAR>()[0] * j;
+      }
+      return i;
+    } else if constexpr (sph::is_x2dep<VAR>()) {
+      return j;
+    } else if constexpr (sph::is_x3dep<VAR>()) {
+      return k;
+    }
+    return 0;
+  }
 
   KOKKOS_INLINE_FUNCTION bool x1dep() const { return true; }
   KOKKOS_INLINE_FUNCTION bool x2dep() const { return true; }
@@ -247,9 +310,9 @@ class Coords<Coordinates::spherical2D>
   // the derived  specialization for 2D spherical coordinates
 
  public:
-  KOKKOS_INLINE_FUNCTION
-  Coords(const CoordParams &cpars, const parthenon::Coordinates_t &pco, const int k,
-         const int j, const int i)
+  template <typename PAR>
+  KOKKOS_INLINE_FUNCTION Coords(const PAR &cpars, const parthenon::Coordinates_t &pco,
+                                const int k, const int j, const int i)
       : CoordsBase<Coords<Coordinates::spherical2D>>(cpars, pco, k, j, i) {}
   KOKKOS_INLINE_FUNCTION
   Coords(const bool log, const parthenon::Coordinates_t &pco, const int k, const int j,
@@ -257,6 +320,38 @@ class Coords<Coordinates::spherical2D>
       : CoordsBase<Coords<Coordinates::spherical2D>>(log, pco, k, j, i) {}
   KOKKOS_INLINE_FUNCTION
   Coords() : CoordsBase<Coords<Coordinates::spherical2D>>() {}
+  template <typename PAR>
+  Coords(const PAR &cpars) : CoordsBase<Coords<Coordinates::spherical2D>>(cpars) {}
+
+  template <class VAR>
+  KOKKOS_INLINE_FUNCTION std::array<int, 3> shape_() const {
+    if constexpr (sph::is_x1dep<VAR>()) {
+      if constexpr (sph::is_x2dep<VAR>()) {
+        return {nx[0] + staggered_field<X1DIR, VAR>(),
+                nx[1] + staggered_field<X2DIR, VAR>(), 1};
+      }
+      return {nx[0] + staggered_field<X1DIR, VAR>(), 1, 1};
+    } else if constexpr (sph::is_x2dep<VAR>()) {
+      return {1, nx[1] + staggered_field<X2DIR, VAR>(), 1};
+    } else if constexpr (sph::is_x3dep<VAR>()) {
+      return {1, 1, nx[2]};
+    }
+    return {1, 1, 1};
+  }
+  template <class VAR>
+  KOKKOS_INLINE_FUNCTION int index_(const int k, const int j, const int i) const {
+    if constexpr (sph::is_x1dep<VAR>()) {
+      if constexpr (sph::is_x2dep<VAR>()) {
+        return i + shape_<VAR>()[0] * j;
+      }
+      return i;
+    } else if constexpr (sph::is_x2dep<VAR>()) {
+      return j;
+    } else if constexpr (sph::is_x3dep<VAR>()) {
+      return k;
+    }
+    return 0;
+  }
 
   KOKKOS_INLINE_FUNCTION bool x1dep() const { return true; }
   KOKKOS_INLINE_FUNCTION bool x2dep() const { return true; }
@@ -453,9 +548,9 @@ class Coords<Coordinates::spherical1D>
   // the derived  specialization for 1D spherical coordinates
 
  public:
-  KOKKOS_INLINE_FUNCTION
-  Coords(const CoordParams &cpars, const parthenon::Coordinates_t &pco, const int k,
-         const int j, const int i)
+  template <typename PAR>
+  KOKKOS_INLINE_FUNCTION Coords(const PAR &cpars, const parthenon::Coordinates_t &pco,
+                                const int k, const int j, const int i)
       : CoordsBase<Coords<Coordinates::spherical1D>>(cpars, pco, k, j, i) {}
   KOKKOS_INLINE_FUNCTION
   Coords(const bool log, const parthenon::Coordinates_t &pco, const int k, const int j,
@@ -463,6 +558,23 @@ class Coords<Coordinates::spherical1D>
       : CoordsBase<Coords<Coordinates::spherical1D>>(log, pco, k, j, i) {}
   KOKKOS_INLINE_FUNCTION
   Coords() : CoordsBase<Coords<Coordinates::spherical1D>>() {}
+  template <typename PAR>
+  Coords(const PAR &cpars) : CoordsBase<Coords<Coordinates::spherical1D>>(cpars) {}
+
+  template <class VAR>
+  KOKKOS_INLINE_FUNCTION int index_(const int k, const int j, const int i) const {
+    if constexpr (sph::is_x1dep<VAR>()) {
+      return i;
+    }
+    return 0;
+  }
+  template <class VAR>
+  KOKKOS_INLINE_FUNCTION std::array<int, 3> shape_() const {
+    if constexpr (sph::is_x1dep<VAR>()) {
+      return {nx[0] + staggered_field<X1DIR, VAR>(), 1, 1};
+    }
+    return {1, 1, 1};
+  }
 
   KOKKOS_INLINE_FUNCTION bool x1dep() const { return true; }
 

@@ -652,11 +652,9 @@ inline void IdealHHe::FillTable(const std::string &filename) {
   // Determine the energy grid
   lEmin = std::numeric_limits<Real>::max();
   lEmax = std::numeric_limits<Real>::min();
-  FILE *f = std::fopen("eos.txt", "w");
-  fprintf(f, "# d T mu E P cv G B x y z1 z2\n");
+
   for (int j = 0; j < nd; j++) {
     const Real d = std::pow(10., lT_.range(1).x(j));
-    printf("%.1e\n", std::pow(10., lT_.range(1).x(j)));
     for (int i = 0; i < nt; i++) {
       const Real T = std::pow(10., lT_.range(0).x(i));
       const auto &[mu, dlmut, dlmur] = MeanMass(d, T);
@@ -666,16 +664,10 @@ inline void IdealHHe::FillTable(const std::string &filename) {
       const Real cv = SpecificHeatFromDensityTemperature(d, T);
       const Real G = GruneisenParamFromDensityTemperature(d, T);
       const Real B = BulkModulusFromDensityTemperature(d, T);
-      fprintf(f,
-              "%.5e\t%.5e\t%.5e\t%.5e\t%.5e\t%.5e\t%.5e\t%.5e\t%.5e\t%.5e\t%.5e\t%.5e\t%."
-              "5e\t%.5e\t%.5e\t%.5e\t%.5e\t%.5e\t%.5e\t%.5e\t%.5e\t%.5e\n",
-              d, T, mu, E, P, cv, G, B, r.x, r.y, r.z1, r.z2, r.dxdt, r.dxdr, r.dydt,
-              r.dydr, r.dz1dt, r.dz1dr, r.dz2dt, r.dz2dr, dlmut, dlmur);
       lEmin = std::min(lEmin, E);
       lEmax = std::max(lEmax, E);
     }
   }
-  std::fclose(f);
   if (lEmin <= 0.0 || (lEmax <= 0.0) || std::isnan(lEmin) || std::isnan(lEmax)) {
     PORTABLE_THROW_OR_ABORT("Failed to find positive or real energy values from given "
                             "temperature and density grid.");
@@ -702,7 +694,7 @@ inline void IdealHHe::FillTable(const std::string &filename) {
     }
   }
 
-  // Check table?
+  // Checking table inversion
   for (int j = 0; j < nd; j++) {
     const Real ld = lT_.range(1).x(j);
     const Real d = std::pow(10., lT_.range(1).x(j));
@@ -723,9 +715,25 @@ inline void IdealHHe::FillTable(const std::string &filename) {
   }
 }
 
+constexpr char METADATA_NAME[] = "Params";
 inline void IdealHHe::Save(const std::string &filename) {
   herr_t status = H5_SUCCESS;
   hid_t file = H5Fcreate(filename.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+
+  hid_t metadata = H5Gcreate(file, METADATA_NAME, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+  status += H5LTset_attribute_double(file, METADATA_NAME, "x", &_X, 1);
+  status += H5LTset_attribute_double(file, METADATA_NAME, "y", &_Y, 1);
+  status += H5LTset_attribute_double(file, METADATA_NAME, "ltmin", &lTmin, 1);
+  status += H5LTset_attribute_double(file, METADATA_NAME, "ltmax", &lTmax, 1);
+  status += H5LTset_attribute_double(file, METADATA_NAME, "ldmin", &lDmin, 1);
+  status += H5LTset_attribute_double(file, METADATA_NAME, "ldmax", &lDmax, 1);
+  status += H5LTset_attribute_double(file, METADATA_NAME, "dlnT", &_dlnT, 1);
+  status += H5LTset_attribute_double(file, METADATA_NAME, "fp", &_fp, 1);
+  status += H5LTset_attribute_double(file, METADATA_NAME, "fm", &_fo, 1);
+  status += H5LTset_attribute_int(file, METADATA_NAME, "nt", &nt, 1);
+  status += H5LTset_attribute_int(file, METADATA_NAME, "nd", &nd, 1);
+  H5Gclose(metadata);
+
   status += lP_.saveHDF(file, "logpress");
   status += lT_.saveHDF(file, "logtemp");
   status += Cv_.saveHDF(file, "cv");
@@ -740,6 +748,21 @@ inline void IdealHHe::Save(const std::string &filename) {
 inline void IdealHHe::Load(const std::string &filename) {
   herr_t status = H5_SUCCESS;
   hid_t file = H5Fopen(filename.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
+
+  hid_t metadata = H5Gopen(file, METADATA_NAME, H5P_DEFAULT);
+  status += H5LTget_attribute_double(file, METADATA_NAME, "x", &_X);
+  status += H5LTget_attribute_double(file, METADATA_NAME, "y", &_Y);
+  status += H5LTget_attribute_double(file, METADATA_NAME, "ltmin", &lTmin);
+  status += H5LTget_attribute_double(file, METADATA_NAME, "ltmax", &lTmax);
+  status += H5LTget_attribute_double(file, METADATA_NAME, "ldmin", &lDmin);
+  status += H5LTget_attribute_double(file, METADATA_NAME, "ldmax", &lDmax);
+  status += H5LTget_attribute_double(file, METADATA_NAME, "dlnT", &_dlnT);
+  status += H5LTget_attribute_double(file, METADATA_NAME, "fp", &_fp);
+  status += H5LTget_attribute_double(file, METADATA_NAME, "fm", &_fo);
+  status += H5LTget_attribute_int(file, METADATA_NAME, "nt", &nt);
+  status += H5LTget_attribute_int(file, METADATA_NAME, "nd", &nd);
+  H5Gclose(metadata);
+
   status += lP_.loadHDF(file, "logpress");
   status += lT_.loadHDF(file, "logtemp");
   status += Cv_.loadHDF(file, "cv");

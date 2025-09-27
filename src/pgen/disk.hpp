@@ -60,7 +60,7 @@ struct DiskParams {
   Real dust_to_gas;
   Real rexp;
   Real rcav;
-  Real Gamma, gamma_gas;
+  Real Gamma;
   Real alpha, nu0, nu_indx;
   Real mdot;
   Real temp_soft2;
@@ -279,9 +279,7 @@ inline void InitDiskParams(MeshBlock *pmb, ParameterInput *pin) {
     disk_params.rho0 = pin->GetOrAddReal("problem", "rho0", 1.0);
     disk_params.p = pin->GetOrAddReal("problem", "dslope", -2.25);
     disk_params.h0 = pin->GetOrAddReal("problem", "h0", 0.05);
-    disk_params.gamma_gas = gas_pkg->Param<Real>("adiabatic_index");
-    disk_params.Gamma =
-        pin->GetOrAddReal("problem", "polytropic_index", disk_params.gamma_gas);
+    disk_params.Gamma = pin->GetOrAddReal("problem", "polytropic_index", 1.0);
 
     PARTHENON_REQUIRE(disk_params.Gamma >= 1, "problem/gamma needs to be >= 1");
 
@@ -334,8 +332,8 @@ inline void InitDiskParams(MeshBlock *pmb, ParameterInput *pin) {
       const auto vtype = pin->GetString("gas/viscosity", "type");
       if (vtype == "alpha") {
         disk_params.alpha = pin->GetReal("gas/viscosity", "alpha");
-        disk_params.nu0 = disk_params.alpha * disk_params.gamma_gas *
-                          SQR(disk_params.h0 * disk_params.r0 * disk_params.Omega0);
+        disk_params.nu0 =
+            disk_params.alpha * SQR(disk_params.h0 * disk_params.r0 * disk_params.Omega0);
         disk_params.nu_indx = 1.5 + disk_params.q;
       } else if ((vtype == "powerlaw") || (vtype == "constant")) {
         disk_params.nu0 = pin->GetReal("gas/viscosity", "nu");

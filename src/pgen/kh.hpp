@@ -46,6 +46,9 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   // Extract parameters from packages
   auto artemis_pkg = pmb->packages.Get("artemis");
   auto gas_pkg = pmb->packages.Get("gas");
+
+  PARTHENON_REQUIRE(gas_pkg->Param<std::string>("eos_type") == "ideal",
+                    "KH pgen requires an ideal gas");
   const bool do_gas = artemis_pkg->Param<bool>("do_gas");
 
   KH_params.y1 = pin->GetOrAddReal("problem", "y1", 0.5);

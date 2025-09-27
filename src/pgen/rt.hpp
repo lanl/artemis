@@ -56,6 +56,8 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   RT_params.freq = pin->GetOrAddReal("problem", "frequency", 6 * M_PI);
   RT_params.amp = pin->GetOrAddReal("problem", "amplitude", 0.01);
 
+  PARTHENON_REQUIRE(gas_pkg->Param<std::string>("eos_type") == "ideal",
+                    "RT pgen requires an ideal gas");
   const auto gm1 = gas_pkg->Param<Real>("adiabatic_index") - 1.0;
 
   // packing and capture variables for kernel

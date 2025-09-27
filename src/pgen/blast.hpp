@@ -153,6 +153,8 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const bool do_dust = artemis_pkg->Param<bool>("do_dust");
   // TODO(PDM): Replace the below with a call to singularity-eos
   auto gas_pkg = pmb->packages.Get("gas");
+  PARTHENON_REQUIRE(gas_pkg->Param<std::string>("eos_type") == "ideal",
+                    "blast pgen requires an ideal gas");
   const Real gm1 = gas_pkg->Param<Real>("adiabatic_index") - 1.0;
 
   // packing and capture variables for kernel

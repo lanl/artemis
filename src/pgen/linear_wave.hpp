@@ -198,6 +198,8 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   lwv.v1_0 = lwv.vflow;
   // TODO(PDM): Replace the below with a call to singularity-eos
   auto gas_pkg = pmb->packages.Get("gas");
+  PARTHENON_REQUIRE(gas_pkg->Param<std::string>("eos_type") == "ideal",
+                    "linear_wave pgen requires an ideal gas");
   lwv.gamma = gas_pkg->Param<Real>("adiabatic_index");
   lwv.gm1 = lwv.gamma - 1.0;
   lwv.p0 = 1.0 / lwv.gamma;

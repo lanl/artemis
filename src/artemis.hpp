@@ -46,8 +46,10 @@ ARTEMIS_VARIABLE(gas.cons, momentum);
 namespace prim {
 ARTEMIS_VARIABLE(gas.prim, density);
 ARTEMIS_VARIABLE(gas.prim, pressure);
+ARTEMIS_VARIABLE(gas.prim, temperature);
 ARTEMIS_VARIABLE(gas.prim, velocity);
 ARTEMIS_VARIABLE(gas.prim, sie);
+ARTEMIS_VARIABLE(gas.prim, bmod);
 } // namespace prim
 namespace diff {
 ARTEMIS_VARIABLE(gas.diff, momentum);

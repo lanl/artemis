@@ -73,6 +73,8 @@ dust = true
 cfl = 0.9
 reconstruct = plm
 riemann = hllc
+
+<gas/eos/ideal>
 gamma = 1.66666666667
 
 <dust>

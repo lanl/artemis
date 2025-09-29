@@ -40,7 +40,6 @@ class IdealHHe : public singularity::eos_base::EosBase<IdealHHe> {
  public:
   using DataBox = Spiner::DataBox<Real>;
   IdealHHe() = default;
-  PORTABLE_INLINE_FUNCTION
   IdealHHe(Real X, Real Y, Real ltmin, Real ltmax, int nt, Real ldmin, Real ldmax, int nd,
            const std::string &save_to_file, bool use_table = true, Real dlnT = 1e-6,
            const singularity::MeanAtomicProperties &AZbar =
@@ -348,19 +347,19 @@ class IdealHHe : public singularity::eos_base::EosBase<IdealHHe> {
   Real lTmin, lTmax, lDmin, lDmax, _dlnT, lEmin, lEmax;
   int nd, nt;
   DataBox lP_, lB_, lT_, Cv_, Gm_;
-  static constexpr Real _small = 1e-15;
-  static constexpr Real _na = 6.02214129e23;
-  static constexpr Real _hbar = 1.0546e-27; // cm^2 g/s
-  static constexpr Real _kb = 1.3807e-16;   // cm^2 g/(s^2 K)
-  static constexpr Real _eV = 8.6173e-5;    // eV/K
-  static constexpr Real _me = 9.1094e-28;   // g
-  static constexpr Real _mp = 1.6726e-24;   // g
-  static constexpr Real _Tp = 4.0 * M_PI * _hbar * _hbar / (_mp * _kb);
-  static constexpr Real _Te = 2.0 * M_PI * _hbar * _hbar / (_me * _kb);
-  static constexpr Real _ye = 4.478069 / _eV;
-  static constexpr Real _xe = 13.598433 / _eV;
-  static constexpr Real _z1e = 24.587387 / _eV;
-  static constexpr Real _z2e = 54.417760 / _eV;
+  Real _small = 1e-15;
+  Real _na = 6.02214129e23;
+  Real _hbar = 1.0546e-27; // cm^2 g/s
+  Real _kb = 1.3807e-16;   // cm^2 g/(s^2 K)
+  Real _eV = 8.6173e-5;    // eV/K
+  Real _me = 9.1094e-28;   // g
+  Real _mp = 1.6726e-24;   // g
+  Real _Tp = 4.0 * M_PI * _hbar * _hbar / (_mp * _kb);
+  Real _Te = 2.0 * M_PI * _hbar * _hbar / (_me * _kb);
+  Real _ye = 4.478069 / _eV;
+  Real _xe = 13.598433 / _eV;
+  Real _z1e = 24.587387 / _eV;
+  Real _z2e = 54.417760 / _eV;
 
   singularity::MeanAtomicProperties _AZbar;
   static constexpr const unsigned long _preferred_input =
@@ -422,7 +421,6 @@ class IdealHHe : public singularity::eos_base::EosBase<IdealHHe> {
   }
   PORTABLE_INLINE_FUNCTION Mixture GetMassFractions(const Real rho, const Real T) const {
     Mixture res{0.0};
-    constexpr Real is_zero = _small;
     // y
     Real f1 = _mp / rho;
     const Real ppfac = _mp * std::pow(_Tp, -1.5);
@@ -439,7 +437,7 @@ class IdealHHe : public singularity::eos_base::EosBase<IdealHHe> {
     Real a = f1 / _X * f2e * singularity::robust::safe_arg_exp(-_xe / (T));
     Real dlat = _xe / (T) + 1.5;
     res.x = snap(quadratic_root(a, 0., 1.0));
-    if ((std::abs(a) > is_zero) && (res.x > 0.0) && (res.x < 1.0)) {
+    if ((std::abs(a) > _small) && (res.x > 0.0) && (res.x < 1.0)) {
       res.dxdt = singularity::robust::ratio(dlat * a * (1. - res.x), 2 * res.x + a);
       res.dxdr = singularity::robust::ratio(-a * (1. - res.x), (2 * res.x + a));
     }
@@ -450,7 +448,7 @@ class IdealHHe : public singularity::eos_base::EosBase<IdealHHe> {
     a = 0.5 * f1 / _X * f2p * singularity::robust::safe_arg_exp(-_ye / (T));
     res.y = snap(quadratic_root(a, 0.0, 1.0));
     dlat = _ye / (T) + 1.5;
-    if ((std::abs(a) > is_zero) || (res.y > 0.0) && (res.y < 1.0)) {
+    if ((std::abs(a) > _small) || (res.y > 0.0) && (res.y < 1.0)) {
       res.dydt = singularity::robust::ratio(dlat * a * (1. - res.y), 2 * res.y + a);
       res.dydr = singularity::robust::ratio(-a * (1. - res.y), (2 * res.y + a));
     }
@@ -459,7 +457,7 @@ class IdealHHe : public singularity::eos_base::EosBase<IdealHHe> {
     a = 4.0 * f1 * f2e * singularity::robust::safe_arg_exp(-_z1e / (T));
     dlat = _z1e / (T) + 1.5;
     res.z1 = snap(quadratic_root(a, _X, 0.25 * _Y));
-    if ((std::abs(a) > is_zero) && (res.z1 > 0.0) && (res.z1 < 1.0)) {
+    if ((std::abs(a) > _small) && (res.z1 > 0.0) && (res.z1 < 1.0)) {
       res.dz1dt = singularity::robust::ratio(dlat * a * (1. - res.z1),
                                              a + 0.5 * _Y * res.z1 + _X);
       res.dz1dr =
@@ -470,7 +468,7 @@ class IdealHHe : public singularity::eos_base::EosBase<IdealHHe> {
     a = f1 * f2e * singularity::robust::safe_arg_exp(-_z2e / (T));
     dlat = _z2e / (T) + 1.5;
     res.z2 = snap(quadratic_root(a, _X + 0.25 * _Y, 0.25 * _Y));
-    if ((std::abs(a) > is_zero) && (res.z2 > 0.0) && (res.z2 < 1.0)) {
+    if ((std::abs(a) > _small) && (res.z2 > 0.0) && (res.z2 < 1.0)) {
       res.dz2dt = singularity::robust::ratio(dlat * a * (1. - res.z2),
                                              a + 0.5 * _Y * res.z2 + _X + 0.25 * _Y);
       res.dz2dr = singularity::robust::ratio(-a * (1. - res.z2),

@@ -99,8 +99,8 @@ struct RiemannSolver<RSolver::llf, FLUID_TYPE, CTYPE,
             if constexpr (FLUID_TYPE == Fluid::gas) {
               wl_ipr = wl(IPR, i);
               wl_ise = wl(ISE, i);
+              wl_ibl = wr(IBL, i);
               wr_ipr = wr(IPR, i);
-              wr_ibl = wr(IBL, i);
               wr_ise = wr(ISE, i);
               wr_ibl = wr(IBL, i);
             }

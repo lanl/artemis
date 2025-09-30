@@ -100,7 +100,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
       PARTHENON_REQUIRE(mu > 0, "Only positive mean molecular weight allowed!");
       cv = constants.GetKBCode() / ((gamma - 1.) * constants.GetAMUCode() * mu);
     }
-    params.Add("eos_type", "ideal");
+    params.Add("eos_type", std::string("ideal"));
     params.Add("mu", mu);
     params.Add("cv", cv);
     EOS eos_host = singularity::UnitSystem<singularity::IdealGas>(
@@ -115,7 +115,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
     params.Add("adiabatic_index", gamma);
 #ifdef SPINER_USE_HDF
   } else if (pin->DoesBlockExist("gas/eos/h-he")) {
-    params.Add("eos_type", "h-he");
+    params.Add("eos_type", std::string("h-he"));
     const std::string block_name = "gas/eos/h-he";
     if (pin->DoesParameterExist(block_name, "eos_file")) {
       // load from file
@@ -152,7 +152,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
       params.Add("eos_d", eos_device);
     }
   } else if (pin->DoesBlockExist("gas/eos/table_re")) {
-    params.Add("eos_type", "table_re");
+    params.Add("eos_type", std::string("table_re"));
     const std::string block_name = "gas/eos/table_re";
     std::string filename = pin->GetString(block_name, "eos_file");
     EOS eos_host = singularity::UnitSystem<singularity::SpinerEOSDependsRhoSie>(
@@ -165,7 +165,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
     params.Add("eos_d", eos_device);
     params.Add("mu", 1.0);
   } else if (pin->DoesBlockExist("gas/eos/table_rt")) {
-    params.Add("eos_type", "table_rt");
+    params.Add("eos_type", std::string("table_rt"));
     const std::string block_name = "gas/eos/table_rt";
     std::string filename = pin->GetString(block_name, "eos_file");
     EOS eos_host = singularity::UnitSystem<singularity::SpinerEOSDependsRhoT>(

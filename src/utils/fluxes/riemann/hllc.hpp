@@ -58,6 +58,9 @@ struct RiemannSolver<RSolver::hllc, FLUID_TYPE, CTYPE,
     PARTHENON_REQUIRE(dir > 0 && dir <= 3, "Invalid flux direction!");
     auto fdir = (dir == 1) ? TE::F1 : ((dir == 2) ? TE::F2 : TE::F3);
 
+    // TODO(BRR) temporary
+    const Real gm1 = eos.GruneisenParamFromDensityTemperature(Null<Real>(), Null<Real>());
+
     // Obtain number of species
     const int nspecies = q.GetSize(b, gas::cons::density());
 
@@ -68,9 +71,12 @@ struct RiemannSolver<RSolver::hllc, FLUID_TYPE, CTYPE,
       const int ivz = nspecies + (n * 3) + ((dir - 1) + 2) % 3;
       const int IPR = nspecies * 4 + n;
       const int ISE = nspecies * 5 + n;
-      const int IBL = nspecies * 6 + n;
       const int IEN = IPR;
       const int IEG = ISE;
+
+      Real igm1 = 1.0 / gm1;
+      Real gamma = gm1 + 1.0;
+      Real alpha = (gamma + 1.0) / (2.0 * gamma);
 
       parthenon::par_for_inner(
           DEFAULT_INNER_LOOP_PATTERN, member, il, iu, [&](const int i) {
@@ -81,7 +87,6 @@ struct RiemannSolver<RSolver::hllc, FLUID_TYPE, CTYPE,
             Real &wl_ivz = wl(ivz, i);
             Real &wl_ipr = wl(IPR, i);
             Real &wl_ise = wl(ISE, i);
-            Real &wl_ibl = wl(IBL, i);
 
             Real &wr_idn = wr(IDN, i);
             Real &wr_ivx = wr(ivx, i);
@@ -89,32 +94,25 @@ struct RiemannSolver<RSolver::hllc, FLUID_TYPE, CTYPE,
             Real &wr_ivz = wr(ivz, i);
             Real &wr_ipr = wr(IPR, i);
             Real &wr_ise = wr(ISE, i);
-            Real &wr_ibl = wr(IBL, i);
 
             // Compute middle state estimates with PVRS (Toro 10.5.2)
             // define 6 registers used below
             Real qa, qb, qc, qd, qe, qf;
-            qa = std::sqrt(wl_ibl / wl_idn);
-            qb = std::sqrt(wr_ibl / wr_idn);
-            Real el = wl_idn * wl_ise +
-                      0.5 * wl_idn * (SQR(wl_ivx) + SQR(wl_ivy) + SQR(wl_ivz));
-            Real er = wr_idn * wr_ise +
-                      0.5 * wr_idn * (SQR(wr_ivx) + SQR(wr_ivy) + SQR(wr_ivz));
+            qa = std::sqrt(gamma * wl_ipr / wl_idn);
+            qb = std::sqrt(gamma * wr_ipr / wr_idn);
+            Real el =
+                wl_ipr * igm1 + 0.5 * wl_idn * (SQR(wl_ivx) + SQR(wl_ivy) + SQR(wl_ivz));
+            Real er =
+                wr_ipr * igm1 + 0.5 * wr_idn * (SQR(wr_ivx) + SQR(wr_ivy) + SQR(wr_ivz));
             qc = 0.25 * (wl_idn + wr_idn) *
                  (qa + qb); // average density * average sound speed
             qd = 0.5 * (wl_ipr + wr_ipr + (wl_ivx - wr_ivx) * qc); // P_mid
 
             // Compute sound speed in L,R
-            // Batten+1997
-            const Real alpha_l =
-                std::sqrt((wl_ipr / wl_ibl) * (wl_ipr / (wl_idn * wl_ise)));
-            const Real alpha_r =
-                std::sqrt((wr_ipr / wr_ibl) * (wr_ipr / (wr_idn * wr_ise)));
-
             qe = (qd <= wl_ipr) ? 1.0
-                                : std::sqrt(1.0 + alpha_l * ((qd / wl_ipr) - 1.0)); // ql
+                                : std::sqrt(1.0 + alpha * ((qd / wl_ipr) - 1.0)); // ql
             qf = (qd <= wr_ipr) ? 1.0
-                                : std::sqrt(1.0 + alpha_r * ((qd / wr_ipr) - 1.0)); // qr
+                                : std::sqrt(1.0 + alpha * ((qd / wr_ipr) - 1.0)); // qr
 
             // Compute the max/min wave speeds based on L/R
             Real sl = wl_ivx - qa * qe;

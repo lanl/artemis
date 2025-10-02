@@ -58,7 +58,7 @@ struct DiskParams {
   Real gm, Omega0, l0;
   Real omf;
   Real dust_to_gas;
-  Real rexp;
+  Real rexp, exp_pow;
   Real rcav;
   Real Gamma, gamma_gas;
   Real alpha, nu0, nu_indx;
@@ -91,7 +91,8 @@ Real DenProfile(struct DiskParams pgen, const Real R, const Real z) {
   const Real r = std::sqrt(R * R + z * z);
   const Real h = pgen.h0 * std::pow(R / pgen.r0, pgen.flare);
   const Real sig0 = pgen.rho0; // / (std::sqrt(2.0 * M_PI) * pgen.h0 * pgen.r0);
-  const Real exp_fac = (pgen.rexp == 0.) ? 1. : std::exp(-SQR(R / pgen.rexp));
+  const Real exp_fac =
+      (pgen.rexp == 0.) ? 1. : std::exp(-std::pow(R / pgen.rexp, pgen.exp_pow));
   const Real dmid =
       (sig0 * std::pow(R / pgen.r0, pgen.p)) *
       (1. - pgen.l0 * std::sqrt(pgen.r0 / R)) * // correction for an inner binary
@@ -288,6 +289,7 @@ inline void InitDiskParams(MeshBlock *pmb, ParameterInput *pin) {
     disk_params.dens_min = pin->GetOrAddReal("problem", "dens_min", 1.0e-20);
     disk_params.pres_min = pin->GetOrAddReal("problem", "pres_min", 1.0e-24);
     disk_params.rexp = pin->GetOrAddReal("problem", "rexp", 0.0);
+    disk_params.exp_pow = pin->GetOrAddReal("problem", "exp_pow", 2.0);
     disk_params.rcav = pin->GetOrAddReal("problem", "rcav", 0.0);
     disk_params.l0 = pin->GetOrAddReal("problem", "l0", 0.0);
     disk_params.dust_to_gas = pin->GetOrAddReal("problem", "dust_to_gas", 0.01);
@@ -753,6 +755,9 @@ void DiskBoundaryExtrap(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) 
   constexpr int ix1 = x1dir ? 0 : (x2dir ? 1 : 2);
   constexpr int ix2 = (ix1 + 1) % 3;
   constexpr int ix3 = (ix1 + 2) % 3;
+  constexpr bool inner =
+      ((BDY == IndexDomain::inner_x1) || (BDY == IndexDomain::inner_x2) ||
+       (BDY == IndexDomain::inner_x3));
 
   pmb->par_for_bndry(
       "DiskExtrap", nb, BDY, parthenon::TopologicalElement::CC, coarse, fine,
@@ -839,7 +844,8 @@ void DiskBoundaryExtrap(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) 
             // Set extrapolated values
             v(0, gas::prim::density(n), k, j, i) = rhog;
             v(0, gas::prim::sie(n), k, j, i) = sieg;
-            v(0, gas::prim::velocity(VI(n, ix1)), k, j, i) = gvel[ix1];
+            const bool inflow = (inner) ? gva[ix1] > 0.0 : gva[ix1] < 0.0;
+            v(0, gas::prim::velocity(VI(n, ix1)), k, j, i) = (inflow) ? 0.0 : gvel[ix1];
             v(0, gas::prim::velocity(VI(n, ix2)), k, j, i) = gvel[ix2];
             v(0, gas::prim::velocity(VI(n, ix3)), k, j, i) = gvel[ix3];
           }

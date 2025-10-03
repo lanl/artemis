@@ -44,7 +44,7 @@ namespace ArtemisUtils {
 //! \class ArtemisUtils::RiemannSolver<RSolver::hllc, ...>
 //! \brief The HLLC Riemann solver for ideal gas hydrodynamics
 template <Fluid FLUID_TYPE, Closure CTYPE>
-struct RiemannSolver<RSolver::hllc, FLUID_TYPE, CTYPE,
+struct RiemannSolver<RSolver::ghllc, FLUID_TYPE, CTYPE,
                      std::enable_if_t<FLUID_TYPE == Fluid::gas>> {
   template <typename V1, typename V2, typename V3>
   KOKKOS_INLINE_FUNCTION void operator()(const EOS &eos, const Real c, const Real chat,
@@ -190,7 +190,7 @@ struct RiemannSolver<RSolver::hllc, FLUID_TYPE, CTYPE,
 //! \class ArtemisUtils::RiemannSolver<RSolver::hllc, ...>
 //! \brief The HLLC Riemann solver for ideal gas hydrodynamics
 template <Fluid FLUID_TYPE, Closure CTYPE>
-struct RiemannSolver<RSolver::ghllc, FLUID_TYPE, CTYPE,
+struct RiemannSolver<RSolver::hllc, FLUID_TYPE, CTYPE,
                      std::enable_if_t<FLUID_TYPE == Fluid::gas>> {
   template <typename V1, typename V2, typename V3>
   KOKKOS_INLINE_FUNCTION void operator()(const EOS &eos, const Real c, const Real chat,

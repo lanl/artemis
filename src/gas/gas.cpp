@@ -72,7 +72,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   std::string eos_type = "none";
   if (pin->DoesBlockExist("gas/eos/ideal") || (pin->DoesParameterExist("gas", "gamma"))) {
     const std::string block_name =
-        pin->DoesBlockExist("gas/eos") ? "gas/eos/ideal" : "gas";
+        pin->DoesBlockExist("gas/eos/ideal") ? "gas/eos/ideal" : "gas";
     const Real gamma = pin->GetOrAddReal(block_name, "gamma", 1.66666666667);
     auto cv = Null<Real>();
     auto mu = Null<Real>();

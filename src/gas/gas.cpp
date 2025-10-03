@@ -64,25 +64,12 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   recon_method = ArtemisUtils::ChooseReconMethod(recon);
   params.Add("recon", recon_method);
 
-  // Riemann solver
-  RSolver riemann_solver = RSolver::null;
-  const std::string riemann = pin->GetOrAddString("gas", "riemann", "hllc");
-  if (riemann.compare("hllc") == 0) {
-    riemann_solver = RSolver::hllc;
-  } else if (riemann.compare("hlle") == 0) {
-    riemann_solver = RSolver::hlle;
-  } else if (riemann.compare("llf") == 0) {
-    riemann_solver = RSolver::llf;
-  } else {
-    PARTHENON_FAIL("Riemann solver (gas) not recognized.");
-  }
-  params.Add("rsolver", riemann_solver);
-
   // Courant, Friedrichs, & Lewy (CFL) Number
   const Real cfl_number = pin->GetOrAddReal("gas", "cfl", 0.8);
   params.Add("cfl", cfl_number);
 
   // Equation of state
+  std::string eos_type = "none";
   if (pin->DoesBlockExist("gas/eos/ideal") || (pin->DoesParameterExist("gas", "gamma"))) {
     const std::string block_name =
         pin->DoesBlockExist("gas/eos") ? "gas/eos/ideal" : "gas";
@@ -100,7 +87,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
       PARTHENON_REQUIRE(mu > 0, "Only positive mean molecular weight allowed!");
       cv = constants.GetKBCode() / ((gamma - 1.) * constants.GetAMUCode() * mu);
     }
-    params.Add("eos_type", std::string("ideal"));
+    eos_type = "ideal";
     params.Add("mu", mu);
     params.Add("cv", cv);
     EOS eos_host = singularity::UnitSystem<singularity::IdealGas>(
@@ -115,7 +102,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
     params.Add("adiabatic_index", gamma);
 #ifdef SPINER_USE_HDF
   } else if (pin->DoesBlockExist("gas/eos/h-he")) {
-    params.Add("eos_type", std::string("h-he"));
+    eos_type = "h-he";
     const std::string block_name = "gas/eos/h-he";
     if (pin->DoesParameterExist(block_name, "eos_file")) {
       // load from file
@@ -152,7 +139,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
       params.Add("eos_d", eos_device);
     }
   } else if (pin->DoesBlockExist("gas/eos/table_re")) {
-    params.Add("eos_type", std::string("table_re"));
+    eos_type = "table_re";
+    params.Add("eos_type", eos_type);
     const std::string block_name = "gas/eos/table_re";
     std::string filename = pin->GetString(block_name, "eos_file");
     EOS eos_host = singularity::UnitSystem<singularity::SpinerEOSDependsRhoSie>(
@@ -165,7 +153,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
     params.Add("eos_d", eos_device);
     params.Add("mu", 1.0);
   } else if (pin->DoesBlockExist("gas/eos/table_rt")) {
-    params.Add("eos_type", std::string("table_rt"));
+    eos_type = "table_rt";
     const std::string block_name = "gas/eos/table_rt";
     std::string filename = pin->GetString(block_name, "eos_file");
     EOS eos_host = singularity::UnitSystem<singularity::SpinerEOSDependsRhoT>(
@@ -181,6 +169,24 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   } else {
     PARTHENON_FAIL("Unspported gas EOS!");
   }
+
+  params.Add("eos_type", eos_type);
+
+  // Riemann solver
+  RSolver riemann_solver = RSolver::null;
+  const std::string riemann = pin->GetOrAddString("gas", "riemann", "hllc");
+  if (riemann.compare("hllc") == 0) {
+    riemann_solver = RSolver::hllc;
+  } else if (riemann.compare("ghllc") == 0) {
+    riemann_solver = RSolver::ghllc;
+  } else if (riemann.compare("hlle") == 0) {
+    riemann_solver = RSolver::hlle;
+  } else if (riemann.compare("llf") == 0) {
+    riemann_solver = RSolver::llf;
+  } else {
+    PARTHENON_FAIL("Riemann solver (gas) not recognized.");
+  }
+  params.Add("rsolver", riemann_solver);
 
   // Opacity models
   const Real time = units.GetTimeCodeToPhysical();

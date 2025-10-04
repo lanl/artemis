@@ -184,6 +184,10 @@ KOKKOS_FORCEINLINE_FUNCTION constexpr auto Big() {
   return std::numeric_limits<T>::max();
 }
 template <typename T = Real>
+KOKKOS_FORCEINLINE_FUNCTION constexpr auto Tiny() {
+  return std::numeric_limits<T>::lowest();
+}
+template <typename T = Real>
 KOKKOS_FORCEINLINE_FUNCTION constexpr auto Fuzz() {
   if constexpr (std::is_same_v<T, float>) {
     return 1e-22;

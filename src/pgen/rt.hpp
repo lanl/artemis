@@ -56,9 +56,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   RT_params.freq = pin->GetOrAddReal("problem", "frequency", 6 * M_PI);
   RT_params.amp = pin->GetOrAddReal("problem", "amplitude", 0.01);
 
-  PARTHENON_REQUIRE(gas_pkg->Param<std::string>("eos_type") == "ideal",
-                    "RT pgen requires an ideal gas");
-  const auto gm1 = gas_pkg->Param<Real>("adiabatic_index") - 1.0;
+  const auto &eos = gas_pkg->Param<ArtemisUtils::EOS>("eos_d");
 
   // packing and capture variables for kernel
   auto &md = pmb->meshblock_data.Get();
@@ -113,7 +111,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         const Real pres = p0 + gx * (zc - z0) * dens;
 
         v(0, gas::prim::density(0), k, j, i) = dens;
-        v(0, gas::prim::sie(0), k, j, i) = pres / (dens * gm1);
+        v(0, gas::prim::sie(0), k, j, i) = ArtemisUtils::EofPR(eos, pres, dens);
         v(0, gas::prim::velocity(0), k, j, i) = 0.0;
         v(0, gas::prim::velocity(1), k, j, i) = pars.amp * std::cos(pars.freq * xc);
         v(0, gas::prim::velocity(2), k, j, i) = 0.0;

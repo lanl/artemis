@@ -530,7 +530,7 @@ Real EstimateTimestepMesh(MeshData<Real> *md) {
   auto eos_d = params.template Get<EOS>("eos_d");
 
   static auto desc =
-      MakePackDescriptor<gas::prim::density, gas::prim::velocity, gas::prim::sie>(
+      MakePackDescriptor<gas::prim::density, gas::prim::velocity, gas::prim::sie, gas::prim::bmod>(
           resolved_pkgs.get());
   auto vmesh = desc.GetPack(md);
   static auto desc_g =
@@ -554,8 +554,7 @@ Real EstimateTimestepMesh(MeshData<Real> *md) {
 
         for (int n = 0; n < vmesh.GetSize(b, gas::prim::density()); ++n) {
           const Real &dens = vmesh(b, gas::prim::density(n), k, j, i);
-          const Real &sie = vmesh(b, gas::prim::sie(n), k, j, i);
-          const Real bulk = eos_d.BulkModulusFromDensityInternalEnergy(dens, sie);
+          const Real &bulk = vmesh(b, gas::prim::bmod(n), k, j, i);
           const Real cs = std::sqrt(bulk / dens);
           Real denom = 0.0;
           for (int d = 0; d < ndim; d++) {

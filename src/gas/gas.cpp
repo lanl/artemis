@@ -530,8 +530,8 @@ Real EstimateTimestepMesh(MeshData<Real> *md) {
   auto eos_d = params.template Get<EOS>("eos_d");
 
   static auto desc =
-      MakePackDescriptor<gas::prim::density, gas::prim::velocity, gas::prim::sie, gas::prim::bmod>(
-          resolved_pkgs.get());
+      MakePackDescriptor<gas::prim::density, gas::prim::velocity, gas::prim::sie,
+                         gas::prim::bmod>(resolved_pkgs.get());
   auto vmesh = desc.GetPack(md);
   static auto desc_g =
       MakePackDescriptor<geom::dx1, geom::dx2, geom::dx3>(resolved_pkgs.get());

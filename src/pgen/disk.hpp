@@ -138,7 +138,8 @@ Real PresProfile(struct DiskParams pgen, const EOS &eos, const Real tf, const Re
 //! \fn Real ViscosityProfile
 //! \brief Computes viscosity profile at cylindrical R and z (via dens and temp profiles)
 KOKKOS_INLINE_FUNCTION
-Real ViscosityProfile(struct DiskParams pgen, const EOS &eos, const Real R, const Real z) {
+Real ViscosityProfile(struct DiskParams pgen, const EOS &eos, const Real R,
+                      const Real z) {
   return pgen.nu0 * std::pow(R / pgen.r0, pgen.nu_indx);
 }
 
@@ -186,8 +187,8 @@ KOKKOS_INLINE_FUNCTION State ComputeDiskProfile(
                                                                         particles, npart)
                              : xf[0];
   Real tfp = TempProfile(pgen, rtp, xf[2]);
-  pfp =
-      (pfm == pgen.pres_min) ? pgen.pres_min : PresProfile(pgen, eos_d, tfp, xf[0], xf[2]);
+  pfp = (pfm == pgen.pres_min) ? pgen.pres_min
+                               : PresProfile(pgen, eos_d, tfp, xf[0], xf[2]);
   pfm = (pfp == pgen.pres_min) ? pgen.pres_min : pfm;
   pgrad[0] = (pfp - pfm) / dx[0];
 
@@ -203,8 +204,8 @@ KOKKOS_INLINE_FUNCTION State ComputeDiskProfile(
             ? -pgen.gm / Gravity::NBodyPotential<GEOM>(coords, fx2p, particles, npart)
             : xf[0];
   tfp = TempProfile(pgen, rtp, xf[2]);
-  pfp =
-      (pfm == pgen.pres_min) ? pgen.pres_min : PresProfile(pgen, eos_d, tfp, xf[0], xf[2]);
+  pfp = (pfm == pgen.pres_min) ? pgen.pres_min
+                               : PresProfile(pgen, eos_d, tfp, xf[0], xf[2]);
   pfm = (pfp == pgen.pres_min) ? pgen.pres_min : pfm;
   pgrad[1] = (pfp - pfm) / dx[1];
 
@@ -220,8 +221,8 @@ KOKKOS_INLINE_FUNCTION State ComputeDiskProfile(
             ? -pgen.gm / Gravity::NBodyPotential<GEOM>(coords, fx3p, particles, npart)
             : xf[0];
   tfp = TempProfile(pgen, rtp, xf[2]);
-  pfp =
-      (pfm == pgen.pres_min) ? pgen.pres_min : PresProfile(pgen, eos_d, tfp, xf[0], xf[2]);
+  pfp = (pfm == pgen.pres_min) ? pgen.pres_min
+                               : PresProfile(pgen, eos_d, tfp, xf[0], xf[2]);
   pfm = (pfp == pgen.pres_min) ? pgen.pres_min : pfm;
   pgrad[2] = (pfp - pfm) / dx[2];
 
@@ -360,8 +361,9 @@ inline void InitDiskParams(MeshBlock *pmb, ParameterInput *pin) {
 
 template <Coordinates GEOM, typename V1, typename V2>
 KOKKOS_INLINE_FUNCTION void
-DiskICImpl(V1 v, const int b, const int k, const int j, const int i, V2 pco, const EOS &eos_d,
-           DiskParams dp, ParArray1D<NBody::Particle> particles, const int npart) {
+DiskICImpl(V1 v, const int b, const int k, const int j, const int i, V2 pco,
+           const EOS &eos_d, DiskParams dp, ParArray1D<NBody::Particle> particles,
+           const int npart) {
 
   geometry::Coords<GEOM> coords(dp.log, pco, k, j, i);
   const auto &xv = coords.GetCellCenter();

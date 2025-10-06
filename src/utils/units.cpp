@@ -68,6 +68,7 @@ Units::Units(ParameterInput *pin, std::shared_ptr<StateDescriptor> pkg) {
   pkg->AddParam("length", length_);
   pkg->AddParam("time", time_);
   pkg->AddParam("mass", mass_);
+  pkg->AddParam("temp", temp_);
 }
 
 //----------------------------------------------------------------------------------------

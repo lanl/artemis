@@ -128,7 +128,7 @@ Real TempProfile(struct DiskParams pgen, const Real R, const Real z) {
 //! \fn Real PresProfile
 //! \brief Computes pressure profile at cylindrical R and z (via dens and temp profiles)
 KOKKOS_INLINE_FUNCTION
-Real PresProfile(struct DiskParams pgen, EOS eos, const Real tf, const Real R,
+Real PresProfile(struct DiskParams pgen, const EOS &eos, const Real tf, const Real R,
                  const Real z) {
   const Real df = DenProfile(pgen, R, z);
   return std::max(pgen.pres_min, eos.PressureFromDensityTemperature(df, tf));
@@ -138,7 +138,7 @@ Real PresProfile(struct DiskParams pgen, EOS eos, const Real tf, const Real R,
 //! \fn Real ViscosityProfile
 //! \brief Computes viscosity profile at cylindrical R and z (via dens and temp profiles)
 KOKKOS_INLINE_FUNCTION
-Real ViscosityProfile(struct DiskParams pgen, EOS eos, const Real R, const Real z) {
+Real ViscosityProfile(struct DiskParams pgen, const EOS &eos, const Real R, const Real z) {
   return pgen.nu0 * std::pow(R / pgen.r0, pgen.nu_indx);
 }
 
@@ -150,7 +150,7 @@ template <Coordinates GEOM>
 KOKKOS_INLINE_FUNCTION State ComputeDiskProfile(
     const struct DiskParams pgen, const geometry::Coords<GEOM> &coords,
     const std::array<Real, 3> &xv, const std::array<Real, 3> &dx, const int k,
-    const int j, const int i, EOS eos_d, const bool do_gas, const bool do_dust,
+    const int j, const int i, const EOS &eos_d, const bool do_gas, const bool do_dust,
     ParArray1D<NBody::Particle> particles, const int npart) {
   // Extract coordinates
 
@@ -187,7 +187,7 @@ KOKKOS_INLINE_FUNCTION State ComputeDiskProfile(
                              : xf[0];
   Real tfp = TempProfile(pgen, rtp, xf[2]);
   pfp =
-      (pfm = pgen.pres_min) ? pgen.pres_min : PresProfile(pgen, eos_d, tfp, xf[0], xf[2]);
+      (pfm == pgen.pres_min) ? pgen.pres_min : PresProfile(pgen, eos_d, tfp, xf[0], xf[2]);
   pfm = (pfp == pgen.pres_min) ? pgen.pres_min : pfm;
   pgrad[0] = (pfp - pfm) / dx[0];
 
@@ -204,7 +204,7 @@ KOKKOS_INLINE_FUNCTION State ComputeDiskProfile(
             : xf[0];
   tfp = TempProfile(pgen, rtp, xf[2]);
   pfp =
-      (pfm = pgen.pres_min) ? pgen.pres_min : PresProfile(pgen, eos_d, tfp, xf[0], xf[2]);
+      (pfm == pgen.pres_min) ? pgen.pres_min : PresProfile(pgen, eos_d, tfp, xf[0], xf[2]);
   pfm = (pfp == pgen.pres_min) ? pgen.pres_min : pfm;
   pgrad[1] = (pfp - pfm) / dx[1];
 
@@ -221,7 +221,7 @@ KOKKOS_INLINE_FUNCTION State ComputeDiskProfile(
             : xf[0];
   tfp = TempProfile(pgen, rtp, xf[2]);
   pfp =
-      (pfm = pgen.pres_min) ? pgen.pres_min : PresProfile(pgen, eos_d, tfp, xf[0], xf[2]);
+      (pfm == pgen.pres_min) ? pgen.pres_min : PresProfile(pgen, eos_d, tfp, xf[0], xf[2]);
   pfm = (pfp == pgen.pres_min) ? pgen.pres_min : pfm;
   pgrad[2] = (pfp - pfm) / dx[2];
 
@@ -360,7 +360,7 @@ inline void InitDiskParams(MeshBlock *pmb, ParameterInput *pin) {
 
 template <Coordinates GEOM, typename V1, typename V2>
 KOKKOS_INLINE_FUNCTION void
-DiskICImpl(V1 v, const int b, const int k, const int j, const int i, V2 pco, EOS eos_d,
+DiskICImpl(V1 v, const int b, const int k, const int j, const int i, V2 pco, const EOS &eos_d,
            DiskParams dp, ParArray1D<NBody::Particle> particles, const int npart) {
 
   geometry::Coords<GEOM> coords(dp.log, pco, k, j, i);
@@ -412,7 +412,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   // Extract gas package and params
   auto &gas_pkg = pmb->packages.Get("gas");
-  auto eos_d = gas_pkg->template Param<EOS>("eos_d");
+  const auto &eos_d = gas_pkg->template Param<EOS>("eos_d");
 
   // Disk parameters
   auto disk_params = artemis_pkg->Param<DiskParams>("disk_params");

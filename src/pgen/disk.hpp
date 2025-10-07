@@ -187,8 +187,8 @@ KOKKOS_INLINE_FUNCTION State ComputeDiskProfile(
                                                                         particles, npart)
                              : xf[0];
   Real tfp = TempProfile(pgen, rtp, xf[2]);
-  pfp = (pfm == pgen.pres_min) ? pgen.pres_min
-                               : PresProfile(pgen, eos_d, tfp, xf[0], xf[2]);
+  pfp =
+      (pfm = pgen.pres_min) ? pgen.pres_min : PresProfile(pgen, eos_d, tfp, xf[0], xf[2]);
   pfm = (pfp == pgen.pres_min) ? pgen.pres_min : pfm;
   pgrad[0] = (pfp - pfm) / dx[0];
 
@@ -204,8 +204,8 @@ KOKKOS_INLINE_FUNCTION State ComputeDiskProfile(
             ? -pgen.gm / Gravity::NBodyPotential<GEOM>(coords, fx2p, particles, npart)
             : xf[0];
   tfp = TempProfile(pgen, rtp, xf[2]);
-  pfp = (pfm == pgen.pres_min) ? pgen.pres_min
-                               : PresProfile(pgen, eos_d, tfp, xf[0], xf[2]);
+  pfp =
+      (pfm = pgen.pres_min) ? pgen.pres_min : PresProfile(pgen, eos_d, tfp, xf[0], xf[2]);
   pfm = (pfp == pgen.pres_min) ? pgen.pres_min : pfm;
   pgrad[1] = (pfp - pfm) / dx[1];
 
@@ -221,8 +221,8 @@ KOKKOS_INLINE_FUNCTION State ComputeDiskProfile(
             ? -pgen.gm / Gravity::NBodyPotential<GEOM>(coords, fx3p, particles, npart)
             : xf[0];
   tfp = TempProfile(pgen, rtp, xf[2]);
-  pfp = (pfm == pgen.pres_min) ? pgen.pres_min
-                               : PresProfile(pgen, eos_d, tfp, xf[0], xf[2]);
+  pfp =
+      (pfm = pgen.pres_min) ? pgen.pres_min : PresProfile(pgen, eos_d, tfp, xf[0], xf[2]);
   pfm = (pfp == pgen.pres_min) ? pgen.pres_min : pfm;
   pgrad[2] = (pfp - pfm) / dx[2];
 

@@ -161,7 +161,6 @@ KOKKOS_INLINE_FUNCTION State ComputeDiskProfile(
   res.gdens = DenProfile(pgen, xcyl[0], xcyl[2]);
   const Real dxr = 1e-6 * std::sqrt(SQR(dx[0]) + SQR(dx[1]) + SQR(dx[2]));
 
-  // These are spherical but need to be converted back to cylindrical
   const Real rt = pgen.nbody_temp
                       ? -pgen.gm / Gravity::NBodyPotential<Coordinates::cylindrical>(
                                        coords, xcyl, particles, npart)
@@ -181,9 +180,10 @@ KOKKOS_INLINE_FUNCTION State ComputeDiskProfile(
   const Real tp = TempProfile(pgen, rtp, xcyl[2]);
   const Real tm = TempProfile(pgen, rtm, xcyl[2]);
 
-  const Real pres = PresProfile(pgen, eos_d, res.gtemp, rt, xcyl[2]);
-  const Real dpdr = (PresProfile(pgen, eos_d, tp, rt + dxr, xcyl[2]) -
-                     PresProfile(pgen, eos_d, tm, rt - dxr, xcyl[2])) /
+  // Note that pressure calls density and needs the true cylindrical radius
+  const Real pres = PresProfile(pgen, eos_d, res.gtemp, xcyl[0], xcyl[2]);
+  const Real dpdr = (PresProfile(pgen, eos_d, tp, xcyl[0] + dxr, xcyl[2]) -
+                     PresProfile(pgen, eos_d, tm, xcyl[0] - dxr, xcyl[2])) /
                     (2. * dxr);
   // Set v_phi to centrifugal equilibrium
   //   vp^2/R = grad(p) + vk^2/R

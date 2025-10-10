@@ -167,7 +167,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
     params.Add("mu", 1.0);
 #endif
   } else {
-    PARTHENON_FAIL("Unspported gas EOS!");
+    PARTHENON_FAIL("Unsupported gas EOS!");
   }
 
   params.Add("eos_type", eos_type);
@@ -178,6 +178,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   if (riemann.compare("hllc") == 0) {
     riemann_solver = RSolver::hllc;
   } else if (riemann.compare("ghllc") == 0) {
+    PARTHENON_REQUIRE(eos_type == "ideal",
+                      "The ghllc Riemann solver requires the ideal eos.");
+
     riemann_solver = RSolver::ghllc;
   } else if (riemann.compare("hlle") == 0) {
     riemann_solver = RSolver::hlle;

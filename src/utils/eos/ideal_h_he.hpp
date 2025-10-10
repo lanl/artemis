@@ -116,8 +116,7 @@ class IdealHHe : public singularity::eos_base::EosBase<IdealHHe> {
       Indexer_t &&lambda = static_cast<Real *>(nullptr)) const {
     const Real ld = std::log10(rho);
     const Real lE = std::log10(sie);
-    if (((ld >= lDmin) && (ld <= lDmax) && (lE >= lEmin) && (lE <= lEmax)) &&
-        !use_table) {
+    if (use_table && ((ld >= lDmin) && (ld <= lDmax) && (lE >= lEmin) && (lE <= lEmax))) {
       return std::pow(10., lP_.interpToReal(ld, lE));
     }
     // fall back to inline
@@ -220,8 +219,7 @@ class IdealHHe : public singularity::eos_base::EosBase<IdealHHe> {
       Indexer_t &&lambda = static_cast<Real *>(nullptr)) const {
     const Real ld = std::log10(rho);
     const Real lE = std::log10(sie);
-    if (((ld >= lDmin) && (ld <= lDmax) && (lE >= lEmin) && (lE <= lEmax)) &&
-        !use_table) {
+    if (use_table && ((ld >= lDmin) && (ld <= lDmax) && (lE >= lEmin) && (lE <= lEmax))) {
       return Cv_.interpToReal(ld, lE);
     }
     // fall back to inline
@@ -242,8 +240,7 @@ class IdealHHe : public singularity::eos_base::EosBase<IdealHHe> {
       Indexer_t &&lambda = static_cast<Real *>(nullptr)) const {
     const Real ld = std::log10(rho);
     const Real lE = std::log10(sie);
-    if (((ld >= lDmin) && (ld <= lDmax) && (lE >= lEmin) && (lE <= lEmax)) &&
-        !use_table) {
+    if (use_table && ((ld >= lDmin) && (ld <= lDmax) && (lE >= lEmin) && (lE <= lEmax))) {
       return std::pow(10., lB_.interpToReal(ld, lE));
     }
     // fall back to inline
@@ -291,8 +288,7 @@ class IdealHHe : public singularity::eos_base::EosBase<IdealHHe> {
       Indexer_t &&lambda = static_cast<Real *>(nullptr)) const {
     const Real ld = std::log10(rho);
     const Real lE = std::log10(sie);
-    if (((ld >= lDmin) && (ld <= lDmax) && (lE >= lEmin) && (lE <= lEmax)) &&
-        !use_table) {
+    if (use_table && ((ld >= lDmin) && (ld <= lDmax) && (lE >= lEmin) && (lE <= lEmax))) {
       return Gm_.interpToReal(ld, lE);
     }
     // fall back to inline
@@ -564,10 +560,19 @@ class IdealHHe : public singularity::eos_base::EosBase<IdealHHe> {
     int iter = 0;
     Real sie_new = 0.0;
     bool conv = false;
-    Real lower = std::pow(10., lTmin) * .9;
-    Real upper = std::pow(10., lTmax) * 1.1;
-    Real dE_low = InternalEnergyFromDensityTemperature(rho, lower) - sie;
-    Real dE_high = InternalEnergyFromDensityTemperature(rho, upper) - sie;
+    Real lower = std::pow(10., lTmin) * .01;
+    Real upper = std::pow(10., lTmax) * 100;
+    Real E_low = InternalEnergyFromDensityTemperature(rho, lower);
+    ;
+    Real E_high = InternalEnergyFromDensityTemperature(rho, upper);
+    Real dE_low = E_low - sie;
+    Real dE_high = E_high - sie;
+
+    if (dE_low * dE_high > 0.0) {
+      printf("Initial sie %lg not bracketed at density %lg by temperature bounds [%lg, "
+             "%lg], [%lg, %lg]\n",
+             sie, rho, lower, upper, E_low, E_high);
+    }
 
     for (iter = 0; iter < 100; iter++) {
       T = std::sqrt(lower * upper);

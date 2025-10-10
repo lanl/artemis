@@ -99,6 +99,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
       PARTHENON_REQUIRE(mu > 0, "Only positive mean molecular weight allowed!");
       cv = constants.GetKBCode() / ((gamma - 1.) * constants.GetAMUCode() * mu);
     }
+    params.Add("kbmu", constants.GetKBCode() / (mu * constants.GetAMUCode()));
     params.Add("mu", mu);
     params.Add("cv", cv);
     EOS eos_host = singularity::UnitSystem<singularity::IdealGas>(

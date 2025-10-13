@@ -88,6 +88,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
       cv = constants.GetKBCode() / ((gamma - 1.) * constants.GetAMUCode() * mu);
     }
     eos_type = "ideal";
+    params.Add("kbmu", constants.GetKBCode() / (mu * constants.GetAMUCode()));
     params.Add("mu", mu);
     params.Add("cv", cv);
     EOS eos_host = singularity::UnitSystem<singularity::IdealGas>(

@@ -67,12 +67,12 @@ gravity = true
 viscosity = true
 nbody = true
 cooling = true
-damping = true
+drag = true
 
 <gas>
 cfl = 0.3
 reconstruct = plm
-riemann = llf
+riemann = hllc
 dfloor = 1.0e-6
 siefloor = 1.0e-6
 
@@ -82,6 +82,20 @@ gamma = 1.4
 <gas/viscosity>
 type = constant
 nu = 1e-3
+
+<gas/damping>
+inner_x1 = -9.0
+inner_x1_rate = 30.0
+outer_x1 = 9.0
+outer_x1_rate = 30.0
+inner_x2 = -9.0
+inner_x2_rate = 30.0
+outer_x2 = 9.0
+outer_x2_rate = 30.0
+inner_x3 = -9.0
+inner_x3_rate = 30.0
+outer_x3 = 9.0
+outer_x3_rate = 30.0
 
 <gravity/nbody>
 mtot = 1.0
@@ -109,19 +123,8 @@ tref = nbody
 tsph = .01
 sph_plaw = -1.0
 
-<damping>
-inner_x1 = -9.0
-inner_x1_rate = 30.0
-outer_x1 = 9.0
-outer_x1_rate = 30.0
-inner_x2 = -9.0
-inner_x2_rate = 30.0
-outer_x2 = 9.0
-outer_x2_rate = 30.0
-inner_x3 = -9.0
-inner_x3_rate = 30.0
-outer_x3 = 9.0
-outer_x3_rate = 30.0
+<drag>
+type = self
 
 <problem>
 r0 = 1.0
@@ -129,8 +132,6 @@ rho0 = 1.0
 dslope = -0.5
 flare = 0.0
 h0 = 0.1
-dens_min = 1.0e-6
-pres_min = 1.0e-8
 polytropic_index = 1
 rcav = 1.0
 rexp = 3.0

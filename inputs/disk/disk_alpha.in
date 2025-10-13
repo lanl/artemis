@@ -92,6 +92,4 @@ mdot = 0.00023561944901923456   # Mdot we feed the outer boundary with
 dslope = -0.5
 flare = 0.0
 h0 = 0.05
-dens_min = 1.0e-10
-pres_min = 1.0e-15
 polytropic_index = 1

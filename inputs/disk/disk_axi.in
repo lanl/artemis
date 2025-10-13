@@ -72,7 +72,7 @@ cfl = 0.3
 reconstruct = plm
 riemann = hlle
 dfloor = 1.0e-10
-pfloor = 1.0e-13
+siefloor = 1.0e-10
 
 <gas/eos/ideal>
 gamma = 1.4
@@ -93,6 +93,4 @@ rho0 = 1.0
 dslope = -2.25
 flare = 0.25
 h0 = 0.05
-dens_min = 1.0e-10
-pres_min = 1.0e-15
 polytropic_index = 1

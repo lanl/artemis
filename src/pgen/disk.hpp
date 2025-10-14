@@ -272,10 +272,9 @@ inline void InitDiskParams(MeshBlock *pmb, ParameterInput *pin) {
 
     disk_params.do_imc = params.Get<bool>("do_imc");
     disk_params.do_moment = params.Get<bool>("do_moment");
-    const auto nx = params.Get<std::array<int,3>>("prob_dim");
+    const auto nx = params.Get<std::array<int, 3>>("prob_dim");
     disk_params.three_d = nx[2] > 1;
     disk_params.multi_d = disk_params.three_d || (nx[1] > 1);
-
 
     disk_params.ar = constants.GetARCode();
 
@@ -287,8 +286,8 @@ inline void InitDiskParams(MeshBlock *pmb, ParameterInput *pin) {
 
     if (flare == -Big<Real>()) {
       flare = 0.5 * (1.0 + q);
-    } else if (q == -Big<Real>()) { 
-      q = 2.0 * flare - 1.;         
+    } else if (q == -Big<Real>()) {
+      q = 2.0 * flare - 1.;
     } else {
       PARTHENON_FAIL("Set either flare or tslope in <problem> not both!");
     }

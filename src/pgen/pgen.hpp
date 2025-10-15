@@ -26,6 +26,7 @@
 #include "disk.hpp"
 #include "dust_coagulation.hpp"
 #include "gaussian_bump.hpp"
+#include "geometry/geometry.hpp"
 #include "kh.hpp"
 #include "linear_wave.hpp"
 #include "lw.hpp"
@@ -75,6 +76,28 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
     dust_coagulation::ProblemGenerator<T>(pmb, pin);
   } else {
     PARTHENON_FAIL("Invalid problem name!");
+  }
+}
+
+//----------------------------------------------------------------------------------------
+//! \fn  StateDescriptor artemis::InitMeshBlockData
+//! \brief Driver routine to initialize meshblock data when meshblocks are created
+template <Coordinates GEOM>
+void InitMeshBlockData(MeshBlock *pmb, ParameterInput *pin) {
+
+  geometry::InitBlockGeom<GEOM>(pmb, pin);
+
+  std::string name = pin->GetString("artemis", "problem");
+  if (name == "beam") {
+    beam::InitBeamParams(pmb, pin);
+  } else if (name == "conduction") {
+    cond::InitCondParams(pmb, pin);
+  } else if (name == "disk") {
+    disk::InitDiskParams(pmb, pin);
+  } else if (name == "shock") {
+    shock::InitShockParams(pmb, pin);
+  } else if (name == "strat") {
+    strat::InitStratParams(pmb, pin);
   }
 }
 

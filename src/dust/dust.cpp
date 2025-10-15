@@ -246,6 +246,9 @@ Real EstimateTimestepMesh(MeshData<Real> *md) {
   static auto desc =
       MakePackDescriptor<dust::prim::density, dust::prim::velocity>(resolved_pkgs.get());
   auto vmesh = desc.GetPack(md);
+  static auto desc_g =
+      MakePackDescriptor<geom::dx1, geom::dx2, geom::dx3>(resolved_pkgs.get());
+  auto vg = desc_g.GetPack(md);
   IndexRange ib = md->GetBoundsI(IndexDomain::interior);
   IndexRange jb = md->GetBoundsJ(IndexDomain::interior);
   IndexRange kb = md->GetBoundsK(IndexDomain::interior);
@@ -260,7 +263,7 @@ Real EstimateTimestepMesh(MeshData<Real> *md) {
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, Real &ldt) {
         // Extract coordinates
         geometry::Coords<GEOM> coords(cpars, vmesh.GetCoordinates(b), k, j, i);
-        const auto &dx = coords.GetCellWidths();
+        const auto &dx = coords.GetCellWidths(vg, b, k, j, i);
 
         for (int n = 0; n < vmesh.GetSize(b, dust::prim::density()); ++n) {
           Real denom = 0.0;
@@ -291,11 +294,18 @@ TaskStatus CalculateFluxes(MeshData<Real> *md, const bool pcm) {
   static auto desc_flux =
       parthenon::MakePackDescriptor<dust::cons::density, dust::cons::momentum>(
           resolved_pkgs.get(), {}, {parthenon::PDOpt::WithFluxes});
+  static auto desc_g =
+      parthenon::MakePackDescriptor<geom::x1v, geom::x2v, geom::x3v, geom::dx1, geom::dx2,
+                                    geom::dx3, geom::hx1f1, geom::hx2f1, geom::hx3f1,
+                                    geom::hx1f2, geom::hx2f2, geom::hx3f2, geom::hx1f3,
+                                    geom::hx2f3, geom::hx3f3>(resolved_pkgs.get());
   auto vprim = desc_prim.GetPack(md);
   auto vflux = desc_flux.GetPack(md);
   SparsePack vface;
+  auto vg = desc_g.GetPack(md);
 
-  return ArtemisUtils::CalculateFluxes<Fluid::dust>(md, pkg, vprim, vflux, vface, pcm);
+  return ArtemisUtils::CalculateFluxes<Fluid::dust>(md, pkg, vprim, vflux, vface, vg,
+                                                    pcm);
 }
 
 //----------------------------------------------------------------------------------------
@@ -316,11 +326,18 @@ TaskStatus FluxSource(MeshData<Real> *md, const Real dt) {
             resolved_pkgs.get(), {}, {parthenon::PDOpt::WithFluxes});
     static auto desc_cons =
         parthenon::MakePackDescriptor<dust::cons::momentum>(resolved_pkgs.get());
+    static auto desc_g =
+        parthenon::MakePackDescriptor<geom::vol, geom::x1v, geom::x2v, geom::x3v,
+                                      geom::dh1dx1, geom::dh2dx1, geom::dh3dx1,
+                                      geom::dh1dx2, geom::dh2dx2, geom::dh3dx2,
+                                      geom::dh1dx3, geom::dh2dx3, geom::dh3dx3>(
+            resolved_pkgs.get());
     auto vprim = desc_prim.GetPack(md);
     auto vcons = desc_cons.GetPack(md);
+    auto vg = desc_g.GetPack(md);
     SparsePack vface;
 
-    return ArtemisUtils::FluxSource<Fluid::dust>(md, pkg, vprim, vcons, vface, dt);
+    return ArtemisUtils::FluxSource<Fluid::dust>(md, pkg, vprim, vcons, vface, vg, dt);
   }
 
   return TaskStatus::complete;

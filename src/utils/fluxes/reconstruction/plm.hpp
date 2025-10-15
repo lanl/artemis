@@ -76,11 +76,11 @@ void PLM_G(const Real &q_im1, const Real &q_i, const Real &q_ip1, Real &ql_ip1,
 //! \brief The piecewise linear reconstruction method in the X1 direction
 template <Coordinates GEOM>
 struct Reconstruction<ReconstructionMethod::plm, X1DIR, GEOM> {
-  template <typename V>
+  template <typename V1, typename V2>
   KOKKOS_INLINE_FUNCTION void
   operator()(parthenon::team_mbr_t const &member, const geometry::CoordParams &cpars,
              const int b, const int k, const int j, const int il, const int iu,
-             const V &q, parthenon::ScratchPad2D<Real> &ql,
+             const V1 &q, const V2 &vg, parthenon::ScratchPad2D<Real> &ql,
              parthenon::ScratchPad2D<Real> &qr) const {
     auto &pco = q.GetCoordinates(b);
     for (int n = q.GetLowerBound(b); n <= q.GetUpperBound(b); ++n) {
@@ -90,15 +90,13 @@ struct Reconstruction<ReconstructionMethod::plm, X1DIR, GEOM> {
               PLM(q(b, n, k, j, i - 1), q(b, n, k, j, i), q(b, n, k, j, i + 1),
                   ql(n, i + 1), qr(n, i));
             } else {
-              geometry::Coords<GEOM> coords_m(cpars, pco, k, j, i - 1);
-              geometry::Coords<GEOM> coords_c(cpars, pco, k, j, i);
-              geometry::Coords<GEOM> coords_p(cpars, pco, k, j, i + 1);
-              const Real xvm = coords_m.x1v();
-              const Real xvc = coords_c.x1v();
-              const Real xvp = coords_p.x1v();
-              const Real dx = coords_c.GetCellWidthX1();
+              geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
+              const Real xvm = coords.GetCellCenter(vg, b, k, j, i - 1)[0];
+              const Real xvc = coords.GetCellCenter(vg, b, k, j, i)[0];
+              const Real xvp = coords.GetCellCenter(vg, b, k, j, i + 1)[0];
+              const Real dx = coords.GetCellWidths(vg, b, k, j, i)[0];
               PLM_G(q(b, n, k, j, i - 1), q(b, n, k, j, i), q(b, n, k, j, i + 1),
-                    ql(n, i + 1), qr(n, i), xvm, xvc, xvp, coords_c.bnds.x1, dx);
+                    ql(n, i + 1), qr(n, i), xvm, xvc, xvp, coords.bnds.x1, dx);
             }
           });
     }
@@ -110,11 +108,11 @@ struct Reconstruction<ReconstructionMethod::plm, X1DIR, GEOM> {
 //! \brief The piecewise linear reconstruction method in the X2 direction
 template <Coordinates GEOM>
 struct Reconstruction<ReconstructionMethod::plm, X2DIR, GEOM> {
-  template <typename V>
+  template <typename V1, typename V2>
   KOKKOS_INLINE_FUNCTION void
   operator()(parthenon::team_mbr_t const &member, const geometry::CoordParams &cpars,
              const int b, const int k, const int j, const int il, const int iu,
-             const V &q, parthenon::ScratchPad2D<Real> &ql_jp1,
+             const V1 &q, const V2 &vg, parthenon::ScratchPad2D<Real> &ql_jp1,
              parthenon::ScratchPad2D<Real> &qr_j) const {
     auto &pco = q.GetCoordinates(b);
     for (int n = q.GetLowerBound(b); n <= q.GetUpperBound(b); ++n) {
@@ -124,15 +122,13 @@ struct Reconstruction<ReconstructionMethod::plm, X2DIR, GEOM> {
               PLM(q(b, n, k, j - 1, i), q(b, n, k, j, i), q(b, n, k, j + 1, i),
                   ql_jp1(n, i), qr_j(n, i));
             } else {
-              geometry::Coords<GEOM> coords_m(cpars, pco, k, j - 1, i);
-              geometry::Coords<GEOM> coords_c(cpars, pco, k, j, i);
-              geometry::Coords<GEOM> coords_p(cpars, pco, k, j + 1, i);
-              const Real xvm = coords_m.x2v();
-              const Real xvc = coords_c.x2v();
-              const Real xvp = coords_p.x2v();
-              const Real dx = coords_c.GetCellWidthX2();
+              geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
+              const Real xvm = coords.GetCellCenter(vg, b, k, j - 1, i)[1];
+              const Real xvc = coords.GetCellCenter(vg, b, k, j, i)[1];
+              const Real xvp = coords.GetCellCenter(vg, b, k, j + 1, i)[1];
+              const Real dx = coords.GetCellWidths(vg, b, k, j, i)[1];
               PLM_G(q(b, n, k, j - 1, i), q(b, n, k, j, i), q(b, n, k, j + 1, i),
-                    ql_jp1(n, i), qr_j(n, i), xvm, xvc, xvp, coords_c.bnds.x2, dx);
+                    ql_jp1(n, i), qr_j(n, i), xvm, xvc, xvp, coords.bnds.x2, dx);
             }
           });
     }
@@ -144,11 +140,11 @@ struct Reconstruction<ReconstructionMethod::plm, X2DIR, GEOM> {
 //! \brief The piecewise linear reconstruction method in the X3 direction
 template <Coordinates GEOM>
 struct Reconstruction<ReconstructionMethod::plm, X3DIR, GEOM> {
-  template <typename V>
+  template <typename V1, typename V2>
   KOKKOS_INLINE_FUNCTION void
   operator()(parthenon::team_mbr_t const &member, const geometry::CoordParams &cpars,
              const int b, const int k, const int j, const int il, const int iu,
-             const V &q, parthenon::ScratchPad2D<Real> &ql_kp1,
+             const V1 &q, const V2 &vg, parthenon::ScratchPad2D<Real> &ql_kp1,
              parthenon::ScratchPad2D<Real> &qr_k) const {
     auto &pco = q.GetCoordinates(b);
     for (int n = q.GetLowerBound(b); n <= q.GetUpperBound(b); ++n) {
@@ -158,15 +154,13 @@ struct Reconstruction<ReconstructionMethod::plm, X3DIR, GEOM> {
               PLM(q(b, n, k - 1, j, i), q(b, n, k, j, i), q(b, n, k + 1, j, i),
                   ql_kp1(n, i), qr_k(n, i));
             } else {
-              geometry::Coords<GEOM> coords_m(cpars, pco, k - 1, j, i);
-              geometry::Coords<GEOM> coords_c(cpars, pco, k, j, i);
-              geometry::Coords<GEOM> coords_p(cpars, pco, k + 1, j, i);
-              const Real xvm = coords_m.x3v();
-              const Real xvc = coords_c.x3v();
-              const Real xvp = coords_p.x3v();
-              const Real dx = coords_c.GetCellWidthX3();
+              geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
+              const Real xvm = coords.GetCellCenter(vg, b, k - 1, j, i)[2];
+              const Real xvc = coords.GetCellCenter(vg, b, k, j, i)[2];
+              const Real xvp = coords.GetCellCenter(vg, b, k + 1, j, i)[2];
+              const Real dx = coords.GetCellWidths(vg, b, k, j, i)[2];
               PLM_G(q(b, n, k - 1, j, i), q(b, n, k, j, i), q(b, n, k + 1, j, i),
-                    ql_kp1(n, i), qr_k(n, i), xvm, xvc, xvp, coords_c.bnds.x3, dx);
+                    ql_kp1(n, i), qr_k(n, i), xvm, xvc, xvp, coords.bnds.x3, dx);
             }
           });
     }

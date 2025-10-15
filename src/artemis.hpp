@@ -85,6 +85,46 @@ ARTEMIS_VARIABLE(rad.opac, scattering);
 } // namespace opac
 } // namespace rad
 
+namespace geom {
+ARTEMIS_VARIABLE(geom, x1v);
+ARTEMIS_VARIABLE(geom, x2v);
+ARTEMIS_VARIABLE(geom, x3v);
+ARTEMIS_VARIABLE(geom, hx1v);
+ARTEMIS_VARIABLE(geom, hx2v);
+ARTEMIS_VARIABLE(geom, hx3v);
+ARTEMIS_VARIABLE(geom, hx1f1);
+ARTEMIS_VARIABLE(geom, hx2f1);
+ARTEMIS_VARIABLE(geom, hx3f1);
+ARTEMIS_VARIABLE(geom, hx1f2);
+ARTEMIS_VARIABLE(geom, hx2f2);
+ARTEMIS_VARIABLE(geom, hx3f2);
+ARTEMIS_VARIABLE(geom, hx1f3);
+ARTEMIS_VARIABLE(geom, hx2f3);
+ARTEMIS_VARIABLE(geom, hx3f3);
+ARTEMIS_VARIABLE(geom, dx1);
+ARTEMIS_VARIABLE(geom, dx2);
+ARTEMIS_VARIABLE(geom, dx3);
+ARTEMIS_VARIABLE(geom, vol);
+ARTEMIS_VARIABLE(geom, ax1);
+ARTEMIS_VARIABLE(geom, ax2);
+ARTEMIS_VARIABLE(geom, ax3);
+ARTEMIS_VARIABLE(geom, dh1dx1);
+ARTEMIS_VARIABLE(geom, dh2dx1);
+ARTEMIS_VARIABLE(geom, dh3dx1);
+ARTEMIS_VARIABLE(geom, dh1dx2);
+ARTEMIS_VARIABLE(geom, dh2dx2);
+ARTEMIS_VARIABLE(geom, dh3dx2);
+ARTEMIS_VARIABLE(geom, dh1dx3);
+ARTEMIS_VARIABLE(geom, dh2dx3);
+ARTEMIS_VARIABLE(geom, dh3dx3);
+ARTEMIS_VARIABLE(geom, rfw1m);
+ARTEMIS_VARIABLE(geom, rfw1p);
+ARTEMIS_VARIABLE(geom, rfw2m);
+ARTEMIS_VARIABLE(geom, rfw2p);
+ARTEMIS_VARIABLE(geom, rfw3m);
+ARTEMIS_VARIABLE(geom, rfw3p);
+} // namespace geom
+
 #undef ARTEMIS_VARIABLE
 
 // Restart options (see Parthenon #1231)

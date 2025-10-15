@@ -166,11 +166,14 @@ void ArtemisDriver<GEOM>::PreStepTasks() {
 
   // Assign registers with fields required for moments
   if (do_moment) {
-    parthenon::Metadata::FlagCollection moments_flags;
+    parthenon::Metadata::FlagCollection moments_flags, geom_flags;
     moments_flags.TakeUnion(pmesh->packages.Get("moments")->GetMetadataFlag());
+    geom_flags.TakeUnion(pmesh->packages.Get("geometry")->GetMetadataFlag());
     auto moment_names = pmesh->GetVariableNames(moments_flags);
+    auto geom_names = pmesh->GetVariableNames(geom_flags);
     auto coupling_names = unsplit_names;
     coupling_names.insert(coupling_names.end(), moment_names.begin(), moment_names.end());
+    moment_names.insert(moment_names.end(), geom_names.begin(), geom_names.end());
     auto &u0c = pmesh->mesh_data.AddShallow("u0c", base, coupling_names);
     auto &u0m = pmesh->mesh_data.AddShallow("u0m", base, moment_names);
     auto &u1m = pmesh->mesh_data.Add("u1m", u0m);

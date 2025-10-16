@@ -124,6 +124,7 @@ struct StoppingTimeParams {
   Real scale;
   DragModel model;
   ParArray1D<Real> tau;
+  Real tau_max, tau_min;
 
   StoppingTimeParams(std::string block_name, ParameterInput *pin) {
     const std::string choice = pin->GetString(block_name, "type");
@@ -143,6 +144,8 @@ struct StoppingTimeParams {
 
       model = DragModel::stokes;
       scale = pin->GetOrAddReal(block_name, "scale", 1.0);
+      tau_max = pin->GetOrAddReal(block_name, "maximum", 1e99);
+      tau_min = pin->GetOrAddReal(block_name, "minimum", 0.0);
       auto h_tau = tau.GetHostMirror();
       for (int n = 0; n < nd; n++) {
         h_tau(n) = scale;
@@ -488,7 +491,8 @@ TaskStatus SimpleDragSourceImpl(MeshData<Real> *md, const Real time, const Real 
           Real tc = tp.tau(id);
           [[maybe_unused]] auto &sizes_ = sizes;
           if constexpr (DRAG == DragModel::stokes) {
-            tc = tp.scale * grain_density_ / dg * sizes_(id) / vth;
+            tc = std::max(tp.tau_min, std::min(tp.tau_max, tp.scale * grain_density_ /
+                                                               dg * sizes_(id) / vth));
           }
           const Real alpha = dt * ((tc <= 0.0) ? Big<Real>() : 1.0 / tc);
           for (int d = 0; d < 3; d++) {
@@ -523,7 +527,8 @@ TaskStatus SimpleDragSourceImpl(MeshData<Real> *md, const Real time, const Real 
           Real tc = tp.tau(id);
           [[maybe_unused]] auto &sizes_ = sizes;
           if constexpr (DRAG == DragModel::stokes) {
-            tc = tp.scale * grain_density_ / dg * sizes_(id) / vth;
+            tc = std::max(tp.tau_min, std::min(tp.tau_max, tp.scale * grain_density_ /
+                                                               dg * sizes_(id) / vth));
           }
           const Real alpha = dt * ((tc <= 0.0) ? Big<Real>() : 1.0 / tc);
           // Update dust momenta

@@ -22,7 +22,7 @@ coagulation:
     _default: "true"
     _description: "Turn on momentum-preserving coagulation"
   
-  coag_nsteps_mx:
+  coag_nsteps_max:
     _type: int
     _default: 1000
     _description: "Maximum number of time-steps per coagulation call"
@@ -38,7 +38,7 @@ coagulation:
     _description: "Turn on the bouncing impact on coagulation"
     _units: "cm"
 
-  nstep1Coag:
+  nstep_coag:
     _type: int
     _default: 50
     _description: "Number of hydro steps between two coagulation calls"
@@ -58,3 +58,7 @@ coagulation:
     _default: "false"
     _description: "Turn on output coagualtion info after each call"
 
+  surface_density_flag:
+    _type: bool
+    _default: "true"
+    _description: "Turn on the surface density flag"

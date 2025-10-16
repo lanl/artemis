@@ -21,10 +21,10 @@
 #include "advection.hpp"
 #include "beam.hpp"
 #include "blast.hpp"
+#include "coag.hpp"
 #include "conduction.hpp"
 #include "constant.hpp"
 #include "disk.hpp"
-#include "dust_coagulation.hpp"
 #include "gaussian_bump.hpp"
 #include "geometry/geometry.hpp"
 #include "kh.hpp"
@@ -50,6 +50,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
     beam::ProblemGenerator<T>(pmb, pin);
   } else if (name == "blast") {
     blast::ProblemGenerator<T>(pmb, pin);
+  } else if (name == "coag") {
+    coag::ProblemGenerator<T>(pmb, pin);
   } else if (name == "conduction") {
     cond::ProblemGenerator<T>(pmb, pin);
   } else if (name == "constant") {
@@ -72,8 +74,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
     strat::ProblemGenerator<T>(pmb, pin);
   } else if (name == "thermalization") {
     thermalization::ProblemGenerator<T>(pmb, pin);
-  } else if (name == "dust_coagulation") {
-    dust_coagulation::ProblemGenerator<T>(pmb, pin);
   } else {
     PARTHENON_FAIL("Invalid problem name!");
   }

@@ -18,11 +18,11 @@
 // NOTE(@pdmullen): The following is taken directly from the open-source
 // Athena++-dustfluid software, and adapted for Parthenon/Artemis by @Shengtai on 7/30/24
 
-//! \file dust_coagulation.hpp
+//! \file coag.hpp
 //! \brief dust collision problem generator for 1D problems.
 
-#ifndef PGEN_DUST_COAGULATION_HPP_
-#define PGEN_DUST_COAGULATION_HPP_
+#ifndef PGEN_COAG_HPP_
+#define PGEN_COAG_HPP_
 
 // C/C++ headers
 #include <algorithm>
@@ -46,10 +46,10 @@ namespace {
 
 //----------------------------------------------------------------------------------------
 //! \struct DustCoagulationVariable
-//! \brief container for variables shared with dust_coagulation pgen
+//! \brief container for variables shared with coag pgen
 struct DustCoagulationVariable {
-  int nDust;
-  int nInit_dust;
+  int ndust;
+  int ninit_dust;
   Real gamma, gm1;
   Real h0;
   Real d2g;
@@ -58,60 +58,66 @@ struct DustCoagulationVariable {
 
 } // end anonymous namespace
 
-namespace dust_coagulation {
+namespace coag {
 
 DustCoagulationVariable dcv;
 
 //----------------------------------------------------------------------------------------
-//! \fn void ProblemGenerator::DustCollision_()
+//! \fn void ProblemGenerator::DustCoagulation_()
 //! \brief Sets initial conditions for dust coagulation tests
 template <Coordinates GEOM>
 inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   using parthenon::MakePackDescriptor;
 
+  // Require Cartesian geometry
   auto artemis_pkg = pmb->packages.Get("artemis");
   const auto geom = artemis_pkg->Param<Coordinates>("coords");
   PARTHENON_REQUIRE(geom == Coordinates::cartesian,
-                    "dust_coagulation pgen requires Cartesian geometry!");
+                    "coag pgen requires Cartesian geometry!");
+
+  // Require dust physics
   const bool do_dust = artemis_pkg->Param<bool>("do_dust");
-  PARTHENON_REQUIRE(do_dust, "dust_coagulation pgen requires do_dust=true!");
+  PARTHENON_REQUIRE(do_dust, "coag pgen requires do_dust=true!");
 
+  // Require coagulation
   auto &dust_pkg = pmb->packages.Get("dust");
-
   const bool do_coagulation = artemis_pkg->Param<bool>("do_coagulation");
-  PARTHENON_REQUIRE(do_coagulation,
-                    "dust_coagulation pgen requires physics coagulation=true!");
+  PARTHENON_REQUIRE(do_coagulation, "coag pgen requires physics coagulation=true!");
 
-  // read global parameters
-  dcv.nDust = pin->GetOrAddReal("dust", "nspecies", 121);
-  dcv.nInit_dust = pin->GetOrAddReal("problem", "nInit_dust", 1);
+  // Read global parameters
+  dcv.ndust = dust_pkg->Param<int>("nspecies");
+  dcv.ninit_dust = pin->GetOrAddReal("problem", "ninit_dust", 1);
   dcv.d2g = pin->GetOrAddReal("problem", "dust_to_gas", 0.01);
   dcv.rho0 = pin->GetOrAddReal("problem", "rho0", 1.0);
-
-  // using MRN distribution for the initial dust setup
-  ParArray1D<Real> dust_size = dust_pkg->template Param<ParArray1D<Real>>("sizes");
 
   auto gas_pkg = pmb->packages.Get("gas");
   auto eos_d = gas_pkg->template Param<EOS>("eos_d");
 
+  // Extract adiabatic index and H0
   dcv.gamma = gas_pkg->Param<Real>("adiabatic_index");
   dcv.gm1 = dcv.gamma - 1.0;
   dcv.h0 = pin->GetOrAddReal("problem", "h0", 0.05);
 
+  // Extract fluid state vector
   const Real gdens = dcv.rho0;
   const auto mu = gas_pkg->Param<Real>("mu");
-  auto &constants = artemis_pkg->Param<ArtemisUtils::Constants>("constants");
+  const auto &constants = artemis_pkg->Param<ArtemisUtils::Constants>("constants");
   const Real kbmu = constants.GetKBCode() / (mu * constants.GetAMUCode());
   const Real gtemp = SQR(dcv.h0) / kbmu / dcv.gamma;
   const Real gsie = eos_d.InternalEnergyFromDensityTemperature(gdens, gtemp);
   const Real pres = eos_d.PressureFromDensityTemperature(gdens, gtemp);
   if (pmb->gid == 0) {
-    std::cout << "gamma,cs,pre=" << dcv.gamma << " " << dcv.h0 << " "
-              << gsie * dcv.gm1 * gdens << " " << pres << std::endl;
+    std::cout << "gamma, h0, pres=" << dcv.gamma << " " << dcv.h0 << " "
+              << dcv.gm1 * gdens * gsie << " " << pres << std::endl;
   }
 
-  const Real vx_g = 0.0;
-  const Real vx_d = 0.0;
+  // Using MRN distribution for the initial dust setup
+  ParArray1D<Real> dust_size = dust_pkg->template Param<ParArray1D<Real>>("sizes");
+  Real sum1 = 0.0;
+  auto &dcoag = dcv;
+  pmb->par_reduce(
+      "pgen_partialSum", 0, dcoag.ninit_dust - 1,
+      KOKKOS_LAMBDA(const int n, Real &lsum) { lsum += std::sqrt(dust_size(n)); }, sum1);
 
   // packing and capture variables for kernel
   auto &md = pmb->meshblock_data.Get();
@@ -126,38 +132,37 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
-  auto &dcoag = dcv;
 
-  Real sum1 = 0.0;
-  pmb->par_reduce(
-      "pgen_partialSum", 0, dcoag.nInit_dust - 1,
-      KOKKOS_LAMBDA(const int n, Real &lsum) { lsum += std::sqrt(dust_size(n)); }, sum1);
-
+  // Initialize state vectors
+  const Real vx_g = 0.0;
+  const Real vx_d = 0.0;
   pmb->par_for(
       "pgen_dustCoagulation", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
+        // Set gas state vector
         v(0, gas::prim::density(0), k, j, i) = gdens;
         v(0, gas::prim::velocity(0), k, j, i) = vx_g;
         v(0, gas::prim::velocity(1), k, j, i) = 0.0;
         v(0, gas::prim::velocity(2), k, j, i) = 0.0;
         v(0, gas::prim::sie(0), k, j, i) = gsie;
 
-        for (int n = 0; n < dcoag.nInit_dust; ++n) {
+        // Set dust state vector
+        for (int n = 0; n < dcoag.ninit_dust; ++n) {
           const Real sratio = std::sqrt(dust_size(n)) / sum1;
           v(0, dust::prim::density(n), k, j, i) = dcoag.d2g * gdens * sratio;
-          v(0, dust::prim::velocity(n * 3 + 0), k, j, i) = vx_d;
-          v(0, dust::prim::velocity(n * 3 + 1), k, j, i) = 0.0;
-          v(0, dust::prim::velocity(n * 3 + 2), k, j, i) = 0.0;
+          v(0, dust::prim::velocity(VI(n, 0)), k, j, i) = vx_d;
+          v(0, dust::prim::velocity(VI(n, 1)), k, j, i) = 0.0;
+          v(0, dust::prim::velocity(VI(n, 2)), k, j, i) = 0.0;
         }
-        for (int n = dcoag.nInit_dust; n < dcoag.nDust; ++n) {
+        for (int n = dcoag.ninit_dust; n < dcoag.ndust; ++n) {
           v(0, dust::prim::density(n), k, j, i) = 0.0;
-          v(0, dust::prim::velocity(n * 3 + 0), k, j, i) = vx_d;
-          v(0, dust::prim::velocity(n * 3 + 1), k, j, i) = 0.0;
-          v(0, dust::prim::velocity(n * 3 + 2), k, j, i) = 0.0;
+          v(0, dust::prim::velocity(VI(n, 0)), k, j, i) = vx_d;
+          v(0, dust::prim::velocity(VI(n, 1)), k, j, i) = 0.0;
+          v(0, dust::prim::velocity(VI(n, 2)), k, j, i) = 0.0;
         }
       });
 }
 
-} // namespace dust_coagulation
+} // namespace coag
 
-#endif // PGEN_DUST_COAGULATION_HPP_
+#endif // PGEN_COAG_HPP_

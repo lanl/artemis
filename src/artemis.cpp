@@ -115,9 +115,9 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   PARTHENON_REQUIRE(!(do_radiation) || (do_radiation && do_gas),
                     "Radiation requires the gas package, but there is not gas!");
   PARTHENON_REQUIRE(!(do_imc && do_moment),
-                    "Cannot simultaneously evolve IMC and moments radiation");
-  PARTHENON_REQUIRE(!(do_coagulation) || (do_coagulation && do_dust),
-                    "Coagulation requires the dust package, but there is not dust!");
+                    "Cannot simultaneously evolve IMC and moments radiation!");
+  PARTHENON_REQUIRE(!(do_coagulation) || (do_coagulation && (do_gas && do_dust)),
+                    "Coagulation requires gas and dust packages, at least one missing!");
 
   // Store configuration choices in params
   artemis->AddParam("do_gas", do_gas);
@@ -155,10 +155,16 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   if (do_rotating_frame) packages.Add(RotatingFrame::Initialize(pin.get()));
   if (do_cooling) packages.Add(Gas::Cooling::Initialize(pin.get()));
   if (do_drag) packages.Add(Drag::Initialize(pin.get()));
+
+  // Operator split dust coagulation
   if (do_coagulation) {
-    auto &dustPars = packages.Get("dust")->AllParams();
-    packages.Add(Dust::Coagulation::Initialize(pin.get(), dustPars, units, constants));
+    auto &gas_params = packages.Get("gas")->AllParams();
+    auto &dust_params = packages.Get("dust")->AllParams();
+    packages.Add(Dust::Coagulation::Initialize(pin.get(), gas_params, dust_params, units,
+                                               constants));
   }
+
+  // Operator split radiation
   if (do_radiation) {
     // Top-level radiation package
     packages.Add(Radiation::Initialize(pin.get(), constants, do_imc));

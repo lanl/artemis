@@ -60,6 +60,7 @@ set (SRC_LIST
   pgen/advection.hpp
   pgen/beam.hpp
   pgen/blast.hpp
+  pgen/coag.hpp
   pgen/conduction.hpp
   pgen/constant.hpp
   pgen/disk.hpp

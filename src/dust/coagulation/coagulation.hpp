@@ -205,7 +205,7 @@ static void InitializeArray(const int nm, int &pgrid, const Real &rho_p, const R
   // Set fragmentation variables
   const Real ten_a = std::pow(10.0, a);
   const Real ten_ma = 1.0 / ten_a;
-  const int ce = static_cast<int>( std::floor(-1.0 / a * std::log10(1.0 - ten_ma)))  + 1;
+  const int ce = static_cast<int>(std::floor(-1.0 / a * std::log10(1.0 - ten_ma))) + 1;
 
   // Used in integration
   pgrid = static_cast<int>(std::floor(1.0 / a));
@@ -214,7 +214,7 @@ static void InitializeArray(const int nm, int &pgrid, const Real &rho_p, const R
   const int iphifrag = coag2drv::phifrag;
   const int iepsfrag = coag2drv::epsfrag;
   const int iafrag = coag2drv::afrag;
-  const Real frag_slope = 1.0/6.0; // = 2.0 - 11.0 / 6.0;
+  const Real frag_slope = 1.0 / 6.0; // = 2.0 - 11.0 / 6.0;
   parthenon::par_for(
       parthenon::loop_pattern_flatrange_tag, "initializeCoag2", parthenon::DevExecSpace(),
       0, nm - 1, KOKKOS_LAMBDA(const int i) {

@@ -30,7 +30,8 @@
 namespace artemis {
 
 std::function<AmrTag(MeshBlockData<Real> *mbd)> ProblemCheckRefinementBlock = nullptr;
-
+std::function<TaskStatus(MeshData<Real> *md, const Real time, const Real dt)>
+    UserSourceTerm = nullptr;
 } // namespace artemis
 
 // Problem modifiers
@@ -66,6 +67,7 @@ void ProblemModifier(parthenon::ParthenonManager *pman) {
   } else if (artemis_problem == "disk") {
 
     artemis::ProblemCheckRefinementBlock = disk::ProblemCheckRefinementBlock;
+    artemis::UserSourceTerm = disk::UserSourceTerm<G>;
 
     pman->app_input->RegisterBoundaryCondition(BF::inner_x1, "ic",
                                                disk::DiskBoundaryIC<G, ID::inner_x1>);

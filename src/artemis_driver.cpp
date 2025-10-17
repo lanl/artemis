@@ -302,9 +302,12 @@ TaskCollection ArtemisDriver<GEOM>::StepTasks() {
             tl.AddTask(rt_src, RotatingFrame::RotatingFrameForce, u0.get(), time, bdt);
       }
 
+      auto user_src =
+          tl.AddTask(rframe_src, ArtemisUtils::ProblemSourceTerm, u0.get(), time, bdt);
+
       // Apply drag source term
       // NOTE(@pdmullen): RK integrated, operator split drag (RHS computed from U)
-      TaskID drag_src = rframe_src;
+      TaskID drag_src = user_src;
       if (do_drag) {
         drag_src = tl.AddTask(rframe_src, Drag::DragSource<GEOM>, u0.get(), time, bdt);
       }

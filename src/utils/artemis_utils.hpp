@@ -36,6 +36,16 @@ KOKKOS_FORCEINLINE_FUNCTION Real VDot(const V1 &a, const V2 &b) {
 }
 
 //----------------------------------------------------------------------------------------
+//! \fn int ArtemisUtils::ProblemSourceTerm
+//! \brief Wrapper function for user-defined source term, checking for nullptr
+static TaskStatus ProblemSourceTerm(MeshData<Real> *md, const Real time, const Real dt) {
+  if (artemis::UserSourceTerm != nullptr) {
+    return artemis::UserSourceTerm(md, time, dt);
+  }
+  return TaskStatus::complete;
+}
+
+//----------------------------------------------------------------------------------------
 //! \fn Real ArtemisUtils::DualEnergySIE(vmesh, const int b, const int n, const int k,
 //!                                      const int j, const int i, const Real de_switch,
 //!                                      const Real hx[3])

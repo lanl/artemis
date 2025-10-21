@@ -66,6 +66,7 @@ struct DiskParams {
   Real temp_soft2;
   Real kbmu, ar;
   bool do_gas, do_dust, do_moment, do_imc;
+  bool multi_d, three_d;
   bool nbody_temp;
   bool quiet_start;
   bool log;
@@ -162,21 +163,28 @@ KOKKOS_INLINE_FUNCTION State ComputeDiskProfile(
   res.gdens = DenProfile(pgen, xcyl[0], xcyl[2]);
   const Real dxr = 1e-6 * std::sqrt(SQR(dx[0]) + SQR(dx[1]) + SQR(dx[2]));
 
-  const Real rt = pgen.nbody_temp
-                      ? -pgen.gm / Gravity::NBodyPotential<Coordinates::cylindrical>(
-                                       coords, xcyl, particles, npart)
-                      : xcyl[0];
+  Real rt = xcyl[0];
+  Real rtp = xcyl[0] + dxr;
+  Real rtm = xcyl[0] - dxr;
 
-  const Real rtp =
-      pgen.nbody_temp
-          ? -pgen.gm / Gravity::NBodyPotential<Coordinates::cylindrical>(
-                           coords, {xcyl[0] + dxr, xcyl[1], xcyl[2]}, particles, npart)
-          : xcyl[0] + dxr;
-  const Real rtm =
-      pgen.nbody_temp
-          ? -pgen.gm / Gravity::NBodyPotential<Coordinates::cylindrical>(
-                           coords, {xcyl[0] - dxr, xcyl[1], xcyl[2]}, particles, npart)
-          : xcyl[0] - dxr;
+  // this is a mess
+  if (pgen.nbody_temp) {
+    const Real pot = Gravity::NBodyPotential<GEOM>(coords, xv, particles, npart);
+    const Real dxpot = Gravity::NBodyPotential<GEOM>(
+        coords, {xv[0] + 1e-6 * dx[0], xv[1], xv[2]}, particles, npart);
+    const Real dypot = Gravity::NBodyPotential<GEOM>(
+        coords, {xv[0], xv[1] + 1e-6 * dx[1], xv[2]}, particles, npart);
+    const Real dzpot = Gravity::NBodyPotential<GEOM>(
+        coords, {xv[0], xv[1], xv[2] + 1e-6 * dx[2]}, particles, npart);
+    // dPhi/dr = grad(Phi) . \hat{e}_r
+    Real drpot = (dxpot - pot) / (2e-6 * dx[0]) * ex1[0];
+    drpot += pgen.multi_d * (dypot - pot) / (2e-6 * dx[1]) * ex2[0];
+    drpot += pgen.three_d * (dzpot - pot) / (2e-6 * dx[2]) * ex3[0];
+    rt = -pgen.gm / pot;
+    rtp = -pgen.gm / (pot + drpot * dxr);
+    rtm = -pgen.gm / (pot - drpot * dxr);
+  }
+
   res.gtemp = TempProfile(pgen, rt, xcyl[2]);
   const Real tp = TempProfile(pgen, rtp, xcyl[2]);
   const Real tm = TempProfile(pgen, rtm, xcyl[2]);
@@ -264,6 +272,10 @@ inline void InitDiskParams(MeshBlock *pmb, ParameterInput *pin) {
 
     disk_params.do_imc = params.Get<bool>("do_imc");
     disk_params.do_moment = params.Get<bool>("do_moment");
+    const auto nx = params.Get<std::array<int, 3>>("prob_dim");
+    disk_params.three_d = nx[2] > 1;
+    disk_params.multi_d = disk_params.three_d || (nx[1] > 1);
+
     disk_params.ar = constants.GetARCode();
 
     Real q = pin->GetOrAddReal("problem", "tslope", -Big<Real>());

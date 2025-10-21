@@ -34,6 +34,9 @@ struct H2Partition {
   Real Z, dZ, d2Z;
 };
 
+// NOTE(@adempsey)
+// This implements the ideal gas H-He mixture EOS defined in
+// D'Angelo & Bodenheimer, 2013, ApJ 778.
 class IdealHHe : public singularity::eos_base::EosBase<IdealHHe> {
   friend class singularity::table_utils::SpinerTricks<IdealHHe>;
 
@@ -142,6 +145,9 @@ class IdealHHe : public singularity::eos_base::EosBase<IdealHHe> {
   PORTABLE_INLINE_FUNCTION Real SpecificHeatFromDensityTemperature(
       const Real rho, const Real temperature,
       Indexer_t &&lambda = static_cast<Real *>(nullptr)) const {
+
+    // NOTE(@adempsey)
+    // Uncomment if you want the analytic Cv
 
     // const auto &r = GetMassFractions(rho, temperature);
     // const Real kT = _eV * temperature;
@@ -255,23 +261,6 @@ class IdealHHe : public singularity::eos_base::EosBase<IdealHHe> {
     const Real Cv = SpecificHeatFromDensityTemperature(rho, temperature);
     const Real P = PressureFromDensityTemperature(rho, temperature);
 
-    // log(T) - log(T*(1-eps))
-    // -log(1-eps)
-    // const Real tp = temperature * (1. + 0);
-    // const Real tm = temperature * (1. - _dlnT);
-    // const Real dp = rho * (1. + 0);
-    // const Real dm = rho * (1. - _dlnT);
-    // const Real dlmudt =
-    //     std::log(MeanMass(rho, tp) / MeanMass(rho, tm)) / std::log(tp / tm);
-    // const Real dlmudr = std::log(MeanMass(dp, temperature) / MeanMass(dm, temperature))
-    // /
-    //                     std::log(dp / dm);
-    // const Real dlpt = std::log(PressureFromDensityTemperature(rho, tp) /
-    //                            PressureFromDensityTemperature(rho, tm)) /
-    //                   std::log(tp / tm);
-    // const Real dlpr = std::log(PressureFromDensityTemperature(dp, temperature) /
-    //                            PressureFromDensityTemperature(dm, temperature)) /
-    //                   std::log(dp / dm);
     const auto &[mu, dlmudt, dlmudr] = MeanMass(rho, temperature);
     // dln(P)/dln(T)
     // dln(P)/dln(rho)
@@ -394,8 +383,7 @@ class IdealHHe : public singularity::eos_base::EosBase<IdealHHe> {
     // solution is  (-(a+b) + sqrt( (a+b)^2 + 4*a*c)) /(2*c)
     // = c*y^2 + (b + a)*y - a == 0
     // = c/a y^2 + (b/a + 1) * y - 1 == 0
-    // const Real disc = 1.0 + (2 * (b + 2.0 * c) / a + (b / a) * (b / a));
-    // return singularity::robust::ratio(2.0, 1.0 + (b / a + std::sqrt(disc)));
+
     const Real a_ = std::abs(a);
     if (a_ <= _small) {
       // Treat as 0 and pick the zero root
@@ -423,16 +411,11 @@ class IdealHHe : public singularity::eos_base::EosBase<IdealHHe> {
     Real f2p = std::pow(T / _Tp, 1.5);
     Real f2e = std::pow(T / _Te, 1.5);
     const Real kT = _eV * T;
-    auto snap = [](Real x) {
-      //   if (std::abs(x - 1.0) <= 1e-10) return 1.0;
-      //   if (std::abs(x) <= 1e-10) return 0.0;
-      return x;
-    };
     // x^2 = (1-x)*a
     // x
     Real a = f1 / _X * f2e * singularity::robust::safe_arg_exp(-_xe / (T));
     Real dlat = _xe / (T) + 1.5;
-    res.x = snap(quadratic_root(a, 0., 1.0));
+    res.x = quadratic_root(a, 0., 1.0);
     if ((std::abs(a) > _small) && (res.x > 0.0) && (res.x < 1.0)) {
       res.dxdt = singularity::robust::ratio(dlat * a * (1. - res.x), 2 * res.x + a);
       res.dxdr = singularity::robust::ratio(-a * (1. - res.x), (2 * res.x + a));
@@ -442,7 +425,7 @@ class IdealHHe : public singularity::eos_base::EosBase<IdealHHe> {
     Real efac_ = singularity::robust::safe_arg_exp(-_ye / (T));
     Real fac1_ = f1 * f2p;
     a = 0.5 * f1 / _X * f2p * singularity::robust::safe_arg_exp(-_ye / (T));
-    res.y = snap(quadratic_root(a, 0.0, 1.0));
+    res.y = quadratic_root(a, 0.0, 1.0);
     dlat = _ye / (T) + 1.5;
     if ((std::abs(a) > _small) || (res.y > 0.0) && (res.y < 1.0)) {
       res.dydt = singularity::robust::ratio(dlat * a * (1. - res.y), 2 * res.y + a);
@@ -452,7 +435,7 @@ class IdealHHe : public singularity::eos_base::EosBase<IdealHHe> {
     // (X + 0.25*Y * z)*z = (1-z)*a
     a = 4.0 * f1 * f2e * singularity::robust::safe_arg_exp(-_z1e / (T));
     dlat = _z1e / (T) + 1.5;
-    res.z1 = snap(quadratic_root(a, _X, 0.25 * _Y));
+    res.z1 = quadratic_root(a, _X, 0.25 * _Y);
     if ((std::abs(a) > _small) && (res.z1 > 0.0) && (res.z1 < 1.0)) {
       res.dz1dt = singularity::robust::ratio(dlat * a * (1. - res.z1),
                                              a + 0.5 * _Y * res.z1 + _X);
@@ -463,7 +446,7 @@ class IdealHHe : public singularity::eos_base::EosBase<IdealHHe> {
     // (X + 0.25*Y  + 0.25*Y * z)*z = (1-z)*a
     a = f1 * f2e * singularity::robust::safe_arg_exp(-_z2e / (T));
     dlat = _z2e / (T) + 1.5;
-    res.z2 = snap(quadratic_root(a, _X + 0.25 * _Y, 0.25 * _Y));
+    res.z2 = quadratic_root(a, _X + 0.25 * _Y, 0.25 * _Y);
     if ((std::abs(a) > _small) && (res.z2 > 0.0) && (res.z2 < 1.0)) {
       res.dz2dt = singularity::robust::ratio(dlat * a * (1. - res.z2),
                                              a + 0.5 * _Y * res.z2 + _X + 0.25 * _Y);
@@ -533,6 +516,9 @@ class IdealHHe : public singularity::eos_base::EosBase<IdealHHe> {
     Real dlmut = (get_mu(_X, _Y, rtp) - get_mu(_X, _Y, rtm)) / (2. * _dlnT * mu);
     Real dlmur = (get_mu(_X, _Y, rdp) - get_mu(_X, _Y, rdm)) / (2. * _dlnT * mu);
 
+    // NOTE(@adempsey)
+    // Uncomment for the analytic derivatives
+
     // const auto &r = GetMassFractions(rho, T);
     // Real imu =
     //     0.25 * (2. * _X * (1. + r.y * (1. + 2. * r.x)) + _Y * (1. + r.z1 * (1. +
@@ -593,18 +579,6 @@ class IdealHHe : public singularity::eos_base::EosBase<IdealHHe> {
                InternalEnergyFromDensityTemperature(rho, T, lambda));
         break;
       }
-      //   sie_new = InternalEnergyFromDensityTemperature(rho, T, lambda);
-      //   const Real dE = sie_new - sie;
-      //   const Real Cv = SpecificHeatFromDensityTemperature(rho, T, lambda);
-      //   Real dT = singularity::robust::ratio(-dE, Cv);
-      //   if ((T + dT <= 0.0) || (std::abs(dT) > .5 * T)) {
-      //     dT = ((dT > 0) ? 1 : -1) * 0.1 * T;
-      //   }
-      //   T += dT;
-      //   if ((std::abs(dT) <= 1e-8 * T) && (std::abs(dE) <= 1e-8 * sie)) {
-      //     conv = true;
-      //     break;
-      //   }
     }
     if (!conv) {
       printf("Failed to converge %lg %lg %lg %lg\n", rho, sie, T,

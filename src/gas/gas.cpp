@@ -383,7 +383,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   m.SetSparseThresholds(0.0, 0.0, 0.0);
   gas->AddSparsePool<gas::prim::bmod>(m, control_field, fluidids);
 
-  // Bulk modulus
+  // Temperature
   m = Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy, Metadata::Sparse});
   m.SetSparseThresholds(0.0, 0.0, 0.0);
   gas->AddSparsePool<gas::prim::temperature>(m, control_field, fluidids);

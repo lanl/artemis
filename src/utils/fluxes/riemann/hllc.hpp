@@ -205,10 +205,6 @@ struct RiemannSolver<RSolver::hllc, FLUID_TYPE, CTYPE,
     PARTHENON_REQUIRE(dir > 0 && dir <= 3, "Invalid flux direction!");
     auto fdir = (dir == 1) ? TE::F1 : ((dir == 2) ? TE::F2 : TE::F3);
 
-    // TODO(BRR) temporary
-    // const Real gm1 = eos.GruneisenParamFromDensityTemperature(Null<Real>(),
-    // Null<Real>());
-
     // Obtain number of species
     const int nspecies = q.GetSize(b, gas::cons::density());
 
@@ -222,10 +218,6 @@ struct RiemannSolver<RSolver::hllc, FLUID_TYPE, CTYPE,
       const int IBL = nspecies * 6 + n;
       const int IEN = IPR;
       const int IEG = ISE;
-
-      // Real igm1 = 1.0 / gm1;
-      // Real gamma = gm1 + 1.0;
-      // Real alpha = (gamma + 1.0) / (2.0 * gamma);
 
       parthenon::par_for_inner(
           DEFAULT_INNER_LOOP_PATTERN, member, il, iu, [&](const int i) {
@@ -254,7 +246,9 @@ struct RiemannSolver<RSolver::hllc, FLUID_TYPE, CTYPE,
             Real el = wl_idn * (wl_ise + 0.5 * (SQR(wl_ivx) + SQR(wl_ivy) + SQR(wl_ivz)));
             Real er = wr_idn * (wr_ise + 0.5 * (SQR(wr_ivx) + SQR(wr_ivy) + SQR(wr_ivz)));
 
-            // Roe averages
+            // NOTE(@adempsey)
+            // The below choices are taken from Batten et al 1997 and Fleischmann et al
+            // 2020 Roe averages
             Real sqrtl = std::sqrt(wl_idn);
             Real sqrtr = std::sqrt(wr_idn);
             const Real isqrt = 1.0 / (sqrtl + sqrtr);

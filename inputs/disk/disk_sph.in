@@ -12,7 +12,7 @@
 # ========================================================================================
 
 <artemis>
-problem         = "disk"   # name of the pgen
+problem         = "disk"       # name of the pgen
 coordinates     = "spherical"  # coordinate system
 physical_units  = "cgs"
 unit_conversion = "ppd"
@@ -32,10 +32,10 @@ file_type = "rst"
 dt        = 0.2
 
 <parthenon/time>
-nlim       = -1     # cycle limit
+nlim       = -1       # cycle limit
 tlim       = 10*2*pi  # time limit
-integrator = "rk2"  # time integration algorithm
-ncycle_out = 1      # interval for stdout summary info
+integrator = "rk2"    # time integration algorithm
+ncycle_out = 1        # interval for stdout summary info
 
 <parthenon/mesh>
 nx1    = 128   # Number of zones in X1-direction
@@ -44,11 +44,11 @@ x1max  = 5.6   # maximum value of X1
 ix1_bc = "ic"  # Inner-X1 boundary condition flag
 ox1_bc = "ic"  # Outer-X1 boundary condition flag
 
-nx2    = 64                    # Number of zones in X2-direction
-x2min  = pi/2. - 30. * pi/180. # minimum value of X2
-x2max  = pi/2. + 30. * pi/180. # maximum value of X2
-ix2_bc = "ic"                  # Inner-X2 boundary condition flag
-ox2_bc = "ic"                  # Outer-X2 boundary condition flag
+nx2    = 64                     # Number of zones in X2-direction
+x2min  = pi/2. - 30. * pi/180.  # minimum value of X2
+x2max  = pi/2. + 30. * pi/180.  # maximum value of X2
+ix2_bc = "ic"                   # Inner-X2 boundary condition flag
+ox2_bc = "ic"                   # Outer-X2 boundary condition flag
 
 nx3    = 64          # Number of zones in X3-direction
 x3min  = -pi         # minimum value of X3

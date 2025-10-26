@@ -12,7 +12,7 @@
 # ========================================================================================
 
 <artemis>
-problem         = "disk"   # name of the pgen
+problem         = "disk"       # name of the pgen
 coordinates     = "cartesian"  # coordinate system
 physical_units  = "cgs"
 unit_conversion = "ppd"
@@ -26,18 +26,18 @@ variables = "gas.prim.density"  &
             "gas.prim.pressure"  &
             "dust.prim.density"  &
             "dust.prim.velocity"
-file_type = "hdf5"  # HDF5 data dump
-dt        = 0.19625 # time increment between outputs
+file_type = "hdf5"   # HDF5 data dump
+dt        = 0.19625  # time increment between outputs
 
 <parthenon/output2>
 file_type = "rst"
 dt        = 0.2
 
 <parthenon/time>
-nlim       = -1     # cycle limit
+nlim       = -1       # cycle limit
 tlim       = 10*2*pi  # time limit
-integrator = "rk2"  # time integration algorithm
-ncycle_out = 1      # interval for stdout summary info
+integrator = "rk2"    # time integration algorithm
+ncycle_out = 1        # interval for stdout summary info
 
 <parthenon/mesh>
 nghost     = 4

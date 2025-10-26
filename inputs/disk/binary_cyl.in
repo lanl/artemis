@@ -37,11 +37,11 @@ nghost = 2
 # refinement = adaptive
 # numlevel = 4
 
-nx1    = 256      # Number of zones in X1-direction
-x1min  = log(0.3) # minimum value of X1 ( = 0.3)
-x1max  = log(3.0) # maximum value of X1 ( = 3.0)
-ix1_bc = "ic"     # Inner-X1 boundary condition flag
-ox1_bc = "ic"     # Outer-X1 boundary condition flag
+nx1    = 256       # Number of zones in X1-direction
+x1min  = log(0.3)  # minimum value of X1 ( = 0.3)
+x1max  = log(3.0)  # maximum value of X1 ( = 3.0)
+ix1_bc = "ic"      # Inner-X1 boundary condition flag
+ox1_bc = "ic"      # Outer-X1 boundary condition flag
 
 nx2    = 512         # Number of zones in X2-direction
 x2min  = 0.0         # minimum value of X2

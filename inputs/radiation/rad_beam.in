@@ -12,7 +12,7 @@
 # ========================================================================================
 
 <artemis>
-problem         = "beam"   # name of the pgen
+problem         = "beam"       # name of the pgen
 physical_units  = "cgs"
 unit_conversion = "base"
 coordinates     = "cartesian"  # coordinate system
@@ -26,15 +26,15 @@ variables = "gas.prim.density"  &
             "gas.prim.pressure"  &
             "rad.prim.energy"  &
             "rad.prim.flux"
-file_type       = "hdf5" # HDF5 data dump
-dt              = 5e-12  # time increment between outputs
+file_type       = "hdf5"  # HDF5 data dump
+dt              = 5e-12   # time increment between outputs
 use_final_label = false
 
 <parthenon/time>
-nlim       = -1     # cycle limit
-tlim       = 1e-9   # time limit
-integrator = "rk2"  # time integration algorithm
-ncycle_out = 1      # interval for stdout summary info
+nlim       = -1       # cycle limit
+tlim       = 1e-9     # time limit
+integrator = "rk2"    # time integration algorithm
+ncycle_out = 1        # interval for stdout summary info
 dt_user    = 2.5e-13
 
 <parthenon/mesh>
@@ -74,7 +74,7 @@ efloor      = 1e-12
 
 <gas>
 cfl         = 0.3
-gamma       = 1.4    # gamma = C_p/C_v
+gamma       = 1.4      # gamma = C_p/C_v
 reconstruct = "plm"
 riemann     = "hlle"
 dfloor      = 1.0e-10

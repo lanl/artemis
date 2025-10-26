@@ -13,7 +13,7 @@
 
 <artemis>
 problem     = "linear_wave"  # name of the pgen
-coordinates = "cartesian"  # coordinate system
+coordinates = "cartesian"    # coordinate system
 
 <parthenon/job>
 problem_id = "linear_wave"  # problem ID: basename of output filenames
@@ -70,10 +70,10 @@ riemann     = "hllc"
 gamma       = 1.66666666667
 
 <problem>
-nperiod   = 1     # Number of wave crossing periods to evolve simulation
-wave_flag = 3     # Wave family number ([0-4] for adiabatic hydro)
+nperiod   = 1       # Number of wave crossing periods to evolve simulation
+wave_flag = 3       # Wave family number ([0-4] for adiabatic hydro)
 amp       = 1.0e-3  # Wave Amplitude
-vflow     = 1.0   # background flow velocity
-along_x1  = false # set to 'true' for wave along x1-axis
-along_x2  = false # set to 'true' for wave along x2-axis
-along_x3  = false # set to 'true' for wave along x3-axis
+vflow     = 1.0     # background flow velocity
+along_x1  = false   # set to 'true' for wave along x1-axis
+along_x2  = false   # set to 'true' for wave along x2-axis
+along_x3  = false   # set to 'true' for wave along x3-axis

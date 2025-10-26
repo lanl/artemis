@@ -15,7 +15,7 @@
 problem         = "thermalization"  # name of the pgen
 physical_units  = "cgs"
 unit_conversion = "base"
-coordinates     = "cartesian"  # coordinate system
+coordinates     = "cartesian"       # coordinate system
 
 <parthenon/job>
 problem_id = "thermalization"  # problem ID: basename of output filenames
@@ -30,9 +30,9 @@ file_type = "hdf5"  # HDF5 data dump
 dt        = 1.0e-9  # time increment between outputs
 
 <parthenon/time>
-nlim       = -1     # cycle limit
-tlim       = 6.0e-8 # time limit
-integrator = "rk1"  # time integration algorithm
+nlim       = -1      # cycle limit
+tlim       = 6.0e-8  # time limit
+integrator = "rk1"   # time integration algorithm
 dt_force   = 1e-10
 
 <parthenon/mesh>
@@ -64,8 +64,8 @@ gas       = true
 radiation = true
 
 <gas>
-gamma       = 1.4    # adiabatic index
-mu          = 28.96  # mean molecular weight
+gamma       = 1.4      # adiabatic index
+mu          = 28.96    # mean molecular weight
 cfl         = 0.8
 reconstruct = "plm"
 riemann     = "hllc"

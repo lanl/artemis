@@ -12,8 +12,8 @@
 # ========================================================================================
 
 <artemis>
-problem     = "conduction" # name of the pgen
-coordinates = "cartesian"  # coordinate system
+problem     = "conduction"  # name of the pgen
+coordinates = "cartesian"   # coordinate system
 
 <parthenon/job>
 problem_id = "cond"  # problem ID: basename of output filenames

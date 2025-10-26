@@ -12,14 +12,14 @@
 # ========================================================================================
 
 <artemis>
-problem         = "shock"  # name of the pgen
-coordinates     = "cartesian"  # coordinate system
-physical_units  = "cgs"    # not scale-free
-unit_conversion = "base"   # [L/T/M/Temp] = 1
-time            = 1.0e-10  # time unit
-length          = 0.01575  # length unit
+problem         = "shock"         # name of the pgen
+coordinates     = "cartesian"     # coordinate system
+physical_units  = "cgs"           # not scale-free
+unit_conversion = "base"          # [L/T/M/Temp] = 1
+time            = 1.0e-10         # time unit
+length          = 0.01575         # length unit
 mass            = 3.906984375e-6  # mass unit (implying dunit=1.0)
-temperature     = 2.18e6   # temperature unit
+temperature     = 2.18e6          # temperature unit
 
 <parthenon/job>
 problem_id = "shock"  # problem ID: basename of output filenames
@@ -76,10 +76,10 @@ radiation = true  # enable IMC radiation
 
 <gas>
 gamma       = 1.666666  # adiabatic index
-mu          = 1.008  # mean molecular weight
-cfl         = 0.8    # CFL number
-reconstruct = "plm"  # reconstruction algorithm
-riemann     = "hllc" # Riemann solver
+mu          = 1.008     # mean molecular weight
+cfl         = 0.8       # CFL number
+reconstruct = "plm"     # reconstruction algorithm
+riemann     = "hllc"    # Riemann solver
 
 <gas/opacity/absorption>
 opacity_model = "powerlaw"  # absorption opacity model

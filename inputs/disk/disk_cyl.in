@@ -12,7 +12,7 @@
 # ========================================================================================
 
 <artemis>
-problem         = "disk"     # name of the pgen
+problem         = "disk"         # name of the pgen
 coordinates     = "cylindrical"  # coordinate system
 physical_units  = "cgs"
 unit_conversion = "ppd"
@@ -32,10 +32,10 @@ file_type = "rst"
 dt        = 0.2
 
 <parthenon/time>
-nlim       = -1     # cycle limit
+nlim       = -1       # cycle limit
 tlim       = 10*2*pi  # time limit
-integrator = "rk2"  # time integration algorithm
-ncycle_out = 1      # interval for stdout summary info
+integrator = "rk2"    # time integration algorithm
+ncycle_out = 1        # interval for stdout summary info
 
 <parthenon/mesh>
 nx1    = 128   # Number of zones in X1-direction

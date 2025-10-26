@@ -70,7 +70,7 @@ drag = true
 
 <gas>
 cfl         = 0.3
-gamma       = 1.4    # gamma = C_p/C_v
+gamma       = 1.4      # gamma = C_p/C_v
 reconstruct = "plm"
 riemann     = "hlle"
 dfloor      = 1.0e-10

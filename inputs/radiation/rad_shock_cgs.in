@@ -12,9 +12,9 @@
 # ========================================================================================
 
 <artemis>
-problem         = "shock"  # name of the pgen
+problem         = "shock"      # name of the pgen
 coordinates     = "cartesian"  # coordinate system
-physical_units  = "cgs"    # not scale-free
+physical_units  = "cgs"        # not scale-free
 unit_conversion = "base"
 
 <parthenon/job>
@@ -35,11 +35,11 @@ tlim       = 6e-10  # time limit
 integrator = "rk2"  # time integration algorithm
 
 <parthenon/mesh>
-nx1    = 512     # Number of zones in X1-direction
-x1min  = 0.0     # minimum value of X1
-x1max  = 0.01575 # maximum value of X1
-ix1_bc = "ic"    # inner-X1 boundary flag
-ox1_bc = "ic"    # outer-X1 boundary flag
+nx1    = 512      # Number of zones in X1-direction
+x1min  = 0.0      # minimum value of X1
+x1max  = 0.01575  # maximum value of X1
+ix1_bc = "ic"     # inner-X1 boundary flag
+ox1_bc = "ic"     # outer-X1 boundary flag
 
 nx2    = 1           # Number of zones in X2-direction
 x2min  = 0.0         # minimum value of X2
@@ -72,10 +72,10 @@ radiation = true  # enable IMC radiation
 
 <gas>
 gamma       = 5.0/3.0  # adiabatic index
-mu          = 1.008  # mean molecular weight
-cfl         = 0.3    # CFL number
-reconstruct = "plm"  # reconstruction algorithm
-riemann     = "hllc" # Riemann solver
+mu          = 1.008    # mean molecular weight
+cfl         = 0.3      # CFL number
+reconstruct = "plm"    # reconstruction algorithm
+riemann     = "hllc"   # Riemann solver
 
 <gas/opacity/absorption>
 opacity_model = "powerlaw"  # absorption opacity model
@@ -96,10 +96,10 @@ creduc      = 43.3526011561
 # use_ddmc = false        # use DDMC?
 
 <problem>
-rhol  = 5.69   # density (left)
-rhor  = 17.1   # density (right)
-vxl   = 5.19e7 # x-velocity (left)
-vxr   = 1.73e7 # x-velocity (right)
-tl    = 2.18e6 # gas and radiation temp (left)
-tr    = 7.98e6 # gas and radiation temp (right)
-xdisc = 0.013  # discontinuity position
+rhol  = 5.69    # density (left)
+rhor  = 17.1    # density (right)
+vxl   = 5.19e7  # x-velocity (left)
+vxr   = 1.73e7  # x-velocity (right)
+tl    = 2.18e6  # gas and radiation temp (left)
+tr    = 7.98e6  # gas and radiation temp (right)
+xdisc = 0.013   # discontinuity position

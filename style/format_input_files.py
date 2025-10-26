@@ -17,10 +17,10 @@ from typing import List, Tuple
 import subprocess
 
 
-def parse_line(line: str) -> Tuple[str, str, str, str, bool]:
+def parse_line(line: str) -> Tuple[str, str, str, str, bool, bool]:
     """
-    Parse a line into components: (indent, key, value, comment, has_continuation)
-    Returns empty strings for non-parameter lines.
+    Parse a line into components: (indent, key, value, comment, has_continuation, has_trailing_comma)
+    Returns empty strings/False for non-parameter lines.
     """
     stripped = line.strip()
     
@@ -46,11 +46,18 @@ def parse_line(line: str) -> Tuple[str, str, str, str, bool]:
         if has_continuation:
             value_clean = value_clean.rstrip()[:-1]
         
-        value_clean = value_clean.strip()
+        # Strip value but preserve trailing comma if present (for list continuations)
+        value_clean = value_clean.rstrip()
+        has_trailing_comma = value_clean.endswith(',')
+        if has_trailing_comma:
+            value_clean = value_clean[:-1].rstrip()
+        else:
+            # If no trailing comma, strip leading spaces too
+            value_clean = value_clean.strip()
         
-        return (indent, key, value_clean, comment, has_continuation)
+        return (indent, key, value_clean, comment, has_continuation, has_trailing_comma)
     
-    return ('', '', '', '', False)
+    return ('', '', '', '', False, False)
 
 
 def format_block_lines(lines: List[str]) -> List[str]:
@@ -63,30 +70,36 @@ def format_block_lines(lines: List[str]) -> List[str]:
     # Parse all lines in the block
     parsed = []
     for line in lines:
-        indent, key, value, comment, has_cont = parse_line(line)
+        indent, key, value, comment, has_cont, has_comma = parse_line(line)
         if key:  # Only parameter lines
-            parsed.append((indent, key, value, comment, has_cont, line))
+            parsed.append((indent, key, value, comment, has_cont, has_comma, line))
     
     if not parsed:
         return lines
     
     # Find the longest key to determine = alignment
-    max_key_len = max(len(key) for _, key, _, _, _, _ in parsed)
+    max_key_len = max(len(key) for _, key, _, _, _, _, _ in parsed)
     
     # Find the longest "key = value" part (with key padding) to determine comment alignment
     max_kv_len = 0
-    for indent, key, value, comment, has_cont, _ in parsed:
+    for indent, key, value, comment, has_cont, has_comma, _ in parsed:
         # Include the key padding in the calculation
         kv_str = key + ' ' * (max_key_len - len(key)) + ' = ' + value
+        if has_comma:
+            kv_str += ','
         if has_cont:
             kv_str += '  &'
         max_kv_len = max(max_kv_len, len(kv_str))
     
     # Reconstruct formatted lines
     formatted = []
-    for indent, key, value, comment, has_cont, original in parsed:
+    for indent, key, value, comment, has_cont, has_comma, original in parsed:
         # Format: key = value
         new_line = indent + key + ' ' * (max_key_len - len(key)) + ' = ' + value
+        
+        # Add trailing comma if present (for list continuations)
+        if has_comma:
+            new_line += ','
         
         # Add continuation marker if present
         if has_cont:
@@ -131,15 +144,16 @@ def format_continuation_line(line: str) -> str:
     if has_continuation:
         value_part = value_part.rstrip()[:-1]
     
-    value_part = value_part.strip()
-    
-    # Normalize comma-separated values (one space after comma)
-    if ',' in value_part:
-        values = [v.strip() for v in value_part.split(',')]
-        value_part = ', '.join(values)
+    # Check for trailing comma (for list continuations)
+    value_part = value_part.rstrip()
+    has_trailing_comma = value_part.endswith(',')
+    if has_trailing_comma:
+        value_part = value_part[:-1].rstrip()
     
     # Reconstruct
     new_line = indent + value_part
+    if has_trailing_comma:
+        new_line += ','
     if has_continuation:
         new_line += '  &'
     if comment:

@@ -19,10 +19,10 @@ coordinates = "cartesian"  # coordinate system
 problem_id = "drag"  # problem ID: basename of output filenames
 
 <parthenon/output1>
-variables = "gas.prim.density"  &
-            "gas.prim.velocity"  &
-            "gas.prim.pressure"  &
-            "dust.prim.density"  &
+variables =  "gas.prim.density",  &
+            "gas.prim.velocity",  &
+            "gas.prim.pressure",  &
+            "dust.prim.density",  &
             "dust.prim.velocity"
 
 file_type = "hdf5"  # HDF5 data dump

@@ -19,18 +19,18 @@ coordinates = "cartesian"  # coordinate system
 problem_id = "cb_disk"  # problem ID: basename of output filenames
 
 <parthenon/output1>
-variables = "gas.prim.density"  &
-            "gas.prim.velocity"  &
+variables =  "gas.prim.density",  &
+            "gas.prim.velocity",  &
             "gas.prim.pressure"
 file_type = "hdf5"  # HDF5 data dump
 dt        = 0.2     # time increment between outputs
 
 
 <parthenon/time>
-nlim       = -1       # cycle limit
-tlim       = 10*2*pi  # time limit
-integrator = "rk2"    # time integration algorithm
-ncycle_out = 1        # interval for stdout summary info
+nlim       = -1     # cycle limit
+tlim       = 62.8   # time limit
+integrator = "rk2"  # time integration algorithm
+ncycle_out = 1      # interval for stdout summary info
 dt_min     = 1e-12
 
 <parthenon/mesh>
@@ -75,7 +75,7 @@ gamma       = 1.4
 reconstruct = "plm"
 riemann     = "hllc"
 dfloor      = 1.0e-6
-siefloor    = dfloor
+siefloor    = 1.0e-6
 
 <gas/viscosity>
 type = "constant"
@@ -118,7 +118,7 @@ refine_distance = 0.8
 type     = "beta"
 beta0    = 1e-8
 tref     = "nbody"
-tsph     = 0.1**2
+tsph     = .01
 sph_plaw = -1.0
 
 <drag>

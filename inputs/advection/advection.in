@@ -23,10 +23,10 @@ file_type = "hst"
 dt        = 0.1
 
 <parthenon/output1>
-variables = "gas.prim.density"  &
-            "gas.prim.velocity"  &
-            "gas.prim.pressure"  &
-            "dust.prim.density"  &
+variables =  "gas.prim.density",  &
+            "gas.prim.velocity",  &
+            "gas.prim.pressure",  &
+            "dust.prim.density",  &
             "dust.prim.velocity"
 file_type = "hdf5"  # HDF5 data dump
 dt        = 0.1     # time increment between outputs
@@ -73,7 +73,7 @@ dust = true
 cfl         = 0.9
 reconstruct = "plm"
 riemann     = "hllc"
-gamma       = 5.0/3.0
+gamma       = 1.66666666667
 
 <dust>
 cfl         = 0.9

@@ -21,10 +21,10 @@ unit_conversion = "base"
 problem_id = "shock"  # problem ID: basename of output filenames
 
 <parthenon/output1>
-variables = "gas.prim.density"  &
-            "gas.prim.velocity"  &
-            "gas.prim.sie"  &
-            "rad.prim.energy"  &
+variables =  "gas.prim.density",  &
+            "gas.prim.velocity",  &
+            "gas.prim.sie",  &
+            "rad.prim.energy",  &
             "field.jaybenne.energy_tally"
 file_type = "hdf5"  # HDF5 data dump
 dt        = 1e-10   # time increment between outputs
@@ -71,11 +71,11 @@ gas       = true  # enable gas hydrodynamics
 radiation = true  # enable IMC radiation
 
 <gas>
-gamma       = 5.0/3.0  # adiabatic index
-mu          = 1.008    # mean molecular weight
-cfl         = 0.3      # CFL number
-reconstruct = "plm"    # reconstruction algorithm
-riemann     = "hllc"   # Riemann solver
+gamma       = 1.666666  # adiabatic index
+mu          = 1.008     # mean molecular weight
+cfl         = 0.3       # CFL number
+reconstruct = "plm"     # reconstruction algorithm
+riemann     = "hllc"    # Riemann solver
 
 <gas/opacity/absorption>
 opacity_model = "powerlaw"  # absorption opacity model

@@ -20,34 +20,34 @@ radial_spacing = "logarithmic"
 problem_id = "disk"  # problem ID: basename of output filenames
 
 <parthenon/output1>
-variables =  "gas.prim.density",  &
+variables =   "gas.prim.density",  &
             "gas.prim.velocity",  &
             "gas.prim.pressure"
-file_type = "hdf5"             # HDF5 data dump
-dt        = 6.283185307179586  # time increment between outputs
+file_type = "hdf5"  # HDF5 data dump
+dt        = 2*pi    # time increment between outputs
 
 <parthenon/time>
-nlim       = -1                 # cycle limit
-tlim       = 6.283185307179586  # time limit
-integrator = "rk2"              # time integration algorithm
-ncycle_out = 1000               # interval for stdout summary info
+nlim       = -1     # cycle limit
+tlim       = 2*pi   # time limit
+integrator = "rk2"  # time integration algorithm
+ncycle_out = 1000   # interval for stdout summary info
 
 <parthenon/mesh>
 nghost = 2
 # refinement = adaptive
 # numlevel = 4
 
-nx1    = 256                  # Number of zones in X1-direction
-x1min  = -1.2039728043259361  # minimum value of X1 ( = 0.3)
-x1max  = 1.0986122886681098   # maximum value of X1 ( = 3.0)
-ix1_bc = "ic"                 # Inner-X1 boundary condition flag
-ox1_bc = "ic"                 # Outer-X1 boundary condition flag
+nx1    = 256       # Number of zones in X1-direction
+x1min  = log(0.3)  # minimum value of X1 ( = 0.3)
+x1max  = log(3.0)  # maximum value of X1 ( = 3.0)
+ix1_bc = "ic"      # Inner-X1 boundary condition flag
+ox1_bc = "ic"      # Outer-X1 boundary condition flag
 
-nx2    = 512                # Number of zones in X2-direction
-x2min  = 0.0                # minimum value of X2
-x2max  = 6.283185307179586  # maximum value of X2
-ix2_bc = "periodic"         # Inner-X2 boundary condition flag
-ox2_bc = "periodic"         # Outer-X2 boundary condition flag
+nx2    = 512         # Number of zones in X2-direction
+x2min  = 0.0         # minimum value of X2
+x2max  = 2*pi        # maximum value of X2
+ix2_bc = "periodic"  # Inner-X2 boundary condition flag
+ox2_bc = "periodic"  # Outer-X2 boundary condition flag
 
 nx3    = 1           # Number of zones in X3-direction
 x3min  = -0.5        # minimum value of X3

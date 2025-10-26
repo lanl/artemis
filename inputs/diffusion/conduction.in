@@ -19,7 +19,7 @@ coordinates = "cartesian"   # coordinate system
 problem_id = "cond"  # problem ID: basename of output filenames
 
 <parthenon/output1>
-variables =  "gas.prim.density",  &
+variables =   "gas.prim.density",  &
             "gas.prim.velocity",  &
             "gas.prim.pressure"
 file_type = "hdf5"  # HDF5 data dump
@@ -64,7 +64,7 @@ drag       = true
 
 <gas>
 cfl         = 0.3
-gamma       = 1.66667
+gamma       = 5.0/3.0
 reconstruct = "plm"
 riemann     = "hllc"
 dfloor      = 1.0e-10

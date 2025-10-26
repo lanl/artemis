@@ -19,7 +19,7 @@ coordinates = "cylindrical"  # coordinate system
 problem_id = "disk_cyl"  # problem ID: basename of output filenames
 
 <parthenon/output1>
-variables =  "gas.prim.density",  &
+variables =   "gas.prim.density",  &
             "gas.prim.velocity",  &
             "gas.prim.pressure"
 file_type = "hdf5"  # HDF5 data dump
@@ -27,13 +27,13 @@ dt        = 0.1     # time increment between outputs
 
 <parthenon/output2>
 file_type = "rst"
-dt        = 6.28
+dt        = 2*pi
 
 <parthenon/time>
-nlim       = -1     # cycle limit
-tlim       = 62.8   # time limit
-integrator = "rk2"  # time integration algorithm
-ncycle_out = 1      # interval for stdout summary info
+nlim       = -1       # cycle limit
+tlim       = 10*2*pi  # time limit
+integrator = "rk2"    # time integration algorithm
+ncycle_out = 1        # interval for stdout summary info
 
 <parthenon/mesh>
 nx1    = 128   # Number of zones in X1-direction
@@ -42,11 +42,11 @@ x1max  = 4.3   # maximum value of X1
 ix1_bc = "ic"  # Inner-X1 boundary condition flag
 ox1_bc = "ic"  # Outer-X1 boundary condition flag
 
-nx2    = 64                  # Number of zones in X2-direction
-x2min  = -3.141592653589793  # minimum value of X2
-x2max  = 3.141592653589793   # maximum value of X2
-ix2_bc = "periodic"          # Inner-X2 boundary condition flag
-ox2_bc = "periodic"          # Outer-X2 boundary condition flag
+nx2    = 64          # Number of zones in X2-direction
+x2min  = -pi         # minimum value of X2
+x2max  = pi          # maximum value of X2
+ix2_bc = "periodic"  # Inner-X2 boundary condition flag
+ox2_bc = "periodic"  # Outer-X2 boundary condition flag
 
 nx3    = 32    # Number of zones in X3-direction
 x3min  = -1.0  # minimum value of X3

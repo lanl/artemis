@@ -23,7 +23,7 @@ file_type = "hst"
 dt        = 0.1
 
 <parthenon/output1>
-variables =  "gas.prim.density",  &
+variables =   "gas.prim.density",  &
             "gas.prim.velocity",  &
             "gas.prim.pressure",  &
             "dust.prim.density",  &
@@ -73,7 +73,7 @@ dust = true
 cfl         = 0.9
 reconstruct = "plm"
 riemann     = "hllc"
-gamma       = 1.66666666667
+gamma       = 5.0/3.0
 
 <dust>
 cfl         = 0.9

@@ -19,7 +19,7 @@ coordinates = "cartesian"  # coordinate system
 problem_id = "ssheet"  # problem ID: basename of output filenames
 
 <parthenon/output1>
-variables =  "gas.prim.density",  &
+variables =   "gas.prim.density",  &
             "gas.prim.velocity",  &
             "gas.prim.pressure"
 file_type = "hdf5"  # HDF5 data dump

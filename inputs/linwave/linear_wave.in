@@ -19,7 +19,7 @@ coordinates = "cartesian"    # coordinate system
 problem_id = "linear_wave"  # problem ID: basename of output filenames
 
 <parthenon/output1>
-variables =  "gas.prim.density",  &
+variables =   "gas.prim.density",  &
             "gas.prim.velocity",  &
             "gas.prim.pressure"
 file_type = "hdf5"  # HDF5 data dump
@@ -67,7 +67,7 @@ dust = false
 cfl         = 0.9
 reconstruct = "plm"
 riemann     = "hllc"
-gamma       = 1.66666666667
+gamma       = 5.0/3.0
 
 <problem>
 nperiod   = 1       # Number of wave crossing periods to evolve simulation

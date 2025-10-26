@@ -73,10 +73,11 @@ def format_block_lines(lines: List[str]) -> List[str]:
     # Find the longest key to determine = alignment
     max_key_len = max(len(key) for _, key, _, _, _, _ in parsed)
     
-    # Find the longest "key = value" part to determine comment alignment
+    # Find the longest "key = value" part (with key padding) to determine comment alignment
     max_kv_len = 0
     for indent, key, value, comment, has_cont, _ in parsed:
-        kv_str = key + ' = ' + value
+        # Include the key padding in the calculation
+        kv_str = key + ' ' * (max_key_len - len(key)) + ' = ' + value
         if has_cont:
             kv_str += '  &'
         max_kv_len = max(max_kv_len, len(kv_str))

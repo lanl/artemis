@@ -12,54 +12,54 @@
 # ========================================================================================
 
 <artemis>
-problem = disk           # name of the pgen
-coordinates = cartesian  # coordinate system
+problem = "disk"  # name of the pgen
+coordinates = "cartesian"  # coordinate system
 
 <parthenon/job>
-problem_id = cb_disk # problem ID: basename of output filenames
+problem_id = "cb_disk"  # problem ID: basename of output filenames
 
 <parthenon/output1>
-variables = gas.prim.density,  &
-            gas.prim.velocity, &
-            gas.prim.pressure
-file_type = hdf5     # HDF5 data dump
-dt        = 0.2      # time increment between outputs
+variables = "gas.prim.density"  &
+            "gas.prim.velocity"  &
+            "gas.prim.pressure"
+file_type = "hdf5"  # HDF5 data dump
+dt = 0.2  # time increment between outputs
 
 
 <parthenon/time>
-nlim       = -1    # cycle limit
-tlim       = 62.8  # time limit
-integrator = rk2   # time integration algorithm
-ncycle_out = 1     # interval for stdout summary info
+nlim = -1  # cycle limit
+tlim = 10*2*pi  # time limit
+integrator = "rk2"  # time integration algorithm
+ncycle_out = 1  # interval for stdout summary info
 dt_min = 1e-12
 
 <parthenon/mesh>
 nghost = 2
-refinement = adaptive
+refinement = "adaptive"
 numlevel = 3
 
-nx1    = 512       # Number of zones in X1-direction
-x1min  = -10.0     # minimum value of X1
-x1max  = 10.0      # maximum value of X1
-ix1_bc = ic        # Inner-X1 boundary condition flag
-ox1_bc = ic        # Outer-X1 boundary condition flag
+nx1 = 512  # Number of zones in X1-direction
+x1min = -10.0  # minimum value of X1
+x1max = 10.0  # maximum value of X1
+ix1_bc = "ic"  # Inner-X1 boundary condition flag
+ox1_bc = "ic"  # Outer-X1 boundary condition flag
 
-nx2    = 512       # Number of zones in X2-direction
-x2min  = -10.0     # minimum value of X2
-x2max  = 10.0      # maximum value of X2
-ix2_bc = ic        # Inner-X2 boundary condition flag
-ox2_bc = ic        # Outer-X2 boundary condition flag
+nx2 = 512  # Number of zones in X2-direction
+x2min = -10.0  # minimum value of X2
+x2max = 10.0  # maximum value of X2
+ix2_bc = "ic"  # Inner-X2 boundary condition flag
+ox2_bc = "ic"  # Outer-X2 boundary condition flag
 
-nx3    = 1         # Number of zones in X3-direction
-x3min  = -0.5      # minimum value of X3
-x3max  = 0.5       # maximum value of X3
-ix3_bc = periodic  # Inner-X3 boundary condition flag
-ox3_bc = periodic  # Outer-X3 boundary condition flag
+nx3 = 1  # Number of zones in X3-direction
+x3min = -0.5  # minimum value of X3
+x3max = 0.5  # maximum value of X3
+ix3_bc = "periodic"  # Inner-X3 boundary condition flag
+ox3_bc = "periodic"  # Outer-X3 boundary condition flag
 
 <parthenon/meshblock>
 nx1 = 64  # Number of cells in each MeshBlock, X1-dir
 nx2 = 64  # Number of cells in each MeshBlock, X2-dir
-nx3 = 1   # Number of cells in each MeshBlock, X3-dir
+nx3 = 1  # Number of cells in each MeshBlock, X3-dir
 
 <physics>
 gas = true
@@ -72,13 +72,13 @@ drag = true
 <gas>
 cfl = 0.3
 gamma = 1.4
-reconstruct = plm
-riemann = hllc
+reconstruct = "plm"
+riemann = "hllc"
 dfloor = 1.0e-6
-siefloor = 1.0e-6
+siefloor = dfloor
 
 <gas/viscosity>
-type = constant
+type = "constant"
 nu = 1e-3
 
 <gas/damping>
@@ -99,10 +99,10 @@ outer_x3_rate = 30.0
 mtot = 1.0
 
 <nbody>
-integrator = ias15
+integrator = "ias15"
 dt_reb = 0.01
 dt_output = .01
-refine_type = distance
+refine_type = "distance"
 
 <nbody/binary1>
 mass = 1.0
@@ -115,14 +115,14 @@ couple = 1
 refine_distance = 0.8
 
 <cooling>
-type = beta
+type = "beta"
 beta0 = 1e-8
-tref = nbody
-tsph = .01
+tref = "nbody"
+tsph = 0.1**2
 sph_plaw = -1.0
 
 <drag>
-type = self
+type = "self"
 
 <problem>
 r0 = 1.0

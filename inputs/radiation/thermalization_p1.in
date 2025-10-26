@@ -12,47 +12,47 @@
 # ========================================================================================
 
 <artemis>
-problem = thermalization  # name of the pgen
-physical_units = cgs
-unit_conversion = base
-coordinates = cartesian   # coordinate system
+problem = "thermalization"  # name of the pgen
+physical_units = "cgs"
+unit_conversion = "base"
+coordinates = "cartesian"  # coordinate system
 
 <parthenon/job>
-problem_id = thermalization  # problem ID: basename of output filenames
+problem_id = "thermalization"  # problem ID: basename of output filenames
 
 <parthenon/output1>
-variables = gas.prim.density,  &
-            gas.prim.velocity, &
-            gas.prim.sie,      &
-            rad.prim.energy, &
-            field.jaybenne.energy_tally
-file_type = hdf5   # HDF5 data dump
-dt        = 1.0e-9 # time increment between outputs
+variables = "gas.prim.density"  &
+            "gas.prim.velocity"  &
+            "gas.prim.sie"  &
+            "rad.prim.energy"  &
+            "field.jaybenne.energy_tally"
+file_type = "hdf5"  # HDF5 data dump
+dt = 1.0e-9  # time increment between outputs
 
 <parthenon/time>
-nlim       = -1      # cycle limit
-tlim       = 6.0e-8  # time limit
-integrator = rk1     # time integration algorithm
+nlim = -1  # cycle limit
+tlim = 6.0e-8  # time limit
+integrator = "rk1"  # time integration algorithm
 dt_force = 1e-10
 
 <parthenon/mesh>
-nx1    = 4         # Number of zones in X1-direction
-x1min  = -2.0      # minimum value of X1
-x1max  = 2.0       # maximum value of X1
-ix1_bc = periodic  # inner-X1 boundary flag
-ox1_bc = periodic  # outer-X1 boundary flag
+nx1 = 4  # Number of zones in X1-direction
+x1min = -2.0  # minimum value of X1
+x1max = 2.0  # maximum value of X1
+ix1_bc = "periodic"  # inner-X1 boundary flag
+ox1_bc = "periodic"  # outer-X1 boundary flag
 
-nx2    = 1         # Number of zones in X2-direction
-x2min  = -2.0      # minimum value of X2
-x2max  = 2.0       # maximum value of X2
-ix2_bc = periodic  # inner-X2 boundary flag
-ox2_bc = periodic  # outer-X2 boundary flag
+nx2 = 1  # Number of zones in X2-direction
+x2min = -2.0  # minimum value of X2
+x2max = 2.0  # maximum value of X2
+ix2_bc = "periodic"  # inner-X2 boundary flag
+ox2_bc = "periodic"  # outer-X2 boundary flag
 
-nx3    = 1         # Number of zones in X3-direction
-x3min  = -2.0      # minimum value of X3
-x3max  = 2.0       # maximum value of X3
-ix3_bc = periodic  # inner-X3 boundary flag
-ox3_bc = periodic  # outer-X3 boundary flag
+nx3 = 1  # Number of zones in X3-direction
+x3min = -2.0  # minimum value of X3
+x3max = 2.0  # maximum value of X3
+ix3_bc = "periodic"  # inner-X3 boundary flag
+ox3_bc = "periodic"  # outer-X3 boundary flag
 
 <parthenon/meshblock>
 nx1 = 4  # Number of cells in each MeshBlock, X1-dir
@@ -65,15 +65,15 @@ radiation = true
 
 <gas>
 gamma = 1.4  # adiabatic index
-mu = 28.96   # mean molecular weight
+mu = 28.96  # mean molecular weight
 cfl = 0.8
-reconstruct = plm
-riemann = hllc
+reconstruct = "plm"
+riemann = "hllc"
 dfloor = 1.0e-10
 siefloor = 1.0e-10
 
 <gas/opacity/absorption>
-opacity_model = constant
+opacity_model = "constant"
 kappa_a = 2.0
 
 # <gas/opacity/scattering>
@@ -86,7 +86,7 @@ kappa_a = 2.0
 
 <radiation/moment>
 cfl = 0.3
-riemann = hlle
-reconstruct = plm
+riemann = "hlle"
+reconstruct = "plm"
 efloor = 1e-16
-closure = p1
+closure = "p1"

@@ -12,49 +12,49 @@
 # ========================================================================================
 
 <artemis>
-problem = disk           # name of the pgen
-coordinates = spherical  # coordinate system
-physical_units = cgs
-unit_conversion = ppd
+problem = "disk"  # name of the pgen
+coordinates = "spherical"  # coordinate system
+physical_units = "cgs"
+unit_conversion = "ppd"
 
 <parthenon/job>
-problem_id = disk  # problem ID: basename of output filenames
+problem_id = "disk"  # problem ID: basename of output filenames
 
 <parthenon/output1>
-variables = gas.prim.density,  &
-            gas.prim.velocity, &
-            gas.prim.pressure
-file_type = hdf5  # HDF5 data dump
-dt        = 0.2   # time increment between outputs
+variables = "gas.prim.density"  &
+            "gas.prim.velocity"  &
+            "gas.prim.pressure"
+file_type = "hdf5"  # HDF5 data dump
+dt = 0.2  # time increment between outputs
 
 <parthenon/output2>
-file_type = rst
+file_type = "rst"
 dt = 0.2
 
 <parthenon/time>
-nlim       = -1    # cycle limit
-tlim       = 62.8  # time limit
-integrator = rk2   # time integration algorithm
-ncycle_out = 1     # interval for stdout summary info
+nlim = -1  # cycle limit
+tlim = 10*2*pi  # time limit
+integrator = "rk2"  # time integration algorithm
+ncycle_out = 1  # interval for stdout summary info
 
 <parthenon/mesh>
-nx1    = 128                 # Number of zones in X1-direction
-x1min  = 0.2                 # minimum value of X1
-x1max  = 5.6                 # maximum value of X1
-ix1_bc = ic                  # Inner-X1 boundary condition flag
-ox1_bc = ic                  # Outer-X1 boundary condition flag
+nx1 = 128  # Number of zones in X1-direction
+x1min = 0.2  # minimum value of X1
+x1max = 5.6  # maximum value of X1
+ix1_bc = "ic"  # Inner-X1 boundary condition flag
+ox1_bc = "ic"  # Outer-X1 boundary condition flag
 
-nx2    = 64                  # Number of zones in X2-direction
-x2min  = 1.059856161608513   # minimum value of X2
-x2max  = 2.081736491981280   # maximum value of X2
-ix2_bc = ic                  # Inner-X2 boundary condition flag
-ox2_bc = ic                  # Outer-X2 boundary condition flag
+nx2 = 64  # Number of zones in X2-direction
+x2min = pi/2. - 30. * pi/180.  # minimum value of X2
+x2max = pi/2. + 30. * pi/180.  # maximum value of X2
+ix2_bc = "ic"  # Inner-X2 boundary condition flag
+ox2_bc = "ic"  # Outer-X2 boundary condition flag
 
-nx3    = 64                  # Number of zones in X3-direction
-x3min  = -3.141592653589793  # minimum value of X3
-x3max  = 3.141592653589793   # maximum value of X3
-ix3_bc = periodic            # Inner-X3 boundary condition flag
-ox3_bc = periodic            # Outer-X3 boundary condition flag
+nx3 = 64  # Number of zones in X3-direction
+x3min = -pi  # minimum value of X3
+x3max = pi  # maximum value of X3
+ix3_bc = "periodic"  # Inner-X3 boundary condition flag
+ox3_bc = "periodic"  # Outer-X3 boundary condition flag
 
 <parthenon/meshblock>
 nx1 = 32  # Number of cells in each MeshBlock, X1-dir
@@ -70,8 +70,8 @@ rotating_frame = true
 <gas>
 cfl = 0.3
 gamma = 1.4
-reconstruct = plm
-riemann = hlle
+reconstruct = "plm"
+riemann = "hlle"
 dfloor = 1.0e-10
 siefloor = 1.0e-10
 
@@ -80,7 +80,7 @@ siefloor = 1.0e-10
 omega = 1.0
 
 <gas/viscosity>
-type = alpha
+type = "alpha"
 alpha = 1e-3
 
 <gravity/point>

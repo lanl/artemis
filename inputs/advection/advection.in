@@ -12,7 +12,7 @@
 # ========================================================================================
 
 <artemis>
-problem = "advection"  # name of the pgen
+problem     = "advection"  # name of the pgen
 coordinates = "cartesian"  # coordinate system
 
 <parthenon/job>
@@ -20,7 +20,7 @@ problem_id = "advection"  # problem ID: basename of output filenames
 
 <parthenon/output0>
 file_type = "hst"
-dt = 0.1
+dt        = 0.1
 
 <parthenon/output1>
 variables = "gas.prim.density"  &
@@ -29,34 +29,34 @@ variables = "gas.prim.density"  &
             "dust.prim.density"  &
             "dust.prim.velocity"
 file_type = "hdf5"  # HDF5 data dump
-dt = 0.1  # time increment between outputs
+dt        = 0.1     # time increment between outputs
 
 <parthenon/time>
-nlim = -1  # cycle limit
-tlim = -1.0  # time limit (to be reset by problem generator)
+nlim       = -1     # cycle limit
+tlim       = -1.0   # time limit (to be reset by problem generator)
 integrator = "rk2"  # time integration algorithm
-ncycle_out = 1  # interval for stdout summary info
+ncycle_out = 1      # interval for stdout summary info
 
 <parthenon/mesh>
-nghost = 2
+nghost     = 2
 refinement = "none"
-numlevel = 1
+numlevel   = 1
 
-nx1 = 128  # Number of zones in X1-direction
-x1min = 0.0  # minimum value of X1
-x1max = 3.0  # maximum value of X1
+nx1    = 128         # Number of zones in X1-direction
+x1min  = 0.0         # minimum value of X1
+x1max  = 3.0         # maximum value of X1
 ix1_bc = "periodic"  # Inner-X1 boundary condition flag
 ox1_bc = "periodic"  # Outer-X1 boundary condition flag
 
-nx2 = 64  # Number of zones in X2-direction
-x2min = 0.0  # minimum value of X2
-x2max = 1.5  # maximum value of X2
+nx2    = 64          # Number of zones in X2-direction
+x2min  = 0.0         # minimum value of X2
+x2max  = 1.5         # maximum value of X2
 ix2_bc = "periodic"  # Inner-X2 boundary condition flag
 ox2_bc = "periodic"  # Outer-X2 boundary condition flag
 
-nx3 = 64  # Number of zones in X3-direction
-x3min = 0.0  # minimum value of X3
-x3max = 1.5  # maximum value of X3
+nx3    = 64          # Number of zones in X3-direction
+x3min  = 0.0         # minimum value of X3
+x3max  = 1.5         # maximum value of X3
 ix3_bc = "periodic"  # Inner-X3 boundary condition flag
 ox3_bc = "periodic"  # Outer-X3 boundary condition flag
 
@@ -66,26 +66,26 @@ nx2 = 32  # Number of cells in each MeshBlock, X2-dir
 nx3 = 32  # Number of cells in each MeshBlock, X3-dir
 
 <physics>
-gas = true
+gas  = true
 dust = true
 
 <gas>
-cfl = 0.9
+cfl         = 0.9
 reconstruct = "plm"
-riemann = "hllc"
-gamma = 5.0/3.0
+riemann     = "hllc"
+gamma       = 5.0/3.0
 
 <dust>
-cfl = 0.9
+cfl         = 0.9
 reconstruct = "plm"
-riemann = "hlle"
-nspecies = 2
-sizes = 1.0,  1.0
+riemann     = "hlle"
+nspecies    = 2
+sizes       = 1.0,  1.0
 
 <problem>
-nperiod = 1  # Number of wave crossing periods to evolve simulation
-amp = 1.0e-3  # Wave Amplitude
-vflow = 1.0  # background flow velocity
+nperiod  = 1      # Number of wave crossing periods to evolve simulation
+amp      = 1.0e-3 # Wave Amplitude
+vflow    = 1.0    # background flow velocity
 along_x1 = false  # set to 'true' for wave along x1-axis
 along_x2 = false  # set to 'true' for wave along x2-axis
 along_x3 = false  # set to 'true' for wave along x3-axis

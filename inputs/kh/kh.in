@@ -12,7 +12,7 @@
 # ========================================================================================
 
 <artemis>
-problem = "kh"  # name of the pgen
+problem     = "kh"         # name of the pgen
 coordinates = "cartesian"  # coordinate system
 
 <parthenon/job>
@@ -22,53 +22,53 @@ problem_id = "kh"  # problem ID: basename of output filenames
 variables = "gas.prim.density"  &
             "gas.prim.velocity"  &
             "gas.prim.pressure"
-file_type = "hdf5"  # HDF5 data dump
-dt = 0.1  # time increment between outputs
+file_type       = "hdf5" # HDF5 data dump
+dt              = 0.1    # time increment between outputs
 use_final_label = false
 
 <parthenon/output2>
-file_type = "hst"
-dt = 0.01
+file_type   = "hst"
+dt          = 0.01
 data_format = "%12.14e"
 
 <parthenon/time>
-nlim = -1  # cycle limit
-tlim = 2.5  # time limit
+nlim       = -1     # cycle limit
+tlim       = 2.5    # time limit
 integrator = "rk2"  # time integration algorithm
-ncycle_out = 1  # interval for stdout summary info
+ncycle_out = 1      # interval for stdout summary info
 
 <parthenon/mesh>
 nghost = 2
-nx1 = 128  # Number of zones in X1-direction
-x1min = 0.0  # minimum value of X1
-x1max = 1.0  # maximum value of X1
+nx1    = 128         # Number of zones in X1-direction
+x1min  = 0.0         # minimum value of X1
+x1max  = 1.0         # maximum value of X1
 ix1_bc = "periodic"  # inner-X1 boundary flag
 ox1_bc = "periodic"  # outer-X1 boundary flag
 
-nx2 = 512  # Number of zones in X2-direction
-x2min = 0.0  # minimum value of X2
-x2max = 2.00  # maximum value of X2
+nx2    = 512         # Number of zones in X2-direction
+x2min  = 0.0         # minimum value of X2
+x2max  = 2.00        # maximum value of X2
 ix2_bc = "periodic"  # inner-X2 boundary flag
 ox2_bc = "periodic"  # outer-X2 boundary flag
 
-nx3 = 1  # Number of zones in X3-direction
-x3min = -0.5  # minimum value of X3
-x3max = 0.5  # maximum value of X3
+nx3    = 1           # Number of zones in X3-direction
+x3min  = -0.5        # minimum value of X3
+x3max  = 0.5         # maximum value of X3
 ix3_bc = "periodic"  # inner-X3 boundary flag
 ox3_bc = "periodic"  # outer-X3 boundary flag
 
 <parthenon/meshblock>
 nx1 = 32  # Number of cells in each MeshBlock, X1-dir
 nx2 = 32  # Number of cells in each MeshBlock, X2-dir
-nx3 = 1  # Number of cells in each MeshBlock, X3-dir
+nx3 = 1   # Number of cells in each MeshBlock, X3-dir
 
 <physics>
 gas = true
 
 <gas>
-cfl = 0.3
-gamma = 1.4  # gamma = C_p/C_v
+cfl         = 0.3
+gamma       = 1.4    # gamma = C_p/C_v
 reconstruct = "plm"
-riemann = "hllc"
-dfloor = 1.0e-10
-siefloor = 1.0e-10
+riemann     = "hllc"
+dfloor      = 1.0e-10
+siefloor    = 1.0e-10

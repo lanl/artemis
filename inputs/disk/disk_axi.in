@@ -12,9 +12,9 @@
 # ========================================================================================
 
 <artemis>
-problem = "disk"  # name of the pgen
-coordinates = "axisymmetric"  # coordinate system
-physical_units = "cgs"
+problem         = "disk"      # name of the pgen
+coordinates     = "axisymmetric"  # coordinate system
+physical_units  = "cgs"
 unit_conversion = "ppd"
 
 <parthenon/job>
@@ -25,70 +25,70 @@ variables = "gas.prim.density"  &
             "gas.prim.velocity"  &
             "gas.prim.pressure"
 file_type = "hdf5"  # HDF5 data dump
-dt = 0.2  # time increment between outputs
+dt        = 0.2     # time increment between outputs
 
 <parthenon/output2>
 file_type = "rst"
-dt = 0.2
+dt        = 0.2
 
 <parthenon/time>
-nlim = -1  # cycle limit
-tlim = 10*2*pi  # time limit
+nlim       = -1     # cycle limit
+tlim       = 10*2*pi  # time limit
 integrator = "rk2"  # time integration algorithm
-ncycle_out = 1  # interval for stdout summary info
+ncycle_out = 1      # interval for stdout summary info
 
 <parthenon/mesh>
-nx1 = 128  # Number of zones in X1-direction
-x1min = 0.3  # minimum value of X1
-x1max = 4.3  # maximum value of X1
+nx1    = 128   # Number of zones in X1-direction
+x1min  = 0.3   # minimum value of X1
+x1max  = 4.3   # maximum value of X1
 ix1_bc = "ic"  # Inner-X1 boundary condition flag
 ox1_bc = "ic"  # Outer-X1 boundary condition flag
 
-nx2 = 64  # Number of zones in X2-direction
-x2min = -2.0  # minimum value of X2
-x2max = 2.0  # maximum value of X2
+nx2    = 64    # Number of zones in X2-direction
+x2min  = -2.0  # minimum value of X2
+x2max  = 2.0   # maximum value of X2
 ix2_bc = "ic"  # Inner-X2 boundary condition flag
 ox2_bc = "ic"  # Outer-X2 boundary condition flag
 
-nx3 = 1  # Number of zones in X3-direction
-x3min = -0.5  # minimum value of X3
-x3max = 0.5  # maximum value of X3
+nx3    = 1           # Number of zones in X3-direction
+x3min  = -0.5        # minimum value of X3
+x3max  = 0.5         # maximum value of X3
 ix3_bc = "periodic"  # Inner-X3 boundary condition flag
 ox3_bc = "periodic"  # Outer-X3 boundary condition flag
 
 <parthenon/meshblock>
 nx1 = 32  # Number of cells in each MeshBlock, X1-dir
 nx2 = 32  # Number of cells in each MeshBlock, X2-dir
-nx3 = 1  # Number of cells in each MeshBlock, X3-dir
+nx3 = 1   # Number of cells in each MeshBlock, X3-dir
 
 <physics>
-gas = true
-gravity = true
-viscosity = true
+gas            = true
+gravity        = true
+viscosity      = true
 rotating_frame = true
 
 <gas>
-cfl = 0.3
-gamma = 1.4
+cfl         = 0.3
+gamma       = 1.4
 reconstruct = "plm"
-riemann = "hlle"
-dfloor = 1.0e-10
-siefloor = 1.0e-10
+riemann     = "hlle"
+dfloor      = 1.0e-10
+siefloor    = 1.0e-10
 
 <rotating_frame>
 omega = 1.0
 
 <gas/viscosity>
-type = "alpha"
+type  = "alpha"
 alpha = 1e-3
 
 <gravity/point>
 mass = 1.0
 
 <problem>
-r0 = 1.0
-rho0 = 1.0
-dslope = -2.25
-flare = 0.25
-h0 = 0.05
+r0               = 1.0
+rho0             = 1.0
+dslope           = -2.25
+flare            = 0.25
+h0               = 0.05
 polytropic_index = 1

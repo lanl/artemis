@@ -12,14 +12,14 @@
 # ========================================================================================
 
 <artemis>
-problem = "shock"  # name of the pgen
-coordinates = "cartesian"  # coordinate system
-physical_units = "cgs"  # not scale-free
-unit_conversion = "base"  # [L/T/M/Temp] = 1
-time = 1.0e-10  # time unit
-length = 0.01575  # length unit
-mass = 3.906984375e-6  # mass unit (implying dunit=1.0)
-temperature = 2.18e6  # temperature unit
+problem         = "shock"  # name of the pgen
+coordinates     = "cartesian"  # coordinate system
+physical_units  = "cgs"    # not scale-free
+unit_conversion = "base"   # [L/T/M/Temp] = 1
+time            = 1.0e-10  # time unit
+length          = 0.01575  # length unit
+mass            = 3.906984375e-6  # mass unit (implying dunit=1.0)
+temperature     = 2.18e6   # temperature unit
 
 <parthenon/job>
 problem_id = "shock"  # problem ID: basename of output filenames
@@ -31,61 +31,61 @@ variables = "gas.prim.density"  &
             "rad.prim.energy"  &
             "field.jaybenne.energy_tally"
 file_type = "hdf5"  # HDF5 data dump
-dt = 1.0  # time increment between outputs
+dt        = 1.0     # time increment between outputs
 
 <parthenon/time>
-nlim = -1  # cycle limit
-tlim = 6.0  # time limit
+nlim       = -1     # cycle limit
+tlim       = 6.0    # time limit
 integrator = "rk2"  # time integration algorithm
 
 <parthenon/mesh>
-nx1 = 128  # Number of zones in X1-direction
-x1min = 0.0  # minimum value of X1
-x1max = 1.0  # maximum value of X1
+nx1    = 128   # Number of zones in X1-direction
+x1min  = 0.0   # minimum value of X1
+x1max  = 1.0   # maximum value of X1
 ix1_bc = "ic"  # inner-X1 boundary flag
 ox1_bc = "ic"  # outer-X1 boundary flag
 
-nx2 = 1  # Number of zones in X2-direction
-x2min = 0.0  # minimum value of X2
-x2max = 1.0  # maximum value of X2
+nx2    = 1           # Number of zones in X2-direction
+x2min  = 0.0         # minimum value of X2
+x2max  = 1.0         # maximum value of X2
 ix2_bc = "periodic"  # inner-X2 boundary flag
 ox2_bc = "periodic"  # outer-X2 boundary flag
 
-nx3 = 1  # Number of zones in X3-direction
-x3min = 0.0  # minimum value of X3
-x3max = 1.0  # maximum value of X3
+nx3    = 1           # Number of zones in X3-direction
+x3min  = 0.0         # minimum value of X3
+x3max  = 1.0         # maximum value of X3
 ix3_bc = "periodic"  # inner-X3 boundary flag
 ox3_bc = "periodic"  # outer-X3 boundary flag
 
 <parthenon/swarm>
 ix1_bc = "jaybenne_reflecting"  # inner-X1 boundary flag for swarms
 ox1_bc = "jaybenne_reflecting"  # outer-X1 boundary flag for swarms
-ix2_bc = "periodic"  # inner-X2 boundary flag for swarms
-ox2_bc = "periodic"  # outer-X2 boundary flag for swarms
-ix3_bc = "periodic"  # inner-X3 boundary flag for swarms
-ox3_bc = "periodic"  # outer-X3 boundary flag for swarms
+ix2_bc = "periodic"             # inner-X2 boundary flag for swarms
+ox2_bc = "periodic"             # outer-X2 boundary flag for swarms
+ix3_bc = "periodic"             # inner-X3 boundary flag for swarms
+ox3_bc = "periodic"             # outer-X3 boundary flag for swarms
 
 <parthenon/meshblock>
 nx1 = 128  # Number of cells in each MeshBlock, X1-dir
-nx2 = 1  # Number of cells in each MeshBlock, X2-dir
-nx3 = 1  # Number of cells in each MeshBlock, X3-dir
+nx2 = 1    # Number of cells in each MeshBlock, X2-dir
+nx3 = 1    # Number of cells in each MeshBlock, X3-dir
 
 <physics>
-gas = true  # enable gas hydrodynamics
+gas       = true  # enable gas hydrodynamics
 radiation = true  # enable IMC radiation
 
 <gas>
-gamma = 1.666666  # adiabatic index
-mu = 1.008  # mean molecular weight
-cfl = 0.8  # CFL number
+gamma       = 1.666666  # adiabatic index
+mu          = 1.008  # mean molecular weight
+cfl         = 0.8    # CFL number
 reconstruct = "plm"  # reconstruction algorithm
-riemann = "hllc"  # Riemann solver
+riemann     = "hllc" # Riemann solver
 
 <gas/opacity/absorption>
 opacity_model = "powerlaw"  # absorption opacity model
-coef_kappa_a = 577.0  # kappa_a,0 constant (must be passed in cgs)
-rho_exp = -1.0  # dens exponent for opacity powerlaw
-temp_exp = 0.0  # temp exponent for opacity powerlaw
+coef_kappa_a  = 577.0       # kappa_a,0 constant (must be passed in cgs)
+rho_exp       = -1.0        # dens exponent for opacity powerlaw
+temp_exp      = 0.0         # temp exponent for opacity powerlaw
 
 # <radiation/moment>
 # cfl = 0.3
@@ -101,13 +101,13 @@ temp_exp = 0.0  # temp exponent for opacity powerlaw
 
 <radiation/imc>
 num_particles = 100000  # particle resolution
-use_ddmc = false  # use DDMC?
+use_ddmc      = false   # use DDMC?
 
 <problem>
-rhol = 5.69  # density (left)
-rhor = 17.1  # density (right)
-vxl = 0.329524  # x-velocity (left)
-vxr = 0.109841  # x-velocity (right)
-tl = 1.0  # gas and radiation temp (left)
-tr = 3.66055  # gas and radiation temp (right)
+rhol  = 5.69      # density (left)
+rhor  = 17.1      # density (right)
+vxl   = 0.329524  # x-velocity (left)
+vxr   = 0.109841  # x-velocity (right)
+tl    = 1.0       # gas and radiation temp (left)
+tr    = 3.66055   # gas and radiation temp (right)
 xdisc = 0.828571  # discontinuity position

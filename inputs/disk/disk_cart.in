@@ -12,9 +12,9 @@
 # ========================================================================================
 
 <artemis>
-problem = "disk"  # name of the pgen
-coordinates = "cartesian"  # coordinate system
-physical_units = "cgs"
+problem         = "disk"   # name of the pgen
+coordinates     = "cartesian"  # coordinate system
+physical_units  = "cgs"
 unit_conversion = "ppd"
 
 <parthenon/job>
@@ -27,45 +27,45 @@ variables = "gas.prim.density"  &
             "dust.prim.density"  &
             "dust.prim.velocity"
 file_type = "hdf5"  # HDF5 data dump
-dt = 0.19625  # time increment between outputs
+dt        = 0.19625 # time increment between outputs
 
 <parthenon/output2>
 file_type = "rst"
-dt = 0.2
+dt        = 0.2
 
 <parthenon/time>
-nlim = -1  # cycle limit
-tlim = 10*2*pi  # time limit
+nlim       = -1     # cycle limit
+tlim       = 10*2*pi  # time limit
 integrator = "rk2"  # time integration algorithm
-ncycle_out = 1  # interval for stdout summary info
+ncycle_out = 1      # interval for stdout summary info
 
 <parthenon/mesh>
-nghost = 4
+nghost     = 4
 refinement = "static"
 # numlevel = 1
 
-nx1 = 128  # Number of zones in X1-direction
-x1min = -3.0  # minimum value of X1
-x1max = 3.0  # maximum value of X1
+nx1    = 128        # Number of zones in X1-direction
+x1min  = -3.0       # minimum value of X1
+x1max  = 3.0        # maximum value of X1
 ix1_bc = "outflow"  # Inner-X1 boundary condition flag
 ox1_bc = "outflow"  # Outer-X1 boundary condition flag
 
-nx2 = 128  # Number of zones in X2-direction
-x2min = -3.0  # minimum value of X2
-x2max = 3.0  # maximum value of X2
+nx2    = 128        # Number of zones in X2-direction
+x2min  = -3.0       # minimum value of X2
+x2max  = 3.0        # maximum value of X2
 ix2_bc = "outflow"  # Inner-X2 boundary condition flag
 ox2_bc = "outflow"  # Outer-X2 boundary condition flag
 
-nx3 = 128  # Number of zones in X3-direction
-x3min = -3.0  # minimum value of X3
-x3max = 3.0  # maximum value of X3
+nx3    = 128        # Number of zones in X3-direction
+x3min  = -3.0       # minimum value of X3
+x3max  = 3.0        # maximum value of X3
 ix3_bc = "outflow"  # Inner-X3 boundary condition flag
 ox3_bc = "outflow"  # Outer-X3 boundary condition flag
 
 <parthenon/meshblock>
 nx1 = 16  # Number of cells in each MeshBlock, X1-dir
 nx2 = 16  # Number of cells in each MeshBlock, X2-dir
-nx3 = 8  # Number of cells in each MeshBlock, X3-dir
+nx3 = 8   # Number of cells in each MeshBlock, X3-dir
 
 <parthenon/static_refinement1>
 level = 1
@@ -88,39 +88,39 @@ x3max = 1.0
 <physics>
 gas = true
 # dust = true
-gravity = true
+gravity   = true
 viscosity = true
 
 <gas>
-cfl = 0.9
-gamma = 1.4
+cfl         = 0.9
+gamma       = 1.4
 reconstruct = "plm"
-riemann = "hllc"
-dfloor = 1.0e-10
-siefloor = 1.0e-10
+riemann     = "hllc"
+dfloor      = 1.0e-10
+siefloor    = 1.0e-10
 
 <gas/viscosity>
-type = "alpha"
+type  = "alpha"
 alpha = 1e-3
 
 
 <dust>
-cfl = 0.9
-nspecies = 2
+cfl         = 0.9
+nspecies    = 2
 reconstruct = "ppm"
-riemann = "hlle"
-dfloor = 1.0e-10
+riemann     = "hlle"
+dfloor      = 1.0e-10
 
 <gravity/point>
 mass = 1.0
 
 <problem>
-r0 = 1.0
-rho0 = 1.0
-dslope = -2.25
-flare = 0.25
-h0 = 0.05
+r0               = 1.0
+rho0             = 1.0
+dslope           = -2.25
+flare            = 0.25
+h0               = 0.05
 polytropic_index = 1
-rcav = 0.8
-rexp = 2.8
-quiet_start = true
+rcav             = 0.8
+rexp             = 2.8
+quiet_start      = true

@@ -12,8 +12,8 @@
 # ========================================================================================
 
 <artemis>
-problem = "disk"  # name of the pgen
-coordinates = "cylindrical"  # coordinate system
+problem        = "disk"         # name of the pgen
+coordinates    = "cylindrical"  # coordinate system
 radial_spacing = "logarithmic"
 
 <parthenon/job>
@@ -24,81 +24,81 @@ variables = "gas.prim.density"  &
             "gas.prim.velocity"  &
             "gas.prim.pressure"
 file_type = "hdf5"  # HDF5 data dump
-dt = 2*pi  # time increment between outputs
+dt        = 2*pi    # time increment between outputs
 
 <parthenon/time>
-nlim = -1  # cycle limit
-tlim = 2*pi  # time limit
+nlim       = -1     # cycle limit
+tlim       = 2*pi   # time limit
 integrator = "rk2"  # time integration algorithm
-ncycle_out = 1000  # interval for stdout summary info
+ncycle_out = 1000   # interval for stdout summary info
 
 <parthenon/mesh>
 nghost = 2
 # refinement = adaptive
 # numlevel = 4
 
-nx1 = 256  # Number of zones in X1-direction
-x1min = log(0.3)  # minimum value of X1 ( = 0.3)
-x1max = log(3.0)  # maximum value of X1 ( = 3.0)
-ix1_bc = "ic"  # Inner-X1 boundary condition flag
-ox1_bc = "ic"  # Outer-X1 boundary condition flag
+nx1    = 256      # Number of zones in X1-direction
+x1min  = log(0.3) # minimum value of X1 ( = 0.3)
+x1max  = log(3.0) # maximum value of X1 ( = 3.0)
+ix1_bc = "ic"     # Inner-X1 boundary condition flag
+ox1_bc = "ic"     # Outer-X1 boundary condition flag
 
-nx2 = 512  # Number of zones in X2-direction
-x2min = 0.0  # minimum value of X2
-x2max = 2*pi  # maximum value of X2
+nx2    = 512         # Number of zones in X2-direction
+x2min  = 0.0         # minimum value of X2
+x2max  = 2*pi        # maximum value of X2
 ix2_bc = "periodic"  # Inner-X2 boundary condition flag
 ox2_bc = "periodic"  # Outer-X2 boundary condition flag
 
-nx3 = 1  # Number of zones in X3-direction
-x3min = -0.5  # minimum value of X3
-x3max = 0.5  # maximum value of X3
+nx3    = 1           # Number of zones in X3-direction
+x3min  = -0.5        # minimum value of X3
+x3max  = 0.5         # maximum value of X3
 ix3_bc = "periodic"  # Inner-X3 boundary condition flag
 ox3_bc = "periodic"  # Outer-X3 boundary condition flag
 
 <parthenon/meshblock>
 nx1 = 32  # Number of cells in each MeshBlock, X1-dir
 nx2 = 32  # Number of cells in each MeshBlock, X2-dir
-nx3 = 1  # Number of cells in each MeshBlock, X3-dir
+nx3 = 1   # Number of cells in each MeshBlock, X3-dir
 
 <physics>
 gas = true
 # dust = true
 gravity = true
-drag = true
+drag    = true
 # cooling = true
-viscosity = true
+viscosity      = true
 rotating_frame = true
 
 <gas>
-cfl = 0.3
-reconstruct = "plm"
-riemann = "hllc"
-gamma = 1.00001
-dfloor = 1.0e-10
-siefloor = dfloor
+cfl          = 0.3
+reconstruct  = "plm"
+riemann      = "hllc"
+gamma        = 1.00001
+dfloor       = 1.0e-10
+siefloor     = dfloor
 refine_field = "pressure"
-refine_type = "gradient"
-refine_thr = 3.0
+refine_type  = "gradient"
+refine_thr   = 3.0
 
 <rotating_frame>
 omega = 1.0
 
 <gas/viscosity>
-type = "alpha"
+type  = "alpha"
 alpha = 1e-3
 
 <gravity/binary>
-mass = 1.0
-q = 1.0e-5
-a = 1.0
-e = 0.0
-f = 180.0
+mass  = 1.0
+q     = 1.0e-5
+a     = 1.0
+e     = 0.0
+f     = 180.0
 soft1 = 0.0
 soft2 = 0.03
 
 <gas/damping>
-inner_x1 = 0.45
-outer_x1 = 2.8
+inner_x1      = 0.45
+outer_x1      = 2.8
 inner_x1_rate = 30.0
 outer_x1_rate = 30.0
 
@@ -106,15 +106,15 @@ outer_x1_rate = 30.0
 type = "self"
 
 <cooling>
-type = "beta"
-tref = "powerlaw"
-beta0 = 1e-8
-tcyl = 0.05**2
+type     = "beta"
+tref     = "powerlaw"
+beta0    = 1e-8
+tcyl     = 0.05**2
 cyl_plaw = -1.0
 
 <problem>
-r0 = 1.0
-rho0 = 1.0
+r0     = 1.0
+rho0   = 1.0
 dslope = -0.5
 tslope = -1.0
-h0 = 0.05
+h0     = 0.05

@@ -12,7 +12,7 @@
 # ========================================================================================
 
 <artemis>
-problem = "disk"  # name of the pgen
+problem     = "disk"         # name of the pgen
 coordinates = "cylindrical"  # coordinate system
 
 <parthenon/job>
@@ -25,73 +25,73 @@ variables = "gas.prim.density"  &
             "dust.prim.density"  &
             "dust.prim.velocity"
 file_type = "hdf5"  # HDF5 data dump
-dt = 2*pi  # time increment between outputs
+dt        = 2*pi    # time increment between outputs
 
 <parthenon/time>
-nlim = -1  # cycle limit
-tlim = 10*2*pi  # time limit
+nlim       = -1     # cycle limit
+tlim       = 10*2*pi  # time limit
 integrator = "rk2"  # time integration algorithm
-ncycle_out = 1  # interval for stdout summary info
+ncycle_out = 1      # interval for stdout summary info
 
 <parthenon/mesh>
 
-nx1 = 512  # Number of zones in X1-direction
-x1min = 0.3  # minimum value of X1
-x1max = 3.0  # maximum value of X1
+nx1    = 512        # Number of zones in X1-direction
+x1min  = 0.3        # minimum value of X1
+x1max  = 3.0        # maximum value of X1
 ix1_bc = "viscous"  # Inner-X1 boundary condition flag
 ox1_bc = "viscous"  # Outer-X1 boundary condition flag
 
-nx2 = 1024  # Number of zones in X2-direction
-x2min = -pi  # minimum value of X2
-x2max = pi  # maximum value of X2
+nx2    = 1024        # Number of zones in X2-direction
+x2min  = -pi         # minimum value of X2
+x2max  = pi          # maximum value of X2
 ix2_bc = "periodic"  # Inner-X2 boundary condition flag
 ox2_bc = "periodic"  # Outer-X2 boundary condition flag
 
-nx3 = 1  # Number of zones in X3-direction
-x3min = -0.5  # minimum value of X3
-x3max = 0.5  # maximum value of X3
+nx3    = 1           # Number of zones in X3-direction
+x3min  = -0.5        # minimum value of X3
+x3max  = 0.5         # maximum value of X3
 ix3_bc = "periodic"  # Inner-X3 boundary condition flag
 ox3_bc = "periodic"  # Outer-X3 boundary condition flag
 
 <parthenon/meshblock>
 nx1 = 32  # Number of cells in each MeshBlock, X1-dir
 nx2 = 32  # Number of cells in each MeshBlock, X2-dir
-nx3 = 1  # Number of cells in each MeshBlock, X3-dir
+nx3 = 1   # Number of cells in each MeshBlock, X3-dir
 
 <physics>
-gas = true
-gravity = true
-cooling = true
+gas       = true
+gravity   = true
+cooling   = true
 viscosity = true
 
 <gas>
-cfl = 0.3
-gamma = 1.0001
+cfl         = 0.3
+gamma       = 1.0001
 reconstruct = "plm"
-riemann = "hllc"
-dfloor = 1.0e-10
-siefloor = 1.0e-15
+riemann     = "hllc"
+dfloor      = 1.0e-10
+siefloor    = 1.0e-15
 
 <gas/viscosity>
-type = "alpha"
+type  = "alpha"
 alpha = 1.0e-3
 
 <cooling>
-type = "beta"
-tref = "powerlaw"
-beta0 = 0.0
-tcyl = 0.05**2
+type     = "beta"
+tref     = "powerlaw"
+beta0    = 0.0
+tcyl     = 0.05**2
 cyl_plaw = -1.0
 
 <gravity/point>
 mass = 1.0
 
 <problem>
-r0 = 1.0
-dslope = -0.5
-flare = 0.0
-h0 = 0.05
-dens_min = 1.0e-10
-pres_min = 1.0e-15
+r0               = 1.0
+dslope           = -0.5
+flare            = 0.0
+h0               = 0.05
+dens_min         = 1.0e-10
+pres_min         = 1.0e-15
 polytropic_index = 1.0
-mdot = 3*pi*1e-3 * .05**2
+mdot             = 3*pi*1e-3 * .05**2

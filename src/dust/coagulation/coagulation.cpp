@@ -352,11 +352,267 @@ TaskStatus CoagulationStep(MeshData<Real> *md, const Real time, const Real dt) {
 }
 
 //----------------------------------------------------------------------------------------
+//! \fn  void Dust::Coagulation::PreCoagulationDiagnostics
+//  \brief Gather pre-coagulation diagnostics
+template <Coordinates GEOM>
+void CoagulationDiagnostics(MeshData<Real> *md, DiagPack_t &vmesh,
+                            const geometry::CoordParams &cpars, const Real &dfloor,
+                            Real &mass_d, int &max_size) {
+  // Indexing
+  IndexRange ib = md->GetBoundsI(IndexDomain::interior);
+  IndexRange jb = md->GetBoundsJ(IndexDomain::interior);
+  IndexRange kb = md->GetBoundsK(IndexDomain::interior);
+
+  // Reduction
+  Real lmass_d = 0.0;
+  int lmax_size = 1;
+  Kokkos::parallel_reduce(
+      "coag::diag",
+      Kokkos::MDRangePolicy<Kokkos::Rank<4>>(
+          {0, kb.s, jb.s, ib.s}, {md->NumBlocks(), kb.e + 1, jb.e + 1, ib.e + 1}),
+      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, Real &lsum,
+                    int &lmax) {
+        geometry::Coords<GEOM> coords(cpars, vmesh.GetCoordinates(b), k, j, i);
+        const Real &vol = coords.Volume();
+
+        // Sum over nspecies
+        for (int n = 0; n < vmesh.GetSize(b, dust::cons::density()); ++n) {
+          lsum += vmesh(b, dust::cons::density(n), k, j, i) * vol;
+        }
+
+        // Max
+        for (int n = vmesh.GetSize(b, dust::cons::density()) - 1; n >= 0; --n) {
+          const Real &dens_d = vmesh(b, dust::cons::density(n), k, j, i);
+          if (dens_d > dfloor) {
+            lmax = std::max(lmax, n);
+            break;
+          }
+        }
+      },
+      lmass_d, Kokkos::Max<int>(lmax_size));
+  Kokkos::fence();
+
+#ifdef MPI_PARALLEL
+  // Sum over all processors
+  MPI_Allreduce(MPI_IN_PLACE, &lmax_size, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
+  MPI_Allreduce(MPI_IN_PLACE, &lmass_d, 1, MPI_PARTHENON_REAL, MPI_SUM, MPI_COMM_WORLD);
+#endif // MPI_PARALLEL
+
+  mass_d = lmass_d;
+  max_size = lmax_size;
+}
+
+//----------------------------------------------------------------------------------------
+//! \fn  void Dust::Coagulation::WriteCoagulationDiagnostics
+//  \brief Write coagulation diagnostics to file
+void WriteCoagulationDiagnostics(MeshData<Real> *md, const Real time, const Real dt,
+                                 const int max_size1, const int max_size0,
+                                 const Real mass_d1, const Real mass_d0) {
+  if (parthenon::Globals::my_rank == 0) {
+    auto pm = md->GetParentPointer();
+    auto &artemis_pkg = pm->packages.Get("artemis");
+    std::string fname;
+    fname.assign(artemis_pkg->template Param<std::string>("job_name"));
+    fname.append("_info.dat");
+    static FILE *pfile = NULL;
+
+    // The file exists -- reopen the file in append mode
+    if (pfile == NULL) {
+      if ((pfile = std::fopen(fname.c_str(), "r")) != nullptr) {
+        if ((pfile = std::freopen(fname.c_str(), "a", pfile)) == nullptr) {
+          PARTHENON_FAIL("Error output file could not be opened");
+        }
+        // The file does not exist -- open the file in write mode and add headers
+      } else {
+        if ((pfile = std::fopen(fname.c_str(), "w")) == nullptr) {
+          PARTHENON_FAIL("Error output file could not be opened");
+        }
+        std::string label = "# time dt max_size1 max_size0 mass_d1 mass_d0 delta \n";
+        std::fprintf(pfile, "%s", label.c_str());
+      }
+    }
+    std::fprintf(pfile, "  %24.16e ", time);
+    std::fprintf(pfile, "  %24.16e ", dt);
+    std::fprintf(pfile, "  %d  %d ", max_size1, max_size0);
+    std::fprintf(pfile, "  %24.16e  %24.16e  %24.16e", mass_d1, mass_d0,
+                 1.0 - mass_d0 / mass_d1);
+    std::fprintf(pfile, "\n");
+  }
+}
+
+//----------------------------------------------------------------------------------------
+//! \fn  void Dust::Coagulation::InitializeArray
+//  \brief Initialize static coagulation arrays
+void InitializeArray(const int nm, int &pgrid, const Real &rho_p, const Real &chi,
+                     const Real &a, const ParArray1D<Real> dsize, ParArray2D<int> klf,
+                     ParArray1D<Real> mass_grid, ParArray3D<Real> coag3d,
+                     ParArray3D<int> cpod_notzero, ParArray3D<Real> cpod_short) {
+  // Initialization Part I
+  const int ikdelta = coag2drv::kdelta;
+  const int icoef_fett = coag2drv::coef_fett;
+  parthenon::par_for(
+      parthenon::loop_pattern_flatrange_tag, "initializeCoag1", parthenon::DevExecSpace(),
+      0, nm - 1, KOKKOS_LAMBDA(const int i) {
+        for (int j = 0; j < nm; j++) {
+          coag3d(ikdelta, i, j) = 0.0;
+        }
+        coag3d(ikdelta, i, i) = 1.0;
+        mass_grid(i) = 4.0 * M_PI / 3.0 * rho_p * dsize(i) * dsize(i) * dsize(i);
+        for (int j = 0; j < nm; j++) {
+          Real tmp1 = (1.0 - 0.5 * coag3d(ikdelta, i, j));
+          coag3d(icoef_fett, i, j) = M_PI * SQR(dsize(i) + dsize(j)) * tmp1;
+        }
+      });
+
+  // Set fragmentation variables
+  const Real ten_a = std::pow(10.0, a);
+  const Real ten_ma = 1.0 / ten_a;
+  const int ce = static_cast<int>(std::floor(-1.0 / a * std::log10(1.0 - ten_ma))) + 1;
+
+  // Used in integration
+  pgrid = static_cast<int>(std::floor(1.0 / a));
+
+  // Initialization Part II
+  const int iphifrag = coag2drv::phifrag;
+  const int iepsfrag = coag2drv::epsfrag;
+  const int iafrag = coag2drv::afrag;
+  const Real frag_slope = 1.0 / 6.0; // = 2.0 - 11.0 / 6.0;
+  parthenon::par_for(
+      parthenon::loop_pattern_flatrange_tag, "initializeCoag2", parthenon::DevExecSpace(),
+      0, nm - 1, KOKKOS_LAMBDA(const int i) {
+        Real sum_pF = 0.0;
+        for (int j = 0; j <= i; j++) {
+          coag3d(iphifrag, j, i) = std::pow(mass_grid(j), frag_slope);
+          sum_pF += coag3d(iphifrag, j, i);
+        }
+        // normalization
+        for (int j = 0; j <= i; j++) {
+          coag3d(iphifrag, j, i) /= sum_pF; // switch (i,j) from fortran
+        }
+
+        // Cratering
+        for (int j = 0; j <= i - pgrid - 1; j++) {
+          // FRAGMENT DISTRIBUTION
+          // The largest fragment has the mass of the smaller collision partner
+
+          // Mass bin of largest fragment
+          klf(i, j) = j;
+
+          coag3d(iafrag, i, j) = (1.0 + chi) * mass_grid(j);
+          //                      |_______|
+          //                           |
+          //                    Mass of fragments
+          coag3d(iepsfrag, i, j) = chi * mass_grid(j) / (mass_grid(i) * (1.0 - ten_ma));
+        }
+
+        int i1 = std::max(0, i - pgrid);
+        for (int j = i1; j <= i; j++) {
+          // The largest fragment has the mass of the larger collison partner
+          klf(i, j) = i;
+          coag3d(iafrag, i, j) = (mass_grid(i) + mass_grid(j));
+        }
+      });
+
+  // Initialization Part III
+  // --> dalp array
+  // --> D matrix
+  // --> E matrix
+  ParArray2D<Real> e("epod", nm, nm);
+  int idalp = coag2drv::dalp, idpod = coag2drv::dpod;
+  parthenon::par_for(
+      parthenon::loop_pattern_flatrange_tag, "initializeCoag4", parthenon::DevExecSpace(),
+      0, nm - 1, KOKKOS_LAMBDA(const int k) {
+        for (int j = 0; j < nm; j++) {
+          if (j <= k + 1 - ce) {
+            coag3d(idalp, k, j) = 1.0;
+            coag3d(idpod, k, j) = -mass_grid(j) / (mass_grid(k) * (ten_a - 1.0));
+          } else {
+            coag3d(idpod, k, j) = -1.0;
+            coag3d(idalp, k, j) = 0.0;
+          }
+        }
+        // for E matrix-------------
+        const Real mkkme = mass_grid(k) * (1.0 - ten_ma);
+        const Real mkpek = mass_grid(k) * (ten_a - 1.0);
+        const Real mkpeme = mass_grid(k) * (ten_a - ten_ma);
+        for (int j = 0; j < nm; ++j) {
+          if (j <= k - ce) {
+            e(k, j) = mass_grid(j) / mkkme;
+          } else {
+            Real theta1 = (mkpeme - mass_grid(j) < 0.0) ? 0.0 : 1.0;
+            e(k, j) = (1.0 - (mass_grid(j) - mkkme) / mkpek) * theta1;
+          }
+        }
+      });
+
+  // Initialization Part IV
+  // -->cpod array;
+  ParArray3D<Real> cpod("cpod", nm, nm, nm);
+  parthenon::par_for(
+      parthenon::loop_pattern_mdrange_tag, "initializeCoag6", parthenon::DevExecSpace(),
+      0, nm - 1, 0, nm - 1, KOKKOS_LAMBDA(const int i, const int j) {
+        // initialize to zero first
+        for (int k = 0; k < nm; k++) {
+          cpod(i, j, k) = 0.0;
+        }
+        Real mloc = mass_grid(i) + mass_grid(j);
+        if (mloc < mass_grid(nm - 1)) {
+          int gg = 0;
+          for (int k = std::max(i, j); k < nm - 1; k++) {
+            if (mloc >= mass_grid(k) && mloc < mass_grid(k + 1)) {
+              gg = k;
+              break;
+            }
+          }
+
+          cpod(i, j, gg) =
+              (mass_grid(gg + 1) - mloc) / (mass_grid(gg + 1) - mass_grid(gg));
+          cpod(i, j, gg + 1) = 1.0 - cpod(i, j, gg);
+
+          // modified cpod(*) array-------------------------
+          Real dtheta_ji = (j - i - 0.5 < 0.0) ? 0.0 : 1.0; // theta(j - i - 0.5);
+          for (int k = 0; k < nm; k++) {
+            Real theta_kj = (k - j - 1.5 < 0.0) ? 0.0 : 1.0; // theta(k - j - 1.5)
+            cpod(i, j, k) = (0.5 * coag3d(ikdelta, i, j) * cpod(i, j, k) +
+                             cpod(i, j, k) * theta_kj * dtheta_ji);
+          }
+          cpod(i, j, j) += coag3d(idpod, j, i);
+          cpod(i, j, j + 1) += e(j + 1, i) * dtheta_ji;
+
+        } //  end if
+      });
+
+  // Initialization Part V
+  // -->cpod_nonzero and cpod_short array
+  parthenon::par_for(
+      parthenon::loop_pattern_mdrange_tag, "initializeCoag7", parthenon::DevExecSpace(),
+      0, nm - 1, 0, nm - 1, KOKKOS_LAMBDA(const int i, const int j) {
+        if (j <= i) {
+          // initialize cpod_notzero(i, j, 4) and cpod_short(i, j, 4)
+          for (int k = 0; k < 4; k++) {
+            cpod_notzero(i, j, k) = 0;
+            cpod_short(i, j, k) = 0.0;
+          }
+          int inc = 0;
+          for (int k = 0; k < nm; ++k) {
+            Real dum = cpod(i, j, k) + cpod(j, i, k);
+            if (dum != 0.0) {
+              cpod_notzero(i, j, inc) = k;
+              cpod_short(i, j, inc) = dum;
+              inc++;
+            }
+          }
+        }
+      });
+}
+
+//----------------------------------------------------------------------------------------
 //! template instantiations
 typedef Coordinates G;
 typedef Mesh M;
 typedef MeshData<Real> MD;
 typedef parthenon::SimTime ST;
+typedef geometry::CoordParams CP;
 template TaskListStatus CoagulationDriver<G::cartesian>(M *pm, ST &tm);
 template TaskListStatus CoagulationDriver<G::cylindrical>(M *pm, ST &tm);
 template TaskListStatus CoagulationDriver<G::spherical1D>(M *pm, ST &tm);
@@ -369,6 +625,20 @@ template TaskStatus CoagulationStep<G::spherical1D>(MD *md, const Real t, const 
 template TaskStatus CoagulationStep<G::spherical2D>(MD *md, const Real t, const Real dt);
 template TaskStatus CoagulationStep<G::spherical3D>(MD *md, const Real t, const Real dt);
 template TaskStatus CoagulationStep<G::axisymmetric>(MD *md, const Real t, const Real dt);
+// clang-format off
+template void CoagulationDiagnostics<G::cartesian>(
+    MD *md, DiagPack_t &vmesh, const CP &c, const Real &d, Real &massd, int &maxsize);
+template void CoagulationDiagnostics<G::cylindrical>(
+    MD *md, DiagPack_t &vmesh, const CP &c, const Real &d, Real &massd, int &maxsize);
+template void CoagulationDiagnostics<G::spherical1D>(
+    MD *md, DiagPack_t &vmesh, const CP &c, const Real &d, Real &massd, int &maxsize);
+template void CoagulationDiagnostics<G::spherical2D>(
+    MD *md, DiagPack_t &vmesh, const CP &c, const Real &d, Real &massd, int &maxsize);
+template void CoagulationDiagnostics<G::spherical3D>(
+    MD *md, DiagPack_t &vmesh, const CP &c, const Real &d, Real &massd, int &maxsize);
+template void CoagulationDiagnostics<G::axisymmetric>(
+    MD *md, DiagPack_t &vmesh, const CP &c, const Real &d, Real &massd, int &maxsize);
+// clang-format on
 
 } // namespace Coagulation
 } // namespace Dust

@@ -20,10 +20,10 @@ problem_id = "drag"   # problem ID: basename of output filenames
 
 <parthenon/output1>
 variables = "gas.prim.density",  &
-"gas.prim.velocity", &
-"gas.prim.pressure", &
-"dust.prim.density", &
-"dust.prim.velocity"
+            "gas.prim.velocity", &
+            "gas.prim.pressure", &
+            "dust.prim.density", &
+            "dust.prim.velocity"
 
 file_type = "hdf5"                   # HDF5 data dump
 dt        = 0.05                     # time increment between outputs

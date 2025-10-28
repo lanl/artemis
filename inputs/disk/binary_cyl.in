@@ -21,8 +21,8 @@ problem_id = "disk"   # problem ID: basename of output filenames
 
 <parthenon/output1>
 variables = "gas.prim.density",  &
-"gas.prim.velocity", &
-"gas.prim.pressure"
+            "gas.prim.velocity", &
+            "gas.prim.pressure"
 file_type = "hdf5"                   # HDF5 data dump
 dt        = 2*pi                     # time increment between outputs
 

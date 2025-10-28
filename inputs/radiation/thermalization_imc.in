@@ -22,10 +22,10 @@ problem_id = "thermalization"   # problem ID: basename of output filenames
 
 <parthenon/output1>
 variables = "gas.prim.density",           &
-"gas.prim.velocity",          &
-"gas.prim.sie",               &
-"rad.prim.energy",            &
-"field.jaybenne.energy_tally"
+            "gas.prim.velocity",          &
+            "gas.prim.sie",               &
+            "rad.prim.energy",            &
+            "field.jaybenne.energy_tally"
 file_type = "hdf5"                            # HDF5 data dump
 dt        = 1.0e-9                            # time increment between outputs
 

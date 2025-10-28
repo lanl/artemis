@@ -24,10 +24,10 @@ dt        = 0.1
 
 <parthenon/output1>
 variables = "gas.prim.density",  &
-"gas.prim.velocity", &
-"gas.prim.pressure", &
-"dust.prim.density", &
-"dust.prim.velocity"
+            "gas.prim.velocity", &
+            "gas.prim.pressure", &
+            "dust.prim.density", &
+            "dust.prim.velocity"
 file_type = "hdf5"                   # HDF5 data dump
 dt        = 0.1                      # time increment between outputs
 

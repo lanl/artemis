@@ -45,11 +45,15 @@ def output_block(block, debug=False):
     max_val = max([len(_[1]) for  _ in block if not isnode(_[1])])
     max_val += 2*any([_[3] for _ in block])
     if debug:
+        print("========")
+        print(block)
         print(max_key, max_val)
 
     blines=[]
     for b in block:
         k,v,c,lc = b[0],b[1],b[2],b[3]
+        if debug:
+            print(b)
         res=''
         if len(k) == 0:
             if len(v) == 0:
@@ -91,11 +95,13 @@ def output_block(block, debug=False):
                 res += ' &'
             if len(c) > 0:
                 res += comm + c
-        blines.append(res.strip())  # make sure any whitespace padding that was added is removed 
+        if debug:
+            print(res)
+        blines.append(res.rstrip())  # make sure any whitespace padding that was added is removed 
     return '\n'.join(blines)
 
 
-def format_file(fname):
+def format_file(fname, debug=False):
     with open(fname,'r') as f:
         lines = f.read()
     flines=''
@@ -106,13 +112,13 @@ def format_file(fname):
             if '<' in l[1] and '>' in l[1]:
                 # a node
                 if len(block) > 0:
-                    flines += output_block(block) + '\n'
+                    flines += output_block(block, debug=debug) + '\n'
                 block = [l]
             else:
                 block.append(l)
         else:
             block.append(l)
-    flines += output_block(block) 
+    flines += output_block(block, debug=debug) 
 
     return lines, flines
 

@@ -19,6 +19,8 @@
 : ${PFM:=black}
 : ${VERBOSE:=0}
 
+REPO=$(git rev-parse --show-toplevel)
+
 if ! command -v ${CFM} &> /dev/null; then
     >&2 echo "Error: No clang format found! Looked for ${CFM}"
     if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
@@ -39,7 +41,6 @@ echo "You are using ${CF_VRSN}."
 echo "If these differ, results may not be stable."
 
 echo "Formatting C++ files..."
-REPO=$(git rev-parse --show-toplevel)
 for f in $(git ls-tree --full-tree --name-only -r HEAD | grep -E 'cpp|hpp'); do
     if [ ${VERBOSE} -ge 1 ]; then
        echo ${f}
@@ -63,7 +64,6 @@ else
 fi
 
 echo "Formatting Python files..."
-REPO=$(git rev-parse --show-toplevel)
 for f in $(git ls-tree --full-tree --name-only -r HEAD | grep -E 'py'); do
     if [ ${VERBOSE} -ge 1 ]; then
        echo ${f}
@@ -73,9 +73,9 @@ done
 echo "...Done"
 
 # format input files
-INPUT_FORMATTER="${REPO}/style/format_input_files.py"
-if [ ! -f "${INPUT_FORMATTER}" ]; then
-    >&2 echo "Warning: Input file formatter not found at ${INPUT_FORMATTER}"
+IFM="${REPO}/style/ifm.py"
+if [ ! -f "${IFM}" ]; then
+    >&2 echo "Warning: Input file formatter not found at ${IFM}"
     >&2 echo "Skipping input file formatting."
 else
     echo "Formatting input (.in/.par) files..."
@@ -83,13 +83,7 @@ else
         if [ ${VERBOSE} -ge 1 ]; then
            echo ${f}
         fi
+        ${IFM} -i ${REPO}/${f}
     done
-    
-    # Run the formatter with --fix to apply changes directly
-    if python3 "${INPUT_FORMATTER}" --fix; then
-        echo "...Done"
-    else
-        # Exit code 1 means files were formatted
-        echo "...Done"
-    fi
 fi
+echo "...Done"

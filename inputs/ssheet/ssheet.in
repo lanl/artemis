@@ -1,6 +1,6 @@
 # ========================================================================================
 # (C) (or copyright) 2023-2024. Triad National Security, LLC. All rights reserved.
-#  
+#
 # This program was produced under U.S. Government contract 89233218CNA000001 for Los
 # Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
 # for the U.S. Department of Energy/National Nuclear Security Administration. All rights
@@ -20,8 +20,8 @@ problem_id = "ssheet"   # problem ID: basename of output filenames
 
 <parthenon/output1>
 variables = "gas.prim.density",  &
-            "gas.prim.velocity", &
-            "gas.prim.pressure"   
+"gas.prim.velocity", &
+"gas.prim.pressure"
 file_type = "hdf5"                   # HDF5 data dump
 dt        = 6.28                     # time increment between outputs
 
@@ -65,30 +65,30 @@ gravity        = true
 rotating_frame = true
 
 <gas>
-cfl          = 0.3        
-gamma        = 1.000001   
-reconstruct  = "plm"      
-riemann      = "hllc"     
-dfloor       = 1.0e-10    
-siefloor     = 1.0e-10    
-refine_field = "density"  
+cfl          = 0.3
+gamma        = 1.000001
+reconstruct  = "plm"
+riemann      = "hllc"
+dfloor       = 1.0e-10
+siefloor     = 1.0e-10
+refine_field = "density"
 refine_type  = "magnitude"
-refine_thr   = 3.0        
-deref_thr    = 0.8        
+refine_thr   = 3.0
+deref_thr    = 0.8
 
 <gravity/point>
 mass = 1.0e-5
-soft = 0.03  
-x    = 0.0   
-y    = 0.0   
-z    = 0.0   
+soft = 0.03
+x    = 0.0
+y    = 0.0
+z    = 0.0
 
 <rotating_frame>
 omega  = 1.0
 qshear = 1.5
 
 <problem>
-rho0     = 1.0    
+rho0     = 1.0
 dens_min = 1.0e-10
 pres_min = 1.0e-13
-h        = 0.05   
+h        = 0.05

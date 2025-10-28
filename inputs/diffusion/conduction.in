@@ -1,6 +1,6 @@
 # ========================================================================================
 # (C) (or copyright) 2023-2024. Triad National Security, LLC. All rights reserved.
-#  
+#
 # This program was produced under U.S. Government contract 89233218CNA000001 for Los
 # Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
 # for the U.S. Department of Energy/National Nuclear Security Administration. All rights
@@ -20,8 +20,8 @@ problem_id = "cond"   # problem ID: basename of output filenames
 
 <parthenon/output1>
 variables = "gas.prim.density",  &
-            "gas.prim.velocity", &
-            "gas.prim.pressure"   
+"gas.prim.velocity", &
+"gas.prim.pressure"
 file_type = "hdf5"                   # HDF5 data dump
 dt        = 10.0                     # time increment between outputs
 
@@ -63,16 +63,16 @@ conduction = true
 drag       = true
 
 <gas>
-cfl         = 0.3    
+cfl         = 0.3
 gamma       = 5.0/3.0
-reconstruct = "plm"  
-riemann     = "hllc" 
+reconstruct = "plm"
+riemann     = "hllc"
 dfloor      = 1.0e-10
 siefloor    = 1.0e-15
 
 <gas/conductivity>
 type = "conductivity"
-cond = 1.0e-1        
+cond = 1.0e-1
 
 <gravity/uniform>
 gx1 = 0.0
@@ -81,7 +81,7 @@ gx3 = 0.0
 
 <gas/damping>
 # Damping is everywhere and strong enough to turn off hydro
-inner_x1      = 4.0  
+inner_x1      = 4.0
 inner_x1_rate = 1.0e4
 
 <drag>
@@ -90,4 +90,4 @@ type = "self"
 <problem>
 flux     = 0.01
 gas_temp = 0.05
-gas_dens = 1.0 
+gas_dens = 1.0

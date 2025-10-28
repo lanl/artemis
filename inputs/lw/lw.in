@@ -1,6 +1,6 @@
 # ========================================================================================
 # (C) (or copyright) 2025. Triad National Security, LLC. All rights reserved.
-#  
+#
 # This program was produced under U.S. Government contract 89233218CNA000001 for Los
 # Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
 # for the U.S. Department of Energy/National Nuclear Security Administration. All rights
@@ -20,15 +20,15 @@ problem_id = "lw"   # problem ID: basename of output filenames
 
 <parthenon/output1>
 variables       = "gas.prim.density",  &
-                  "gas.prim.velocity", &
-                  "gas.prim.pressure"   
+"gas.prim.velocity", &
+"gas.prim.pressure"
 file_type       = "hdf5"                   # HDF5 data dump
 dt              = 0.1                      # time increment between outputs
-use_final_label = false                 
+use_final_label = false
 
 <parthenon/output2>
-file_type   = "hst"    
-dt          = 0.01     
+file_type   = "hst"
+dt          = 0.01
 data_format = "%12.14e"
 
 <parthenon/time>
@@ -38,7 +38,7 @@ integrator = "rk2"   # time integration algorithm
 ncycle_out = 1       # interval for stdout summary info
 
 <parthenon/mesh>
-nghost = 2           
+nghost = 2
 nx1    = 512            # Number of zones in X1-direction
 x1min  = 0.0            # minimum value of X1
 x1max  = 0.3            # maximum value of X1
@@ -66,9 +66,9 @@ nx3 = 1     # Number of cells in each MeshBlock, X3-dir
 gas = true
 
 <gas>
-cfl         = 0.3    
+cfl         = 0.3
 gamma       = 1.4       # gamma = C_p/C_v
-reconstruct = "plm"  
-riemann     = "hllc" 
+reconstruct = "plm"
+riemann     = "hllc"
 dfloor      = 1.0e-10
 siefloor    = 1.0e-10

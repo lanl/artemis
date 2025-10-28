@@ -1,6 +1,6 @@
 # ========================================================================================
 # (C) (or copyright) 2023-2025. Triad National Security, LLC. All rights reserved.
-#  
+#
 # This program was produced under U.S. Government contract 89233218CNA000001 for Los
 # Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
 # for the U.S. Department of Energy/National Nuclear Security Administration. All rights
@@ -13,20 +13,20 @@
 
 <artemis>
 problem     = "gaussian_bump"   # name of the pgen
-coordinates = "cartesian"    
+coordinates = "cartesian"
 
 <parthenon/job>
 problem_id = "bump3"   # problem ID: basename of output filenames
 
 <parthenon/output1>
 variables = "gas.prim.density",  &
-            "gas.prim.velocity", &
-            "gas.prim.pressure"   
+"gas.prim.velocity", &
+"gas.prim.pressure"
 file_type = "hdf5"                   # HDF5 data dump
 dt        = 0.05                     # time increment between outputs
 
 <parthenon/output2>
-file_type = "hst"  
+file_type = "hst"
 dt        = 0.05      # time increment between outputs
 fmt       = "0.16f"
 
@@ -68,22 +68,22 @@ gas        = true
 conduction = true
 
 <gas>
-cfl         = 0.3     
+cfl         = 0.3
 gamma       = 1.000001
-reconstruct = "plm"   
-riemann     = "hllc"  
-dfloor      = 1.0e-10 
-siefloor    = 1.0e-10 
+reconstruct = "plm"
+riemann     = "hllc"
+dfloor      = 1.0e-10
+siefloor    = 1.0e-10
 
 <gas/viscosity>
 type = "constant"
-nu   = 5.0e-3    
+nu   = 5.0e-3
 
 <gas/conductivity>
 type = "conductivity"
-cond = 5.0e-3        
+cond = 5.0e-3
 
 <problem>
-temperature_bump = 5.0        
-sigma            = 0.1        
+temperature_bump = 5.0
+sigma            = 0.1
 system           = "cartesian"

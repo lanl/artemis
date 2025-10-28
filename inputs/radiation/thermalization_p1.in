@@ -1,6 +1,6 @@
 # ========================================================================================
 # (C) (or copyright) 2023-2024. Triad National Security, LLC. All rights reserved.
-#  
+#
 # This program was produced under U.S. Government contract 89233218CNA000001 for Los
 # Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
 # for the U.S. Department of Energy/National Nuclear Security Administration. All rights
@@ -13,8 +13,8 @@
 
 <artemis>
 problem         = "thermalization"   # name of the pgen
-physical_units  = "cgs"           
-unit_conversion = "base"          
+physical_units  = "cgs"
+unit_conversion = "base"
 coordinates     = "cartesian"        # coordinate system
 
 <parthenon/job>
@@ -22,10 +22,10 @@ problem_id = "thermalization"   # problem ID: basename of output filenames
 
 <parthenon/output1>
 variables = "gas.prim.density",           &
-            "gas.prim.velocity",          &
-            "gas.prim.sie",               &
-            "rad.prim.energy",            &
-            "field.jaybenne.energy_tally"  
+"gas.prim.velocity",          &
+"gas.prim.sie",               &
+"rad.prim.energy",            &
+"field.jaybenne.energy_tally"
 file_type = "hdf5"                            # HDF5 data dump
 dt        = 1.0e-9                            # time increment between outputs
 
@@ -33,7 +33,7 @@ dt        = 1.0e-9                            # time increment between outputs
 nlim       = -1       # cycle limit
 tlim       = 6.0e-8   # time limit
 integrator = "rk1"    # time integration algorithm
-dt_force   = 1e-10 
+dt_force   = 1e-10
 
 <parthenon/mesh>
 nx1    = 4            # Number of zones in X1-direction
@@ -66,15 +66,15 @@ radiation = true
 <gas>
 gamma       = 1.4       # adiabatic index
 mu          = 28.96     # mean molecular weight
-cfl         = 0.8    
-reconstruct = "plm"  
-riemann     = "hllc" 
+cfl         = 0.8
+reconstruct = "plm"
+riemann     = "hllc"
 dfloor      = 1.0e-10
 siefloor    = 1.0e-10
 
 <gas/opacity/absorption>
 opacity_model = "constant"
-kappa_a       = 2.0       
+kappa_a       = 2.0
 
 # <gas/opacity/scattering>
 # scattering_model = constant
@@ -85,8 +85,8 @@ kappa_a       = 2.0
 # use_ddmc = true
 
 <radiation/moment>
-cfl         = 0.3   
+cfl         = 0.3
 riemann     = "hlle"
-reconstruct = "plm" 
-efloor      = 1e-16 
-closure     = "p1"  
+reconstruct = "plm"
+efloor      = 1e-16
+closure     = "p1"

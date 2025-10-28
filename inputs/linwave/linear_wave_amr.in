@@ -1,6 +1,6 @@
 # ========================================================================================
 # (C) (or copyright) 2023-2024. Triad National Security, LLC. All rights reserved.
-#  
+#
 # This program was produced under U.S. Government contract 89233218CNA000001 for Los
 # Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
 # for the U.S. Department of Energy/National Nuclear Security Administration. All rights
@@ -20,8 +20,8 @@ problem_id = "linear_wave"   # problem ID: basename of output filenames
 
 <parthenon/output1>
 variables = "gas.prim.density",  &
-            "gas.prim.velocity", &
-            "gas.prim.pressure"   
+"gas.prim.velocity", &
+"gas.prim.pressure"
 file_type = "hdf5"                   # HDF5 data dump
 dt        = 0.1                      # time increment between outputs
 
@@ -32,9 +32,9 @@ integrator = "rk2"   # time integration algorithm
 ncycle_out = 1       # interval for stdout summary info
 
 <parthenon/mesh>
-nghost     = 2         
+nghost     = 2
 refinement = "adaptive"
-numlevel   = 2         
+numlevel   = 2
 
 nx1        = 128          # Number of zones in X1-direction
 x1min      = 0.0          # minimum value of X1
@@ -60,18 +60,18 @@ nx2 = 16   # Number of cells in each MeshBlock, X2-dir
 nx3 = 1    # Number of cells in each MeshBlock, X3-dir
 
 <physics>
-gas  = true 
+gas  = true
 dust = false
 
 <gas>
-cfl          = 0.9        
-reconstruct  = "plm"      
-riemann      = "hllc"     
-gamma        = 5.0/3.0    
-refine_field = "density"  
+cfl          = 0.9
+reconstruct  = "plm"
+riemann      = "hllc"
+gamma        = 5.0/3.0
+refine_field = "density"
 refine_type  = "magnitude"
-refine_thr   = 1.0008     
-deref_thr    = 1.0008     
+refine_thr   = 1.0008
+deref_thr    = 1.0008
 
 <problem>
 nperiod   = 5        # Number of wave crossing periods to evolve simulation

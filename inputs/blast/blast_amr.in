@@ -1,6 +1,6 @@
 # ========================================================================================
 # (C) (or copyright) 2023-2024. Triad National Security, LLC. All rights reserved.
-#  
+#
 # This program was produced under U.S. Government contract 89233218CNA000001 for Los
 # Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
 # for the U.S. Department of Energy/National Nuclear Security Administration. All rights
@@ -20,8 +20,8 @@ problem_id = "blast_cyl"   # problem ID: basename of output filenames
 
 <parthenon/output1>
 variables = "gas.prim.density",  &
-            "gas.prim.velocity", &
-            "gas.prim.pressure"   
+"gas.prim.velocity", &
+"gas.prim.pressure"
 file_type = "hdf5"                   # HDF5 data dump
 dt        = 0.01                     # time increment between outputs
 
@@ -32,9 +32,9 @@ integrator = "rk2"   # time integration algorithm
 ncycle_out = 1       # interval for stdout summary info
 
 <parthenon/mesh>
-nghost     = 2                
-refinement = "adaptive"       
-numlevel   = 3                
+nghost     = 2
+refinement = "adaptive"
+numlevel   = 3
 
 nx1        = 128                 # Number of zones in X1-direction
 x1min      = 1.0                 # minimum value of X1
@@ -63,24 +63,24 @@ nx3 = 1   # Number of cells in each MeshBlock, X3-dir
 gas = true
 
 <gas>
-cfl          = 0.3       
+cfl          = 0.3
 gamma        = 1.4          # gamma = C_p/C_v
-reconstruct  = "plm"     
-riemann      = "hlle"    
-dfloor       = 1.0e-10   
-siefloor     = 1.0e-10   
+reconstruct  = "plm"
+riemann      = "hlle"
+dfloor       = 1.0e-10
+siefloor     = 1.0e-10
 refine_field = "pressure"
 refine_type  = "gradient"
-refine_thr   = 10.0      
+refine_thr   = 10.0
 
 <problem>
-d0              = 1.0               
-p0              = 1.0e-5            
-internal_energy = 1.0               
-radius          = 0.1               
-height          = 1.0               
-symmetry        = "cylindrical"     
-samples         = 0                 
-x1              = 2.5               
+d0              = 1.0
+p0              = 1.0e-5
+internal_energy = 1.0
+radius          = 0.1
+height          = 1.0
+symmetry        = "cylindrical"
+samples         = 0
+x1              = 2.5
 x2              = 0.7853981633974485
-x3              = 0.0               
+x3              = 0.0

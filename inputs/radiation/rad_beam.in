@@ -1,6 +1,6 @@
 # ========================================================================================
 # (C) (or copyright) 2023-2025. Triad National Security, LLC. All rights reserved.
-#  
+#
 # This program was produced under U.S. Government contract 89233218CNA000001 for Los
 # Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
 # for the U.S. Department of Energy/National Nuclear Security Administration. All rights
@@ -13,8 +13,8 @@
 
 <artemis>
 problem         = "beam"        # name of the pgen
-physical_units  = "cgs"      
-unit_conversion = "base"     
+physical_units  = "cgs"
+unit_conversion = "base"
 coordinates     = "cartesian"   # coordinate system
 
 <parthenon/job>
@@ -22,13 +22,13 @@ problem_id = "beam"   # problem ID: basename of output filenames
 
 <parthenon/output1>
 variables       = "gas.prim.density",  &
-                  "gas.prim.velocity", &
-                  "gas.prim.pressure", &
-                  "rad.prim.energy",   &
-                  "rad.prim.flux"       
+"gas.prim.velocity", &
+"gas.prim.pressure", &
+"rad.prim.energy",   &
+"rad.prim.flux"
 file_type       = "hdf5"                   # HDF5 data dump
 dt              = 5e-12                    # time increment between outputs
-use_final_label = false                 
+use_final_label = false
 
 <parthenon/time>
 nlim       = -1        # cycle limit
@@ -66,29 +66,29 @@ gas       = true
 radiation = true
 
 <radiation/moment>
-creduc      = 1     
-cfl         = 0.1   
-reconstruct = "plm" 
+creduc      = 1
+cfl         = 0.1
+reconstruct = "plm"
 riemann     = "hlle"
-efloor      = 1e-12 
+efloor      = 1e-12
 
 <gas>
-cfl         = 0.3    
+cfl         = 0.3
 gamma       = 1.4       # gamma = C_p/C_v
-reconstruct = "plm"  
-riemann     = "hlle" 
+reconstruct = "plm"
+riemann     = "hlle"
 dfloor      = 1.0e-10
 siefloor    = 1.0e-10
 
 <gas/opacity/absorption>
 opacity_model = "constant"
-kappa_a       = 1.0       
+kappa_a       = 1.0
 
 <problem>
 width = 0.35
-mu    = 0.5 
+mu    = 0.5
 sigma = 0.05
 rho   = 1e-3
-bump  = 1e6 
-tgas  = 3e2 
-trad  = 1e3 
+bump  = 1e6
+tgas  = 3e2
+trad  = 1e3

@@ -1,6 +1,6 @@
 # ========================================================================================
 # (C) (or copyright) 2023-2025. Triad National Security, LLC. All rights reserved.
-#  
+#
 # This program was produced under U.S. Government contract 89233218CNA000001 for Los
 # Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
 # for the U.S. Department of Energy/National Nuclear Security Administration. All rights
@@ -14,24 +14,24 @@
 <artemis>
 problem         = "disk"        # name of the pgen
 coordinates     = "cartesian"   # coordinate system
-physical_units  = "cgs"      
-unit_conversion = "ppd"      
+physical_units  = "cgs"
+unit_conversion = "ppd"
 
 <parthenon/job>
 problem_id = "disk"   # problem ID: basename of output filenames
 
 <parthenon/output1>
 variables = "gas.prim.density",  &
-            "gas.prim.velocity", &
-            "gas.prim.pressure", &
-            "dust.prim.density", &
-            "dust.prim.velocity"  
+"gas.prim.velocity", &
+"gas.prim.pressure", &
+"dust.prim.density", &
+"dust.prim.velocity"
 file_type = "hdf5"                   # HDF5 data dump
 dt        = 0.19625                  # time increment between outputs
 
 <parthenon/output2>
 file_type = "rst"
-dt        = 0.2  
+dt        = 0.2
 
 <parthenon/time>
 nlim       = -1        # cycle limit
@@ -40,8 +40,8 @@ integrator = "rk2"     # time integration algorithm
 ncycle_out = 1         # interval for stdout summary info
 
 <parthenon/mesh>
-nghost     = 4        
-refinement = "static" 
+nghost     = 4
+refinement = "static"
 # numlevel = 1
 
 nx1        = 128         # Number of zones in X1-direction
@@ -68,13 +68,13 @@ nx2 = 16   # Number of cells in each MeshBlock, X2-dir
 nx3 = 8    # Number of cells in each MeshBlock, X3-dir
 
 <parthenon/static_refinement1>
-level = 1   
+level = 1
 x1min = -2.0
-x1max = 2.0 
+x1max = 2.0
 x2min = -2.0
-x2max = 2.0 
+x2max = 2.0
 x3min = -1.0
-x3max = 1.0 
+x3max = 1.0
 
 # <parthenon/static_refinement2>
 # level = 2
@@ -92,35 +92,35 @@ gravity   = true
 viscosity = true
 
 <gas>
-cfl         = 0.9    
-gamma       = 1.4    
-reconstruct = "plm"  
-riemann     = "hllc" 
+cfl         = 0.9
+gamma       = 1.4
+reconstruct = "plm"
+riemann     = "hllc"
 dfloor      = 1.0e-10
 siefloor    = 1.0e-10
 
 <gas/viscosity>
 type  = "alpha"
-alpha = 1e-3   
+alpha = 1e-3
 
 
 <dust>
-cfl         = 0.9    
-nspecies    = 2      
-reconstruct = "ppm"  
-riemann     = "hlle" 
+cfl         = 0.9
+nspecies    = 2
+reconstruct = "ppm"
+riemann     = "hlle"
 dfloor      = 1.0e-10
 
 <gravity/point>
 mass = 1.0
 
 <problem>
-r0               = 1.0  
-rho0             = 1.0  
+r0               = 1.0
+rho0             = 1.0
 dslope           = -2.25
-flare            = 0.25 
-h0               = 0.05 
-polytropic_index = 1    
-rcav             = 0.8  
-rexp             = 2.8  
-quiet_start      = true 
+flare            = 0.25
+h0               = 0.05
+polytropic_index = 1
+rcav             = 0.8
+rexp             = 2.8
+quiet_start      = true

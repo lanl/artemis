@@ -1,6 +1,6 @@
 # ========================================================================================
 # (C) (or copyright) 2023-2025. Triad National Security, LLC. All rights reserved.
-#  
+#
 # This program was produced under U.S. Government contract 89233218CNA000001 for Los
 # Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
 # for the U.S. Department of Energy/National Nuclear Security Administration. All rights
@@ -20,10 +20,10 @@ problem_id = "disk"   # problem ID: basename of output filenames
 
 <parthenon/output1>
 variables = "gas.prim.density",  &
-            "gas.prim.velocity", &
-            "gas.prim.pressure", &
-            "dust.prim.density", &
-            "dust.prim.velocity"  
+"gas.prim.velocity", &
+"gas.prim.pressure", &
+"dust.prim.density", &
+"dust.prim.velocity"
 file_type = "hdf5"                   # HDF5 data dump
 dt        = 2*pi                     # time increment between outputs
 
@@ -65,33 +65,33 @@ cooling   = true
 viscosity = true
 
 <gas>
-cfl         = 0.3    
-gamma       = 1.0001 
-reconstruct = "plm"  
-riemann     = "hllc" 
+cfl         = 0.3
+gamma       = 1.0001
+reconstruct = "plm"
+riemann     = "hllc"
 dfloor      = 1.0e-10
 siefloor    = 1.0e-15
 
 <gas/viscosity>
 type  = "alpha"
-alpha = 1.0e-3 
+alpha = 1.0e-3
 
 <cooling>
-type     = "beta"    
+type     = "beta"
 tref     = "powerlaw"
-beta0    = 0.0       
-tcyl     = .0025     
-cyl_plaw = -1.0      
+beta0    = 0.0
+tcyl     = .0025
+cyl_plaw = -1.0
 
 <gravity/point>
 mass = 1.0
 
 <problem>
-r0               = 1.0             
-dslope           = -0.5            
-flare            = 0.0             
-h0               = 0.05            
-dens_min         = 1.0e-10         
-pres_min         = 1.0e-15         
-polytropic_index = 1.0             
+r0               = 1.0
+dslope           = -0.5
+flare            = 0.0
+h0               = 0.05
+dens_min         = 1.0e-10
+pres_min         = 1.0e-15
+polytropic_index = 1.0
 mdot             = 3*pi*1e-3*.05**2

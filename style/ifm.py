@@ -91,7 +91,7 @@ def output_block(block, debug=False):
                 res += ' &'
             if len(c) > 0:
                 res += comm + c
-        blines.append(res)
+        blines.append(res.strip())  # make sure any whitespace padding that was added is removed 
     return '\n'.join(blines)
 
 

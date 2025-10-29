@@ -323,7 +323,7 @@ TaskStatus CoagulationStep(MeshData<Real> *md, const Real time, const Real dt) {
         // NOTE(@pdmullen): mbr.team_barrier() included at end of CoagulationOneCell
         // NOTE(@pdmullen): ncall could be stored or reduced (see 0a5d72b)
         int ncall = Null<int>();
-        Coagulation::CoagulationOneCell(mbr, i, time1, dt_sync, gdens1, rhod, stime, vel,
+        Coagulation::CoagulationOneCell(mbr, time1, dt_sync, gdens1, rhod, stime, vel,
                                         nvel, Q, nQs, alpha, cs1, omega1, coag, source,
                                         ncall, Q2);
 

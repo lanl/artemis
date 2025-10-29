@@ -540,8 +540,8 @@ void Coagulation_nQs3(parthenon::team_mbr_t const &mbr, const Real &dt,
                       const ScratchPad1D<Real> &stoppingTime, const CoagParams &coag,
                       ScratchPad1D<Real> &source, ScratchPad1D<Real> &Q2,
                       const int &mimax2) {
-  const Real mom_scale = 1.0e10;
-  const Real mom_iscale = 1.0e-10;
+  static constexpr Real mom_scale = 1.0e10;
+  static constexpr Real mom_iscale = 1.0e-10;
   parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, mbr, 0, coag.nm - 1,
                            [&](const int k) {
                              Q2(k) = nQs(k); // 2nd stage source

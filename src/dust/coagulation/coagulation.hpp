@@ -529,6 +529,7 @@ void Coagulation_nQs(parthenon::team_mbr_t const &mbr, const Real &dt,
   mbr.team_barrier();
 }
 
+/*
 //----------------------------------------------------------------------------------------
 //! \fn  void Dust::Coagulation::Coagulation_nQs3
 //  \brief
@@ -587,6 +588,7 @@ void Coagulation_nQs3(parthenon::team_mbr_t const &mbr, const Real &dt,
       [&](const int k) { distri(k) += 0.5 * dt * (source(k) + Q2(k)); });
   mbr.team_barrier();
 }
+*/
 
 //----------------------------------------------------------------------------------------
 //! \fn  void Dust::Coagulation::CoagulationOneCell

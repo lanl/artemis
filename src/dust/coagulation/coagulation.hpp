@@ -559,7 +559,7 @@ void CoagulationOneCell(parthenon::team_mbr_t const &mbr, const Real &time, Real
                                });
       mbr.team_barrier();
 
-      Coagulation_nQ(mbr, nQs, Q, dustdens, mimax, kernel, vel, stime, coag);
+      // Coagulation_nQ(mbr, nQs, Q, dustdens, mimax, kernel, vel, stime, coag);
 
       parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, mbr, 0, coag.nm - 1,
                                [&](const int i) {

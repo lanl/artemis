@@ -41,8 +41,10 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin, Params &gas_par
   auto coag = std::make_shared<StateDescriptor>("coagulation");
   Params &params = coag->AllParams();
 
-  // Assign CoagParams
+  // Assign structs
   CoagParams dcpars;
+  CoagArrays dcarrs;
+  RateParams drpars;
 
   // Units
   dcpars.rho0 = units.GetMassDensityCodeToPhysical();
@@ -54,7 +56,6 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin, Params &gas_par
   dcpars.nm = dust_params.Get<int>("nspecies");
   dcpars.dfloor = dcpars.rho0 * dust_params.Get<Real>("dfloor");
   dcpars.rho_p = dcpars.rho0 * dust_params.Get<Real>("grain_density");
-  dcpars.vfrag = pin->GetOrAddReal("dust/coagulation", "vfrag", 1.e3); // cm/s
   dcpars.integrator = pin->GetOrAddInteger("dust/coagulation", "coag_int", 3);
   dcpars.use_adaptive =
       pin->GetOrAddBoolean("dust/coagulation", "coag_use_adaptive_step", true);
@@ -62,21 +63,22 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin, Params &gas_par
   dcpars.ncall_max = pin->GetOrAddInteger("dust/coagulation", "coag_nsteps_max", 1000);
   dcpars.const_omega =
       pin->GetOrAddBoolean("dust/coagulation", "const_coag_omega", false);
-  dcpars.ibounce = pin->GetOrAddBoolean("dust/coagulation", "coag_bounce", false);
   dcpars.err_eps = pin->GetOrAddReal("dust/coagulation", "err_eps", 0.1);
   dcpars.S = pin->GetOrAddReal("dust/coagulation", "S", 0.9);
   dcpars.cfl = pin->GetOrAddReal("dust/coagulation", "cfl_coag", 0.1);
   dcpars.chi = pin->GetOrAddReal("dust/coagulation", "chi", 1.0);
 
-  // Gas properties
-  dcpars.mmw = gas_params.Get<Real>("mu") * constants.GetAMUPhysical();
-  dcpars.cross_section = pin->GetOrAddReal("dust/coagulation", "cross_section", 2.0e-15);
+  // Properties used in computing rates
+  drpars.mmw = gas_params.Get<Real>("mu") * constants.GetAMUPhysical();
+  drpars.cross_section = pin->GetOrAddReal("dust/coagulation", "cross_section", 2.0e-15);
+  drpars.vfrag = pin->GetOrAddReal("dust/coagulation", "vfrag", 1.e3); // cm/s
+  drpars.ibounce = pin->GetOrAddBoolean("dust/coagulation", "coag_bounce", false);
 
   // Coordinate type
   // NOTE(@pdmullen): Following @sli's earlier implementation, rho_p and dfloor use solely
   // the density unit in construction, not the one weighted by length unit
-  dcpars.coord = pin->GetOrAddBoolean("dust/coagulation", "surface_density_flag", true);
-  if (dcpars.coord) dcpars.rho0 *= dcpars.length0;
+  drpars.coord = pin->GetOrAddBoolean("dust/coagulation", "surface_density_flag", true);
+  if (drpars.coord) dcpars.rho0 *= dcpars.length0;
 
   // Adaptivity
   if (dcpars.use_adaptive) {
@@ -121,17 +123,19 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin, Params &gas_par
   const Real a = 3.0 * std::log10(h_sizes(0) / h_sizes(dcpars.nm - 1)) /
                  static_cast<Real>(1 - dcpars.nm);
   const int n2drv = coag2drv::last2;
-  dcpars.klf = ParArray2D<int>("klf", dcpars.nm, dcpars.nm);
-  dcpars.mass_grid = ParArray1D<Real>("mass_grid", dcpars.nm);
-  dcpars.coagR3D = ParArray3D<Real>("coagReal3D", n2drv, dcpars.nm, dcpars.nm);
-  dcpars.cpod_notzero = ParArray3D<int>("idx_nzcpod", dcpars.nm, dcpars.nm, 4);
-  dcpars.cpod_short = ParArray3D<Real>("nzcpod", dcpars.nm, dcpars.nm, 4);
+  dcarrs.klf = ParArray2D<int>("klf", dcpars.nm, dcpars.nm);
+  dcarrs.mass_grid = ParArray1D<Real>("mass_grid", dcpars.nm);
+  dcarrs.coagR3D = ParArray3D<Real>("coagReal3D", n2drv, dcpars.nm, dcpars.nm);
+  dcarrs.cpod_notzero = ParArray3D<int>("idx_nzcpod", dcpars.nm, dcpars.nm, 4);
+  dcarrs.cpod_short = ParArray3D<Real>("nzcpod", dcpars.nm, dcpars.nm, 4);
   InitializeArray(dcpars.nm, dcpars.pgrid, dcpars.rho_p, dcpars.chi, a, dust_size,
-                  dcpars.klf, dcpars.mass_grid, dcpars.coagR3D, dcpars.cpod_notzero,
-                  dcpars.cpod_short);
+                  dcarrs.klf, dcarrs.mass_grid, dcarrs.coagR3D, dcarrs.cpod_notzero,
+                  dcarrs.cpod_short);
 
   // Stash CoagParams
   params.Add("coag_pars", dcpars);
+  params.Add("coag_arrs", dcarrs);
+  params.Add("rate_pars", drpars);
 
   // Remaining parameters for coagulation package
   params.Add("nstep_coag", pin->GetOrAddInteger("dust/coagulation", "nstep_coag", 50));
@@ -227,8 +231,12 @@ TaskStatus CoagulationStep(MeshData<Real> *md, const Real time, const Real dt) {
   // Extract coagulation params
   auto &coag_pkg = pm->packages.Get("coagulation");
   auto &coag = coag_pkg->template Param<Dust::Coagulation::CoagParams>("coag_pars");
+  auto &coag_arrays =
+      coag_pkg->template Param<Dust::Coagulation::CoagArrays>("coag_arrs");
+  auto &rate = coag_pkg->template Param<Dust::Coagulation::RateParams>("rate_pars");
   const Real alpha = coag_pkg->template Param<Real>("coag_alpha");
-  const int nvel = (coag.coord) ? 2 : 3;
+  const bool surface = rate.coord;
+  const int nvel = surface ? 2 : 3;
   const int scr_level = coag_pkg->template Param<int>("coag_scr_level");
   const bool info_out_flag = coag_pkg->template Param<bool>("coag_info_out");
 
@@ -302,8 +310,8 @@ TaskStatus CoagulationStep(MeshData<Real> *md, const Real time, const Real dt) {
         Real dt_sync = dt * time0;
 
         // Set stopping times, rhod, and veld in scratch memory
-        const Real st0 = (coag.coord) ? 0.5 * M_PI * coag.rho_p / gdens1 / omega1
-                                      : std::sqrt(M_PI / 8.0) * coag.rho_p / gdens1 / cs1;
+        const Real st0 = surface ? (0.5 * M_PI * coag.rho_p / gdens1 / omega1)
+                                 : (std::sqrt(M_PI / 8.0) * coag.rho_p / gdens1 / cs1);
         parthenon::par_for_inner(
             DEFAULT_INNER_LOOP_PATTERN, mbr, 0, nm - 1, [&](const int n) {
               // Calculate the stopping time
@@ -324,8 +332,8 @@ TaskStatus CoagulationStep(MeshData<Real> *md, const Real time, const Real dt) {
         // NOTE(@pdmullen): ncall could be stored or reduced (see 0a5d72b)
         int ncall = Null<int>();
         Coagulation::CoagulationOneCell(mbr, time1, dt_sync, gdens1, rhod, stime, vel,
-                                        nvel, Q, nQs, alpha, cs1, omega1, coag, source,
-                                        ncall, Q2);
+                                        nvel, Q, nQs, alpha, cs1, omega1, coag,
+                                        coag_arrays, rate, source, ncall, Q2);
 
         // Update dust density and momentum after coagulation
         parthenon::par_for_inner(

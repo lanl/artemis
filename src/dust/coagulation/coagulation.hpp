@@ -60,28 +60,24 @@ void WriteCoagulationDiagnostics(MeshData<Real> *md, const Real time, const Real
 // Constants that enumerate coagulation kernel
 enum coag2drv { dpod, afrag, phifrag, epsfrag, dalp, kdelta, coef_fett, last2 };
 
-// Coagulation Kernel Parameters
+// Coagulation State Parameters
 // NOTE(@pdmullen): Shared between various inline function calls
-struct KernelParams {
-  Real gdens = Null<Real>();
-  Real alpha = Null<Real>();
-  Real cs = Null<Real>();
-  Real omega = Null<Real>();
+struct StateParams {
+  Real gdens;
+  Real alpha;
+  Real cs;
+  Real omega;
 };
 
 // Struct that holds coagulation parameters
 struct CoagParams {
-  bool coord = false; // true--surface density, false: 3D
-
-  int nm;               // nspecies
-  int ncall_max = 1000; // max coag calls
-  bool ibounce = false; // include bouncing
-  Real rho_p;           // grain density
-  Real vfrag;           // fragmentation velocity
-  Real dfloor;          // dust density floor
-  int integrator;       // coag time integrator
-  bool use_adaptive;    // adaptive step size
-  bool mom_coag;        // mom-preserving coagulation
+  int nm;            // nspecies
+  int ncall_max;     // max coag calls
+  Real rho_p;        // grain density
+  Real dfloor;       // dust density floor
+  int integrator;    // coag time integrator
+  bool use_adaptive; // adaptive step size
+  bool mom_coag;     // mom-preserving coagulation
 
   int pgrid;        // dust grid
   Real chi;         // chi parameter
@@ -93,12 +89,24 @@ struct CoagParams {
   Real errcon;      // Needed for increasing step size
   bool const_omega; // for shearing-box or testing
 
+  Real rho0;    // physical-to-code unit conversion density
+  Real length0; // physical-to-code unit conversion length
+};
+
+// Coagulation Rate Parameters
+// NOTE(@pdmullen): Shared between CoagulationRate calls
+struct RateParams {
+  bool coord; // true--surface density, false: 3D
+
   Real mmw;           // mean molecular weight (mu * amu in CGS)
   Real cross_section; // cross section of gas species
 
-  Real rho0;    // physical-to-code unit conversion density
-  Real length0; // physical-to-code unit conversion length
+  Real vfrag;   // fragmentation velocity
+  bool ibounce; // include bouncing
+};
 
+// Struct that holds coagulation arrays
+struct CoagArrays {
   // pre-calculated arrays
   ParArray2D<int> klf;
   ParArray1D<Real> mass_grid;
@@ -184,13 +192,14 @@ Real Qplus(const Real &m1, const Real &Q1, const Real &m2, const Real &Q2) {
 //! \fn  Real Dust::Coagulation::CoagulationRate
 //  \brief
 KOKKOS_INLINE_FUNCTION
-Real CoagulationRate(const int &i, const int &j, const KernelParams &kernel4,
-                     const ScratchPad1D<Real> &vel,
-                     const ScratchPad1D<Real> &stoppingTime, const CoagParams &coag,
-                     const int &itype) {
-  const Real &mass_gridi = coag.mass_grid(i);
-  const Real &mass_gridj = coag.mass_grid(j);
-  const Real &mass_gride = coag.mass_grid(coag.nm - 1);
+Real CoagulationRate(const int &i, const int &j, const int &nm1,
+                     const StateParams &kernel4, const ScratchPad1D<Real> &vel,
+                     const ScratchPad1D<Real> &stoppingTime,
+                     const ParArray1D<Real> &mass_grid, const ParArray3D<Real> &coagR3D,
+                     const RateParams &rate, const int &itype) {
+  const Real &mass_gridi = mass_grid(i);
+  const Real &mass_gridj = mass_grid(j);
+  const Real &mass_gride = mass_grid(nm1);
   if (mass_gridi + mass_gridj >= mass_gride) return 0.0;
 
   const Real &gdens = kernel4.gdens;
@@ -202,13 +211,13 @@ Real CoagulationRate(const int &i, const int &j, const KernelParams &kernel4,
   const Real *vel_i = &vel(3 * i);
   const Real *vel_j = &vel(3 * j);
 
-  const Real &sig = coag.cross_section; //! cross section of gas species
-  const Real &mmw = coag.mmw;           //! mean molecular weight (mu * mp)
+  const Real &sig = rate.cross_section; //! cross section of gas species
+  const Real &mmw = rate.mmw;           //! mean molecular weight (mu * mp)
 
   // Calculate some basic properties
   const Real hg = cs / omega;
   Real re = alpha * sig * gdens / (2.0 * mmw);
-  if (!(coag.coord)) re *= std::sqrt(2.0 * M_PI) * hg;
+  if (!(rate.coord)) re *= std::sqrt(2.0 * M_PI) * hg;
 
   const Real tn = 1.0 / omega;
   const Real ts = tn / std::sqrt(re);
@@ -231,7 +240,7 @@ Real CoagulationRate(const int &i, const int &j, const KernelParams &kernel4,
 
   Real dv2_ij;
   Real hij = 1.0;
-  if (coag.coord) { // surface density
+  if (rate.coord) { // surface density
     const Real hi =
         std::min(std::sqrt(alpha / (std::min(0.5, stokes_i) * (SQR(stokes_i) + 1.0))),
                  1.0) *
@@ -257,18 +266,18 @@ Real CoagulationRate(const int &i, const int &j, const KernelParams &kernel4,
   // New pf calculation: for fragmenation
   Real pf = 0.0;
   if (dv > 0.0) {
-    const Real tmp = 1.5 * SQR(coag.vfrag / dv);
+    const Real tmp = 1.5 * SQR(rate.vfrag / dv);
     pf = (tmp + 1.0) * std::exp(-tmp);
   }
 
   const int icoef_fett = coag2drv::coef_fett;
-  const Real &coef_fettij = coag.coagR3D(icoef_fett, i, j);
+  const Real &coef_fettij = coagR3D(icoef_fett, i, j);
   if (itype == 0) {                 // coagulation
-    if (coag.ibounce && dv > 0.0) { // including bouncing effect
+    if (rate.ibounce && dv > 0.0) { // including bouncing effect
       const Real froll = 1e-4;      // Heim et al.(PRL) 1999
       const Real amono = 1e-4;      // micro-size
       const Real vbounce = std::sqrt(5.0 * M_PI * amono * froll / mredu);
-      if (vbounce < coag.vfrag) {
+      if (vbounce < rate.vfrag) {
         const Real tmp = 1.5 * SQR(vbounce / dv);
         pf = (tmp + 1.0) * std::exp(-tmp); // using bouncing vel
       }
@@ -281,78 +290,118 @@ Real CoagulationRate(const int &i, const int &j, const KernelParams &kernel4,
 }
 
 //----------------------------------------------------------------------------------------
-//! \fn  void Dust::Coagulation::CoagulationSource
+//! \fn  void Dust::Coagulation::
 //  \brief
 KOKKOS_INLINE_FUNCTION
-void CoagulationSource(parthenon::team_mbr_t const &mbr, ScratchPad1D<Real> &source,
-                       const ScratchPad1D<Real> &distri, const int &mimax,
-                       const KernelParams &kernel4, const ScratchPad1D<Real> &vel,
-                       const ScratchPad1D<Real> &stoppingTime, const CoagParams &coag) {
+void ZeroSource(parthenon::team_mbr_t const &mbr, const int &nm1,
+                ScratchPad1D<Real> &source) {
   // Initialize source(*)
-  parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, mbr, 0, coag.nm - 1,
-                           [&](const int k) { source(k) = 0.0; });
+  parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, mbr, 0, nm1,
+                           [&](const int i) { source(i) = 0.0; });
   mbr.team_barrier();
+}
 
-  // Adding coagulation source terms
+//----------------------------------------------------------------------------------------
+//! \fn  void Dust::Coagulation::
+//  \brief
+KOKKOS_INLINE_FUNCTION
+void InitializeSource(parthenon::team_mbr_t const &mbr, const int &nm1, const int &mimax,
+                      ScratchPad1D<Real> &source, const ScratchPad1D<Real> &distri,
+                      const ScratchPad1D<Real> &vel,
+                      const ScratchPad1D<Real> &stoppingTime, const StateParams &kernel4,
+                      const ParArray1D<Real> &mass_grid, const ParArray3D<Real> &coagR3D,
+                      const ParArray3D<int> &cpod_notzero,
+                      const ParArray3D<Real> &cpod_short, const RateParams &rate) {
   parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, mbr, 0, mimax, [&](const int i) {
     for (int j = 0; j <= i; j++) {
       // Calculate the Rate
-      const Real fett_t = CoagulationRate(i, j, kernel4, vel, stoppingTime, coag, 0);
+      const Real fett_t = CoagulationRate(i, j, nm1, kernel4, vel, stoppingTime,
+                                          mass_grid, coagR3D, rate, 0);
       const Real Rc1 = distri(i) * distri(j) * fett_t;
       for (int nz = 0; nz < 4; nz++) {
-        const int k = coag.cpod_notzero(i, j, nz);
+        const int k = cpod_notzero(i, j, nz);
         if (k < 0) continue;
-        const Real src_coag0 = coag.cpod_short(i, j, nz) * Rc1;
+        const Real src_coag0 = cpod_short(i, j, nz) * Rc1;
         Kokkos::atomic_add(&source(k), src_coag0);
       }
     }
   });
   mbr.team_barrier();
+}
 
-  // FRAGMENTATION------------------------------------------------------------------------
-
+//----------------------------------------------------------------------------------------
+//! \fn  void Dust::Coagulation::
+//  \brief
+KOKKOS_INLINE_FUNCTION
+void FragmentationSource(parthenon::team_mbr_t const &mbr, const int &nm1,
+                         const int &mimax, const int iafrag, const int iphifrag,
+                         const ScratchPad1D<Real> &source,
+                         const ScratchPad1D<Real> &distri, const ScratchPad1D<Real> &vel,
+                         const ScratchPad1D<Real> &stoppingTime,
+                         const StateParams &kernel4, const ParArray1D<Real> &mass_grid,
+                         const ParArray3D<Real> &coagR3D, const ParArray2D<int> &klf,
+                         const RateParams &rate) {
   // Adding fragment distribution
-  const int pgrid = coag.pgrid;
-  const int iafrag = coag2drv::afrag;
-  const int iphifrag = coag2drv::phifrag, iepsfrag = coag2drv::epsfrag;
-  parthenon::par_for_inner(
-      DEFAULT_INNER_LOOP_PATTERN, mbr, 0, coag.nm - 1, [&](const int k) {
-        for (int j = k; j <= mimax; j++) {
-          // Calculate As(j) on fly
-          Real As_j = 0.0;
-          for (int i2 = 0; i2 <= mimax; i2++) {
-            for (int j2 = 0; j2 <= i2; j2++) {
-              if (coag.klf(i2, j2) == j) {
-                const Real fett_l =
-                    CoagulationRate(i2, j2, kernel4, vel, stoppingTime, coag, 1);
-                As_j += coag.coagR3D(iafrag, i2, j2) * distri(i2) * distri(j2) * fett_l;
-              }
-            }
+  parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, mbr, 0, nm1, [&](const int k) {
+    for (int j = k; j <= mimax; j++) {
+      // Calculate As(j) on fly
+      Real As_j = 0.0;
+      for (int i2 = 0; i2 <= mimax; i2++) {
+        for (int j2 = 0; j2 <= i2; j2++) {
+          if (klf(i2, j2) == j) {
+            const Real fett_l = CoagulationRate(i2, j2, nm1, kernel4, vel, stoppingTime,
+                                                mass_grid, coagR3D, rate, 1);
+            As_j += coagR3D(iafrag, i2, j2) * distri(i2) * distri(j2) * fett_l;
           }
-          source(k) += coag.coagR3D(iphifrag, k, j) / coag.mass_grid(k) * As_j;
         }
-      });
+      }
+      source(k) += coagR3D(iphifrag, k, j) / mass_grid(k) * As_j;
+    }
+  });
   mbr.team_barrier();
+}
 
-  // Negative terms and cratering remnants
+//----------------------------------------------------------------------------------------
+//! \fn  void Dust::Coagulation::
+//  \brief
+KOKKOS_INLINE_FUNCTION
+void CrateringSource(parthenon::team_mbr_t const &mbr, const int &nm1, const int &mimax,
+                     const ScratchPad1D<Real> &source, const ScratchPad1D<Real> &distri,
+                     const ScratchPad1D<Real> &vel,
+                     const ScratchPad1D<Real> &stoppingTime, const StateParams &kernel4,
+                     const ParArray1D<Real> &mass_grid, const ParArray3D<Real> &coagR3D,
+                     const RateParams &rate) {
   parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, mbr, 0, mimax, [&](const int j) {
     Real sum0 = 0.0;
     for (int i = j; i <= mimax; i++) {
-      const Real fett_l = CoagulationRate(i, j, kernel4, vel, stoppingTime, coag, 1);
+      const Real fett_l = CoagulationRate(i, j, nm1, kernel4, vel, stoppingTime,
+                                          mass_grid, coagR3D, rate, 1);
       const Real Rf1 = distri(i) * distri(j) * fett_l;
       sum0 -= Rf1;
     }
     source(j) += sum0;
   });
   mbr.team_barrier();
+}
 
+//----------------------------------------------------------------------------------------
+//! \fn  void Dust::Coagulation::
+//  \brief
+KOKKOS_INLINE_FUNCTION
+void FinalizeSource(parthenon::team_mbr_t const &mbr, const int &nm1, const int &mimax,
+                    const int &pgrid, const int iepsfrag,
+                    const ScratchPad1D<Real> &source, const ScratchPad1D<Real> &distri,
+                    const ScratchPad1D<Real> &vel, const ScratchPad1D<Real> &stoppingTime,
+                    const StateParams &kernel4, const ParArray1D<Real> &mass_grid,
+                    const ParArray3D<Real> &coagR3D, const RateParams &rate) {
   // Cratering
   parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, mbr, 0, mimax, [&](const int i) {
     Real sum0 = 0.0;
     for (int j = 0; j <= i - pgrid - 1; j++) {
-      const Real fett_l = CoagulationRate(i, j, kernel4, vel, stoppingTime, coag, 1);
+      const Real fett_l = CoagulationRate(i, j, nm1, kernel4, vel, stoppingTime,
+                                          mass_grid, coagR3D, rate, 1);
       const Real Rf1 = distri(i) * distri(j) * fett_l;
-      const Real dummy = coag.coagR3D(iepsfrag, i, j) * Rf1;
+      const Real dummy = coagR3D(iepsfrag, i, j) * Rf1;
       sum0 += dummy;
     }
 
@@ -364,7 +413,8 @@ void CoagulationSource(parthenon::team_mbr_t const &mbr, ScratchPad1D<Real> &sou
     // Full fragmentation (only negative terms)
     int i1 = std::max(0, i - pgrid);
     for (int j = i1; j <= i; j++) {
-      const Real fett_l = CoagulationRate(i, j, kernel4, vel, stoppingTime, coag, 1);
+      const Real fett_l = CoagulationRate(i, j, nm1, kernel4, vel, stoppingTime,
+                                          mass_grid, coagR3D, rate, 1);
       const Real Rf1 = distri(i) * distri(j) * fett_l;
       sum1 -= Rf1;
     }
@@ -374,31 +424,44 @@ void CoagulationSource(parthenon::team_mbr_t const &mbr, ScratchPad1D<Real> &sou
 }
 
 //----------------------------------------------------------------------------------------
-//! \fn  void Dust::Coagulation::Coagulation_nQ
+//! \fn  void Dust::Coagulation::
 //  \brief
 KOKKOS_INLINE_FUNCTION
-void Coagulation_nQ(parthenon::team_mbr_t const &mbr, ScratchPad1D<Real> &nQs,
-                    const ScratchPad1D<Real> &Q, const ScratchPad1D<Real> &distri,
-                    const int &mimax, const KernelParams &kernel4,
-                    const ScratchPad1D<Real> &vel, const ScratchPad1D<Real> &stoppingTime,
-                    const CoagParams &coag) {
-  // Adding coagulation source terms
-  const int iafrag = coag2drv::afrag;
-  const int iphifrag = coag2drv::phifrag;
-  const int iepsfrag = coag2drv::epsfrag;
-  const int idalp = coag2drv::dalp;
-  const int idpod = coag2drv::dpod;
+void ZeroSourceNQ(parthenon::team_mbr_t const &mbr, const int &n, const int &nm1,
+                  ScratchPad1D<Real> &Q, ScratchPad1D<Real> &nQs,
+                  ScratchPad1D<Real> &vel) {
+  parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, mbr, 0, nm1, [&](const int i) {
+    Q(i) = vel(n + i * 3) * mom_scale;
+    nQs(i) = 0.0;
+  });
+  mbr.team_barrier();
+}
+
+//----------------------------------------------------------------------------------------
+//! \fn  void Dust::Coagulation::
+//  \brief
+KOKKOS_INLINE_FUNCTION
+void InitializeSourceNQ(parthenon::team_mbr_t const &mbr, const int &nm1,
+                        const int &mimax, const int idalp, const int idpod,
+                        const ScratchPad1D<Real> &Q, ScratchPad1D<Real> &nQs,
+                        const ScratchPad1D<Real> &distri, const ScratchPad1D<Real> &vel,
+                        const ScratchPad1D<Real> &stoppingTime,
+                        const StateParams &kernel4, const ParArray1D<Real> &mass_grid,
+                        const ParArray3D<Real> &coagR3D,
+                        const ParArray3D<int> &cpod_notzero,
+                        const ParArray3D<Real> &cpod_short, const RateParams &rate) {
   parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, mbr, 0, mimax, [&](const int i) {
     for (int j = 0; j <= i; j++) {
       // calculate the rate
-      const Real fett_t = CoagulationRate(i, j, kernel4, vel, stoppingTime, coag, 0);
+      const Real fett_t = CoagulationRate(i, j, nm1, kernel4, vel, stoppingTime,
+                                          mass_grid, coagR3D, rate, 0);
       const Real Rc1 = distri(i) * distri(j) * fett_t;
-      const Real &mass_gridi = coag.mass_grid(i);
-      const Real &mass_gridj = coag.mass_grid(j);
-      const Real &dalpji = coag.coagR3D(idalp, j, i);
-      const Real &dpodji = coag.coagR3D(idpod, j, i);
-      const Real &dalpij = coag.coagR3D(idalp, i, j);
-      const Real &dpodij = coag.coagR3D(idpod, i, j);
+      const Real &mass_gridi = mass_grid(i);
+      const Real &mass_gridj = mass_grid(j);
+      const Real &dalpji = coagR3D(idalp, j, i);
+      const Real &dpodji = coagR3D(idpod, j, i);
+      const Real &dalpij = coagR3D(idalp, i, j);
+      const Real &dpodij = coagR3D(idpod, i, j);
 
       const Real Qp1 = Qplus(mass_gridi, Q(i), mass_gridj, Q(j));
       const Real dphijQ = dalpji * Qp1 * (1.0 + dpodji) - Q(j);
@@ -407,71 +470,104 @@ void Coagulation_nQ(parthenon::team_mbr_t const &mbr, ScratchPad1D<Real> &nQs,
       const Real tmp1 = dphijQ - Qp1 * dpodji;
       const Real tmp2 = dphjiQ - Qp1 * dpodij;
       for (int nz = 0; nz < 4; nz++) {
-        const int k = coag.cpod_notzero(i, j, nz);
+        const int k = cpod_notzero(i, j, nz);
         if (k < 0) continue;
-        const Real kdeltajk = (j == k) ? 1.0 : 0.0;
-        const Real kdeltaik = (i == k) ? 1.0 : 0.0;
+        const bool kdeltajk = (j == k);
+        const bool kdeltaik = (i == k);
         const Real nqs_k =
-            (Qp1 * coag.cpod_short(i, j, nz) + tmp1 * kdeltajk + tmp2 * kdeltaik) * Rc1;
+            (Qp1 * cpod_short(i, j, nz) + tmp1 * kdeltajk + tmp2 * kdeltaik) * Rc1;
         Kokkos::atomic_add(&nQs(k), nqs_k);
       }
     }
   });
   mbr.team_barrier();
+}
 
-  // FRAGMENTATION------------------------------------------------------------------------
-
-  // Adding fragment distribution
-  const int pgrid = coag.pgrid;
-  parthenon::par_for_inner(
-      DEFAULT_INNER_LOOP_PATTERN, mbr, 0, coag.nm - 1, [&](const int k) {
-        for (int j = k; j <= mimax; j++) {
-          // calculate As(j) on fly
-          Real As_j = 0.0;
-          for (int i2 = 0; i2 <= mimax; i2++) {
-            for (int j2 = 0; j2 <= i2; j2++) {
-              int klf = (j2 <= i2 - pgrid - 1) ? j2 : i2;
-              if (klf == j) {
-                const Real fett_l =
-                    CoagulationRate(i2, j2, kernel4, vel, stoppingTime, coag, 1);
-                Real Qf1;
-                const Real &mass_gridi2 = coag.mass_grid(i2);
-                const Real &mass_gridj2 = coag.mass_grid(j2);
-                const Real &afragi2j2 = coag.coagR3D(iafrag, i2, j2);
-                if (j2 <= i2 - pgrid - 1) {
-                  Qf1 = Qplus(coag.chi * mass_gridj2, Q(i2), mass_gridj2, Q(j2));
-                } else {
-                  Qf1 = Qplus(mass_gridi2, Q(i2), mass_gridj2, Q(j2));
-                }
-                As_j += afragi2j2 * distri(i2) * distri(j2) * fett_l * Qf1;
-              }
+//----------------------------------------------------------------------------------------
+//! \fn  void Dust::Coagulation::
+//  \brief
+KOKKOS_INLINE_FUNCTION
+void FragmentationSourceNQ(parthenon::team_mbr_t const &mbr, const int &nm1,
+                           const int &mimax, const int &pgrid, const int iafrag,
+                           const int iphifrag, const ScratchPad1D<Real> &Q,
+                           ScratchPad1D<Real> &nQs, const ScratchPad1D<Real> &distri,
+                           const ScratchPad1D<Real> &vel,
+                           const ScratchPad1D<Real> &stoppingTime,
+                           const StateParams &kernel4, const ParArray1D<Real> &mass_grid,
+                           const ParArray3D<Real> &coagR3D, const Real &chi,
+                           const RateParams &rate) {
+  parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, mbr, 0, nm1, [&](const int k) {
+    for (int j = k; j <= mimax; j++) {
+      // calculate As(j) on fly
+      Real As_j = 0.0;
+      for (int i2 = 0; i2 <= mimax; i2++) {
+        for (int j2 = 0; j2 <= i2; j2++) {
+          int klf = (j2 <= i2 - pgrid - 1) ? j2 : i2;
+          if (klf == j) {
+            const Real fett_l = CoagulationRate(i2, j2, nm1, kernel4, vel, stoppingTime,
+                                                mass_grid, coagR3D, rate, 1);
+            Real Qf1;
+            const Real &mass_gridi2 = mass_grid(i2);
+            const Real &mass_gridj2 = mass_grid(j2);
+            const Real &afragi2j2 = coagR3D(iafrag, i2, j2);
+            if (j2 <= i2 - pgrid - 1) {
+              Qf1 = Qplus(chi * mass_gridj2, Q(i2), mass_gridj2, Q(j2));
+            } else {
+              Qf1 = Qplus(mass_gridi2, Q(i2), mass_gridj2, Q(j2));
             }
+            As_j += afragi2j2 * distri(i2) * distri(j2) * fett_l * Qf1;
           }
-          const Real &mass_gridk = coag.mass_grid(k);
-          nQs(k) += coag.coagR3D(iphifrag, k, j) / mass_gridk * As_j;
         }
-      });
+      }
+      const Real &mass_gridk = mass_grid(k);
+      nQs(k) += coagR3D(iphifrag, k, j) / mass_gridk * As_j;
+    }
+  });
   mbr.team_barrier();
+}
 
-  // Negative terms and cratering remnants
+//----------------------------------------------------------------------------------------
+//! \fn  void Dust::Coagulation::
+//  \brief
+KOKKOS_INLINE_FUNCTION
+void CrateringSourceNQ(parthenon::team_mbr_t const &mbr, const int &nm1, const int &mimax,
+                       const ScratchPad1D<Real> &Q, ScratchPad1D<Real> &nQs,
+                       const ScratchPad1D<Real> &distri, const ScratchPad1D<Real> &vel,
+                       const ScratchPad1D<Real> &stoppingTime, const StateParams &kernel4,
+                       const ParArray1D<Real> &mass_grid, const ParArray3D<Real> &coagR3D,
+                       const RateParams &rate) {
   parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, mbr, 0, mimax, [&](const int j) {
     // Cratering
     Real sum0 = 0.0;
     for (int i = j; i <= mimax; i++) {
-      const Real fett_l = CoagulationRate(i, j, kernel4, vel, stoppingTime, coag, 1);
+      const Real fett_l = CoagulationRate(i, j, nm1, kernel4, vel, stoppingTime,
+                                          mass_grid, coagR3D, rate, 1);
       const Real Rf1 = distri(i) * distri(j) * fett_l;
       sum0 -= Rf1;
     }
     nQs(j) += (sum0 * Q(j));
   });
   mbr.team_barrier();
+}
 
+//----------------------------------------------------------------------------------------
+//! \fn  void Dust::Coagulation::
+//  \brief
+KOKKOS_INLINE_FUNCTION
+void FinalizeSourceNQ(parthenon::team_mbr_t const &mbr, const int &nm1, const int &mimax,
+                      const int &pgrid, const int iepsfrag, const ScratchPad1D<Real> &Q,
+                      ScratchPad1D<Real> &nQs, const ScratchPad1D<Real> &distri,
+                      const ScratchPad1D<Real> &vel,
+                      const ScratchPad1D<Real> &stoppingTime, const StateParams &kernel4,
+                      const ParArray1D<Real> &mass_grid, const ParArray3D<Real> &coagR3D,
+                      const RateParams &rate) {
   parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, mbr, 0, mimax, [&](const int i) {
     Real sum0 = 0.0;
     for (int j = 0; j <= i - pgrid - 1; j++) {
-      const Real fett_l = CoagulationRate(i, j, kernel4, vel, stoppingTime, coag, 1);
+      const Real fett_l = CoagulationRate(i, j, nm1, kernel4, vel, stoppingTime,
+                                          mass_grid, coagR3D, rate, 1);
       const Real Rf1 = distri(i) * distri(j) * fett_l;
-      const Real dummy = coag.coagR3D(iepsfrag, i, j) * Rf1 * Q(i);
+      const Real dummy = coagR3D(iepsfrag, i, j) * Rf1 * Q(i);
       sum0 += dummy;
     }
 
@@ -483,100 +579,111 @@ void Coagulation_nQ(parthenon::team_mbr_t const &mbr, ScratchPad1D<Real> &nQs,
     // Full fragmentation (only negative terms)
     int i1 = std::max(0, i - pgrid);
     for (int j = i1; j <= i; j++) {
-      const Real fett_l = CoagulationRate(i, j, kernel4, vel, stoppingTime, coag, 1);
+      const Real fett_l = CoagulationRate(i, j, nm1, kernel4, vel, stoppingTime,
+                                          mass_grid, coagR3D, rate, 1);
       const Real Rf1 = distri(i) * distri(j) * fett_l * Q(i);
       sum1 -= Rf1;
     }
     Kokkos::atomic_add(&nQs(i), sum1);
   });
   mbr.team_barrier();
-} // end of subroutine source
-
-//----------------------------------------------------------------------------------------
-//! \fn  void Dust::Coagulation::Coagulation_nQs
-//  \brief
-KOKKOS_INLINE_FUNCTION
-void Coagulation_nQs(parthenon::team_mbr_t const &mbr, const Real &dt,
-                     ScratchPad1D<Real> &Q, ScratchPad1D<Real> &nQs,
-                     ScratchPad1D<Real> &distri, const int &mimax, const int &nvel,
-                     const KernelParams &kernel4, ScratchPad1D<Real> &vel,
-                     const ScratchPad1D<Real> &stoppingTime, const CoagParams &coag,
-                     ScratchPad1D<Real> &source) {
-  for (int n = 0; n < nvel; n++) {
-    parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, mbr, 0, coag.nm - 1,
-                             [&](const int k) {
-                               Q(k) = vel(n + k * 3) * mom_scale;
-                               nQs(k) = 0.0; // initialize source(*)
-                             });
-    mbr.team_barrier();
-
-    Coagulation_nQ(mbr, nQs, Q, distri, mimax, kernel4, vel, stoppingTime, coag);
-
-    parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, mbr, 0, coag.nm - 1,
-                             [&](const int k) {
-                               const Real distri_k = distri(k) + dt * source(k);
-                               if (distri_k > coag.dfloor / coag.mass_grid(k)) {
-                                 const Real nQ1 = distri(k) * Q(k) + dt * nQs(k);
-                                 vel(n + k * 3) = nQ1 / distri_k * mom_iscale;
-                               }
-                             });
-    mbr.team_barrier();
-  }
 }
 
-/*
 //----------------------------------------------------------------------------------------
-//! \fn  void Dust::Coagulation::Coagulation_nQs3
+//! \fn  void Dust::Coagulation::
 //  \brief
 KOKKOS_INLINE_FUNCTION
-void Coagulation_nQs3(parthenon::team_mbr_t const &mbr, const Real &dt,
+void UpdateVelocityNQ(parthenon::team_mbr_t const &mbr, const int &n, const int &nm1,
                       ScratchPad1D<Real> &Q, ScratchPad1D<Real> &nQs,
-                      ScratchPad1D<Real> &distri, const int &mimax, const int &nvel,
-                      const KernelParams &kernel4, ScratchPad1D<Real> &vel,
-                      const ScratchPad1D<Real> &stoppingTime, const CoagParams &coag,
-                      ScratchPad1D<Real> &source, ScratchPad1D<Real> &Q2,
-                      const int &mimax2) {
-  parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, mbr, 0, coag.nm - 1,
-                           [&](const int k) {
-                             Q2(k) = nQs(k); // 2nd stage source
-                           });
-  mbr.team_barrier();
-  for (int n = 0; n < nvel; n++) {
-    parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, mbr, 0, coag.nm - 1,
-                             [&](const int k) {
-                               Q(k) = vel(n + k * 3) * mom_scale;
-                               nQs(k) = 0.0;
-                             });
-    mbr.team_barrier();
-    // 1st stage
-    Coagulation_nQ(mbr, nQs, Q, distri, mimax, kernel4, vel, stoppingTime, coag);
-    parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, mbr, 0, coag.nm - 1,
-                             [&](const int k) {
-                               const Real distri_k = distri(k) + dt * source(k);
-                               const Real nQ1 = distri(k) * Q(k) + dt * nQs(k);
-                               Q(k) = nQ1 / distri_k; // intermediate Q
-                             });
-    mbr.team_barrier();
-    // 2nd stage
-    Coagulation_nQ(mbr, nQs, Q, distri, mimax2, kernel4, vel, stoppingTime, coag);
-    parthenon::par_for_inner(
-        DEFAULT_INNER_LOOP_PATTERN, mbr, 0, coag.nm - 1, [&](const int k) {
-          const Real nQ_o = distri(k) * vel(n + k * 3) * mom_scale;
-          const Real distri_k = distri(k) + 0.5 * dt * (source(k) + Q2(k));
-          if (distri_k > coag.dfloor / coag.mass_grid(k)) {
-            Real nQ1 = nQ_o + 0.5 * dt * nQs(k);
-            vel(n + k * 3) = nQ1 / distri_k * mom_iscale;
-          }
-        });
-    mbr.team_barrier();
-  }
-  // update the density
-  parthenon::par_for_inner(
-      DEFAULT_INNER_LOOP_PATTERN, mbr, 0, coag.nm - 1,
-      [&](const int k) { distri(k) += 0.5 * dt * (source(k) + Q2(k)); });
+                      ScratchPad1D<Real> &vel, ScratchPad1D<Real> &distri,
+                      ScratchPad1D<Real> &source, const ParArray1D<Real> &mass_grid,
+                      const Real &dt, const Real &dfloor) {
+  parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, mbr, 0, nm1, [&](const int i) {
+    const Real distri_i = distri(i) + dt * source(i);
+    if (distri_i > dfloor / mass_grid(i)) {
+      const Real nQ1 = distri(i) * Q(i) + dt * nQs(i);
+      vel(n + i * 3) = nQ1 / distri_i * mom_iscale;
+    }
+  });
   mbr.team_barrier();
 }
-*/
+
+//----------------------------------------------------------------------------------------
+//! \fn  void Dust::Coagulation::
+//  \brief
+KOKKOS_INLINE_FUNCTION
+int FindMIMax(parthenon::team_mbr_t const &mbr, const int &nm1,
+              ScratchPad1D<Real> &dustdens, const ParArray1D<Real> &mass_grid,
+              const Real &dfloor) {
+  int mimax = 0;
+  Kokkos::parallel_reduce(
+      Kokkos::TeamThreadRange(mbr, nm1 + 1), // exclusive
+      [&](const int i, int &lmax) {
+        if (dustdens(i) > dfloor / mass_grid(i)) lmax = std::max(lmax, i);
+      },
+      Kokkos::Max<int>(mimax));
+  return mimax;
+}
+
+//----------------------------------------------------------------------------------------
+//! \fn  void Dust::Coagulation::
+//  \brief
+KOKKOS_INLINE_FUNCTION
+Real TimeStepControl(parthenon::team_mbr_t const &mbr, const int &nm1,
+                     ScratchPad1D<Real> &dustdens, ScratchPad1D<Real> &source,
+                     const ParArray1D<Real> &mass_grid, const Real &dfloor,
+                     const Real &cfl) {
+  Real dt_sync = std::numeric_limits<Real>::max();
+  Kokkos::parallel_reduce(
+      Kokkos::TeamThreadRange(mbr, nm1 + 1),
+      [&](const int i, Real &lmin) {
+        if (dustdens(i) > dfloor / mass_grid(i) && source(i) < 0.0) {
+          lmin = std::min(lmin, std::abs(dustdens(i) / source(i)));
+        }
+      },
+      Kokkos::Min<Real>(dt_sync));
+  return cfl * dt_sync;
+}
+
+//----------------------------------------------------------------------------------------
+//! \fn  void Dust::Coagulation::
+//  \brief
+KOKKOS_INLINE_FUNCTION
+void UpdateDensity(parthenon::team_mbr_t const &mbr, const int &nm1,
+                   ScratchPad1D<Real> &dustdens, ScratchPad1D<Real> &source,
+                   const Real &dt) {
+  // Update the density
+  parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, mbr, 0, nm1,
+                           [&](const int i) { dustdens(i) += dt * source(i); });
+  mbr.team_barrier();
+}
+
+//----------------------------------------------------------------------------------------
+//! \fn  void Dust::Coagulation::
+//  \brief
+KOKKOS_INLINE_FUNCTION
+void ConvertToNumberDensity(parthenon::team_mbr_t const &mbr, const int &nm1,
+                            ScratchPad1D<Real> &dustdens,
+                            const ParArray1D<Real> &mass_grid, const Real &dfloor) {
+  parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, mbr, 0, nm1, [&](const int i) {
+    const Real &mass_gridi = mass_grid(i);
+    dustdens(i) /= mass_gridi;
+    dustdens(i) = std::max(dustdens(i), 0.01 * dfloor / mass_gridi);
+  });
+  mbr.team_barrier();
+}
+
+//----------------------------------------------------------------------------------------
+//! \fn  void Dust::Coagulation::
+//  \brief
+KOKKOS_INLINE_FUNCTION
+void ConvertToVolumeDensity(parthenon::team_mbr_t const &mbr, const int &nm1,
+                            ScratchPad1D<Real> &dustdens,
+                            const ParArray1D<Real> &mass_grid) {
+  parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, mbr, 0, nm1,
+                           [&](const int i) { dustdens(i) *= mass_grid(i); });
+  mbr.team_barrier();
+}
 
 //----------------------------------------------------------------------------------------
 //! \fn  void Dust::Coagulation::CoagulationOneCell
@@ -587,142 +694,91 @@ void CoagulationOneCell(parthenon::team_mbr_t const &mbr, const Real &time, Real
                         ScratchPad1D<Real> &stime, ScratchPad1D<Real> &vel,
                         const int nvel, ScratchPad1D<Real> &Q, ScratchPad1D<Real> &nQs,
                         const Real &alpha, const Real &cs, const Real &omega,
-                        const CoagParams &coag, ScratchPad1D<Real> &source, int &nCall,
+                        const CoagParams &coag, const CoagArrays &coag_arrays,
+                        const RateParams &rate, ScratchPad1D<Real> &source, int &nCall,
                         ScratchPad1D<Real> &Q2) {
-  parthenon::par_for_inner(
-      DEFAULT_INNER_LOOP_PATTERN, mbr, 0, coag.nm - 1, [&](const int i) {
-        // convert to number density
-        const Real &mass_gridi = coag.mass_grid(i);
-        dustdens(i) /= mass_gridi; // number density
-        // take the floor value
-        dustdens(i) = std::max(dustdens(i), 0.01 * coag.dfloor / mass_gridi);
-      });
-  mbr.team_barrier();
-
-  // do time steps
   nCall = 0;
   Real time_dummy = time;
   Real dt_sync1 = dt_sync;
   Real time_goal = time_dummy + dt_sync1;
   Real dt = dt_sync1;
   Real hnext = dt;
+  Real cfl = coag.cfl;
   dt_sync = 1e-15; // works H5
 
-  const KernelParams kernel{gdens, alpha, cs, omega};
+  // Params
+  const int nm1 = coag.nm - 1;
+  const int pgrid = coag.pgrid;
+  const Real &dfloor = coag.dfloor;
+  const Real &chi = coag.chi;
+  const bool &do_momentum_conserving_update = coag.mom_coag;
+  const bool &do_adaptive = coag.use_adaptive;
+  const int &ncall_max = coag.ncall_max;
+  const StateParams kernel{gdens, alpha, cs, omega};
+
+  // Arrays
+  auto &klf = coag_arrays.klf;
+  auto &mass_grid = coag_arrays.mass_grid;
+  auto &coagR3D = coag_arrays.coagR3D;
+  auto &cpod_notzero = coag_arrays.cpod_notzero;
+  auto &cpod_short = coag_arrays.cpod_short;
+
+  // Update distribution
+  ConvertToNumberDensity(mbr, nm1, dustdens, mass_grid, dfloor);
   while (std::abs(time_dummy - time_goal) > 1e-6 * dt) {
-    int mimax = 0;
-    Kokkos::parallel_reduce(
-        Kokkos::TeamThreadRange(mbr, coag.nm),
-        [&](const int i, int &lmax) {
-          if (dustdens(i) > coag.dfloor / coag.mass_grid(i)) {
-            lmax = std::max(lmax, i);
-          }
-        },
-        Kokkos::Max<int>(mimax));
+    const int mimax = FindMIMax(mbr, nm1, dustdens, mass_grid, dfloor);
 
-    CoagulationSource(mbr, source, dustdens, mimax, kernel, vel, stime, coag);
+    // Set source
+    ZeroSource(mbr, nm1, source);
+    InitializeSource(mbr, nm1, mimax, source, dustdens, vel, stime, kernel, mass_grid,
+                     coagR3D, cpod_notzero, cpod_short, rate);
+    FragmentationSource(mbr, nm1, mimax, coag2drv::afrag, coag2drv::phifrag, source,
+                        dustdens, vel, stime, kernel, mass_grid, coagR3D, klf, rate);
+    CrateringSource(mbr, nm1, mimax, source, dustdens, vel, stime, kernel, mass_grid,
+                    coagR3D, rate);
+    FinalizeSource(mbr, nm1, mimax, pgrid, coag2drv::epsfrag, source, dustdens, vel,
+                   stime, kernel, mass_grid, coagR3D, rate);
 
-    /*
-    if (coag.use_adaptive == 0 || coag.integrator == 1) {
-    */
-
-    // time step control
-    dt_sync1 = std::numeric_limits<Real>::max(); // start with a large number
-    Kokkos::parallel_reduce(
-        Kokkos::TeamThreadRange(mbr, coag.nm),
-        [&](const int i, Real &lmin) {
-          if (dustdens(i) > coag.dfloor / coag.mass_grid(i) && source(i) < 0.0) {
-            lmin = std::min(lmin, std::abs(dustdens(i) / source(i)));
-          }
-        },
-        Kokkos::Min<Real>(dt_sync1));
-    dt_sync1 *= coag.cfl;
+    // Time step control
+    dt_sync1 = TimeStepControl(mbr, nm1, dustdens, source, mass_grid, dfloor, cfl);
     dt = std::min(dt_sync1, time_goal - time_dummy);
     dt_sync = dt_sync1;
 
-    if (coag.mom_coag) {
-      Coagulation_nQs(mbr, dt, Q, nQs, dustdens, mimax, nvel, kernel, vel, stime, coag,
-                      source);
+    // Momentum Conserving Update (iff do_momentum_conserving_update)
+    for (int n = 0; n < do_momentum_conserving_update * nvel; n++) {
+      ZeroSourceNQ(mbr, n, nm1, Q, nQs, vel);
+      InitializeSourceNQ(mbr, nm1, mimax, coag2drv::dalp, coag2drv::dpod, Q, nQs,
+                         dustdens, vel, stime, kernel, mass_grid, coagR3D, cpod_notzero,
+                         cpod_short, rate);
+      FragmentationSourceNQ(mbr, nm1, mimax, pgrid, coag2drv::afrag, coag2drv::phifrag, Q,
+                            nQs, dustdens, vel, stime, kernel, mass_grid, coagR3D, chi,
+                            rate);
+      CrateringSourceNQ(mbr, nm1, mimax, Q, nQs, dustdens, vel, stime, kernel, mass_grid,
+                        coagR3D, rate);
+      FinalizeSourceNQ(mbr, nm1, mimax, pgrid, coag2drv::epsfrag, Q, nQs, dustdens, vel,
+                       stime, kernel, mass_grid, coagR3D, rate);
+      UpdateVelocityNQ(mbr, n, nm1, Q, nQs, vel, dustdens, source, mass_grid, dt, dfloor);
     }
 
-    // Update the density
-    parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, mbr, 0, coag.nm - 1,
-                             [&](const int i) { dustdens(i) += dt * source(i); });
-    mbr.team_barrier();
-
-    /*
-    } else {
-      // third-order method
-      Real h0 = hnext;
-      Real h = h0;
-      Real errmax;
-      int mimax2 = 0;
-      // Heun's Method
-      while (1) {
-        // Q(*) is temprary variable to store the dust number density
-        mimax2 = 0;
-        Kokkos::parallel_reduce(
-            Kokkos::TeamThreadRange(mbr, coag.nm),
-            [&](const int i, int &lmax) {
-              Q(i) = dustdens(i) + h * source(i);
-              if (Q(i) > coag.dfloor / coag.mass_grid(i)) {
-                lmax = std::max(lmax, i);
-              }
-            },
-            Kokkos::Max<int>(mimax2));
-        CoagulationSource(mbr, nQs, Q, mimax2, kernel, vel, stime, coag);
-        errmax = 0.0;
-        const int nm1 = std::min(mimax2, mimax);
-        Kokkos::parallel_reduce(
-            Kokkos::TeamThreadRange(mbr, nm1),
-            [&](const int i, Real &lmax) {
-              Real dscale = std::abs(dustdens(i)) + std::abs(h0 * source(i));
-              Real derr = 0.5 * h * (nQs(i) - source(i)) / dscale;
-              lmax = std::max(lmax, std::abs(derr));
-            },
-            Kokkos::Max<Real>(errmax));
-        errmax /= coag.err_eps;
-        if (errmax <= 1.0) break;
-        h = std::max(coag.S * h * std::pow(errmax, coag.pshrink), 0.1 * h);
-      }
-      if (errmax > coag.errcon) {
-        hnext = coag.S * h * std::pow(errmax, coag.pgrow);
-      } else {
-        hnext = 5.0 * h;
-      }
-      // Actual taken step
-      dt = h;
-      if (coag.mom_coag) {
-        Coagulation_nQs3(mbr, dt, Q, nQs, dustdens, mimax, nvel, kernel, vel, stime, coag,
-                         source, Q2, mimax2);
-      } else {
-        parthenon::par_for_inner(
-            DEFAULT_INNER_LOOP_PATTERN, mbr, 0, coag.nm - 1,
-            [&](const int i) { dustdens(i) += 0.5 * dt * (source(i) + nQs(i)); });
-        mbr.team_barrier();
-      }
-    }
-    */
+    // Update dust density
+    UpdateDensity(mbr, nm1, dustdens, source, dt);
 
     // Update time and increment ncall
     time_dummy += dt;
     nCall++;
-    dt_sync = (coag.use_adaptive) ? std::max(hnext, dt_sync) : dt_sync;
-    hnext = (coag.use_adaptive) ? std::min(hnext, time_goal - time_dummy) : hnext;
+    dt_sync = (do_adaptive) ? std::max(hnext, dt_sync) : dt_sync;
+    hnext = (do_adaptive) ? std::min(hnext, time_goal - time_dummy) : hnext;
 
     // Warn and break upon reaching ncall_max
-    if (nCall > coag.ncall_max) {
+    if (nCall > ncall_max) {
       PARTHENON_WARN("(Coagulation): Reach ncall_max in coagulation kernel!");
       break;
     }
-  } // end of internal timestep
-
-  // from number density to volume density
-  parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, mbr, 0, coag.nm - 1,
-                           [&](const int i) { dustdens(i) *= coag.mass_grid(i); });
-  mbr.team_barrier();
+  }
+  ConvertToVolumeDensity(mbr, nm1, dustdens, mass_grid);
 
 } // end of CoagulationOneCell
+//----------------------------------------------------------------------------------------
 
 } // namespace Coagulation
 } // namespace Dust

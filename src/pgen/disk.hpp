@@ -167,22 +167,21 @@ KOKKOS_INLINE_FUNCTION State ComputeDiskProfile(
   Real rtm = xcyl[0] - dxr;
 
   if (pgen.nbody_temp) {
-     const Real pot = Gravity::NBodyPotential<GEOM>(coords, xv, particles, npart);
-     const Real dxpot = Gravity::NBodyPotential<GEOM>(
-         coords, {xv[0] + 1e-6 * dx[0], xv[1], xv[2]}, particles, npart);
-     const Real dypot = Gravity::NBodyPotential<GEOM>(
-         coords, {xv[0], xv[1] + 1e-6 * dx[1], xv[2]}, particles, npart);
-     const Real dzpot = Gravity::NBodyPotential<GEOM>(
-         coords, {xv[0], xv[1], xv[2] + 1e-6 * dx[2]}, particles, npart);
-     // dPhi/dr = grad(Phi) . \hat{e}_r
-     Real drpot = (dxpot - pot) / (2e-6 * dx[0]) * ex1[0];
-     drpot += pgen.multi_d * (dypot - pot) / (2e-6 * dx[1]) * ex2[0];
-     drpot += pgen.three_d * (dzpot - pot) / (2e-6 * dx[2]) * ex3[0];
-     rt = -pgen.gm / pot;
-     rtp = -pgen.gm / (pot + drpot * dxr);
-     rtm = -pgen.gm / (pot - drpot * dxr);
-   }
-
+    const Real pot = Gravity::NBodyPotential<GEOM>(coords, xv, particles, npart);
+    const Real dxpot = Gravity::NBodyPotential<GEOM>(
+        coords, {xv[0] + 1e-6 * dx[0], xv[1], xv[2]}, particles, npart);
+    const Real dypot = Gravity::NBodyPotential<GEOM>(
+        coords, {xv[0], xv[1] + 1e-6 * dx[1], xv[2]}, particles, npart);
+    const Real dzpot = Gravity::NBodyPotential<GEOM>(
+        coords, {xv[0], xv[1], xv[2] + 1e-6 * dx[2]}, particles, npart);
+    // dPhi/dr = grad(Phi) . \hat{e}_r
+    Real drpot = (dxpot - pot) / (2e-6 * dx[0]) * ex1[0];
+    drpot += pgen.multi_d * (dypot - pot) / (2e-6 * dx[1]) * ex2[0];
+    drpot += pgen.three_d * (dzpot - pot) / (2e-6 * dx[2]) * ex3[0];
+    rt = -pgen.gm / pot;
+    rtp = -pgen.gm / (pot + drpot * dxr);
+    rtm = -pgen.gm / (pot - drpot * dxr);
+  }
 
   res.gtemp = TempProfile(pgen, rt, xcyl[2]);
   const Real tp = TempProfile(pgen, rtp, xcyl[2]);

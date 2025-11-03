@@ -41,11 +41,12 @@ TaskListStatus JaybenneIMC(Mesh *pmesh, const SimTime &tm, const Real dt) {
 //! template instantiations
 typedef Coordinates G;
 typedef Mesh M;
-template TaskListStatus JaybenneIMC<G::cartesian>(M *pm, const SimTime &tm, const Real dt);
-template TaskListStatus JaybenneIMC<G::cylindrical>(M *pm, const SimTime &tm, const Real dt);
-template TaskListStatus JaybenneIMC<G::spherical1D>(M *pm, const SimTime &tm, const Real dt);
-template TaskListStatus JaybenneIMC<G::spherical2D>(M *pm, const SimTime &tm, const Real dt);
-template TaskListStatus JaybenneIMC<G::spherical3D>(M *pm, const SimTime &tm, const Real dt);
-template TaskListStatus JaybenneIMC<G::axisymmetric>(M *pm, const SimTime &tm, const Real dt);
+typedef SimTime ST;
+template TaskListStatus JaybenneIMC<G::cartesian>(M *pm, const ST &tm, const Real dt);
+template TaskListStatus JaybenneIMC<G::cylindrical>(M *pm, const ST &tm, const Real dt);
+template TaskListStatus JaybenneIMC<G::spherical1D>(M *pm, const ST &tm, const Real dt);
+template TaskListStatus JaybenneIMC<G::spherical2D>(M *pm, const ST &tm, const Real dt);
+template TaskListStatus JaybenneIMC<G::spherical3D>(M *pm, const ST &tm, const Real dt);
+template TaskListStatus JaybenneIMC<G::axisymmetric>(M *pm, const ST &tm, const Real dt);
 
 } // namespace IMC

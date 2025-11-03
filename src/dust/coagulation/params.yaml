@@ -1,7 +1,7 @@
 ---
 coagulation:
 
-  vfrag:
+  vfrag_cgs:
     _type: Real
     _default: "1e3"
     _description:  "Dust fragmentation velocity"
@@ -12,7 +12,7 @@ coagulation:
     _default: 3
     _description: "Coagulation time integration method[forward Euler(1), Heun's method(3)]" 
 
-  coag_use_adaptiveStep:
+  coag_use_adaptive_step:
     _type: bool
     _default: "true"
     _description: "Turn on adaptive time integration"

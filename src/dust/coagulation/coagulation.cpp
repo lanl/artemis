@@ -70,8 +70,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin, Params &gas_par
 
   // Properties used in computing rates
   drpars.mmw = gas_params.Get<Real>("mu") * constants.GetAMUPhysical();
-  drpars.cross_section = pin->GetOrAddReal("dust/coagulation", "cross_section", 2.0e-15);
-  drpars.vfrag = pin->GetOrAddReal("dust/coagulation", "vfrag", 1.e3); // cm/s
+  drpars.cross_section =
+      pin->GetOrAddReal("dust/coagulation", "cross_section_cgs", 2.0e-15);
+  drpars.vfrag = pin->GetOrAddReal("dust/coagulation", "vfrag_cgs", 1.e3);
   drpars.ibounce = pin->GetOrAddBoolean("dust/coagulation", "coag_bounce", false);
 
   // Coordinate type

@@ -911,23 +911,25 @@ void CoagulationOneCell(parthenon::team_mbr_t const &mbr, const bool &surface,
     Source(mbr, nm1, mimax, pgrid, source, dustdens, vel, stime, kernel, klf, mass_grid,
            coagR3D, cpod_notzero, cpod_short, surface, rate);
 
+    /*
     if (!(do_adaptive) || (coag_int == 1)) {
-      // Time step control
-      dt_sync1 = TimeStepControl(mbr, nm1, dustdens, source, mass_grid, dfloor, cfl);
-      dt = std::min(dt_sync1, time_goal - time_dummy);
-      dt_sync = dt_sync1;
+    */
+    // Time step control
+    dt_sync1 = TimeStepControl(mbr, nm1, dustdens, source, mass_grid, dfloor, cfl);
+    dt = std::min(dt_sync1, time_goal - time_dummy);
+    dt_sync = dt_sync1;
 
-      // Momentum Conserving Update (iff do_momentum_conserving_update)
-      for (int n = 0; n < do_momentum_conserving_update * nvel; n++) {
-        ZeroSourceNQ(mbr, n, nm1, Q, nQs, vel);
-        SourceNQ(mbr, n, nm1, mimax, pgrid, Q, nQs, dustdens, vel, stime, kernel,
-                 mass_grid, coagR3D, cpod_notzero, cpod_short, chi, surface, rate);
-        UpdateVelocityNQ(mbr, n, nm1, Q, nQs, vel, dustdens, source, mass_grid, dt,
-                         dfloor);
-      }
+    // Momentum Conserving Update (iff do_momentum_conserving_update)
+    for (int n = 0; n < do_momentum_conserving_update * nvel; n++) {
+      ZeroSourceNQ(mbr, n, nm1, Q, nQs, vel);
+      SourceNQ(mbr, n, nm1, mimax, pgrid, Q, nQs, dustdens, vel, stime, kernel, mass_grid,
+               coagR3D, cpod_notzero, cpod_short, chi, surface, rate);
+      UpdateVelocityNQ(mbr, n, nm1, Q, nQs, vel, dustdens, source, mass_grid, dt, dfloor);
+    }
 
-      // Update dust density
-      UpdateDensity(mbr, nm1, dustdens, source, dt);
+    // Update dust density
+    UpdateDensity(mbr, nm1, dustdens, source, dt);
+    /*
     } else { // third-order method
       // Set source
       Real h0 = hnext, h = h0;
@@ -958,7 +960,7 @@ void CoagulationOneCell(parthenon::team_mbr_t const &mbr, const bool &surface,
       // Update dust density
       UpdateDensityNQS3(mbr, nm1, dustdens, source,
                         (do_momentum_conserving_update ? Q2 : nQs), dt);
-    }
+    */
 
     // Update time and increment ncall
     time_dummy += dt;

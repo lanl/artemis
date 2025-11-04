@@ -78,8 +78,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin, Params &gas_par
   // Coordinate type
   // NOTE(@pdmullen): Following @sli's earlier implementation, rho_p and dfloor use solely
   // the density unit in construction, not the one weighted by length unit
-  drpars.coord = pin->GetOrAddBoolean("dust/coagulation", "surface_density_flag", true);
-  if (drpars.coord) dcpars.rho0 *= dcpars.length0;
+  dcpars.coord = pin->GetOrAddBoolean("dust/coagulation", "surface_density_flag", true);
+  if (dcpars.coord) dcpars.rho0 *= dcpars.length0;
 
   // Adaptivity
   if (dcpars.use_adaptive) {
@@ -96,7 +96,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin, Params &gas_par
           << dcpars.integrator << std::endl;
       PARTHENON_FAIL(msg);
     }
-    dcpars.errcon = std::pow((5. / dcpars.S), (1. / dcpars.pgrow));
+    dcpars.err_con = std::pow((5. / dcpars.S), (1. / dcpars.pgrow));
   }
 
   // Dust sizes
@@ -236,7 +236,7 @@ TaskStatus CoagulationStep(MeshData<Real> *md, const Real time, const Real dt) {
       coag_pkg->template Param<Dust::Coagulation::CoagArrays>("coag_arrs");
   auto &rate = coag_pkg->template Param<Dust::Coagulation::RateParams>("rate_pars");
   const Real alpha = coag_pkg->template Param<Real>("coag_alpha");
-  const bool surface = rate.coord;
+  const bool surface = coag.coord;
   const int nvel = surface ? 2 : 3;
   const int scr_level = coag_pkg->template Param<int>("coag_scr_level");
   const bool info_out_flag = coag_pkg->template Param<bool>("coag_info_out");
@@ -332,8 +332,8 @@ TaskStatus CoagulationStep(MeshData<Real> *md, const Real time, const Real dt) {
         // NOTE(@pdmullen): mbr.team_barrier() included at end of CoagulationOneCell
         // NOTE(@pdmullen): ncall could be stored or reduced (see 0a5d72b)
         int ncall = Null<int>();
-        Coagulation::CoagulationOneCell(mbr, time1, dt_sync, gdens1, rhod, stime, vel,
-                                        nvel, Q, nQs, alpha, cs1, omega1, coag,
+        Coagulation::CoagulationOneCell(mbr, surface, time1, dt_sync, gdens1, rhod, stime,
+                                        vel, nvel, Q, nQs, alpha, cs1, omega1, coag,
                                         coag_arrays, rate, source, ncall, Q2);
 
         // Update dust density and momentum after coagulation

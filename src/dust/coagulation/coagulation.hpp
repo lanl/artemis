@@ -809,16 +809,20 @@ void CoagulationOneCell(parthenon::team_mbr_t const &mbr, const bool &surface,
   const int &pgrid = coag.pgrid;
   const Real &dfloor = coag.dfloor;
   const Real &chi = coag.chi;
+  const bool &do_momentum_conserving_update = coag.mom_coag;
+  const bool &do_adaptive = coag.use_adaptive;
+  const int &ncall_max = coag.ncall_max;
+  const StateParams kernel{gdens, alpha, cs, omega};
+
+  /*
+  // Higher order params
+  const int &coag_int = coag.integrator;
   const Real &err_eps = coag.err_eps;
   const Real &err_con = coag.err_con;
   const Real &S = coag.S;
   const Real &pshrink = coag.pshrink;
   const Real &pgrow = coag.pgrow;
-  const bool &do_momentum_conserving_update = coag.mom_coag;
-  const bool &do_adaptive = coag.use_adaptive;
-  const int &ncall_max = coag.ncall_max;
-  const int &coag_int = coag.integrator;
-  const StateParams kernel{gdens, alpha, cs, omega};
+  */
 
   // Arrays
   auto &klf = coag_arrays.klf;

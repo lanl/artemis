@@ -114,7 +114,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   // Using MRN distribution for the initial dust setup
   ParArray1D<Real> dust_size = dust_pkg->template Param<ParArray1D<Real>>("sizes");
   Real sum1 = 0.0;
-  auto &dcoag = dcv;
+  auto dcoag = dcv;
   pmb->par_reduce(
       "pgen_partialSum", 0, dcoag.ninit_dust - 1,
       KOKKOS_LAMBDA(const int n, Real &lsum) { lsum += std::sqrt(dust_size(n)); }, sum1);

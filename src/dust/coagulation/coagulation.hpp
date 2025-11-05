@@ -788,6 +788,75 @@ Real ComputeError(parthenon::team_mbr_t const &mbr, const int &mimax, const int 
 }
 
 //----------------------------------------------------------------------------------------
+//! \fn  void Dust::Coagulation::
+//  \brief
+KOKKOS_INLINE_FUNCTION
+void Source(const parthenon::team_mbr_t &mbr, const int &nm1, const int &mimax,
+            const int &pgrid, const ScratchPad1D<Real> &source,
+            const ScratchPad1D<Real> &dustdens, const ScratchPad1D<Real> &vel,
+            const ScratchPad1D<Real> &stime, const StateParams &kernel,
+            const ParArray2D<int> &klf, const ParArray1D<Real> &mass_grid,
+            const ParArray3D<Real> &coagR3D, const ParArray3D<int> &cpod_notzero,
+            const ParArray3D<Real> &cpod_short, const bool &surface,
+            const RateParams &rate) {
+  ZeroSource(mbr, nm1, source);
+  InitializeSource(mbr, nm1, mimax, source, dustdens, vel, stime, kernel, mass_grid,
+                   coagR3D, cpod_notzero, cpod_short, surface, rate);
+  FragmentationSource(mbr, nm1, mimax, coag2drv::afrag, coag2drv::phifrag, source,
+                      dustdens, vel, stime, kernel, klf, mass_grid, coagR3D, surface,
+                      rate);
+  CrateringSource(mbr, nm1, mimax, source, dustdens, vel, stime, kernel, mass_grid,
+                  coagR3D, surface, rate);
+  FinalizeSource(mbr, nm1, mimax, pgrid, coag2drv::epsfrag, source, dustdens, vel, stime,
+                 kernel, mass_grid, coagR3D, surface, rate);
+}
+
+//----------------------------------------------------------------------------------------
+//! \fn  void Dust::Coagulation::
+//  \brief
+KOKKOS_INLINE_FUNCTION
+void SourceNQ(const parthenon::team_mbr_t &mbr, const int &n, const int &nm1,
+              const int &mimax, const int &pgrid, const ScratchPad1D<Real> &Q,
+              const ScratchPad1D<Real> &nQs, const ScratchPad1D<Real> &dustdens,
+              const ScratchPad1D<Real> &vel, const ScratchPad1D<Real> &stime,
+              const StateParams &kernel, const ParArray1D<Real> &mass_grid,
+              const ParArray3D<Real> &coagR3D, const ParArray3D<int> &cpod_notzero,
+              const ParArray3D<Real> &cpod_short, const Real &chi, const bool &surface,
+              const RateParams &rate) {
+  InitializeSourceNQ(mbr, nm1, mimax, coag2drv::dalp, coag2drv::dpod, Q, nQs, dustdens,
+                     vel, stime, kernel, mass_grid, coagR3D, cpod_notzero, cpod_short,
+                     surface, rate);
+  FragmentationSourceNQ(mbr, nm1, mimax, pgrid, coag2drv::afrag, coag2drv::phifrag, Q,
+                        nQs, dustdens, vel, stime, kernel, mass_grid, coagR3D, chi,
+                        surface, rate);
+  CrateringSourceNQ(mbr, nm1, mimax, Q, nQs, dustdens, vel, stime, kernel, mass_grid,
+                    coagR3D, surface, rate);
+  FinalizeSourceNQ(mbr, nm1, mimax, pgrid, coag2drv::epsfrag, Q, nQs, dustdens, vel,
+                   stime, kernel, mass_grid, coagR3D, surface, rate);
+}
+
+//----------------------------------------------------------------------------------------
+//! \fn  void Dust::Coagulation::
+//  \brief
+KOKKOS_INLINE_FUNCTION
+void SourceNQS3(const parthenon::team_mbr_t &mbr, const int &n, const int &nm1,
+                const int &mimax, const int &mimax2, const int &pgrid,
+                const ScratchPad1D<Real> &Q, const ScratchPad1D<Real> &Q2,
+                const ScratchPad1D<Real> &source, const ScratchPad1D<Real> &nQs,
+                const ScratchPad1D<Real> &dustdens, const ScratchPad1D<Real> &vel,
+                const ScratchPad1D<Real> &stime, const StateParams &kernel,
+                const ParArray1D<Real> &mass_grid, const ParArray3D<Real> &coagR3D,
+                const ParArray3D<int> &cpod_notzero, const ParArray3D<Real> &cpod_short,
+                const Real &chi, const bool &surface, const RateParams &rate,
+                const Real &dt) {
+  SourceNQ(mbr, n, nm1, mimax, pgrid, Q, nQs, dustdens, vel, stime, kernel, mass_grid,
+           coagR3D, cpod_notzero, cpod_short, chi, surface, rate);
+  IntermediateNQS3(mbr, nm1, Q, nQs, dustdens, source, dt);
+  SourceNQ(mbr, n, nm1, mimax2, pgrid, Q, nQs, dustdens, vel, stime, kernel, mass_grid,
+           coagR3D, cpod_notzero, cpod_short, chi, surface, rate);
+}
+
+//----------------------------------------------------------------------------------------
 //! \fn  void Dust::Coagulation::CoagulationOneCell
 //  \brief
 KOKKOS_INLINE_FUNCTION
@@ -799,7 +868,7 @@ void CoagulationOneCell(parthenon::team_mbr_t const &mbr, const bool &surface,
                         const ScratchPad1D<Real> &nQs, const Real &alpha, const Real &cs,
                         const Real &omega, const CoagParams &coag,
                         const CoagArrays &coag_arrays, const RateParams &rate,
-                        const ScratchPad1D<Real> &source, int &nCall,
+                        const ScratchPad1D<Real> &source, int &ncall,
                         const ScratchPad1D<Real> &Q2) {
   // Params
   const int nm1 = coag.nm - 1;
@@ -828,7 +897,7 @@ void CoagulationOneCell(parthenon::team_mbr_t const &mbr, const bool &surface,
   auto &cpod_short = coag_arrays.cpod_short;
 
   // Timestepping
-  nCall = 0;
+  ncall = 0;
   Real time_dummy = time;
   Real dt_sync1 = dt_sync;
   Real dt = dt_sync1;
@@ -841,19 +910,10 @@ void CoagulationOneCell(parthenon::team_mbr_t const &mbr, const bool &surface,
   while (std::abs(time_dummy - time_goal) > 1e-6 * dt) {
     // Set source
     const int mimax = FindMIMax(mbr, nm1, dustdens, mass_grid, dfloor);
-    ZeroSource(mbr, nm1, source);
-    InitializeSource(mbr, nm1, mimax, source, dustdens, vel, stime, kernel, mass_grid,
-                     coagR3D, cpod_notzero, cpod_short, surface, rate);
-    FragmentationSource(mbr, nm1, mimax, coag2drv::afrag, coag2drv::phifrag, source,
-                        dustdens, vel, stime, kernel, klf, mass_grid, coagR3D, surface,
-                        rate);
-    CrateringSource(mbr, nm1, mimax, source, dustdens, vel, stime, kernel, mass_grid,
-                    coagR3D, surface, rate);
-    FinalizeSource(mbr, nm1, mimax, pgrid, coag2drv::epsfrag, source, dustdens, vel,
-                   stime, kernel, mass_grid, coagR3D, surface, rate);
+    Source(mbr, nm1, mimax, pgrid, source, dustdens, vel, stime, kernel, klf, mass_grid,
+           coagR3D, cpod_notzero, cpod_short, surface, rate);
 
     if (!(do_adaptive) || (coag_int == 1)) {
-      // Time step control
       dt_sync1 = TimeStepControl(mbr, nm1, dustdens, source, mass_grid, dfloor, cfl);
       dt = std::min(dt_sync1, time_goal - time_dummy);
       dt_sync = dt_sync1;
@@ -861,16 +921,8 @@ void CoagulationOneCell(parthenon::team_mbr_t const &mbr, const bool &surface,
       // Momentum Conserving Update (iff do_momentum_conserving_update)
       for (int n = 0; n < do_momentum_conserving_update * nvel; n++) {
         ZeroSourceNQ(mbr, n, nm1, Q, nQs, vel);
-        InitializeSourceNQ(mbr, nm1, mimax, coag2drv::dalp, coag2drv::dpod, Q, nQs,
-                           dustdens, vel, stime, kernel, mass_grid, coagR3D, cpod_notzero,
-                           cpod_short, surface, rate);
-        FragmentationSourceNQ(mbr, nm1, mimax, pgrid, coag2drv::afrag, coag2drv::phifrag,
-                              Q, nQs, dustdens, vel, stime, kernel, mass_grid, coagR3D,
-                              chi, surface, rate);
-        CrateringSourceNQ(mbr, nm1, mimax, Q, nQs, dustdens, vel, stime, kernel,
-                          mass_grid, coagR3D, surface, rate);
-        FinalizeSourceNQ(mbr, nm1, mimax, pgrid, coag2drv::epsfrag, Q, nQs, dustdens, vel,
-                         stime, kernel, mass_grid, coagR3D, surface, rate);
+        SourceNQ(mbr, n, nm1, mimax, pgrid, Q, nQs, dustdens, vel, stime, kernel,
+                 mass_grid, coagR3D, cpod_notzero, cpod_short, chi, surface, rate);
         UpdateVelocityNQ(mbr, n, nm1, Q, nQs, vel, dustdens, source, mass_grid, dt,
                          dfloor);
       }
@@ -885,15 +937,8 @@ void CoagulationOneCell(parthenon::team_mbr_t const &mbr, const bool &surface,
       while (1) {
         mimax2 = FindMIMaxNQS3(mbr, nm1, h, dustdens, source, Q, mass_grid, dfloor);
         ZeroSource(mbr, nm1, source);
-        InitializeSource(mbr, nm1, mimax, source, dustdens, vel, stime, kernel, mass_grid,
-                         coagR3D, cpod_notzero, cpod_short, surface, rate);
-        FragmentationSource(mbr, nm1, mimax, coag2drv::afrag, coag2drv::phifrag, source,
-                            dustdens, vel, stime, kernel, klf, mass_grid, coagR3D,
-                            surface, rate);
-        CrateringSource(mbr, nm1, mimax, source, dustdens, vel, stime, kernel, mass_grid,
-                        coagR3D, surface, rate);
-        FinalizeSource(mbr, nm1, mimax, pgrid, coag2drv::epsfrag, source, dustdens, vel,
-                       stime, kernel, mass_grid, coagR3D, surface, rate);
+        Source(mbr, nm1, mimax2, pgrid, nQs, Q, vel, stime, kernel, klf, mass_grid,
+               coagR3D, cpod_notzero, cpod_short, surface, rate);
         emax = ComputeError(mbr, mimax, mimax2, h, h0, dustdens, source, Q, nQs, err_eps);
         if (emax <= 1.0) break;
         h = std::max(S * h * std::pow(emax, pshrink), 0.1 * h);
@@ -905,27 +950,9 @@ void CoagulationOneCell(parthenon::team_mbr_t const &mbr, const bool &surface,
       for (int n = 0; n < do_momentum_conserving_update * nvel; n++) {
         if (n == 0) InitializeTempNQS3(mbr, n, nm1, Q2, nQs);
         ZeroSourceNQ(mbr, n, nm1, Q, nQs, vel);
-        InitializeSourceNQ(mbr, nm1, mimax, coag2drv::dalp, coag2drv::dpod, Q, nQs,
-                           dustdens, vel, stime, kernel, mass_grid, coagR3D, cpod_notzero,
-                           cpod_short, surface, rate);
-        FragmentationSourceNQ(mbr, nm1, mimax, pgrid, coag2drv::afrag, coag2drv::phifrag,
-                              Q, nQs, dustdens, vel, stime, kernel, mass_grid, coagR3D,
-                              chi, surface, rate);
-        CrateringSourceNQ(mbr, nm1, mimax, Q, nQs, dustdens, vel, stime, kernel,
-                          mass_grid, coagR3D, surface, rate);
-        FinalizeSourceNQ(mbr, nm1, mimax, pgrid, coag2drv::epsfrag, Q, nQs, dustdens, vel,
-                         stime, kernel, mass_grid, coagR3D, surface, rate);
-        IntermediateNQS3(mbr, nm1, Q, nQs, dustdens, source, dt);
-        InitializeSourceNQ(mbr, nm1, mimax2, coag2drv::dalp, coag2drv::dpod, Q, nQs,
-                           dustdens, vel, stime, kernel, mass_grid, coagR3D, cpod_notzero,
-                           cpod_short, surface, rate);
-        FragmentationSourceNQ(mbr, nm1, mimax2, pgrid, coag2drv::afrag, coag2drv::phifrag,
-                              Q, nQs, dustdens, vel, stime, kernel, mass_grid, coagR3D,
-                              chi, surface, rate);
-        CrateringSourceNQ(mbr, nm1, mimax2, Q, nQs, dustdens, vel, stime, kernel,
-                          mass_grid, coagR3D, surface, rate);
-        FinalizeSourceNQ(mbr, nm1, mimax2, pgrid, coag2drv::epsfrag, Q, nQs, dustdens,
-                         vel, stime, kernel, mass_grid, coagR3D, surface, rate);
+        SourceNQS3(mbr, n, nm1, mimax, mimax2, pgrid, Q, Q2, source, nQs, dustdens, vel,
+                   stime, kernel, mass_grid, coagR3D, cpod_notzero, cpod_short, chi,
+                   surface, rate, dt);
         UpdateVelocityNQS3(mbr, n, nm1, Q2, nQs, vel, dustdens, source, mass_grid, dt,
                            dfloor);
       }
@@ -937,12 +964,12 @@ void CoagulationOneCell(parthenon::team_mbr_t const &mbr, const bool &surface,
 
     // Update time and increment ncall
     time_dummy += dt;
-    nCall++;
+    ncall++;
     dt_sync = (do_adaptive) ? std::max(hnext, dt_sync) : dt_sync;
     hnext = (do_adaptive) ? std::min(hnext, time_goal - time_dummy) : hnext;
 
     // Warn and break upon reaching ncall_max
-    if (nCall > ncall_max) {
+    if (ncall > ncall_max) {
       PARTHENON_WARN("(Coagulation): Reach ncall_max in coagulation kernel!");
       break;
     }

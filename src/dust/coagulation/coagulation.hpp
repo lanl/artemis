@@ -687,7 +687,6 @@ int FindMIMax(parthenon::team_mbr_t const &mbr, const int &nm1,
   return mimax;
 }
 
-/*
 //----------------------------------------------------------------------------------------
 //! \fn  void Dust::Coagulation::
 //  \brief
@@ -787,7 +786,6 @@ Real ComputeError(parthenon::team_mbr_t const &mbr, const int &mimax, const int 
       Kokkos::Max<Real>(errmax));
   return errmax / err_eps;
 }
-*/
 
 //----------------------------------------------------------------------------------------
 //! \fn  void Dust::Coagulation::CoagulationOneCell
@@ -814,7 +812,6 @@ void CoagulationOneCell(parthenon::team_mbr_t const &mbr, const bool &surface,
   const int &ncall_max = coag.ncall_max;
   const StateParams kernel{gdens, alpha, cs, omega};
 
-  /*
   // Higher order params
   const int &coag_int = coag.integrator;
   const Real &err_eps = coag.err_eps;
@@ -822,7 +819,6 @@ void CoagulationOneCell(parthenon::team_mbr_t const &mbr, const bool &surface,
   const Real &S = coag.S;
   const Real &pshrink = coag.pshrink;
   const Real &pgrow = coag.pgrow;
-  */
 
   // Arrays
   auto &klf = coag_arrays.klf;
@@ -856,35 +852,31 @@ void CoagulationOneCell(parthenon::team_mbr_t const &mbr, const bool &surface,
     FinalizeSource(mbr, nm1, mimax, pgrid, coag2drv::epsfrag, source, dustdens, vel,
                    stime, kernel, mass_grid, coagR3D, surface, rate);
 
-    /*
     if (!(do_adaptive) || (coag_int == 1)) {
-    */
+      // Time step control
+      dt_sync1 = TimeStepControl(mbr, nm1, dustdens, source, mass_grid, dfloor, cfl);
+      dt = std::min(dt_sync1, time_goal - time_dummy);
+      dt_sync = dt_sync1;
 
-    // Time step control
-    dt_sync1 = TimeStepControl(mbr, nm1, dustdens, source, mass_grid, dfloor, cfl);
-    dt = std::min(dt_sync1, time_goal - time_dummy);
-    dt_sync = dt_sync1;
+      // Momentum Conserving Update (iff do_momentum_conserving_update)
+      for (int n = 0; n < do_momentum_conserving_update * nvel; n++) {
+        ZeroSourceNQ(mbr, n, nm1, Q, nQs, vel);
+        InitializeSourceNQ(mbr, nm1, mimax, coag2drv::dalp, coag2drv::dpod, Q, nQs,
+                           dustdens, vel, stime, kernel, mass_grid, coagR3D, cpod_notzero,
+                           cpod_short, surface, rate);
+        FragmentationSourceNQ(mbr, nm1, mimax, pgrid, coag2drv::afrag, coag2drv::phifrag,
+                              Q, nQs, dustdens, vel, stime, kernel, mass_grid, coagR3D,
+                              chi, surface, rate);
+        CrateringSourceNQ(mbr, nm1, mimax, Q, nQs, dustdens, vel, stime, kernel,
+                          mass_grid, coagR3D, surface, rate);
+        FinalizeSourceNQ(mbr, nm1, mimax, pgrid, coag2drv::epsfrag, Q, nQs, dustdens, vel,
+                         stime, kernel, mass_grid, coagR3D, surface, rate);
+        UpdateVelocityNQ(mbr, n, nm1, Q, nQs, vel, dustdens, source, mass_grid, dt,
+                         dfloor);
+      }
 
-    // Momentum Conserving Update (iff do_momentum_conserving_update)
-    for (int n = 0; n < do_momentum_conserving_update * nvel; n++) {
-      ZeroSourceNQ(mbr, n, nm1, Q, nQs, vel);
-      InitializeSourceNQ(mbr, nm1, mimax, coag2drv::dalp, coag2drv::dpod, Q, nQs,
-                         dustdens, vel, stime, kernel, mass_grid, coagR3D, cpod_notzero,
-                         cpod_short, surface, rate);
-      FragmentationSourceNQ(mbr, nm1, mimax, pgrid, coag2drv::afrag, coag2drv::phifrag, Q,
-                            nQs, dustdens, vel, stime, kernel, mass_grid, coagR3D, chi,
-                            surface, rate);
-      CrateringSourceNQ(mbr, nm1, mimax, Q, nQs, dustdens, vel, stime, kernel, mass_grid,
-                        coagR3D, surface, rate);
-      FinalizeSourceNQ(mbr, nm1, mimax, pgrid, coag2drv::epsfrag, Q, nQs, dustdens, vel,
-                       stime, kernel, mass_grid, coagR3D, surface, rate);
-      UpdateVelocityNQ(mbr, n, nm1, Q, nQs, vel, dustdens, source, mass_grid, dt, dfloor);
-    }
-
-    // Update dust density
-    UpdateDensity(mbr, nm1, dustdens, source, dt);
-
-    /*
+      // Update dust density
+      UpdateDensity(mbr, nm1, dustdens, source, dt);
     } else { // third-order method
       // Set source
       Real h0 = hnext, h = h0;
@@ -942,7 +934,6 @@ void CoagulationOneCell(parthenon::team_mbr_t const &mbr, const bool &surface,
       UpdateDensityNQS3(mbr, nm1, dustdens, source,
                         (do_momentum_conserving_update ? Q2 : nQs), dt);
     }
-    */
 
     // Update time and increment ncall
     time_dummy += dt;

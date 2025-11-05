@@ -91,7 +91,7 @@ min_size = 1e-5        # cm
 max_size = 10.0        # cm
 
 <dust/coagulation>
-vfrag = 1000.0  # cm/s
+vfrag_cgs = 1000.0  # cm/s
 coag_int = 1
 coag_use_adaptive_step = false
 coag_mom_preserve = false

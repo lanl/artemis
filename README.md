@@ -143,8 +143,8 @@ Store the token securely in your own environment as `ARTEMIS_GITHUB_TOKEN`, e.g.
 
 and then, again from Darwin, manually launch the CI runner:
 
-    cd artemis
-    ./tst/launch_ci_runner.py [Number of the github PR]
+    cd artemis/tst/
+    ./launch_ci_runner.py [Number of the github PR]
 
 Note that `launch_ci_runner.py` will create a temporary checkout of the current state of the branch associated
 with this PR according to the `origin` remote, so you don't need to worry about the state of your local checkout

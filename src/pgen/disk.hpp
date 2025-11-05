@@ -70,6 +70,7 @@ struct DiskParams {
   bool nbody_temp;
   bool quiet_start;
   bool log;
+  bool multi_d, three_d;
 };
 
 struct State {
@@ -167,7 +168,6 @@ KOKKOS_INLINE_FUNCTION State ComputeDiskProfile(
   Real rtp = xcyl[0] + dxr;
   Real rtm = xcyl[0] - dxr;
 
-  // this is a mess
   if (pgen.nbody_temp) {
     const Real pot = Gravity::NBodyPotential<GEOM>(coords, xv, particles, npart);
     const Real dxpot = Gravity::NBodyPotential<GEOM>(
@@ -266,6 +266,10 @@ inline void InitDiskParams(MeshBlock *pmb, ParameterInput *pin) {
         eos.PressureFromDensityInternalEnergy(disk_params.dens_min, disk_params.sie_min);
     disk_params.temp_min = eos.TemperatureFromDensityInternalEnergy(disk_params.dens_min,
                                                                     disk_params.sie_min);
+
+    const auto nx = params.Get<std::array<int, 3>>("prob_dim");
+    disk_params.three_d = nx[2] > 1;
+    disk_params.multi_d = disk_params.three_d || (nx[1] > 1);
 
     disk_params.do_gas = true; // NOTE(@pdmullen): Hardcoded for now...
     disk_params.do_dust = params.Get<bool>("do_dust");

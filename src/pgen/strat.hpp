@@ -57,6 +57,7 @@ struct StratParams {
   bool three_d;
   Real ar;
   bool do_dust, do_moment, do_imc;
+  int npoints;
 };
 
 //----------------------------------------------------------------------------------------
@@ -76,6 +77,7 @@ inline void InitStratParams(MeshBlock *pmb, ParameterInput *pin) {
     strat_params.rho0 = pin->GetOrAddReal("problem", "rho0", 1.0);
     strat_params.r0 = pin->GetOrAddReal("problem", "r0", 1.0);
     strat_params.d2g = pin->GetOrAddReal("problem", "dust_to_gas", 0.01);
+    strat_params.npoints = pin->GetOrAddReal("problem", "npoints", 50);
     strat_params.do_dust = params.Get<bool>("do_dust");
 
     auto &gas_pkg = pmb->packages.Get("gas");
@@ -99,10 +101,36 @@ inline void InitStratParams(MeshBlock *pmb, ParameterInput *pin) {
 
 KOKKOS_INLINE_FUNCTION
 Real InitialDensity(const StratParams &pars, const Real z) {
-  const Real temp = pars.temp0;
   const Real efac =
       (pars.three_d) ? std::exp(-SQR(z) / (2.0 * SQR(pars.h * pars.r0))) : 1.0;
   return std::max(pars.dfloor, efac * pars.rho0);
+}
+
+KOKKOS_INLINE_FUNCTION
+Real InitialDensity(const EOS &eos, const StratParams &pars, const Real z) {
+  // dP/dz = -rho * g
+  // dP = (dP/drho)_T drho
+  // drho/dz = -rho * g / (dP/drho)_T
+  Real dens = pars.rho0;
+  if ((pars.three_d) && (std::abs(z) > 1e-16)) {
+    const Real dz = std::abs(z) / static_cast<Real>(pars.npoints);
+    const Real dlnr = 1e-6;
+    const Real ldmin = std::log(pars.dfloor / pars.rho0);
+    Real pres = eos.PressureFromDensityTemperature(dens, pars.temp0);
+    Real zj = 0.0;
+    Real ld = 0.0;
+    dens = std::exp(ld);
+    for (int j = 0; j < pars.npoints; j++) {
+      // ln(d/d0) = \int_0^z - Omega^2 z dz
+      Real pp = eos.PressureFromDensityTemperature(dens * (1. + dlnr), pars.temp0);
+      Real pm = eos.PressureFromDensityTemperature(dens * (1. - dlnr), pars.temp0);
+      Real dPdrho = (pp - pm) / (dlnr * dens);
+      ld -= 0.5 * pars.om0 * (2 * j + 1) * SQR(dz) / (dPdrho + Fuzz<Real>());
+      dens = std::exp(ld);
+      if (dens <= pars.dfloor) return pars.dfloor;
+    }
+  }
+  return std::max(pars.dfloor, dens);
 }
 
 //----------------------------------------------------------------------------------------
@@ -120,6 +148,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   auto &gas_pkg = pmb->packages.Get("gas");
   auto eos_d = gas_pkg->template Param<EOS>("eos_d");
+  const bool is_ideal = (gas_pkg->template Param<std::string>("eos_type") == "ideal");
 
   // Dimensionality
   const int ndim = pmb->pmy_mesh->ndim;
@@ -155,7 +184,8 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         const Real dvx2 = 0.0; // residual eq evolution
         const Real vx3 = 0.0;
         const Real temp = pars.temp0;
-        const Real dens = InitialDensity(pars, z);
+        const Real dens =
+            is_ideal ? InitialDensity(pars, z) : InitialDensity(eos_d, pars, z);
         const Real sie = std::max(pars.siefloor,
                                   eos_d.InternalEnergyFromDensityTemperature(dens, temp));
 

@@ -66,7 +66,6 @@ struct DiskParams {
   Real temp_soft2;
   Real kbmu, ar;
   bool do_gas, do_dust, do_moment, do_imc;
-  bool multi_d, three_d;
   bool nbody_temp;
   bool quiet_start;
   bool log;
@@ -276,9 +275,6 @@ inline void InitDiskParams(MeshBlock *pmb, ParameterInput *pin) {
 
     disk_params.do_imc = params.Get<bool>("do_imc");
     disk_params.do_moment = params.Get<bool>("do_moment");
-    const auto nx = params.Get<std::array<int, 3>>("prob_dim");
-    disk_params.three_d = nx[2] > 1;
-    disk_params.multi_d = disk_params.three_d || (nx[1] > 1);
 
     disk_params.ar = constants.GetARCode();
 

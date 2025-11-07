@@ -39,57 +39,74 @@ class Units {
   KOKKOS_INLINE_FUNCTION
   Real GetLengthCodeToPhysical() const { return length_; }
   KOKKOS_INLINE_FUNCTION
-  Real GetLengthPhysicalToCode() const { return 1. / length_; }
+  Real GetLengthPhysicalToCode() const { return 1. / GetLengthCodeToPhysical(); }
 
   KOKKOS_INLINE_FUNCTION
   Real GetTimeCodeToPhysical() const { return time_; }
   KOKKOS_INLINE_FUNCTION
-  Real GetTimePhysicalToCode() const { return 1. / time_; }
+  Real GetTimePhysicalToCode() const { return 1. / GetTimeCodeToPhysical(); }
 
   KOKKOS_INLINE_FUNCTION
   Real GetMassCodeToPhysical() const { return mass_; }
   KOKKOS_INLINE_FUNCTION
-  Real GetMassPhysicalToCode() const { return 1. / mass_; }
+  Real GetMassPhysicalToCode() const { return 1. / GetMassCodeToPhysical(); }
 
   KOKKOS_INLINE_FUNCTION
   Real GetTemperatureCodeToPhysical() const { return temp_; }
   KOKKOS_INLINE_FUNCTION
-  Real GetTemperaturePhysicalToCode() const { return 1. / temp_; }
+  Real GetTemperaturePhysicalToCode() const {
+    return 1. / GetTemperatureCodeToPhysical();
+  }
 
   KOKKOS_INLINE_FUNCTION
   Real GetSpeedCodeToPhysical() const { return length_ / time_; }
   KOKKOS_INLINE_FUNCTION
-  Real GetSpeedPhysicalToCode() const { return time_ / mass_; }
+  Real GetSpeedPhysicalToCode() const { return 1. / GetSpeedCodeToPhysical(); }
 
   KOKKOS_INLINE_FUNCTION
   Real GetEnergyCodeToPhysical() const { return energy_; }
   KOKKOS_INLINE_FUNCTION
-  Real GetEnergyPhysicalToCode() const { return 1. / energy_; }
+  Real GetEnergyPhysicalToCode() const { return 1. / GetEnergyCodeToPhysical(); }
 
   KOKKOS_INLINE_FUNCTION
   Real GetNumberDensityCodeToPhysical() const { return number_density_; }
   KOKKOS_INLINE_FUNCTION
-  Real GetNumberDensityPhysicalToCode() const { return 1. / number_density_; }
+  Real GetNumberDensityPhysicalToCode() const {
+    return 1. / GetNumberDensityCodeToPhysical();
+  }
 
   KOKKOS_INLINE_FUNCTION
-  Real GetEnergyDensityCodeToPhysical() const { return energy_ * number_density_; }
+  Real GetEnergyDensityCodeToPhysical() const {
+    return 1. / GetNumberDensityCodeToPhysical();
+  }
   KOKKOS_INLINE_FUNCTION
-  Real GetEnergyDensityPhysicalToCode() const { return 1. / (energy_ * number_density_); }
+  Real GetEnergyDensityPhysicalToCode() const {
+    return 1. / GetEnergyDensityCodeToPhysical();
+  }
 
   KOKKOS_INLINE_FUNCTION
   Real GetMassDensityCodeToPhysical() const { return mass_ * number_density_; }
   KOKKOS_INLINE_FUNCTION
-  Real GetMassDensityPhysicalToCode() const { return 1. / (mass_ * number_density_); }
+  Real GetMassDensityPhysicalToCode() const {
+    return 1. / GetMassDensityCodeToPhysical();
+  }
 
   KOKKOS_INLINE_FUNCTION
   Real GetOpacityCodeToPhysical() const { return length_ * length_ / mass_; }
   KOKKOS_INLINE_FUNCTION
-  Real GetOpacityPhysicalToCode() const { return mass_ / (length_ * length_); }
+  Real GetOpacityPhysicalToCode() const { return 1. / GetOpacityCodeToPhysical(); }
 
   KOKKOS_INLINE_FUNCTION
   Real GetSpecificHeatCodeToPhysical() const { return energy_ / (mass_ * temp_); }
   KOKKOS_INLINE_FUNCTION
-  Real GetSpecificHeatPhysicalToCode() const { return mass_ * temp_ / energy_; }
+  Real GetSpecificHeatPhysicalToCode() const {
+    return 1. / GetSpecificHeatCodeToPhysical();
+  }
+
+  KOKKOS_INLINE_FUNCTION
+  Real GetLuminosityCodeToPhysical() const { return energy_ / time_; }
+  KOKKOS_INLINE_FUNCTION
+  Real GetLuminosityPhysicalToCode() const { return 1. / GetLuminosityCodeToPhysical(); }
 
   inline std::string GetSystemName() const {
     return (physical_units_ == PhysicalUnits::scalefree) ? "Scale free" : "CGS";
@@ -153,6 +170,10 @@ class Constants {
   Real GetMsolarPhysical() const { return Msolar_; }
   KOKKOS_INLINE_FUNCTION
   Real GetMsolarCode() const { return Msolar_code_; }
+  KOKKOS_INLINE_FUNCTION
+  Real GetRsolarPhysical() const { return Rsolar_; }
+  KOKKOS_INLINE_FUNCTION
+  Real GetRsolarCode() const { return Rsolar_code_; }
 
   KOKKOS_INLINE_FUNCTION
   Real GetAUPhysical() const { return AU_; }
@@ -184,6 +205,7 @@ class Constants {
   Real Mjup_;   // Jupiter mass
   Real pc_;     // Parsec
   Real Year_;   // Year
+  Real Rsolar_; // Solar radius
 
   // Physical constants in code units
   Real G_code_;
@@ -199,6 +221,7 @@ class Constants {
   Real Mjup_code_;
   Real pc_code_;
   Real Year_code_;
+  Real Rsolar_code_;
 };
 
 } // namespace ArtemisUtils

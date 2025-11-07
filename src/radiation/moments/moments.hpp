@@ -22,7 +22,8 @@ namespace Moments {
 
 //----------------------------------------------------------------------------------------
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
-                                            ArtemisUtils::Constants &Constants);
+                                            ArtemisUtils::Units &units,
+                                            ArtemisUtils::Constants &constants);
 TaskStatus CalculateFluxes(MeshData<Real> *md);
 TaskStatus FluxSource(MeshData<Real> *md, const Real dt);
 

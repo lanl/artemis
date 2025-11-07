@@ -124,7 +124,7 @@ TaskListStatus ArtemisDriver<GEOM>::Step() {
   if (status != TaskListStatus::complete) return status;
 
   // Operator split, IMC/DDMC radiation with Jaybenne
-  if (do_imc) status = IMC::JaybenneIMC<GEOM>(pmesh, tm.time, tm.dt);
+  if (do_imc) status = IMC::JaybenneIMC<GEOM>(pmesh, tm, tm.dt);
   if (status != TaskListStatus::complete) return status;
 
   // Operator split, moments subcyling (M1 or P1)

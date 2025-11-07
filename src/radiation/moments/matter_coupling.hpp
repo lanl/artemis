@@ -353,7 +353,7 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
             T = std::pow(eref * B / arad, 0.25);
             Real eint = dens * eos_d.InternalEnergyFromDensityTemperature(dens, T) / eref;
             Real et = ke + eint;
-            Real Cv = dens * eos_d.SpecificHeatFromDensityTemperature(dens, T);
+            const Real Cv = dens * eos_d.SpecificHeatFromDensityTemperature(dens, T);
             const Real fleck = FleckFactor(arad, T, Cv);
 
             const Real sigp = chat * dt * opac_d.PlanckMeanAbsorptionCoefficient(dens, T);

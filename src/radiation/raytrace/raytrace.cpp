@@ -80,7 +80,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   parthenon::Metadata mintv({Metadata::Integer, Metadata::Vector}, std::vector<int>{3});
   rt->AddSwarmValue(rad::star::ijk::name(), "star", mintv);
 
-  Metadata m = Metadata({Metadata::Cell});
+  Metadata m = Metadata({Metadata::Cell, Metadata::OneCopy});
   rt->AddField<rad::star::absorption>(m);
   rt->AddField<gas::src::energy>(m);
 

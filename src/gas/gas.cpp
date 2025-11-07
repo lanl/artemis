@@ -114,7 +114,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
           units.GetTimeCodeToPhysical(), units.GetMassCodeToPhysical(),
           units.GetLengthCodeToPhysical(), units.GetTemperatureCodeToPhysical());
       EOS eos_device = eos_host.GetOnDevice();
-      params.Add("mu", 1.0);
+      params.Add("mu", pin->GetOrAddReal(block_name, "mu", 1.));
       params.Add("eos_h", eos_host);
       params.Add("eos_d", eos_device);
     } else {
@@ -135,7 +135,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
           units.GetTimeCodeToPhysical(), units.GetMassCodeToPhysical(),
           units.GetLengthCodeToPhysical(), units.GetTemperatureCodeToPhysical());
       EOS eos_device = eos_host.GetOnDevice();
-      params.Add("mu", 1.0);
+      params.Add("mu", pin->GetOrAddReal(block_name, "mu", 1.));
       params.Add("eos_h", eos_host);
       params.Add("eos_d", eos_device);
     }
@@ -152,7 +152,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
     EOS eos_device = eos_host.GetOnDevice();
     params.Add("eos_h", eos_host);
     params.Add("eos_d", eos_device);
-    params.Add("mu", 1.0);
+    params.Add("mu", pin->GetOrAddReal(block_name, "mu", 1.));
   } else if (pin->DoesBlockExist("gas/eos/table_rt")) {
     eos_type = "table_rt";
     const std::string block_name = "gas/eos/table_rt";
@@ -165,7 +165,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
     EOS eos_device = eos_host.GetOnDevice();
     params.Add("eos_h", eos_host);
     params.Add("eos_d", eos_device);
-    params.Add("mu", 1.0);
+    params.Add("mu", pin->GetOrAddReal(block_name, "mu", 1.));
 #endif
   } else {
     PARTHENON_FAIL("Unsupported gas EOS!");

@@ -54,11 +54,11 @@ namespace disk {
 struct DiskParams {
   Real r0, h0;
   Real p, q, flare;
-  Real rho0, dens_min, pres_min;
+  Real rho0, dens_min, pres_min, sie_min, temp_min;
   Real gm, Omega0, l0;
   Real omf;
   Real dust_to_gas;
-  Real rexp;
+  Real rexp, exp_pow;
   Real rcav;
   Real Gamma, gamma_gas;
   Real alpha, nu0, nu_indx;
@@ -69,6 +69,7 @@ struct DiskParams {
   bool nbody_temp;
   bool quiet_start;
   bool log;
+  bool multi_d, three_d;
 };
 
 struct State {
@@ -91,7 +92,8 @@ Real DenProfile(struct DiskParams pgen, const Real R, const Real z) {
   const Real r = std::sqrt(R * R + z * z);
   const Real h = pgen.h0 * std::pow(R / pgen.r0, pgen.flare);
   const Real sig0 = pgen.rho0; // / (std::sqrt(2.0 * M_PI) * pgen.h0 * pgen.r0);
-  const Real exp_fac = (pgen.rexp == 0.) ? 1. : std::exp(-SQR(R / pgen.rexp));
+  const Real exp_fac =
+      (pgen.rexp == 0.) ? 1. : std::exp(-std::pow(R / pgen.rexp, pgen.exp_pow));
   const Real dmid =
       (sig0 * std::pow(R / pgen.r0, pgen.p)) *
       (1. - pgen.l0 * std::sqrt(pgen.r0 / R)) * // correction for an inner binary
@@ -121,7 +123,7 @@ Real TempProfile(struct DiskParams pgen, const Real R, const Real z) {
   const Real omk2 = SQR(pgen.Omega0) * ir1 * ir1 * ir1;
   // c_iso^2 = P/rho = kb/mu T = Omk^2 H^2
   const Real T0 = omk2 * H * H / (pgen.kbmu * pgen.Gamma);
-  return T0 * std::pow(rho / rho0, pgen.Gamma - 1.0);
+  return std::max(pgen.temp_min, T0 * std::pow(rho / rho0, pgen.Gamma - 1.0));
 }
 
 //----------------------------------------------------------------------------------------
@@ -158,83 +160,45 @@ KOKKOS_INLINE_FUNCTION State ComputeDiskProfile(
   State res;
   // compute Keplerian solution
   res.gdens = DenProfile(pgen, xcyl[0], xcyl[2]);
-  const Real rt =
-      pgen.nbody_temp
-          ? -pgen.gm / Gravity::NBodyPotential<GEOM>(coords, xv, particles, npart)
-          : xcyl[0];
+  const Real dxr = 1e-6 * std::sqrt(SQR(dx[0]) + SQR(dx[1]) + SQR(dx[2]));
+
+  Real rt = xcyl[0];
+  Real rtp = xcyl[0] + dxr;
+  Real rtm = xcyl[0] - dxr;
+
+  if (pgen.nbody_temp) {
+    const Real pot = Gravity::NBodyPotential<GEOM>(coords, xv, particles, npart);
+    const Real dxpot = Gravity::NBodyPotential<GEOM>(
+        coords, {xv[0] + 1e-6 * dx[0], xv[1], xv[2]}, particles, npart);
+    const Real dypot = Gravity::NBodyPotential<GEOM>(
+        coords, {xv[0], xv[1] + 1e-6 * dx[1], xv[2]}, particles, npart);
+    const Real dzpot = Gravity::NBodyPotential<GEOM>(
+        coords, {xv[0], xv[1], xv[2] + 1e-6 * dx[2]}, particles, npart);
+    // dPhi/dr = grad(Phi) . \hat{e}_r
+    Real drpot = (dxpot - pot) / (2e-6 * dx[0]) * ex1[0];
+    drpot += pgen.multi_d * (dypot - pot) / (2e-6 * dx[1]) * ex2[0];
+    drpot += pgen.three_d * (dzpot - pot) / (2e-6 * dx[2]) * ex3[0];
+    rt = -pgen.gm / pot;
+    rtp = -pgen.gm / (pot + drpot * dxr);
+    rtm = -pgen.gm / (pot - drpot * dxr);
+  }
+
   res.gtemp = TempProfile(pgen, rt, xcyl[2]);
+  const Real tp = TempProfile(pgen, rtp, xcyl[2]);
+  const Real tm = TempProfile(pgen, rtm, xcyl[2]);
 
-  // Construct grad(P) for this zone
-  const std::array<Real, 3> fx1m{coords.bnds.x1[0], xv[1], xv[2]};
-  const std::array<Real, 3> fx1p{coords.bnds.x1[1], xv[1], xv[2]};
-  const std::array<Real, 3> fx2m{xv[0], coords.bnds.x2[0], xv[2]};
-  const std::array<Real, 3> fx2p{xv[0], coords.bnds.x2[1], xv[2]};
-  const std::array<Real, 3> fx3m{xv[0], xv[1], coords.bnds.x3[0]};
-  const std::array<Real, 3> fx3p{xv[0], xv[1], coords.bnds.x3[1]};
-  Real pgrad[3] = {Null<Real>()};
-  Real pfm = Null<Real>(), pfp = Null<Real>();
-
-  // X1 Faces
-  auto xf = coords.ConvertToCyl(fx1m);
-  Real rtm = pgen.nbody_temp ? -pgen.gm / Gravity::NBodyPotential<GEOM>(coords, fx1m,
-                                                                        particles, npart)
-                             : xf[0];
-  Real tfm = TempProfile(pgen, rtm, xf[2]);
-  pfm = PresProfile(pgen, eos_d, tfm, xf[0], xf[2]);
-  xf = coords.ConvertToCyl(fx1p);
-  Real rtp = pgen.nbody_temp ? -pgen.gm / Gravity::NBodyPotential<GEOM>(coords, fx1p,
-                                                                        particles, npart)
-                             : xf[0];
-  Real tfp = TempProfile(pgen, rtp, xf[2]);
-  pfp =
-      (pfm = pgen.pres_min) ? pgen.pres_min : PresProfile(pgen, eos_d, tfp, xf[0], xf[2]);
-  pfm = (pfp == pgen.pres_min) ? pgen.pres_min : pfm;
-  pgrad[0] = (pfp - pfm) / dx[0];
-
-  // X2 Faces
-  xf = coords.ConvertToCyl(fx2m);
-  rtm = pgen.nbody_temp
-            ? -pgen.gm / Gravity::NBodyPotential<GEOM>(coords, fx2m, particles, npart)
-            : xf[0];
-  tfm = TempProfile(pgen, rtm, xf[2]);
-  pfm = PresProfile(pgen, eos_d, tfm, xf[0], xf[2]);
-  xf = coords.ConvertToCyl(fx2p);
-  rtp = pgen.nbody_temp
-            ? -pgen.gm / Gravity::NBodyPotential<GEOM>(coords, fx2p, particles, npart)
-            : xf[0];
-  tfp = TempProfile(pgen, rtp, xf[2]);
-  pfp =
-      (pfm = pgen.pres_min) ? pgen.pres_min : PresProfile(pgen, eos_d, tfp, xf[0], xf[2]);
-  pfm = (pfp == pgen.pres_min) ? pgen.pres_min : pfm;
-  pgrad[1] = (pfp - pfm) / dx[1];
-
-  // X3 Faces
-  xf = coords.ConvertToCyl(fx3m);
-  rtm = pgen.nbody_temp
-            ? -pgen.gm / Gravity::NBodyPotential<GEOM>(coords, fx3m, particles, npart)
-            : xf[0];
-  tfm = TempProfile(pgen, rtm, xf[2]);
-  pfm = PresProfile(pgen, eos_d, tfm, xf[0], xf[2]);
-  xf = coords.ConvertToCyl(fx3p);
-  rtp = pgen.nbody_temp
-            ? -pgen.gm / Gravity::NBodyPotential<GEOM>(coords, fx3p, particles, npart)
-            : xf[0];
-  tfp = TempProfile(pgen, rtp, xf[2]);
-  pfp =
-      (pfm = pgen.pres_min) ? pgen.pres_min : PresProfile(pgen, eos_d, tfp, xf[0], xf[2]);
-  pfm = (pfp == pgen.pres_min) ? pgen.pres_min : pfm;
-  pgrad[2] = (pfp - pfm) / dx[2];
-
-  // Convert to the cylindrical radial gradient
-  const Real eR[3] = {ex1[0], ex2[0], ex3[0]};
-  const Real dpdr = ArtemisUtils::VDot(pgrad, eR);
-
+  // Note that pressure calls density and needs the true cylindrical radius
+  const Real pres = PresProfile(pgen, eos_d, res.gtemp, xcyl[0], xcyl[2]);
+  const Real dpdr = (PresProfile(pgen, eos_d, tp, xcyl[0] + dxr, xcyl[2]) -
+                     PresProfile(pgen, eos_d, tm, xcyl[0] - dxr, xcyl[2])) /
+                    (2. * dxr);
   // Set v_phi to centrifugal equilibrium
   //   vp^2/R = grad(p) + vk^2/R
   const Real r = pgen.nbody_temp ? rt : std::sqrt(SQR(xcyl[0]) + SQR(xcyl[2]));
   const Real omk2 = pgen.gm / (r * r * r);
   const Real vk2 = omk2 * SQR(xcyl[0]);
-  const Real vp = std::sqrt(vk2 + dpdr * xcyl[0] / res.gdens);
+  const Real vp2 = vk2 + (dpdr / res.gdens) * xcyl[0];
+  const Real vp = (vp2 < 0.0) ? 0.0 : std::sqrt(vp2);
   const Real nu = ViscosityProfile(pgen, eos_d, rt, xcyl[2]);
   const Real vr = pgen.quiet_start ? 0.0 : -1.5 * nu / xcyl[0];
 
@@ -265,6 +229,7 @@ KOKKOS_INLINE_FUNCTION State ComputeDiskProfile(
 //! reset the DiskParams struct upon initialization.
 inline void InitDiskParams(MeshBlock *pmb, ParameterInput *pin) {
   auto &artemis_pkg = pmb->packages.Get("artemis");
+  auto &gas_pkg = pmb->packages.Get("gas");
   Params &params = artemis_pkg->AllParams();
   if (!(params.hasKey("disk_params"))) {
     DiskParams disk_params;
@@ -285,16 +250,26 @@ inline void InitDiskParams(MeshBlock *pmb, ParameterInput *pin) {
 
     PARTHENON_REQUIRE(disk_params.Gamma >= 1, "problem/gamma needs to be >= 1");
 
-    disk_params.dens_min = pin->GetOrAddReal("problem", "dens_min", 1.0e-20);
-    disk_params.pres_min = pin->GetOrAddReal("problem", "pres_min", 1.0e-24);
+    disk_params.dens_min = gas_pkg->Param<Real>("dfloor");
+    disk_params.sie_min = gas_pkg->Param<Real>("siefloor");
     disk_params.rexp = pin->GetOrAddReal("problem", "rexp", 0.0);
+    disk_params.exp_pow = pin->GetOrAddReal("problem", "exp_pow", 2.0);
     disk_params.rcav = pin->GetOrAddReal("problem", "rcav", 0.0);
     disk_params.l0 = pin->GetOrAddReal("problem", "l0", 0.0);
     disk_params.dust_to_gas = pin->GetOrAddReal("problem", "dust_to_gas", 0.01);
     disk_params.temp_soft2 = pin->GetOrAddReal("problem", "temp_soft", 0.0);
     const auto mu = gas_pkg->Param<Real>("mu");
     auto &constants = artemis_pkg->Param<ArtemisUtils::Constants>("constants");
+    const auto &eos = gas_pkg->Param<ArtemisUtils::EOS>("eos_h");
     disk_params.kbmu = constants.GetKBCode() / (mu * constants.GetAMUCode());
+    disk_params.pres_min =
+        eos.PressureFromDensityInternalEnergy(disk_params.dens_min, disk_params.sie_min);
+    disk_params.temp_min = eos.TemperatureFromDensityInternalEnergy(disk_params.dens_min,
+                                                                    disk_params.sie_min);
+
+    const auto nx = params.Get<std::array<int, 3>>("prob_dim");
+    disk_params.three_d = nx[2] > 1;
+    disk_params.multi_d = disk_params.three_d || (nx[1] > 1);
 
     disk_params.do_gas = true; // NOTE(@pdmullen): Hardcoded for now...
     disk_params.do_dust = params.Get<bool>("do_dust");

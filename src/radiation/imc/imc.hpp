@@ -19,7 +19,7 @@
 namespace IMC {
 
 template <Coordinates GEOM>
-TaskListStatus JaybenneIMC(Mesh *pmesh, const Real time, const Real dt);
+TaskListStatus JaybenneIMC(Mesh *pmesh, const SimTime &time, const Real dt);
 
 } // namespace IMC
 

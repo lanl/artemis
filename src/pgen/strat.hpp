@@ -125,7 +125,7 @@ Real InitialDensity(const EOS &eos, const StratParams &pars, const Real z) {
       Real pp = eos.PressureFromDensityTemperature(dens * (1. + dlnr), pars.temp0);
       Real pm = eos.PressureFromDensityTemperature(dens * (1. - dlnr), pars.temp0);
       Real dPdrho = (pp - pm) / (dlnr * dens);
-      ld -= 0.5 * pars.om0 * (2 * j + 1) * SQR(dz) / (dPdrho + Fuzz<Real>());
+      ld -= 0.5 * pars.Om0 * (2 * j + 1) * SQR(dz) / (dPdrho + Fuzz<Real>());
       dens = std::exp(ld);
       if (dens <= pars.dfloor) return pars.dfloor;
     }
@@ -693,11 +693,6 @@ inline void ExtrapInnerX3(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
         // isothermal through boundary
         const Real Tg = pars.temp0;
 
-        // asume P/rho is constant as well
-        // probably could just use Bulk modulus here
-        const Real efac =
-            std::exp(-(SQR(z) - SQR(z0)) * SQR(pars.Om0) / (2.0 * pars.kbmu * Tg));
-
         for (int n = 0; n < v.GetSize(0, gas::prim::density()); ++n) {
           const Real vx1g = v(0, gas::prim::velocity(VI(n, 0)), ks, j, i);
           const Real vx2g = v(0, gas::prim::velocity(VI(n, 1)), ks, j, i);
@@ -705,6 +700,12 @@ inline void ExtrapInnerX3(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
           const Real vx3g = (gv3 > 0.0) ? 0.0 : gv3;
           const Real &gd = v(0, gas::prim::density(n), ks, j, i);
           const Real &gsie = v(0, gas::prim::sie(n), ks, j, i);
+
+          const Real pm = eos_d.PressureFromDensityTemperature(gd * (1. - 1e-6), Tg);
+          const Real pp = eos_d.PressureFromDensityTemperature(gd * (1. + 1e-6), Tg);
+          const Real dPdrho = (pp - pm) / (gd * 1e-6);
+          const Real efac = std::exp(-(SQR(z) - SQR(z0)) * SQR(pars.Om0) /
+                                     (2.0 * dPdrho + Fuzz<Real>()));
           const Real rhog = std::max(gd * efac, pars.dfloor);
 
           v(0, gas::prim::velocity(VI(n, 0)), k, j, i) = vx1g;
@@ -726,7 +727,7 @@ inline void ExtrapInnerX3(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
             v(0, dust::prim::velocity(VI(n, 0)), k, j, i) = vx1d;
             v(0, dust::prim::velocity(VI(n, 1)), k, j, i) = vx2d;
             v(0, dust::prim::velocity(VI(n, 2)), k, j, i) = vx3d;
-            v(0, dust::prim::density(n), k, j, i) = dd * efac;
+            v(0, dust::prim::density(n), k, j, i) = dd;
           }
         }
 
@@ -794,11 +795,6 @@ inline void ExtrapOuterX3(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
         // isothermal through boundary
         const Real Tg = pars.temp0;
 
-        // asume P/rho is constant as well
-        // probably could just use Bulk modulus here
-        const Real efac =
-            std::exp(-(SQR(z) - SQR(z0)) * SQR(pars.Om0) / (2.0 * pars.kbmu * Tg));
-
         for (int n = 0; n < v.GetSize(0, gas::prim::density()); ++n) {
           const Real vx1g = v(0, gas::prim::velocity(VI(n, 0)), ke, j, i);
           const Real vx2g = v(0, gas::prim::velocity(VI(n, 1)), ke, j, i);
@@ -806,6 +802,11 @@ inline void ExtrapOuterX3(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
           const Real vx3g = (gv3 < 0.0) ? 0.0 : gv3;
           const Real &gd = v(0, gas::prim::density(n), ke, j, i);
           const Real &gsie = v(0, gas::prim::sie(n), ke, j, i);
+          const Real pm = eos_d.PressureFromDensityTemperature(gd * (1. - 1e-6), Tg);
+          const Real pp = eos_d.PressureFromDensityTemperature(gd * (1. + 1e-6), Tg);
+          const Real dPdrho = (pp - pm) / (gd * 1e-6);
+          const Real efac = std::exp(-(SQR(z) - SQR(z0)) * SQR(pars.Om0) /
+                                     (2.0 * dPdrho + Fuzz<Real>()));
           const Real rhog = std::max(pars.dfloor, gd * efac);
 
           v(0, gas::prim::velocity(VI(n, 0)), k, j, i) = vx1g;
@@ -827,7 +828,7 @@ inline void ExtrapOuterX3(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
             v(0, dust::prim::velocity(VI(n, 0)), k, j, i) = vx1d;
             v(0, dust::prim::velocity(VI(n, 1)), k, j, i) = vx2d;
             v(0, dust::prim::velocity(VI(n, 2)), k, j, i) = vx3d;
-            v(0, dust::prim::density(n), k, j, i) = dd * efac;
+            v(0, dust::prim::density(n), k, j, i) = dd;
           }
         }
 

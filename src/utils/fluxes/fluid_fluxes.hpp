@@ -102,6 +102,17 @@ TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, FLUX vflx,
     c = pkg->template Param<Real>("c");
   }
 
+  Real dfloor = Null<Real>();
+  Real siefloor = Null<Real>();
+  if constexpr (F == Fluid::radiation) {
+    dfloor = pkg->template Param<Real>("efloor");
+  } else if constexpr (F == Fluid::gas) {
+    dfloor = pkg->template Param<Real>("dfloor");
+    siefloor = pkg->template Param<Real>("siefloor");
+  } else if constexpr (F == Fluid::dust) {
+    dfloor = pkg->template Param<Real>("dfloor");
+  }
+
   // Scratch properties
   // NOTE(PDM): Scratch here must be able to contain up to the total number of species,
   // even if some blocks don't contain all species
@@ -124,13 +135,8 @@ TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, FLUX vflx,
         recon(mbr, cpars, b, k, j, il - 1, iu, vp, vg, wl, wr);
         mbr.team_barrier();
 
-        // NOTE(@adempsey): Moments radiation currently requires zeroing of reconstructed
-        // fluxes when ~round-off.  Future work may invoke PCM fallbacks.  Such a utility
-        // could also be employed for e.g., dust, FOFC, etc...
-        if constexpr (F == Fluid::radiation) {
-          correct_recon(mbr, X1DIR, b, k, j, il - 1, iu, vp, wl, wr);
-          mbr.team_barrier();
-        }
+        post_recon<F>(eos, dfloor, siefloor, mbr, X1DIR, b, k, j, il - 1, iu, vp, wl, wr);
+        mbr.team_barrier();
 
         // Compute fluxes over[is, ie + 1]
         RiemannSolver<RIEMANN, F, C> riemann;
@@ -169,11 +175,9 @@ TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, FLUX vflx,
             recon(mbr, cpars, b, k, j, il, iu, vp, vg, wl_jp1, wr);
             mbr.team_barrier();
 
-            // NOTE(@adempsey): See comments above
-            if constexpr (F == Fluid::radiation) {
-              correct_recon(mbr, X2DIR, b, k, j, il, iu, vp, wl_jp1, wr);
-              mbr.team_barrier();
-            }
+            post_recon<F>(eos, dfloor, siefloor, mbr, X2DIR, b, k, j, il, iu, vp, wl_jp1,
+                          wr);
+            mbr.team_barrier();
 
             if (j > jl) {
               // compute fluxes over [js,je+1]
@@ -216,11 +220,9 @@ TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, FLUX vflx,
             recon(mbr, cpars, b, k, j, il, iu, vp, vg, wl_kp1, wr);
             mbr.team_barrier();
 
-            // NOTE(@adempsey): See comments above
-            if constexpr (F == Fluid::radiation) {
-              correct_recon(mbr, X3DIR, b, k, j, il, iu, vp, wl_kp1, wr);
-              mbr.team_barrier();
-            }
+            post_recon<F>(eos, dfloor, siefloor, mbr, X3DIR, b, k, j, il, iu, vp, wl_kp1,
+                          wr);
+            mbr.team_barrier();
 
             // compute fluxes over [ks,ke+1]
             if (k > kl) {

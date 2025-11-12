@@ -14,6 +14,7 @@
 #define ARTEMIS_UTILS_FLUXES_RECONSTRUCTION_RECONSTRUCTION_HPP_
 
 #include "artemis.hpp"
+#include "utils/eos/eos.hpp"
 
 namespace ArtemisUtils {
 //----------------------------------------------------------------------------------------
@@ -45,26 +46,64 @@ struct ReconGradient {
 //----------------------------------------------------------------------------------------
 //! \class  TaskStatus ArtemisUtils::correct_recon
 //! \brief Utility to zero radiation fluxes when near ~round-off
-template <typename V>
+template <Fluid F, typename V>
 KOKKOS_INLINE_FUNCTION void
-correct_recon(parthenon::team_mbr_t const &member, const int dir, const int b,
-              const int k, const int j, const int il, const int iu, const V &q,
-              parthenon::ScratchPad2D<Real> &ql, parthenon::ScratchPad2D<Real> &qr) {
-  const int nspecies = q.GetSize(b, rad::prim::energy());
-  for (int n = 0; n < nspecies; ++n) {
-    const int IFX = nspecies + (n * 3) + ((dir - 1));
-    const int IFY = nspecies + (n * 3) + ((dir - 1) + 1) % 3;
-    const int IFZ = nspecies + (n * 3) + ((dir - 1) + 2) % 3;
-    parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, member, il, iu,
-                             [&](const int i) {
-                               const int ipl = i + (dir == 1);
-                               ql(IFX, ipl) *= (std::abs(ql(IFX, ipl)) > 1.0e-20);
-                               ql(IFY, ipl) *= (std::abs(ql(IFY, ipl)) > 1.0e-20);
-                               ql(IFZ, ipl) *= (std::abs(ql(IFZ, ipl)) > 1.0e-20);
-                               qr(IFX, i) *= (std::abs(qr(IFX, i)) > 1.0e-20);
-                               qr(IFY, i) *= (std::abs(qr(IFY, i)) > 1.0e-20);
-                               qr(IFZ, i) *= (std::abs(qr(IFZ, i)) > 1.0e-20);
-                             });
+post_recon(const EOS &eos, const Real dfloor, const Real siefloor,
+           parthenon::team_mbr_t const &member, const int dir, const int b, const int k,
+           const int j, const int il, const int iu, const V &q,
+           parthenon::ScratchPad2D<Real> &ql, parthenon::ScratchPad2D<Real> &qr) {
+  if constexpr (F == Fluid::radiation) {
+    const int nspecies = q.GetSize(b, rad::prim::energy());
+    for (int n = 0; n < nspecies; ++n) {
+      const int IFX = nspecies + (n * 3) + ((dir - 1));
+      const int IFY = nspecies + (n * 3) + ((dir - 1) + 1) % 3;
+      const int IFZ = nspecies + (n * 3) + ((dir - 1) + 2) % 3;
+      parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, member, il, iu,
+                               [&](const int i) {
+                                 const int ipl = i + (dir == 1);
+                                 ql(IFX, ipl) *= (std::abs(ql(IFX, ipl)) > 1.0e-20);
+                                 ql(IFY, ipl) *= (std::abs(ql(IFY, ipl)) > 1.0e-20);
+                                 ql(IFZ, ipl) *= (std::abs(ql(IFZ, ipl)) > 1.0e-20);
+                                 qr(IFX, i) *= (std::abs(qr(IFX, i)) > 1.0e-20);
+                                 qr(IFY, i) *= (std::abs(qr(IFY, i)) > 1.0e-20);
+                                 qr(IFZ, i) *= (std::abs(qr(IFZ, i)) > 1.0e-20);
+                               });
+    }
+  } else if constexpr (F == Fluid::gas) {
+    // Make sure reconstructed values are thermodynamically consistent with the density &
+    // pressure
+    const int nspecies = q.GetSize(b, gas::prim::density());
+    for (int n = 0; n < nspecies; ++n) {
+      const int IDN = n;
+      const int IPR = nspecies * 4 + n;
+      const int ISE = nspecies * 5 + n;
+      const int IBL = nspecies * 6 + n;
+      parthenon::par_for_inner(
+          DEFAULT_INNER_LOOP_PATTERN, member, il, iu, [&](const int i) {
+            const int ipl = i + (dir == 1);
+            Real &dL = ql(IDN, ipl);
+            Real &pL = ql(IPR, ipl);
+            Real &eL = ql(ISE, ipl);
+            Real &dR = qr(IDN, i);
+            Real &pR = qr(IPR, i);
+            Real &eR = qr(ISE, i);
+            // Floor everything
+            dL = std::max(dL, dfloor);
+            dR = std::max(dR, dfloor);
+
+            pL = std::max(
+                pL, eos.PressureFromDensityInternalEnergy(dL, std::max(eL, siefloor)));
+            pR = std::max(
+                pR, eos.PressureFromDensityInternalEnergy(dR, std::max(eR, siefloor)));
+
+            // Calculate derived EOS quantities
+            eL = ArtemisUtils::EofPR(eos, pL, dL);
+            ql(IBL, ipl) = eos.BulkModulusFromDensityInternalEnergy(dL, eL);
+
+            eR = ArtemisUtils::EofPR(eos, pR, dR);
+            qr(IBL, i) = eos.BulkModulusFromDensityInternalEnergy(dR, eR);
+          });
+    }
   }
 }
 

@@ -691,7 +691,6 @@ inline void ExtrapInnerX3(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
         const Real z0 = coords_s.x3v();
 
         // isothermal through boundary
-        const Real Tg = pars.temp0;
 
         for (int n = 0; n < v.GetSize(0, gas::prim::density()); ++n) {
           const Real vx1g = v(0, gas::prim::velocity(VI(n, 0)), ks, j, i);
@@ -700,6 +699,7 @@ inline void ExtrapInnerX3(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
           const Real vx3g = (gv3 > 0.0) ? 0.0 : gv3;
           const Real &gd = v(0, gas::prim::density(n), ks, j, i);
           const Real &gsie = v(0, gas::prim::sie(n), ks, j, i);
+          const Real Tg = eos_d.TemperatureFromDensityInternalEnergy(gd, gsie);
 
           const Real pm = eos_d.PressureFromDensityTemperature(gd * (1. - 1e-6), Tg);
           const Real pp = eos_d.PressureFromDensityTemperature(gd * (1. + 1e-6), Tg);
@@ -793,7 +793,6 @@ inline void ExtrapOuterX3(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
         const Real z0 = coords_e.x3v();
 
         // isothermal through boundary
-        const Real Tg = pars.temp0;
 
         for (int n = 0; n < v.GetSize(0, gas::prim::density()); ++n) {
           const Real vx1g = v(0, gas::prim::velocity(VI(n, 0)), ke, j, i);
@@ -802,6 +801,7 @@ inline void ExtrapOuterX3(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
           const Real vx3g = (gv3 < 0.0) ? 0.0 : gv3;
           const Real &gd = v(0, gas::prim::density(n), ke, j, i);
           const Real &gsie = v(0, gas::prim::sie(n), ke, j, i);
+          const Real Tg = eos_d.TemperatureFromDensityInternalEnergy(gd, gsie);
           const Real pm = eos_d.PressureFromDensityTemperature(gd * (1. - 1e-6), Tg);
           const Real pp = eos_d.PressureFromDensityTemperature(gd * (1. + 1e-6), Tg);
           const Real dPdrho = (pp - pm) / (gd * 1e-6);

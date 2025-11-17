@@ -153,7 +153,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin, Params &gas_par
 }
 
 //----------------------------------------------------------------------------------------
-//! \fn  TaskCollection Dust::CoagulationDriver
+//! \fn  TaskCollection Dust::Coagulation::CoagulationDriver
 //! \brief dust wrapper function for Coagulation
 template <Coordinates GEOM>
 TaskListStatus CoagulationDriver(Mesh *pm, parthenon::SimTime &tm) {
@@ -212,7 +212,7 @@ TaskListStatus CoagulationDriver(Mesh *pm, parthenon::SimTime &tm) {
 }
 
 //----------------------------------------------------------------------------------------
-//! \fn  TaskStatus Dust::CoagulationStep
+//! \fn  TaskStatus Dust::Coagulation::CoagulationStep
 //  \brief Wrapper function for coagulation procedure in one time step
 template <Coordinates GEOM>
 TaskStatus CoagulationStep(MeshData<Real> *md, const Real time, const Real dt) {

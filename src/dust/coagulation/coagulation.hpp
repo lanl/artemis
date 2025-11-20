@@ -774,8 +774,8 @@ void UpdateVelocityNQS3(const parthenon::team_mbr_t &mbr, const int &n, const in
 KOKKOS_INLINE_FUNCTION
 Real ComputeError(parthenon::team_mbr_t const &mbr, const int &mimax, const int &mimax2,
                   const Real &h, const Real &h0, const ScratchPad1D<Real> &dustdens,
-                  const ScratchPad1D<Real> &source, const ScratchPad1D<Real> &Q,
-                  const ScratchPad1D<Real> &nQs, const Real &err_eps) {
+                  const ScratchPad1D<Real> &source, const ScratchPad1D<Real> &nQs,
+                  const Real &err_eps) {
   Real errmax = 0.0;
   Kokkos::parallel_reduce(
       Kokkos::TeamThreadRange(mbr, std::min(mimax, mimax2)),
@@ -913,11 +913,37 @@ void CoagulationOneCell(parthenon::team_mbr_t const &mbr, const bool &surface,
     Source(mbr, nm1, mimax, pgrid, source, dustdens, vel, stime, kernel, klf, mass_grid,
            coagR3D, cpod_notzero, cpod_short, surface, rate);
 
+    int mimax2 = Null<int>();
     if (!(do_adaptive) || (coag_int == 1)) {
       dt_sync1 = TimeStepControl(mbr, nm1, dustdens, source, mass_grid, dfloor, cfl);
       dt = std::min(dt_sync1, time_goal - time_dummy);
       dt_sync = dt_sync1;
+      if (coag_int == 3) {
+        mimax2 = FindMIMaxNQS3(mbr, nm1, dt, dustdens, source, Q, mass_grid, dfloor);
+        // now Q stores dustdens + dt*source(), nQs will be used for temperary source(*)
+        ZeroSource(mbr, nm1, nQs);
+        Source(mbr, nm1, mimax2, pgrid, nQs, Q, vel, stime, kernel, klf, mass_grid,
+               coagR3D, cpod_notzero, cpod_short, surface, rate);
+      }
+    } else { // adaptive third-order method
+      // Set source
+      Real h0 = hnext, h = h0;
+      Real emax = Null<Real>();
+      while (1) {
+        mimax2 = FindMIMaxNQS3(mbr, nm1, h, dustdens, source, Q, mass_grid, dfloor);
+        // now Q stores dustdens + dt*source(), nQs will be used for temperary source(*)
+        ZeroSource(mbr, nm1, nQs);
+        Source(mbr, nm1, mimax2, pgrid, nQs, Q, vel, stime, kernel, klf, mass_grid,
+               coagR3D, cpod_notzero, cpod_short, surface, rate);
+        emax = ComputeError(mbr, mimax, mimax2, h, h0, dustdens, source, nQs, err_eps);
+        if (emax <= 1.0) break;
+        h = std::max(S * h * std::pow(emax, pshrink), 0.1 * h);
+      }
+      hnext = (emax > err_con) ? S * h * std::pow(emax, pgrow) : 5.0 * h;
+      dt = h;
+    }
 
+    if (coag_int == 1) {
       // Momentum Conserving Update (iff do_momentum_conserving_update)
       for (int n = 0; n < do_momentum_conserving_update * nvel; n++) {
         ZeroSourceNQ(mbr, n, nm1, Q, nQs, vel);
@@ -929,22 +955,8 @@ void CoagulationOneCell(parthenon::team_mbr_t const &mbr, const bool &surface,
 
       // Update dust density
       UpdateDensity(mbr, nm1, dustdens, source, dt);
+
     } else { // third-order method
-      // Set source
-      Real h0 = hnext, h = h0;
-      int mimax2 = Null<int>();
-      Real emax = Null<Real>();
-      while (1) {
-        mimax2 = FindMIMaxNQS3(mbr, nm1, h, dustdens, source, Q, mass_grid, dfloor);
-        ZeroSource(mbr, nm1, source);
-        Source(mbr, nm1, mimax2, pgrid, nQs, Q, vel, stime, kernel, klf, mass_grid,
-               coagR3D, cpod_notzero, cpod_short, surface, rate);
-        emax = ComputeError(mbr, mimax, mimax2, h, h0, dustdens, source, Q, nQs, err_eps);
-        if (emax <= 1.0) break;
-        h = std::max(S * h * std::pow(emax, pshrink), 0.1 * h);
-      }
-      hnext = (emax > err_con) ? S * h * std::pow(emax, pgrow) : 5.0 * h;
-      dt = h;
 
       // Momentum Conserving Update (iff do_momentum_conserving_update)
       for (int n = 0; n < do_momentum_conserving_update * nvel; n++) {
@@ -965,6 +977,7 @@ void CoagulationOneCell(parthenon::team_mbr_t const &mbr, const bool &surface,
     // Update time and increment ncall
     time_dummy += dt;
     ncall++;
+
     dt_sync = (do_adaptive) ? std::max(hnext, dt_sync) : dt_sync;
     hnext = (do_adaptive) ? std::min(hnext, time_goal - time_dummy) : hnext;
 

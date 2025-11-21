@@ -23,7 +23,17 @@ import ahdf
 
 # Plot a 2D slice of a variable to a provided axis.
 def plot(
-    fig, ax, filename, variable_name, draw_meshblocks, slice, vmin, vmax, coords, scale
+    fig,
+    ax,
+    filename,
+    variable_name,
+    draw_meshblocks,
+    slice,
+    vmin,
+    vmax,
+    data_vbnd,
+    coords,
+    scale,
 ):
     dump = ahdf.ahdf(filename)
 
@@ -58,6 +68,26 @@ def plot(
         else:
             assert False, f'slice "{slice}" unrecognized!'
     assert sum(plot_meshblocks) > 0, "No meshblocks within slice!"
+
+    # Get colorbar bounds from block data (this resets vmin and vmax)
+    if data_vbnd:
+        idx = int(slice_index[0])
+        if slice == "xy":
+            vmin = np.min(variable[0, idx, :, :])
+            vmax = np.max(variable[0, idx, :, :])
+            for b in range(1, dump.NumBlocks):
+                idx = int(slice_index[b])
+                assert idx >= 0 and idx < dump.NX3, "Slice index is out of bounds!"
+                vmin = min(vmin, np.min(variable[b, idx, :, :]))
+                vmax = max(vmax, np.max(variable[b, idx, :, :]))
+        elif slice == "xz":
+            vmin = np.min(variable[0, :, idx, :])
+            vmax = np.max(variable[0, :, idx, :])
+            for b in range(1, dump.NumBlocks):
+                idx = int(slice_index[b])
+                assert idx >= 0 and idx < dump.NX2, "Slice index is out of bounds!"
+                vmin = min(vmin, np.min(variable[b, :, idx, :]))
+                vmax = max(vmax, np.max(variable[b, :, idx, :]))
 
     # Plot all meshblocks within slice
     for b in range(dump.NumBlocks):
@@ -274,6 +304,9 @@ if __name__ == "__main__":
         "--vmax", type=float, default=0, help="Maximum value of colorbar"
     )
     parser.add_argument(
+        "--data_vbnd", action="store_true", help="Use min/max data for colorbar"
+    )
+    parser.add_argument(
         "--scale",
         type=str,
         default="log",
@@ -285,6 +318,9 @@ if __name__ == "__main__":
         type=str,
         default="cartesian",
         help="Coordinates to plot. Choices are: [cartesian code]",
+    )
+    parser.add_argument(
+        "--show", action="store_true", help="Show figure instead of saving it"
     )
     args = parser.parse_args()
 
@@ -299,10 +335,15 @@ if __name__ == "__main__":
         args.slice,
         args.vmin,
         args.vmax,
+        args.data_vbnd,
         args.coords,
         args.scale,
     )
 
-    savename = os.path.basename(args.filename)[:-5] + ".png"
-    print(f"Saving plot as {savename}")
-    plt.savefig(savename, dpi=300, bbox_inches="tight")
+    if args.show:
+        print("Showing figure ...")
+        plt.show()
+    else:
+        savename = os.path.basename(args.filename)[:-5] + ".png"
+        print(f"Saving plot as {savename}")
+        plt.savefig(savename, dpi=300, bbox_inches="tight")

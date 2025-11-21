@@ -114,8 +114,8 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
                     "Conduction requires the gas package, but there is not gas!");
   PARTHENON_REQUIRE(!(do_radiation) || (do_radiation && do_gas),
                     "Radiation requires the gas package, but there is not gas!");
-  PARTHENON_REQUIRE(!(do_imc && do_moment),
-                    "Cannot simultaneously evolve IMC and moments radiation");
+  PARTHENON_REQUIRE(do_radiation ? (do_moment ^ do_imc) : !(do_moment || do_imc),
+                    "Radiation requires exactly one of moment or IMC method");
 
   // Store configuration choices in params
   artemis->AddParam("do_gas", do_gas);

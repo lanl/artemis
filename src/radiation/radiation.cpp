@@ -45,8 +45,15 @@ Initialize(ParameterInput *pin, ArtemisUtils::Constants &constants, const bool d
   params.Add("c", light);
   const Real arad = constants.GetARCode();
   params.Add("arad", arad);
-  const Real creduc = pin->GetOrAddReal("radiation/moment", "creduc", 1.0);
-  params.Add("chat", light / creduc);
+
+  // add moment fields (if IMC inactive, moments must be active for this init routine to
+  // be called)
+  if (!do_imc) {
+    const Real creduc = pin->GetOrAddReal("radiation/moment", "creduc", 1.0);
+    params.Add("chat", light / creduc);
+  } else {
+    params.Add("chat", light);
+  }
 
   // Add derived radiation fields expected by Jaybenne
   if (do_imc) {

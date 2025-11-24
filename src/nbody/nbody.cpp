@@ -307,7 +307,9 @@ AmrTag DistanceRefinement(MeshBlockData<Real> *md) {
 
         // Each particle returns the distance normalized to it's target radius
         for (int n = 0; n < npart; n++) {
-          ldist = std::min(ldist, particles(n).refine_distance(xcart));
+          if (particles(n).alive) {
+            ldist = std::min(ldist, particles(n).refine_distance(xcart));
+          }
         }
       },
       Kokkos::Min<Real>(min_dist));

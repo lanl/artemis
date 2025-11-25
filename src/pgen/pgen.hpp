@@ -29,6 +29,7 @@
 #include "kh.hpp"
 #include "linear_wave.hpp"
 #include "lw.hpp"
+#include "polytrope.hpp"
 #include "rt.hpp"
 #include "shock.hpp"
 #include "strat.hpp"
@@ -63,6 +64,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
     lw::ProblemGenerator<T>(pmb, pin);
   } else if (name == "kh") {
     kh::ProblemGenerator<T>(pmb, pin);
+  } else if (name == "polytrope") {
+    polytrope::ProblemGenerator<T>(pmb, pin);
   } else if (name == "rt") {
     rt::ProblemGenerator<T>(pmb, pin);
   } else if (name == "shock") {

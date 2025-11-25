@@ -66,6 +66,7 @@ set (SRC_LIST
   pgen/linear_wave.hpp
   pgen/lw.hpp
   pgen/pgen.hpp
+  pgen/polytrope.hpp
   pgen/problem_modifier.hpp
   pgen/rt.hpp
   pgen/shock.hpp

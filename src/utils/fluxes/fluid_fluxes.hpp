@@ -417,7 +417,6 @@ template <Coordinates G, Fluid F, Closure C, RSolver R, typename PKG, typename P
           typename FLUX, typename FACE, typename GEO>
 TaskStatus CalculateFluxesReconSelect(MeshData<Real> *md, PKG &pkg, PRIM vp, FLUX vflx,
                                       FACE vface, GEO vg, const bool pcm) {
-  PARTHENON_INSTRUMENT
   const auto recon_method = pkg->template Param<ReconstructionMethod>("recon");
 
   // Select CalculateFluxesImpl based on reconstruction method
@@ -440,7 +439,6 @@ template <Coordinates G, Fluid F, Closure C, typename PKG, typename PRIM, typena
           typename FACE, typename GEO>
 TaskStatus CalculateFluxesRiemannSelect(MeshData<Real> *md, PKG &pkg, PRIM vp, FLUX vflx,
                                         FACE vface, GEO vg, const bool pcm) {
-  PARTHENON_INSTRUMENT
   const auto riemann_method = pkg->template Param<RSolver>("rsolver");
 
   // Select CalculateFluxesReconSelect based on Riemann solver
@@ -469,7 +467,6 @@ template <Fluid F, Closure C = Closure::null, typename PKG, typename PRIM, typen
           typename FACE, typename GEO>
 TaskStatus CalculateFluxes(MeshData<Real> *md, PKG &pkg, PRIM vp, FLUX vflx, FACE vf,
                            GEO vg, const bool dc) {
-  PARTHENON_INSTRUMENT
   const auto sys = pkg->template Param<Coordinates>("coords");
 
   // Select CalculateFluxesRiemannSelect based on coordinate system
@@ -504,7 +501,6 @@ template <Fluid F, Closure C = Closure::null, typename PKG, typename PRIM, typen
           typename FACE, typename GEO>
 TaskStatus FluxSource(MeshData<Real> *md, PKG &pkg, PRIM vp, CONS vcons, FACE vface,
                       GEO vg, const Real dt) {
-  PARTHENON_INSTRUMENT
   auto pm = md->GetParentPointer();
 
   // Extract rotating frame omega

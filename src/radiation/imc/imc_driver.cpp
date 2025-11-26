@@ -29,6 +29,7 @@ namespace IMC {
 //! \brief Executes thermal IMC transport (Jaybenne) and syncs updated fields
 template <Coordinates GEOM>
 TaskListStatus JaybenneIMC(Mesh *pmesh, const SimTime &tm, const Real dt) {
+  PARTHENON_INSTRUMENT
   auto status = Radiation::UpdateRadiationFields(pmesh).Execute();
   if (status != TaskListStatus::complete) return status;
   status = jaybenne::RadiationStep(pmesh, tm, dt).Execute();

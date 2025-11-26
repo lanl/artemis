@@ -261,6 +261,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
 //! \fn  Real NBody::EstimateTimestepMesh
 //! \brief Compute NBody timestep
 Real EstimateTimestepMesh(MeshData<Real> *md) {
+  PARTHENON_INSTRUMENT
   using parthenon::MakePackDescriptor;
   auto pm = md->GetParentPointer();
 
@@ -274,6 +275,7 @@ Real EstimateTimestepMesh(MeshData<Real> *md) {
 //! \brief Distance based refinement criterion
 template <Coordinates GEOM>
 AmrTag DistanceRefinement(MeshBlockData<Real> *md) {
+  PARTHENON_INSTRUMENT
   auto pmb = md->GetBlockPointer();
   auto pm = pmb->pmy_mesh;
   auto &resolved_pkgs = pm->resolved_packages;
@@ -324,6 +326,7 @@ AmrTag DistanceRefinement(MeshBlockData<Real> *md) {
 //! \brief Create REBOUND restart file and store in Params to reuse as Parthenon restart
 void UserWorkBeforeRestartOutputMesh(Mesh *pmesh, ParameterInput *, SimTime &,
                                      OutputParameters *) {
+  PARTHENON_INSTRUMENT
   auto &artemis_pkg = pmesh->packages.Get("artemis");
   if (!(artemis_pkg->Param<bool>("do_nbody"))) return;
 

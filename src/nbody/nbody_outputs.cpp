@@ -30,6 +30,7 @@ namespace NBody {
 //! \fn  void NBody::Outputs
 //! \brief
 void Outputs(parthenon::Mesh *pm, const Real time) {
+  PARTHENON_INSTRUMENT
   // Return immediately if nbody outputs are disabled
   auto nbody = pm->packages.Get("nbody").get();
   if (nbody->Param<bool>("disable_outputs")) return;

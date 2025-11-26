@@ -25,6 +25,7 @@ namespace Gravity {
 //! \brief Applies accelerations due to a point mass gravitational potential
 template <Coordinates GEOM>
 TaskStatus PointMassGravity(MeshData<Real> *md, const Real time, const Real dt) {
+  PARTHENON_INSTRUMENT
   using parthenon::MakePackDescriptor;
   using TE = parthenon::TopologicalElement;
   auto pm = md->GetParentPointer();

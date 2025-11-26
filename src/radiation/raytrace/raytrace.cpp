@@ -92,6 +92,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
 //! \fn  StateDescriptor RT::MeshResetCommunication
 //! \brief Reset comm buffers
 TaskStatus MeshResetCommunication(MeshData<Real> *md) {
+  PARTHENON_INSTRUMENT
   const int nblocks = md->NumBlocks();
   for (int n = 0; n < nblocks; n++) {
     auto &mbd = md->GetBlockData(n);
@@ -106,6 +107,7 @@ TaskStatus MeshResetCommunication(MeshData<Real> *md) {
 //! \fn  StateDescriptor RT::MeshSend
 //! \brief Send boundary comms
 TaskStatus MeshSend(MeshData<Real> *md) {
+  PARTHENON_INSTRUMENT
   const int nblocks = md->NumBlocks();
   for (int n = 0; n < nblocks; n++) {
     auto &mbd = md->GetBlockData(n);
@@ -120,6 +122,7 @@ TaskStatus MeshSend(MeshData<Real> *md) {
 //! \fn  StateDescriptor RT::MeshRecieve
 //! \brief Recieve comm buffers
 TaskStatus MeshReceive(MeshData<Real> *md) {
+  PARTHENON_INSTRUMENT
   TaskStatus status = TaskStatus::complete;
   const int nblocks = md->NumBlocks();
   for (int n = 0; n < nblocks; n++) {
@@ -138,6 +141,7 @@ TaskStatus MeshReceive(MeshData<Real> *md) {
 //! \fn  StateDescriptor RT::SourceParticles
 //! \brief Create new particles for the radiation source
 TaskStatus SourceParticles(MeshData<Real> *md, const ParticleWeights &pwght) {
+  PARTHENON_INSTRUMENT
   auto pm = md->GetParentPointer();
   auto &artemis_pkg = pm->packages.Get("artemis");
   auto geom = artemis_pkg->Param<Coordinates>("coords");
@@ -174,6 +178,7 @@ TaskStatus SourceParticles(MeshData<Real> *md, const ParticleWeights &pwght) {
 //! \fn  StateDescriptor RT::PushParticles
 //! \brief Push the particles through the mesh
 TaskStatus PushParticles(MeshData<Real> *md) {
+  PARTHENON_INSTRUMENT
 
   auto pm = md->GetParentPointer();
   auto &artemis_pkg = pm->packages.Get("artemis");
@@ -211,6 +216,7 @@ TaskStatus PushParticles(MeshData<Real> *md) {
 //! \fn  StateDescriptor RT::RemoveParticles
 //! \brief Remove particles that have been marked for removal
 TaskStatus RemoveParticles(MeshData<Real> *md) {
+  PARTHENON_INSTRUMENT
 
   for (int b = 0; b < md->NumBlocks(); ++b) {
     md->GetSwarmData(b)->Get("star")->RemoveMarkedParticles();
@@ -223,6 +229,7 @@ TaskStatus RemoveParticles(MeshData<Real> *md) {
 //! \fn  StateDescriptor RT::CheckCompletion
 //! \brief Determine how many particles are still left to push
 TaskStatus CheckCompletion(MeshData<Real> *md) {
+  PARTHENON_INSTRUMENT
   // Taken from jaybenne
   auto pm = md->GetParentPointer();
   // Create SwarmPacks
@@ -259,6 +266,7 @@ TaskStatus CheckCompletion(MeshData<Real> *md) {
 //! \fn  StateDescriptor RT::EvalOpac
 //! \brief Evaluate the opacity used for the raytraced radiation
 TaskStatus EvalOpac(MeshData<Real> *md) {
+  PARTHENON_INSTRUMENT
   using parthenon::MakePackDescriptor;
   auto pm = md->GetParentPointer();
   auto &resolved_pkgs = pm->resolved_packages;
@@ -299,6 +307,7 @@ TaskStatus EvalOpac(MeshData<Real> *md) {
 //! \fn  StateDescriptor RT::RaytraceDriverTasks
 //! \brief The driver for the raytrace step
 TaskCollection RaytraceDriverTasks(Mesh *pmesh, const ParticleWeights &pwght) {
+  PARTHENON_INSTRUMENT
   using TQ = TaskQualifier;
   auto &rt_pkg = pmesh->packages.Get("raytrace");
 
@@ -342,6 +351,7 @@ TaskCollection RaytraceDriverTasks(Mesh *pmesh, const ParticleWeights &pwght) {
 //! \fn  StateDescriptor RT::RaytraceDriver
 //! \brief Pepare to call the TaskCollection for raytracing
 TaskListStatus RaytraceDriver(Mesh *pmesh) {
+  PARTHENON_INSTRUMENT
   auto &artemis_pkg = pmesh->packages.Get("artemis");
   auto geom = artemis_pkg->Param<Coordinates>("coords");
   // What is the minimum dtheta, dphi

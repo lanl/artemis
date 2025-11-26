@@ -122,6 +122,7 @@ static void PrintSystem(const int npart, ParArray1D<Particle> particles) {
 //! \brief Copy the positions and velocities from the rebound sim to the Particles list
 static void SyncWithRebound(RebSim &r_sim, std::vector<int> particle_id,
                             ParArray1D<Particle> particles) {
+  PARTHENON_INSTRUMENT
   const auto npart = particle_id.size();
   auto particles_h = particles.GetHostMirrorAndCopy();
 
@@ -211,6 +212,7 @@ static void enable_stderr(int stderr_save_fd) {
 //! \fn  int NBody::write_bytes_to_file
 //! \brief
 inline void write_bytes_to_file(std::string filename, std::vector<BYTE> &bytes) {
+  PARTHENON_INSTRUMENT
   std::ofstream outfile(filename.c_str(), std::ios::binary);
   if (outfile.is_open()) {
     outfile.write(reinterpret_cast<char *>(bytes.data()), bytes.size());
@@ -224,6 +226,7 @@ inline void write_bytes_to_file(std::string filename, std::vector<BYTE> &bytes) 
 //! \fn  int NBody::read_bytes_from_file
 //! \brief
 inline std::vector<BYTE> read_bytes_from_file(std::string filename) {
+  PARTHENON_INSTRUMENT
   std::ifstream file(NBody::rebound_filename, std::ios::binary | std::ios::ate);
   if (file.is_open()) {
     auto size = file.tellg();

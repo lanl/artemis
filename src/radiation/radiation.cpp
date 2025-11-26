@@ -82,6 +82,7 @@ Initialize(ParameterInput *pin, ArtemisUtils::Constants &constants, const bool d
 //! \fn  TaskStatus Radiation::SetOpacities
 //! \brief Routine to set opacitiy fields (when required, e.g., for Jaybenne IMC)
 TaskStatus SetOpacities(MeshData<Real> *md) {
+  PARTHENON_INSTRUMENT
   using parthenon::MakePackDescriptor;
   auto pm = md->GetParentPointer();
   auto &resolved_pkgs = pm->resolved_packages;
@@ -123,6 +124,7 @@ TaskStatus SetOpacities(MeshData<Real> *md) {
 //! \fn  TaskCollection Radiation::UpdateRadiationFields
 //! \brief TaskCollection to set radiation fields (when required, e.g., for Jaybenne IMC)
 TaskCollection UpdateRadiationFields(Mesh *pmesh) {
+  PARTHENON_INSTRUMENT
   TaskCollection tc;
   TaskID none(0);
   const int num_partitions = pmesh->DefaultNumPartitions();

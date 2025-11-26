@@ -32,6 +32,7 @@ namespace RotatingFrame {
 //! \fn TaskListStatus RotatingFrame::Advect
 //! \brief Executes linear advection term for orbital advection
 TaskListStatus Advect(Mesh *pmesh, const SimTime &tm) {
+  PARTHENON_INSTRUMENT
   // Craft a series of **equal** subsetps that sum to the unsplit step
   const Real dtlimit = EstimateTimestep(pmesh, 1.0);
   const int nsteps = static_cast<int>(std::ceil(tm.dt / dtlimit));
@@ -58,6 +59,7 @@ TaskListStatus Advect(Mesh *pmesh, const SimTime &tm) {
 //----------------------------------------------------------------------------------------
 //! \fn  TaskCollection LinearAdvectionStep
 TaskCollection LinearAdvectionStep(Mesh *pmesh, const SimTime &tm, const Real scdt) {
+  PARTHENON_INSTRUMENT
   TaskCollection tc;
   if (!(pmesh->ndim >= 2)) return tc;
 
@@ -89,6 +91,7 @@ TaskCollection LinearAdvectionStep(Mesh *pmesh, const SimTime &tm, const Real sc
 //! \fn  TaskStatus RotatingFrame::LagrangeRemap
 //! \brief
 TaskStatus LagrangeRemap(MeshData<Real> *u0, const Real scdt) {
+  PARTHENON_INSTRUMENT
   using parthenon::MakePackDescriptor;
   auto pm = u0->GetParentPointer();
   auto &resolved_pkgs = pm->resolved_packages;

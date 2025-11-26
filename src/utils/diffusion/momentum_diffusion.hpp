@@ -594,6 +594,7 @@ template <Coordinates GEOM, Fluid FLUID_TYPE, DiffType DIFF, typename PKG,
           typename SparsePackPrim, typename SparsePackFlux>
 TaskStatus MomentumFluxImpl(MeshData<Real> *md, DiffCoeffParams dp, PKG &pkg,
                             SparsePackPrim vprim, SparsePackFlux vf) {
+  PARTHENON_INSTRUMENT
 
   PARTHENON_DEBUG_REQUIRE(FLUID_TYPE == Fluid::gas,
                           "Momentum diffusion only works with a gas fluid");

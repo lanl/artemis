@@ -28,6 +28,7 @@ namespace ArtemisUtils {
 //! \fn  TaskStatus ArtemisUtils::DeepCopyConservedData
 //! \brief
 inline TaskStatus DeepCopyConservedData(MeshData<Real> *to, MeshData<Real> *from) {
+  PARTHENON_INSTRUMENT
   using parthenon::MakePackDescriptor;
   using parthenon::variable_names::any;
 
@@ -56,6 +57,7 @@ inline TaskStatus DeepCopyConservedData(MeshData<Real> *to, MeshData<Real> *from
 template <Coordinates GEOM, bool include_divf = true>
 TaskStatus ApplyUpdate(MeshData<Real> *u0, MeshData<Real> *u1, const Real g0,
                        const Real g1, const Real beta_dt) {
+  PARTHENON_INSTRUMENT
   using parthenon::MakePackDescriptor;
   using parthenon::variable_names::any;
   auto pm = u0->GetParentPointer();

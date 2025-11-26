@@ -54,6 +54,7 @@ GetIndices(const parthenon::Coordinates_t &pco, std::array<Real, 3> x) {
 //! \brief Implementation for pushing particles
 template <Coordinates GEOM, bool LOGR>
 TaskStatus PushParticlesImpl(MeshData<Real> *md, const geometry::CoordParams &cpars) {
+  PARTHENON_INSTRUMENT
   auto pm = md->GetParentPointer();
   auto &resolved_pkgs = pm->resolved_packages;
   auto &rt_pkg = pm->packages.Get("raytrace");
@@ -165,6 +166,7 @@ TaskStatus PushParticlesImpl(MeshData<Real> *md, const geometry::CoordParams &cp
 template <Coordinates GEOM, bool LOGR>
 TaskStatus SourceParticlesImpl(MeshData<Real> *md, const geometry::CoordParams &cpars,
                                const ParticleWeights &pwght) {
+  PARTHENON_INSTRUMENT
   // Create SwarmPacks
 
   // Create pack

@@ -162,6 +162,7 @@ NBodyGravityImpl(V1 &vmesh, V2 &vg, const geometry::Coords<GEOM> &coords,
 //! \brief Applies accelerations due to collection of point masses
 template <Coordinates GEOM>
 TaskStatus NBodyGravity(MeshData<Real> *md, const Real time, const Real dt) {
+  PARTHENON_INSTRUMENT
   using parthenon::MakePackDescriptor;
   using TE = parthenon::TopologicalElement;
   auto pm = md->GetParentPointer();

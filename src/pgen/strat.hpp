@@ -65,6 +65,7 @@ struct StratParams {
 //! NOTE(PDM): In order for our user-defined BCs to be compatible with restarts, we must
 //! reset the StratParams struct upon initialization.
 inline void InitStratParams(MeshBlock *pmb, ParameterInput *pin) {
+  PARTHENON_INSTRUMENT
   auto &artemis_pkg = pmb->packages.Get("artemis");
   Params &params = artemis_pkg->AllParams();
   if (!(params.hasKey("strat_params"))) {
@@ -110,6 +111,7 @@ Real InitialDensity(const StratParams &pars, const Real z) {
 //! \brief Sets initial conditions for shearing box problem
 template <Coordinates GEOM>
 inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
+  PARTHENON_INSTRUMENT
   using parthenon::MakePackDescriptor;
 
   // Extract parameters from packages
@@ -192,6 +194,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 //!        Extrapolation bc + Outflow no inflow
 template <Coordinates GEOM>
 inline void ExtrapInnerX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) {
+  PARTHENON_INSTRUMENT
   using parthenon::MakePackDescriptor;
   using TE = parthenon::TopologicalElement;
   auto pmb = mbd->GetBlockPointer();
@@ -284,6 +287,7 @@ inline void ExtrapInnerX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
 //!        Extrapolation bc + Outflow no inflow
 template <Coordinates GEOM>
 inline void ExtrapOuterX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) {
+  PARTHENON_INSTRUMENT
   using parthenon::MakePackDescriptor;
   using TE = parthenon::TopologicalElement;
   auto pmb = mbd->GetBlockPointer();
@@ -391,6 +395,7 @@ inline void ExtrapOuterX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
 //!
 template <Coordinates GEOM>
 inline void ShearInnerX2(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) {
+  PARTHENON_INSTRUMENT
   using parthenon::MakePackDescriptor;
   using TE = parthenon::TopologicalElement;
   auto pmb = mbd->GetBlockPointer();
@@ -512,6 +517,7 @@ inline void ShearInnerX2(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse)
 //!
 template <Coordinates GEOM>
 inline void ShearOuterX2(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) {
+  PARTHENON_INSTRUMENT
   using parthenon::MakePackDescriptor;
   using TE = parthenon::TopologicalElement;
   auto pmb = mbd->GetBlockPointer();
@@ -621,6 +627,7 @@ inline void ShearOuterX2(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse)
 //! Extrapolation bc + Outflow no inflow
 template <Coordinates GEOM>
 inline void ExtrapInnerX3(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) {
+  PARTHENON_INSTRUMENT
   using parthenon::MakePackDescriptor;
   using TE = parthenon::TopologicalElement;
   auto pmb = mbd->GetBlockPointer();
@@ -721,6 +728,7 @@ inline void ExtrapInnerX3(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
 //! \brief Sets BCs on +z boundary in shearing box
 template <Coordinates GEOM>
 inline void ExtrapOuterX3(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) {
+  PARTHENON_INSTRUMENT
   //  Extrapolation bc + Outflow no inflow
   using parthenon::MakePackDescriptor;
   using TE = parthenon::TopologicalElement;

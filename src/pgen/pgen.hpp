@@ -42,6 +42,7 @@ namespace artemis {
 //! \brief
 template <Coordinates T>
 void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
+  PARTHENON_INSTRUMENT
   std::string name = pin->GetString("artemis", "problem");
   if (name == "advection") {
     advection::ProblemGenerator<T>(pmb, pin);
@@ -81,6 +82,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 //! \brief Driver routine to initialize meshblock data when meshblocks are created
 template <Coordinates GEOM>
 void InitMeshBlockData(MeshBlock *pmb, ParameterInput *pin) {
+  PARTHENON_INSTRUMENT
 
   geometry::InitBlockGeom<GEOM>(pmb, pin);
 

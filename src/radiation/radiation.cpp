@@ -66,13 +66,12 @@ Initialize(ParameterInput *pin, ArtemisUtils::Constants &constants, const bool d
       fluidids.push_back(n);
 
     // Control field for sparse gas fields
-    const std::string control_field = rad::opac::absorption::name();
 
     // Absorption and scattering opacity
     Metadata m = Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy,
-                           Metadata::Sparse, MetadataRadiation, MetadataOperatorSplit});
-    radiation->AddSparsePool<rad::opac::absorption>(m, control_field, fluidids);
-    radiation->AddSparsePool<rad::opac::scattering>(m, control_field, fluidids);
+                           MetadataRadiation, MetadataOperatorSplit});
+    radiation->AddField<rad::opac::absorption>(m);
+    radiation->AddField<rad::opac::scattering>(m);
   }
 
   return radiation;
@@ -104,7 +103,7 @@ TaskStatus SetOpacities(MeshData<Real> *md) {
 
   // Set opacities
   parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "ConsToPrim", parthenon::DevExecSpace(), 0,
+      DEFAULT_LOOP_PATTERN, "SetOpacities", parthenon::DevExecSpace(), 0,
       md->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
         const Real &rho = vmesh(b, gas::prim::density(), k, j, i);

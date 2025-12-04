@@ -24,6 +24,7 @@
 
 parthenon::DriverStatus LaunchWorkFlow(parthenon::ParthenonManager &pman,
                                        parthenon::ParameterInput *pin) {
+  PARTHENON_INSTRUMENT
   // Geometry specific routines
   // (1) Handle ProblemGenerators and associated modifiers
   // (2) Call ParthenonInit to set up the mesh and packages

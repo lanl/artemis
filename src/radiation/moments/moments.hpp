@@ -45,6 +45,7 @@ TaskCollection MomentsTasks(Mesh *pmesh, const SimTime &tm,
 //! \brief Not enrolled in parthenon's determination for global dt
 template <Coordinates GEOM>
 Real EstimateTimeStep(parthenon::Mesh *pmesh) {
+  PARTHENON_INSTRUMENT
   auto &moments_pkg = pmesh->packages.Get("moments");
   auto &params = moments_pkg->AllParams();
 

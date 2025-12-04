@@ -269,6 +269,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
 //! \fn  TaskStatus Moments::CalculateFluxes
 //! \brief Evaluates advective fluxes for moments evolution
 TaskStatus CalculateFluxes(MeshData<Real> *md) {
+  PARTHENON_INSTRUMENT
   auto pm = md->GetParentPointer();
   auto &resolved_pkgs = pm->resolved_packages;
   auto &pkg = pm->packages.Get("moments");
@@ -307,6 +308,7 @@ TaskStatus CalculateFluxes(MeshData<Real> *md) {
 //! \fn  TaskStatus Moments::FluxSource
 //! \brief Evaluates coordinate terms from advective fluxes for moments evolution
 TaskStatus FluxSource(MeshData<Real> *md, const Real dt) {
+  PARTHENON_INSTRUMENT
   auto pm = md->GetParentPointer();
   auto &resolved_pkgs = pm->resolved_packages;
   auto &pkg = pm->packages.Get("moments");
@@ -345,6 +347,7 @@ TaskStatus FluxSource(MeshData<Real> *md, const Real dt) {
 //! \brief
 template <Coordinates GEOM>
 TaskStatus MatterCoupling(MeshData<Real> *u0, const Real dt) {
+  PARTHENON_INSTRUMENT
   auto pm = u0->GetParentPointer();
   auto &artemis_pkg = pm->packages.Get("artemis");
 

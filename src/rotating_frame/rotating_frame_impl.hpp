@@ -29,6 +29,7 @@ namespace RotatingFrame {
 //! \brief Calculate the shearing box frame body forces
 TaskStatus ShearingBoxImpl(MeshData<Real> *md, const Real om0, const Real qshear,
                            const bool do_gas, const bool do_dust, const Real dt) {
+  PARTHENON_INSTRUMENT
   auto pm = md->GetParentPointer();
   auto &resolved_pkgs = pm->resolved_packages;
 
@@ -100,6 +101,7 @@ TaskStatus ShearingBoxImpl(MeshData<Real> *md, const Real om0, const Real qshear
 template <Coordinates GEOM>
 TaskStatus RotatingFrameImpl(MeshData<Real> *md, const Real om0, const bool do_gas,
                              const bool do_dust, const Real dt) {
+  PARTHENON_INSTRUMENT
   // Adds the rotating frame terms to the azimuthal momentum equation and the energy
   // equation. Note that in comments in this function, R is always the cylindrical radius.
 

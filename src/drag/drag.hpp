@@ -164,6 +164,7 @@ template <Diffusion::DiffType DTYP, Coordinates GEOM>
 TaskStatus SelfDragSourceImpl(MeshData<Real> *md, const Real time, const Real dt,
                               const Diffusion::DiffCoeffParams &dp, const EOS &eos_d,
                               const SelfDragParams &gasp, const SelfDragParams &dustp) {
+  PARTHENON_INSTRUMENT
   using TE = parthenon::TopologicalElement;
   auto pm = md->GetParentPointer();
   auto &resolved_pkgs = pm->resolved_packages;
@@ -344,6 +345,7 @@ TaskStatus SimpleDragSourceImpl(MeshData<Real> *md, const Real time, const Real 
                                 const Diffusion::DiffCoeffParams &dp, const EOS &eos_d,
                                 const SelfDragParams &gasp, const SelfDragParams &dustp,
                                 const StoppingTimeParams &tp) {
+  PARTHENON_INSTRUMENT
   using TE = parthenon::TopologicalElement;
   auto pm = md->GetParentPointer();
   auto &resolved_pkgs = pm->resolved_packages;

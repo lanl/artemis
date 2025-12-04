@@ -27,6 +27,7 @@ namespace ArtemisUtils {
 //!        variable specified by VAR
 template <Coordinates GEOM, typename VAR>
 std::vector<Real> ReduceSpeciesVolumeIntegral(MeshData<Real> *md) {
+  PARTHENON_INSTRUMENT
   auto pm = md->GetParentPointer();
   auto &resolved_pkgs = pm->resolved_packages;
 
@@ -68,6 +69,7 @@ std::vector<Real> ReduceSpeciesVolumeIntegral(MeshData<Real> *md) {
 //!        variable specified by VAR
 template <Coordinates GEOM, int DIR, typename VAR>
 std::vector<Real> ReduceSpeciesVectorVolumeIntegral(MeshData<Real> *md) {
+  PARTHENON_INSTRUMENT
   PARTHENON_REQUIRE(DIR > 0 && DIR <= 3, "Direction must be X1DIR, X2DIR, or X3DIR!");
 
   auto pm = md->GetParentPointer();

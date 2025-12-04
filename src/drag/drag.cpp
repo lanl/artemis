@@ -89,6 +89,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 //! \brief Calls source terms for drag
 template <Coordinates GEOM>
 TaskStatus DragSource(MeshData<Real> *md, const Real time, const Real dt) {
+  PARTHENON_INSTRUMENT
   using parthenon::MakePackDescriptor;
   auto pm = md->GetParentPointer();
 

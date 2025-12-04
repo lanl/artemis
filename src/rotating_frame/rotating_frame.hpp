@@ -225,6 +225,7 @@ KOKKOS_INLINE_FUNCTION void RemapCons(const geometry::CoordParams &cpars, const 
 template <ReconstructionMethod R, typename V1, typename V2>
 TaskStatus LagrangeRemapImpl(MeshData<Real> *u0, const V1 &v0, const V2 &vg,
                              const Real dwdt) {
+  PARTHENON_INSTRUMENT
   const int multi_d = u0->GetNDim() >= 2;
   PARTHENON_REQUIRE(multi_d, "Linear advection does not work in 1D");
   const int three_d = u0->GetNDim() == 3;

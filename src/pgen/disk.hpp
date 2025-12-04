@@ -381,6 +381,7 @@ DiskICImpl(V1 v, const int b, const int k, const int j, const int i, V2 pco, EOS
 //! \brief Sets initial conditions for disk problem
 template <Coordinates GEOM>
 inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
+  PARTHENON_INSTRUMENT
   using parthenon::MakePackDescriptor;
 
   // Extract artemis package and params
@@ -432,6 +433,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 //! \brief Sets inner or outer X1 boundary condition to the initial condition
 template <Coordinates GEOM, IndexDomain BDY>
 void DiskBoundaryVisc(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) {
+  PARTHENON_INSTRUMENT
 
   PARTHENON_REQUIRE(GEOM == Coordinates::cylindrical ||
                         GEOM == Coordinates::spherical3D ||
@@ -633,6 +635,7 @@ void DiskBoundaryVisc(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) {
 //! \brief Sets inner or outer boundary condition to the initial condition
 template <Coordinates GEOM, IndexDomain BDY>
 void DiskBoundaryIC(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) {
+  PARTHENON_INSTRUMENT
   auto pmb = mbd->GetBlockPointer();
 
   auto artemis_pkg = pmb->packages.Get("artemis");
@@ -672,6 +675,7 @@ void DiskBoundaryIC(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) {
 //! \brief Extrapolation boundary conditions
 template <Coordinates GEOM, IndexDomain BDY>
 void DiskBoundaryExtrap(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) {
+  PARTHENON_INSTRUMENT
   const bool lnx = (GEOM != Coordinates::cartesian);
 
   auto pmb = mbd->GetBlockPointer();
@@ -889,6 +893,7 @@ void DiskBoundaryExtrap(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) 
 //! \fn AmrTag ProblemCheckRefinementBlock()
 //! \brief Refinement criterion for disk pgen
 inline parthenon::AmrTag ProblemCheckRefinementBlock(MeshBlockData<Real> *mbd) {
+  PARTHENON_INSTRUMENT
   PARTHENON_FAIL("Disk user-defined AMR criterion not yet implemented!");
   return AmrTag::same;
 }

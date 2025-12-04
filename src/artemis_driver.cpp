@@ -114,6 +114,7 @@ ArtemisDriver<GEOM>::ArtemisDriver(ParameterInput *pin, ApplicationInput *app_in
 //! \brief Assembles the tasks associated with a step for the ArtemisDriver
 template <Coordinates GEOM>
 TaskListStatus ArtemisDriver<GEOM>::Step() {
+  PARTHENON_INSTRUMENT
   // Prepare registers
   PreStepTasks();
   TaskListStatus status = TaskListStatus::complete;
@@ -158,6 +159,7 @@ TaskListStatus ArtemisDriver<GEOM>::Step() {
 //! \brief Defines the tasks executed prior to the main integrator in the ArtemisDriver
 template <Coordinates GEOM>
 void ArtemisDriver<GEOM>::PreStepTasks() {
+  PARTHENON_INSTRUMENT
   // set the integration timestep
   integrator->dt = tm.dt;
   if (do_nbody) nbody_integrator->dt = tm.dt;
@@ -194,6 +196,7 @@ void ArtemisDriver<GEOM>::PreStepTasks() {
 //! \brief Defines the main integrator's TaskCollection for the ArtemisDriver
 template <Coordinates GEOM>
 TaskCollection ArtemisDriver<GEOM>::StepTasks() {
+  PARTHENON_INSTRUMENT
   using TQ = TaskQualifier;
   using namespace ::parthenon::Update;
   TaskCollection tc;
@@ -338,6 +341,7 @@ TaskCollection ArtemisDriver<GEOM>::StepTasks() {
 //! \brief Defines the TaskCollection for post step tasks in the ArtemisDriver
 template <Coordinates GEOM>
 TaskCollection ArtemisDriver<GEOM>::PostStepTasks() {
+  PARTHENON_INSTRUMENT
   using namespace ::parthenon::Update;
   TaskCollection tc;
   TaskID none(0);

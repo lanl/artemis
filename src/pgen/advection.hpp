@@ -62,6 +62,7 @@ static AdvectionVariables av;
 //! \brief Sets initial conditions for advection tests
 template <Coordinates GEOM>
 inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
+  PARTHENON_INSTRUMENT
   using parthenon::MakePackDescriptor;
   const Mesh *pmesh = pmb->pmy_mesh;
   const int ndim = pmesh->ndim;
@@ -240,6 +241,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 //! periods.
 template <Coordinates GEOM>
 inline void UserWorkAfterLoop(Mesh *pmesh, ParameterInput *pin, parthenon::SimTime &tm) {
+  PARTHENON_INSTRUMENT
   using parthenon::MakePackDescriptor;
   const int nhyd_vars = 5;
   const int nspec_vars = 4;

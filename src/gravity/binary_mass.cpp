@@ -25,6 +25,7 @@ namespace Gravity {
 //! \brief Applies accelerations due to a binary
 template <Coordinates GEOM>
 TaskStatus BinaryMassGravity(MeshData<Real> *md, const Real time, const Real dt) {
+  PARTHENON_INSTRUMENT
   using parthenon::MakePackDescriptor;
   using TE = parthenon::TopologicalElement;
   auto pm = md->GetParentPointer();

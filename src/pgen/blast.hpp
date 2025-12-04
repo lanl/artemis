@@ -127,6 +127,7 @@ KOKKOS_INLINE_FUNCTION Real compute_overlap_sph(geometry::BBox bnds, Real rad,
 //! \brief Sedov blast wave
 template <Coordinates GEOM>
 inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
+  PARTHENON_INSTRUMENT
   using parthenon::MakePackDescriptor;
 
   // Extract blast parameters

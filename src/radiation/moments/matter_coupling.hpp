@@ -33,6 +33,7 @@ namespace Moments {
 //! \brief Implementation for simple radiation-matter coupling source
 template <Coordinates GEOM, Closure CLOSURE>
 TaskStatus MatterCouplingSimpleImpl(MeshData<Real> *u0, const Real dt) {
+  PARTHENON_INSTRUMENT
   using parthenon::MakePackDescriptor;
   using parthenon::variable_names::any;
   auto pm = u0->GetParentPointer();
@@ -198,6 +199,7 @@ TaskStatus MatterCouplingSimpleImpl(MeshData<Real> *u0, const Real dt) {
 //! \brief Implementation for "full" radiation-matter coupling source
 template <Coordinates GEOM, Closure CLOSURE>
 TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
+  PARTHENON_INSTRUMENT
   using parthenon::MakePackDescriptor;
   using parthenon::variable_names::any;
   auto pm = u0->GetParentPointer();

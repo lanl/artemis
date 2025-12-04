@@ -69,6 +69,7 @@ inline void InitShockParams(MeshBlock *pmb, ParameterInput *pin) {
 //! \brief Sets initial conditions for shock problem
 template <Coordinates GEOM>
 inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
+  PARTHENON_INSTRUMENT
   using parthenon::MakePackDescriptor;
 
   // Extract parameters from packages
@@ -138,6 +139,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 //! \fn void ProblemGenerator::ShockInnerX1()
 template <Coordinates GEOM>
 inline void ShockInnerX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) {
+  PARTHENON_INSTRUMENT
   using parthenon::MakePackDescriptor;
   using TE = parthenon::TopologicalElement;
   auto pmb = mbd->GetBlockPointer();
@@ -188,6 +190,7 @@ inline void ShockInnerX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse)
 //! \fn void ProblemGenerator::ShockOuterX1()
 template <Coordinates GEOM>
 inline void ShockOuterX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) {
+  PARTHENON_INSTRUMENT
   using parthenon::MakePackDescriptor;
   using TE = parthenon::TopologicalElement;
   auto pmb = mbd->GetBlockPointer();

@@ -40,6 +40,7 @@ namespace artemis {
 //! \brief
 template <Coordinates G>
 void ProblemModifier(parthenon::ParthenonManager *pman) {
+  PARTHENON_INSTRUMENT
   using BF = parthenon::BoundaryFace;
   using ID = parthenon::IndexDomain;
 

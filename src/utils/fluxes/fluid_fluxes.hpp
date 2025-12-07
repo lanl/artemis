@@ -75,6 +75,7 @@ template <Coordinates G, Fluid F, Closure C, RSolver RIEMANN, ReconstructionMeth
           typename PKG, typename PRIM, typename FLUX, typename FACE, typename GEO>
 TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, FLUX vflx,
                                FACE vface, GEO vg) {
+  PARTHENON_INSTRUMENT
   auto pm = md->GetParentPointer();
 
   // Bounds and indexing
@@ -249,6 +250,7 @@ template <Coordinates G, Fluid F, Closure C, typename PKG, typename PRIM, typena
           typename FACE, typename GEO>
 TaskStatus FluxSourceImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, CONS vcons, FACE vface,
                           GEO vg, const Real omf, const Real dt) {
+  PARTHENON_INSTRUMENT
   // Indexing and geometry
   const auto ib = md->GetBoundsI(IndexDomain::interior);
   const auto jb = md->GetBoundsJ(IndexDomain::interior);

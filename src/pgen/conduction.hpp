@@ -61,6 +61,7 @@ inline void InitCondParams(MeshBlock *pmb, ParameterInput *pin) {
 //! \brief
 template <Coordinates GEOM>
 inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
+  PARTHENON_INSTRUMENT
   using parthenon::MakePackDescriptor;
 
   // Extract parameters from packages
@@ -130,6 +131,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 //! \brief Sets inner X1 boundary condition to the initial condition
 template <Coordinates GEOM, IndexDomain BDY, Diffusion::DiffType DTYP>
 void CondBoundaryImpl(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) {
+  PARTHENON_INSTRUMENT
   auto pmb = mbd->GetBlockPointer();
 
   // Artemis package and params
@@ -262,6 +264,7 @@ void CondBoundaryImpl(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) {
 //! \brief
 template <Coordinates GEOM, IndexDomain BDY>
 inline void CondBoundary(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) {
+  PARTHENON_INSTRUMENT
   auto pmb = mbd->GetBlockPointer();
   auto artemis_pkg = pmb->packages.Get("artemis");
   auto &pkg = pmb->packages.Get("gas");

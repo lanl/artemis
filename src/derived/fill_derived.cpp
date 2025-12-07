@@ -29,6 +29,7 @@ namespace ArtemisDerived {
 //! NOTE(PDM): Note that this function is not called during remeshing.
 template <Coordinates GEOM>
 TaskStatus SetAuxillaryFields(MeshData<Real> *md) {
+  PARTHENON_INSTRUMENT
   using parthenon::MakePackDescriptor;
   auto pm = md->GetParentPointer();
   auto &resolved_pkgs = pm->resolved_packages;
@@ -94,6 +95,7 @@ TaskStatus SetAuxillaryFields(MeshData<Real> *md) {
 //! or remeshing event in preparation for FillGhost
 template <Coordinates GEOM>
 void ConsToPrim(MeshData<Real> *md) {
+  PARTHENON_INSTRUMENT
   using parthenon::MakePackDescriptor;
   auto pm = md->GetParentPointer();
   auto &resolved_pkgs = pm->resolved_packages;
@@ -224,6 +226,7 @@ void ConsToPrim(MeshData<Real> *md) {
 //! \brief Executes P2C following integrator updates and/or remeshing events
 template <typename T, Coordinates GEOM>
 void PrimToCons(T *md) {
+  PARTHENON_INSTRUMENT
   using parthenon::MakePackDescriptor;
   auto pm = md->GetParentPointer();
   auto &resolved_pkgs = pm->resolved_packages;
@@ -383,6 +386,7 @@ void PrimToCons(T *md) {
 //! but before PreCommFillDerived
 template <Coordinates GEOM>
 void PostInitialization(MeshBlock *pmb, ParameterInput *pin) {
+  PARTHENON_INSTRUMENT
   auto &md = pmb->meshblock_data.Get();
   PrimToCons<MeshBlockData<Real>, GEOM>(md.get());
 }
@@ -392,6 +396,7 @@ void PostInitialization(MeshBlock *pmb, ParameterInput *pin) {
 //! \brief Syncs unsplit fields following an operator split update
 template <Coordinates GEOM>
 TaskCollection SyncFields(Mesh *pmesh, const Real time, const Real dt) {
+  PARTHENON_INSTRUMENT
   using namespace ::parthenon::Update;
   TaskCollection tc;
   TaskID none(0);

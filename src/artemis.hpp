@@ -56,6 +56,9 @@ ARTEMIS_VARIABLE(gas.diff, energy);
 namespace face {
 ARTEMIS_VARIABLE(gas.face, velocity);
 } // namespace face
+namespace src {
+ARTEMIS_VARIABLE(gas.src, energy);
+}
 } // namespace gas
 
 namespace dust {
@@ -83,6 +86,13 @@ namespace opac {
 ARTEMIS_VARIABLE(rad.opac, absorption);
 ARTEMIS_VARIABLE(rad.opac, scattering);
 } // namespace opac
+namespace star {
+ARTEMIS_VARIABLE(rad.star, absorption);
+SWARM_VARIABLE(Real, rad.star, flux);
+SWARM_VARIABLE(Real, rad.star, v);
+SWARM_VARIABLE(Real, rad.star, x);
+SWARM_VARIABLE(int, rad.star, ijk);
+} // namespace star
 } // namespace rad
 
 namespace geom {

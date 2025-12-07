@@ -39,6 +39,7 @@ namespace Cooling {
 //!     Tp - T = -om dt (T - T0) / (beta + om dt)
 template <Coordinates GEOM, TempRefType TTYP>
 TaskStatus BetaCooling(MeshData<Real> *md, const Real time, const Real dt) {
+  PARTHENON_INSTRUMENT
   using parthenon::MakePackDescriptor;
   using TE = parthenon::TopologicalElement;
   auto pm = md->GetParentPointer();

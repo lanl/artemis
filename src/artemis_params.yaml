@@ -59,6 +59,10 @@ artemis:
     _type: "Real"
     _default: "1.0"
     _description: "Physical units value of temperature equal to 1 code unit"
+  radial_spacing:
+    _type: string
+    _default: "uniform"
+    _description: "Set to logarithmic to have log-r grids in cylindrical/spherical coordinates."
 
 physics:
   _description: "Toggle on/off the available physics packages"
@@ -94,3 +98,7 @@ physics:
     _type: "bool"
     _default: "false"
     _description: "Turn on heat conduction in the gas fluid"
+  raytrace:
+    _type: bool
+    _default: false
+    _description: "Turn on raytraced stellar irradiation"

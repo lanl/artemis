@@ -27,6 +27,7 @@ namespace ArtemisUtils {
 //! \brief
 template <typename FIELD, Coordinates GEOM>
 AmrTag ScalarFirstDerivative(MeshBlockData<Real> *md) {
+  PARTHENON_INSTRUMENT
   auto pmb = md->GetBlockPointer();
   auto pm = pmb->pmy_mesh;
   auto &pco = pmb->coords;
@@ -121,6 +122,7 @@ AmrTag ScalarFirstDerivative(MeshBlockData<Real> *md) {
 //! \brief
 template <typename FIELD>
 AmrTag ScalarMagnitude(MeshBlockData<Real> *md) {
+  PARTHENON_INSTRUMENT
   auto pmb = md->GetBlockPointer();
   auto pm = pmb->pmy_mesh;
   auto &resolved_pkgs = pm->resolved_packages;

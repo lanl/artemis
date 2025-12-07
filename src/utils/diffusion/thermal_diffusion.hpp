@@ -34,6 +34,7 @@ template <Coordinates GEOM, Fluid FLUID_TYPE, DiffType DIFF, typename PKG,
           typename SparsePackPrim, typename SparsePackFlux>
 TaskStatus ThermalFluxImpl(MeshData<Real> *md, DiffCoeffParams dp, PKG &pkg,
                            SparsePackPrim vprim, SparsePackFlux vf) {
+  PARTHENON_INSTRUMENT
   // Set heat flux
   // dE/dt = div(q)
   // q = - K . grad(T)

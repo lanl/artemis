@@ -69,7 +69,7 @@ if [[ $PARTITION == "unknown" ]]; then
 elif [[ $PARTITION == "chicoma-gpu" ]]; then
     module unload cray-libsci
     module load PrgEnv-gnu
-    module load cudatoolkit/24.7_12.5
+    module load cudatoolkit
     export CRAY_ACCEL_TARGET=nvidia80
     export MPICH_GPU_SUPPORT_ENABLED=1
     export MPICH_GPU_MANAGED_MEMORY_SUPPORT_ENABLED=1

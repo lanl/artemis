@@ -11,10 +11,7 @@
 // the public, perform publicly and display publicly, and to permit others to do so.
 //========================================================================================
 // NOTE(@sli):
-// The dust coagulation code is modified from the publicly available DustPy package
-//          https://github.com/stammler/dustpy
-//   and from their paper (Stammler and Birnstiel (2022) ApJ 935:35)
-//          "DustPy: A Python Package for Dust Evolution in Protoplanetary Disks"
+// This closely follows the implementation in Stammler and Birnstiel (2022) ApJ 935:35
 //========================================================================================
 
 // Artemis includes
@@ -123,15 +120,14 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin, Params &gas_par
   // Allocate CoagParam arrays
   const Real a = 3.0 * std::log10(h_sizes(0) / h_sizes(dcpars.nm - 1)) /
                  static_cast<Real>(1 - dcpars.nm);
-  const int n2drv = coag2drv::last2;
-  dcarrs.klf = ParArray2D<int>("klf", dcpars.nm, dcpars.nm);
+  dcarrs.idx_largest = ParArray2D<int>("idx_largest", dcpars.nm, dcpars.nm);
   dcarrs.mass_grid = ParArray1D<Real>("mass_grid", dcpars.nm);
-  dcarrs.coagR3D = ParArray3D<Real>("coagReal3D", n2drv, dcpars.nm, dcpars.nm);
-  dcarrs.cpod_notzero = ParArray3D<int>("idx_nzcpod", dcpars.nm, dcpars.nm, 4);
-  dcarrs.cpod_short = ParArray3D<Real>("nzcpod", dcpars.nm, dcpars.nm, 4);
+  dcarrs.coagR3D = ParArray3D<Real>("coagReal3D", 6, dcpars.nm, dcpars.nm);
+  dcarrs.Kijk_sym_ind = ParArray3D<int>("Kijk_sym_ind", dcpars.nm, dcpars.nm, 4);
+  dcarrs.Kijk_sym = ParArray3D<Real>("Kijk_sym", dcpars.nm, dcpars.nm, 4);
   InitializeArray(dcpars.nm, dcpars.pgrid, dcpars.rho_p, dcpars.chi, a, dust_size,
-                  dcarrs.klf, dcarrs.mass_grid, dcarrs.coagR3D, dcarrs.cpod_notzero,
-                  dcarrs.cpod_short);
+                  dcarrs.idx_largest, dcarrs.mass_grid, dcarrs.coagR3D, dcarrs.Kijk_sym_ind,
+                  dcarrs.Kijk_sym);
 
   // Stash CoagParams
   params.Add("coag_pars", dcpars);
@@ -245,8 +241,11 @@ TaskStatus CoagulationStep(MeshData<Real> *md, const Real time, const Real dt) {
   auto &artemis_pkg = pm->packages.Get("artemis");
   const auto &cpars = artemis_pkg->template Param<geometry::CoordParams>("coord_params");
   const auto &units = artemis_pkg->template Param<ArtemisUtils::Units>("units");
+  const auto &constants =
+      artemis_pkg->template Param<ArtemisUtils::Constants>("constants");
   const Real time0 = units.GetTimeCodeToPhysical();
   const Real length0 = units.GetLengthCodeToPhysical();
+  const Real kT0 = constants.GetKBPhysical() * units.GetTemperatureCodeToPhysical();
   const Real rho0 = coag.rho0;
   const Real vel0 = length0 / time0;
 
@@ -302,9 +301,13 @@ TaskStatus CoagulationStep(MeshData<Real> *md, const Real time, const Real dt) {
         // Extract gas state vector
         const Real &gdens = vmesh(b, gas::prim::density(0), k, j, i);
         const Real &gsie = vmesh(b, gas::prim::sie(0), k, j, i);
+        const Real kT = eos_d.TemperatureFromDensityInternalEnergy(gdens, gsie);
         const Real &gbulk = eos_d.BulkModulusFromDensityInternalEnergy(gdens, gsie);
         const Real cs1 = std::sqrt(gbulk / gdens) * vel0;
         const Real gdens1 = gdens * rho0;
+        const Real kT1 = kT * kT0;
+        const StateParams kernel{gdens1, alpha, cs1, kT1, omega1};
+
 
         // Extract time(step)
         const Real time1 = time * time0;
@@ -322,8 +325,7 @@ TaskStatus CoagulationStep(MeshData<Real> *md, const Real time, const Real dt) {
               const bool gtf = vmesh(b, dust::prim::density(n), k, j, i) > dfloor;
               rhod(n) = gtf * vmesh(b, dust::prim::density(n), k, j, i) * rho0;
               for (int d = 0; d < nvel; d++) {
-                const int vidx = VI(n, d);
-                vel(vidx) = gtf * vmesh(b, dust::prim::velocity(vidx), k, j, i) * vel0;
+                vel(VI(n, d)) = gtf * vmesh(b, dust::prim::velocity(VI(n, d)), k, j, i) * vel0;
               }
             });
         mbr.team_barrier();
@@ -331,10 +333,9 @@ TaskStatus CoagulationStep(MeshData<Real> *md, const Real time, const Real dt) {
         // Coagulation Kernel
         // NOTE(@pdmullen): mbr.team_barrier() included at end of CoagulationOneCell
         // NOTE(@pdmullen): ncall could be stored or reduced (see 0a5d72b)
-        int ncall = Null<int>();
-        Coagulation::CoagulationOneCell(mbr, surface, time1, dt_sync, gdens1, rhod, stime,
-                                        vel, nvel, Q, nQs, alpha, cs1, omega1, coag,
-                                        coag_arrays, rate, source, ncall, Q2);
+        const int ncall = Coagulation::CoagulationOneCell(mbr, surface, time1, dt_sync, kernel, rhod, stime,
+                                        vel, nvel, Q, nQs, coag,
+                                        coag_arrays, rate, source, Q2);
 
         // Update dust density and momentum after coagulation
         parthenon::par_for_inner(
@@ -375,10 +376,9 @@ void CoagulationDiagnostics(MeshData<Real> *md, DiagPack_t &vmesh,
   // Reduction
   Real lmass_d = 0.0;
   int lmax_size = 1;
-  Kokkos::parallel_reduce(
-      "coag::diag",
-      Kokkos::MDRangePolicy<Kokkos::Rank<4>>(
-          {0, kb.s, jb.s, ib.s}, {md->NumBlocks(), kb.e + 1, jb.e + 1, ib.e + 1}),
+
+  parthenon::par_reduce(parthenon::loop_pattern_mdrange_tag, "coag::diag", DevExecSpace(),
+      0, md->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, Real &lsum,
                     int &lmax) {
         geometry::Coords<GEOM> coords(cpars, vmesh.GetCoordinates(b), k, j, i);
@@ -398,7 +398,7 @@ void CoagulationDiagnostics(MeshData<Real> *md, DiagPack_t &vmesh,
           }
         }
       },
-      lmass_d, Kokkos::Max<int>(lmax_size));
+      Kokkos::Sum<Real>(lmass_d), Kokkos::Max<int>(lmax_size));
   Kokkos::fence();
 
 #ifdef MPI_PARALLEL
@@ -453,162 +453,123 @@ void WriteCoagulationDiagnostics(MeshData<Real> *md, const Real time, const Real
 //! \fn  void Dust::Coagulation::InitializeArray
 //  \brief Initialize static coagulation arrays
 void InitializeArray(const int nm, int &pgrid, const Real &rho_p, const Real &chi,
-                     const Real &a, const ParArray1D<Real> dsize, ParArray2D<int> klf,
+                     const Real &la, const ParArray1D<Real> dsize, ParArray2D<int> idx_largest,
                      ParArray1D<Real> mass_grid, ParArray3D<Real> coag3d,
-                     ParArray3D<int> cpod_notzero, ParArray3D<Real> cpod_short) {
-  // Initialization Part I
-  const int ikdelta = coag2drv::kdelta;
-  const int icoef_fett = coag2drv::coef_fett;
+                     ParArray3D<int> Kijk_sym_ind, ParArray3D<Real> Kijk_sym) {
   parthenon::par_for(
       parthenon::loop_pattern_flatrange_tag, "initializeCoag1", parthenon::DevExecSpace(),
       0, nm - 1, KOKKOS_LAMBDA(const int i) {
-        for (int j = 0; j < nm; j++) {
-          coag3d(ikdelta, i, j) = 0.0;
-        }
-        coag3d(ikdelta, i, i) = 1.0;
+
         mass_grid(i) = 4.0 * M_PI / 3.0 * rho_p * dsize(i) * dsize(i) * dsize(i);
         for (int j = 0; j < nm; j++) {
-          Real tmp1 = (1.0 - 0.5 * coag3d(ikdelta, i, j));
-          coag3d(icoef_fett, i, j) = M_PI * SQR(dsize(i) + dsize(j)) * tmp1;
+          Real tmp1 = (1.0 - 0.5 * (i==j));
+          coag3d(cidx::rate_coef, i, j) = M_PI * SQR(dsize(i) + dsize(j)) * tmp1;
         }
       });
 
-  // Set fragmentation variables
-  const Real ten_a = std::pow(10.0, a);
-  const Real ten_ma = 1.0 / ten_a;
-  const int ce = static_cast<int>(std::floor(-1.0 / a * std::log10(1.0 - ten_ma))) + 1;
+  const Real a = std::pow(10.0, la);
+  const int ce = static_cast<int>(std::floor(-1.0 / la * std::log10(1.0 - 1./a))) + 1;
 
-  // Used in integration
-  pgrid = static_cast<int>(std::floor(1.0 / a));
-
-  // Initialization Part II
-  const int iphifrag = coag2drv::phifrag;
-  const int iepsfrag = coag2drv::epsfrag;
-  const int iafrag = coag2drv::afrag;
+  pgrid = static_cast<int>(std::floor(1.0 / la));
   const Real frag_slope = 1.0 / 6.0; // = 2.0 - 11.0 / 6.0;
   parthenon::par_for(
       parthenon::loop_pattern_flatrange_tag, "initializeCoag2", parthenon::DevExecSpace(),
       0, nm - 1, KOKKOS_LAMBDA(const int i) {
-        Real sum_pF = 0.0;
+        Real phi_sum = 0.0;
         for (int j = 0; j <= i; j++) {
-          coag3d(iphifrag, j, i) = std::pow(mass_grid(j), frag_slope);
-          sum_pF += coag3d(iphifrag, j, i);
+          coag3d(cidx::Pij, j, i) = std::pow(mass_grid(j), frag_slope);
+          phi_sum += coag3d(cidx::Pij, j, i);
         }
-        // normalization
         for (int j = 0; j <= i; j++) {
-          coag3d(iphifrag, j, i) /= sum_pF; // switch (i,j) from fortran
+          coag3d(cidx::Pij, j, i) /= phi_sum;
         }
 
-        // Cratering
         for (int j = 0; j <= i - pgrid - 1; j++) {
-          // FRAGMENT DISTRIBUTION
-          // The largest fragment has the mass of the smaller collision partner
-
-          // Mass bin of largest fragment
-          klf(i, j) = j;
-
-          coag3d(iafrag, i, j) = (1.0 + chi) * mass_grid(j);
-          //                      |_______|
-          //                           |
-          //                    Mass of fragments
-          coag3d(iepsfrag, i, j) = chi * mass_grid(j) / (mass_grid(i) * (1.0 - ten_ma));
+          idx_largest(i, j) = j;
+          coag3d(cidx::Aij, i, j) = (1.0 + chi) * mass_grid(j);
+          coag3d(cidx::epsij, i, j) = chi * mass_grid(j) / (mass_grid(i) * (1.0 - 1./a));
         }
 
         int i1 = std::max(0, i - pgrid);
         for (int j = i1; j <= i; j++) {
-          // The largest fragment has the mass of the larger collison partner
-          klf(i, j) = i;
-          coag3d(iafrag, i, j) = (mass_grid(i) + mass_grid(j));
+          idx_largest(i, j) = i;
+          coag3d(cidx::Aij, i, j) = (mass_grid(i) + mass_grid(j));
         }
       });
 
-  // Initialization Part III
-  // --> dalp array
-  // --> D matrix
-  // --> E matrix
-  ParArray2D<Real> e("epod", nm, nm);
-  int idalp = coag2drv::dalp, idpod = coag2drv::dpod;
+
+  ParArray2D<Real> Ejk("Ejk", nm, nm);
   parthenon::par_for(
       parthenon::loop_pattern_flatrange_tag, "initializeCoag4", parthenon::DevExecSpace(),
       0, nm - 1, KOKKOS_LAMBDA(const int k) {
         for (int j = 0; j < nm; j++) {
           if (j <= k + 1 - ce) {
-            coag3d(idalp, k, j) = 1.0;
-            coag3d(idpod, k, j) = -mass_grid(j) / (mass_grid(k) * (ten_a - 1.0));
+            coag3d(cidx::dalp, k, j) = 1.0;
+            coag3d(cidx::Djk, k, j) = -mass_grid(j) / (mass_grid(k) * (a - 1.0));
           } else {
-            coag3d(idpod, k, j) = -1.0;
-            coag3d(idalp, k, j) = 0.0;
+            coag3d(cidx::Djk, k, j) = -1.0;
+            coag3d(cidx::dalp, k, j) = 0.0;
           }
         }
-        // for E matrix-------------
-        const Real mkkme = mass_grid(k) * (1.0 - ten_ma);
-        const Real mkpek = mass_grid(k) * (ten_a - 1.0);
-        const Real mkpeme = mass_grid(k) * (ten_a - ten_ma);
+        const Real fac1 = mass_grid(k) * (1.0 - 1./a);
+        const Real fac2 = mass_grid(k) * (a - 1.0);
+        const Real fac3 = mass_grid(k) * (a - 1./a);
         for (int j = 0; j < nm; ++j) {
           if (j <= k - ce) {
-            e(k, j) = mass_grid(j) / mkkme;
+            Ejk(k, j) = mass_grid(j) / fac1;
           } else {
-            Real theta1 = (mkpeme - mass_grid(j) < 0.0) ? 0.0 : 1.0;
-            e(k, j) = (1.0 - (mass_grid(j) - mkkme) / mkpek) * theta1;
+            Ejk(k, j) = (1.0 - (mass_grid(j) - fac1) / fac2) * iHeaviSide(fac3 - mass_grid(j));
           }
         }
       });
 
-  // Initialization Part IV
-  // -->cpod array;
-  ParArray3D<Real> cpod("cpod", nm, nm, nm);
+  ParArray3D<Real> Kijk("Kijk", nm, nm, nm);
   parthenon::par_for(
       parthenon::loop_pattern_mdrange_tag, "initializeCoag6", parthenon::DevExecSpace(),
       0, nm - 1, 0, nm - 1, KOKKOS_LAMBDA(const int i, const int j) {
-        // initialize to zero first
         for (int k = 0; k < nm; k++) {
-          cpod(i, j, k) = 0.0;
+          Kijk(i, j, k) = 0.0;
         }
-        Real mloc = mass_grid(i) + mass_grid(j);
-        if (mloc < mass_grid(nm - 1)) {
-          int gg = 0;
+        Real combined_mass = mass_grid(i) + mass_grid(j);
+        if (combined_mass < mass_grid(nm - 1)) {
+          int kk = 0;
           for (int k = std::max(i, j); k < nm - 1; k++) {
-            if (mloc >= mass_grid(k) && mloc < mass_grid(k + 1)) {
-              gg = k;
+            if (combined_mass >= mass_grid(k) && combined_mass < mass_grid(k + 1)) {
+              kk = k;
               break;
             }
           }
 
-          cpod(i, j, gg) =
-              (mass_grid(gg + 1) - mloc) / (mass_grid(gg + 1) - mass_grid(gg));
-          cpod(i, j, gg + 1) = 1.0 - cpod(i, j, gg);
+          Kijk(i, j, kk) =
+              (mass_grid(kk + 1) - combined_mass) / (mass_grid(kk + 1) - mass_grid(kk));
+          Kijk(i, j, kk + 1) = 1.0 - Kijk(i, j, kk);
 
-          // modified cpod(*) array-------------------------
-          Real dtheta_ji = (j - i - 0.5 < 0.0) ? 0.0 : 1.0; // theta(j - i - 0.5);
+          const Real mask = iHeaviSide((j - i) - 0.5);
           for (int k = 0; k < nm; k++) {
-            Real theta_kj = (k - j - 1.5 < 0.0) ? 0.0 : 1.0; // theta(k - j - 1.5)
-            cpod(i, j, k) = (0.5 * coag3d(ikdelta, i, j) * cpod(i, j, k) +
-                             cpod(i, j, k) * theta_kj * dtheta_ji);
+            Kijk(i, j, k) = (0.5 * (i==j) * Kijk(i, j, k) +
+                             Kijk(i, j, k) * iHeaviSide((k - j) - 1.5) * mask);
           }
-          cpod(i, j, j) += coag3d(idpod, j, i);
-          cpod(i, j, j + 1) += e(j + 1, i) * dtheta_ji;
+          Kijk(i, j, j) += coag3d(cidx::Djk, j, i);
+          Kijk(i, j, j + 1) += Ejk(j + 1, i) * mask;
 
-        } //  end if
+        }
       });
 
-  // Initialization Part V
-  // -->cpod_nonzero and cpod_short array
   parthenon::par_for(
       parthenon::loop_pattern_mdrange_tag, "initializeCoag7", parthenon::DevExecSpace(),
       0, nm - 1, 0, nm - 1, KOKKOS_LAMBDA(const int i, const int j) {
         if (j <= i) {
-          // initialize cpod_notzero(i, j, 4) and cpod_short(i, j, 4)
           for (int k = 0; k < 4; k++) {
-            cpod_notzero(i, j, k) = 0;
-            cpod_short(i, j, k) = 0.0;
+            Kijk_sym_ind(i, j, k) = 0;
+            Kijk_sym(i, j, k) = 0.0;
           }
-          int inc = 0;
+          int kk = 0;
           for (int k = 0; k < nm; ++k) {
-            Real dum = cpod(i, j, k) + cpod(j, i, k);
-            if (dum != 0.0) {
-              cpod_notzero(i, j, inc) = k;
-              cpod_short(i, j, inc) = dum;
-              inc++;
+            const Real ksym = Kijk(i, j, k) + Kijk(j, i, k);
+            if (ksym != 0.0) {
+              Kijk_sym_ind(i, j, kk) = k;
+              Kijk_sym(i, j, kk) = ksym;
+              kk++;
             }
           }
         }

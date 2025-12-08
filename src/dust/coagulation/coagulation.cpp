@@ -126,8 +126,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin, Params &gas_par
   dcarrs.Kijk_sym_ind = ParArray3D<int>("Kijk_sym_ind", dcpars.nm, dcpars.nm, 4);
   dcarrs.Kijk_sym = ParArray3D<Real>("Kijk_sym", dcpars.nm, dcpars.nm, 4);
   InitializeArray(dcpars.nm, dcpars.pgrid, dcpars.rho_p, dcpars.chi, a, dust_size,
-                  dcarrs.idx_largest, dcarrs.mass_grid, dcarrs.coagR3D, dcarrs.Kijk_sym_ind,
-                  dcarrs.Kijk_sym);
+                  dcarrs.idx_largest, dcarrs.mass_grid, dcarrs.coagR3D,
+                  dcarrs.Kijk_sym_ind, dcarrs.Kijk_sym);
 
   // Stash CoagParams
   params.Add("coag_pars", dcpars);
@@ -177,10 +177,10 @@ TaskListStatus CoagulationDriver(Mesh *pm, parthenon::SimTime &tm) {
       std::vector<std::string>{dust::cons::density::name(), dust::cons::momentum::name(),
                                dust::prim::density::name(), dust::prim::velocity::name()},
       std::vector<int>{});
-    //include geom info to the variables
+  // include geom info to the variables
   parthenon::Metadata::FlagCollection geom_flags;
   geom_flags.TakeUnion(pm->packages.Get("geometry")->GetMetadataFlag());
-  auto geom_names = pm->GetVariableNames(geom_flags); 
+  auto geom_names = pm->GetVariableNames(geom_flags);
   coag_names.insert(coag_names.end(), geom_names.begin(), geom_names.end());
   auto &md_coag = pm->mesh_data.AddShallow("md_coag", pm->mesh_data.Get(), coag_names);
 
@@ -313,7 +313,6 @@ TaskStatus CoagulationStep(MeshData<Real> *md, const Real time, const Real dt) {
         const Real kT1 = kT * kT0;
         const StateParams kernel{gdens1, alpha, cs1, kT1, omega1};
 
-
         // Extract time(step)
         const Real time1 = time * time0;
         Real dt_sync = dt * time0;
@@ -330,7 +329,8 @@ TaskStatus CoagulationStep(MeshData<Real> *md, const Real time, const Real dt) {
               const bool gtf = vmesh(b, dust::prim::density(n), k, j, i) > dfloor;
               rhod(n) = gtf * vmesh(b, dust::prim::density(n), k, j, i) * rho0;
               for (int d = 0; d < nvel; d++) {
-                vel(VI(n, d)) = gtf * vmesh(b, dust::prim::velocity(VI(n, d)), k, j, i) * vel0;
+                vel(VI(n, d)) =
+                    gtf * vmesh(b, dust::prim::velocity(VI(n, d)), k, j, i) * vel0;
               }
             });
         mbr.team_barrier();
@@ -338,9 +338,9 @@ TaskStatus CoagulationStep(MeshData<Real> *md, const Real time, const Real dt) {
         // Coagulation Kernel
         // NOTE(@pdmullen): mbr.team_barrier() included at end of CoagulationOneCell
         // NOTE(@pdmullen): ncall could be stored or reduced (see 0a5d72b)
-        const int ncall = Coagulation::CoagulationOneCell(mbr, surface, time1, dt_sync, kernel, rhod, stime,
-                                        vel, nvel, Q, nQs, coag,
-                                        coag_arrays, rate, source, Q2);
+        const int ncall = Coagulation::CoagulationOneCell(
+            mbr, surface, time1, dt_sync, kernel, rhod, stime, vel, nvel, Q, nQs, coag,
+            coag_arrays, rate, source, Q2);
 
         // Update dust density and momentum after coagulation
         parthenon::par_for_inner(
@@ -382,8 +382,9 @@ void CoagulationDiagnostics(MeshData<Real> *md, DiagPack_t &vmesh,
   Real lmass_d = 0.0;
   int lmax_size = 1;
 
-  parthenon::par_reduce(parthenon::loop_pattern_mdrange_tag, "coag::diag", DevExecSpace(),
-      0, md->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+  parthenon::par_reduce(
+      parthenon::loop_pattern_mdrange_tag, "coag::diag", DevExecSpace(), 0,
+      md->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, Real &lsum,
                     int &lmax) {
         geometry::Coords<GEOM> coords(cpars, vmesh.GetCoordinates(b), k, j, i);
@@ -458,22 +459,22 @@ void WriteCoagulationDiagnostics(MeshData<Real> *md, const Real time, const Real
 //! \fn  void Dust::Coagulation::InitializeArray
 //  \brief Initialize static coagulation arrays
 void InitializeArray(const int nm, int &pgrid, const Real &rho_p, const Real &chi,
-                     const Real &la, const ParArray1D<Real> dsize, ParArray2D<int> idx_largest,
-                     ParArray1D<Real> mass_grid, ParArray3D<Real> coag3d,
-                     ParArray3D<int> Kijk_sym_ind, ParArray3D<Real> Kijk_sym) {
+                     const Real &la, const ParArray1D<Real> dsize,
+                     ParArray2D<int> idx_largest, ParArray1D<Real> mass_grid,
+                     ParArray3D<Real> coag3d, ParArray3D<int> Kijk_sym_ind,
+                     ParArray3D<Real> Kijk_sym) {
   parthenon::par_for(
       parthenon::loop_pattern_flatrange_tag, "initializeCoag1", parthenon::DevExecSpace(),
       0, nm - 1, KOKKOS_LAMBDA(const int i) {
-
         mass_grid(i) = 4.0 * M_PI / 3.0 * rho_p * dsize(i) * dsize(i) * dsize(i);
         for (int j = 0; j < nm; j++) {
-          Real tmp1 = (1.0 - 0.5 * (i==j));
+          Real tmp1 = (1.0 - 0.5 * (i == j));
           coag3d(cidx::rate_coef, i, j) = M_PI * SQR(dsize(i) + dsize(j)) * tmp1;
         }
       });
 
   const Real a = std::pow(10.0, la);
-  const int ce = static_cast<int>(std::floor(-1.0 / la * std::log10(1.0 - 1./a))) + 1;
+  const int ce = static_cast<int>(std::floor(-1.0 / la * std::log10(1.0 - 1. / a))) + 1;
 
   pgrid = static_cast<int>(std::floor(1.0 / la));
   const Real frag_slope = 1.0 / 6.0; // = 2.0 - 11.0 / 6.0;
@@ -492,7 +493,8 @@ void InitializeArray(const int nm, int &pgrid, const Real &rho_p, const Real &ch
         for (int j = 0; j <= i - pgrid - 1; j++) {
           idx_largest(i, j) = j;
           coag3d(cidx::Aij, i, j) = (1.0 + chi) * mass_grid(j);
-          coag3d(cidx::epsij, i, j) = chi * mass_grid(j) / (mass_grid(i) * (1.0 - 1./a));
+          coag3d(cidx::epsij, i, j) =
+              chi * mass_grid(j) / (mass_grid(i) * (1.0 - 1. / a));
         }
 
         int i1 = std::max(0, i - pgrid);
@@ -501,7 +503,6 @@ void InitializeArray(const int nm, int &pgrid, const Real &rho_p, const Real &ch
           coag3d(cidx::Aij, i, j) = (mass_grid(i) + mass_grid(j));
         }
       });
-
 
   ParArray2D<Real> Ejk("Ejk", nm, nm);
   parthenon::par_for(
@@ -516,14 +517,15 @@ void InitializeArray(const int nm, int &pgrid, const Real &rho_p, const Real &ch
             coag3d(cidx::dalp, k, j) = 0.0;
           }
         }
-        const Real fac1 = mass_grid(k) * (1.0 - 1./a);
+        const Real fac1 = mass_grid(k) * (1.0 - 1. / a);
         const Real fac2 = mass_grid(k) * (a - 1.0);
-        const Real fac3 = mass_grid(k) * (a - 1./a);
+        const Real fac3 = mass_grid(k) * (a - 1. / a);
         for (int j = 0; j < nm; ++j) {
           if (j <= k - ce) {
             Ejk(k, j) = mass_grid(j) / fac1;
           } else {
-            Ejk(k, j) = (1.0 - (mass_grid(j) - fac1) / fac2) * iHeaviSide(fac3 - mass_grid(j));
+            Ejk(k, j) =
+                (1.0 - (mass_grid(j) - fac1) / fac2) * iHeaviSide(fac3 - mass_grid(j));
           }
         }
       });
@@ -551,12 +553,11 @@ void InitializeArray(const int nm, int &pgrid, const Real &rho_p, const Real &ch
 
           const Real mask = iHeaviSide((j - i) - 0.5);
           for (int k = 0; k < nm; k++) {
-            Kijk(i, j, k) = (0.5 * (i==j) * Kijk(i, j, k) +
+            Kijk(i, j, k) = (0.5 * (i == j) * Kijk(i, j, k) +
                              Kijk(i, j, k) * iHeaviSide((k - j) - 1.5) * mask);
           }
           Kijk(i, j, j) += coag3d(cidx::Djk, j, i);
           Kijk(i, j, j + 1) += Ejk(j + 1, i) * mask;
-
         }
       });
 

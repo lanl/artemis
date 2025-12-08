@@ -83,6 +83,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 //! \fn  TaskStatus RotatingFrame::RotatingFrameForce
 //! \brief
 TaskStatus RotatingFrameForce(MeshData<Real> *md, const Real time, const Real dt) {
+  PARTHENON_INSTRUMENT
   using parthenon::MakePackDescriptor;
   using TE = parthenon::TopologicalElement;
   auto pm = md->GetParentPointer();
@@ -121,6 +122,7 @@ TaskStatus RotatingFrameForce(MeshData<Real> *md, const Real time, const Real dt
 //! \brief Compute multiple of linear advection timestep (if do_shear)
 template <Coordinates GEOM>
 Real EstimateTimestepMesh(MeshData<Real> *md) {
+  PARTHENON_INSTRUMENT
   auto pmesh = md->GetParentPointer();
   const bool do_shear = pmesh->packages.Get("artemis")->template Param<bool>("do_shear");
   if (!(do_shear)) return Big<Real>();
@@ -134,6 +136,7 @@ Real EstimateTimestepMesh(MeshData<Real> *md) {
 //! \fn Real RotatingFrame::EstimateTimeStep
 //! \brief Not enrolled in parthenon's determination for global dt
 Real EstimateTimestep(parthenon::Mesh *pmesh, const Real dt_ratio) {
+  PARTHENON_INSTRUMENT
   // Extract rotating frame params
   auto &rframe_pkg = pmesh->packages.Get("rotating_frame");
   const Real &om0 = rframe_pkg->Param<Real>("omega");

@@ -36,6 +36,7 @@ namespace Moments {
 //! \fn  StateDescriptor Moments::Initialize
 //! \brief Adds intialization function for moments package
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
+                                            ArtemisUtils::Units &units,
                                             ArtemisUtils::Constants &constants) {
   auto moments = std::make_shared<StateDescriptor>("moments");
   Params &params = moments->AllParams();
@@ -82,6 +83,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   const Real cfl_number = pin->GetOrAddReal("radiation/moment", "cfl", 0.8);
   params.Add("cfl", cfl_number);
 
+  params.Add("fatal_if_unconverged",
+             pin->GetOrAddBoolean("radiation/moment", "fatal_if_unconverged", true));
+
   // how to handle the matter coupling:
   // full_coupling = false only does a loop over energy couopling
   // full_coupling = true also does an outer loop over momentum coupling
@@ -100,6 +104,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   // Floors
   const Real efloor = pin->GetOrAddReal("radiation/moment", "efloor", 1.0e-20);
   params.Add("efloor", efloor);
+
+  const Real tfloor = pin->GetOrAddReal("radiation/moment", "tfloor_cgs", 10.); // K
+  params.Add("tfloor", tfloor * units.GetTemperaturePhysicalToCode());
 
   // Number of radiation species
   const int nspecies = pin->GetOrAddInteger("radiation/moment", "nspecies", 1);
@@ -262,6 +269,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
 //! \fn  TaskStatus Moments::CalculateFluxes
 //! \brief Evaluates advective fluxes for moments evolution
 TaskStatus CalculateFluxes(MeshData<Real> *md) {
+  PARTHENON_INSTRUMENT
   auto pm = md->GetParentPointer();
   auto &resolved_pkgs = pm->resolved_packages;
   auto &pkg = pm->packages.Get("moments");
@@ -300,6 +308,7 @@ TaskStatus CalculateFluxes(MeshData<Real> *md) {
 //! \fn  TaskStatus Moments::FluxSource
 //! \brief Evaluates coordinate terms from advective fluxes for moments evolution
 TaskStatus FluxSource(MeshData<Real> *md, const Real dt) {
+  PARTHENON_INSTRUMENT
   auto pm = md->GetParentPointer();
   auto &resolved_pkgs = pm->resolved_packages;
   auto &pkg = pm->packages.Get("moments");
@@ -338,6 +347,7 @@ TaskStatus FluxSource(MeshData<Real> *md, const Real dt) {
 //! \brief
 template <Coordinates GEOM>
 TaskStatus MatterCoupling(MeshData<Real> *u0, const Real dt) {
+  PARTHENON_INSTRUMENT
   auto pm = u0->GetParentPointer();
   auto &artemis_pkg = pm->packages.Get("artemis");
 

@@ -114,6 +114,7 @@ KOKKOS_INLINE_FUNCTION void HydroEigensystem(const Real d, const Real v1, const 
 //! \brief Sets initial conditions for linear wave tests
 template <Coordinates GEOM>
 inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
+  PARTHENON_INSTRUMENT
   using parthenon::MakePackDescriptor;
   const Mesh *pmesh = pmb->pmy_mesh;
   const int ndim = pmesh->ndim;
@@ -272,6 +273,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 //! periods.
 template <Coordinates GEOM>
 inline void UserWorkAfterLoop(Mesh *pmesh, ParameterInput *pin, parthenon::SimTime &tm) {
+  PARTHENON_INSTRUMENT
   using parthenon::MakePackDescriptor;
   const int nhydro = 5;
   const int nvars = nhydro;

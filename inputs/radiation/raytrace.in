@@ -1,0 +1,143 @@
+# ========================================================================================
+#  (C) (or copyright) 2023-2025. Triad National Security, LLC. All rights reserved.
+#
+#  This program was produced under U.S. Government contract 89233218CNA000001 for Los
+#  Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
+#  for the U.S. Department of Energy/National Nuclear Security Administration. All rights
+#  in the program are reserved by Triad National Security, LLC, and the U.S. Department
+#  of Energy/National Nuclear Security Administration. The Government is granted for
+#  itself and others acting on its behalf a nonexclusive, paid-up, irrevocable worldwide
+#  license in this material to reproduce, prepare derivative works, distribute copies to
+#  the public, perform publicly and display publicly, and to permit others to do so.
+# ========================================================================================
+
+<artemis>
+problem = disk           # name of the pgen
+coordinates = spherical  # coordinate system
+radial_spacing = logarithmic
+physical_units = cgs
+unit_conversion = ppd
+
+<parthenon/job>
+problem_id = disk  # problem ID: basename of output filenames
+
+<parthenon/output1>
+variables = gas.prim.density,  &
+            gas.prim.velocity, &
+            gas.prim.pressure, &
+            rad.prim.energy, &
+            rad.prim.flux, &
+            gas.src.energy
+file_type = hdf5   # HDF5 data dump
+dt        = 0.01   # time increment between outputs
+swarms = star
+swarm_variables = star.swarm_position.x, &
+                  star.swarm_position.y, &
+                  rad.part.flux
+
+
+<parthenon/time>
+nlim       = -1        # cycle limit
+tlim       = 62.8      # time limit
+integrator = rk2       # time integration algorithm
+ncycle_out = 1         # interval for stdout summary info
+ncycle_out_mesh = 100  # interval for stdout summary info
+
+<parthenon/mesh>
+refinement = static
+nghost = 2
+
+nx1    = 256                 # Number of zones in X1-direction
+x1min  = -1.2 #=log(0.3)   # minimum value of X1
+x1max  = 1.72 #=log(5.6)   # maximum value of X1
+ix1_bc = extrap              # Inner-X1 boundary condition flag
+ox1_bc = extrap              # Outer-X1 boundary condition flag
+
+nx2    = 256                 # Number of zones in X2-direction
+x2min  = 1.059856161608513   # minimum value of X2
+x2max  = 2.081736491981280   # maximum value of X2
+ix2_bc = extrap              # Inner-X2 boundary condition flag
+ox2_bc = extrap              # Outer-X2 boundary condition flag
+
+nx3    = 1                   # Number of zones in X3-direction
+x3min  = -3.141592653589793  # minimum value of X3
+x3max  = 3.141592653589793   # maximum value of X3
+ix3_bc = periodic            # Inner-X3 boundary condition flag
+ox3_bc = periodic            # Outer-X3 boundary condition flag
+
+<parthenon/meshblock>
+nx1 = 64  # Number of cells in each MeshBlock, X1-dir
+nx2 = 64  # Number of cells in each MeshBlock, X2-dir
+nx3 = 1   # Number of cells in each MeshBlock, X3-dir
+
+<parthenon/static_refinement1>
+level = 1
+x1min = 0.0 #1.0
+x1max = 0.69 #2.0
+x2min = 1.2707963267948965 
+x2max = 1.8707963267948966
+x3min = -0.5
+x3max =  0.5
+
+
+<physics>
+gas = true
+gravity = true
+#viscosity = true
+#rotating_frame = true
+radiation = true
+raytrace = true
+
+<gas>
+cfl = 0.3
+gamma = 1.4
+reconstruct = plm
+riemann = hlle
+
+<gas/opacity/uv/absorption>
+opacity_model = constant
+kappa_a = 0.1
+
+<radiation/raytrace>
+band = uv
+radius_solar = 3.0
+temperature_cgs = 5000.
+
+<gas/opacity/absorption>
+opacity_model = powerlaw  # absorption opacity model
+coef_kappa_a = 577.0      # kappa_a,0 constant (must be passed in cgs)
+rho_exp = -1.0            # dens exponent for opacity powerlaw
+temp_exp = 0.0            # temp exponent for opacity powerlaw
+
+
+<radiation/moment>
+cfl = 0.3
+reconstruct = plm
+riemann = hlle
+efloor = 1e-16
+closure = m1
+creduc = 1000
+#inner_iteration_tol = 1e-8
+#inner_iteration_max = 1000
+full_coupling = true
+fatal_if_unconverged = false
+
+
+<rotating_frame>
+omega = 1.0
+
+<gas/viscosity>
+type = alpha
+alpha = 1e-3
+
+<gravity/point>
+mass = 1.0
+
+<problem>
+r0 = 1.0
+rho0 = 8e-4
+dslope = -2.25
+flare = 0.25
+h0 = 0.05
+polytropic_index = 1
+quiet_start = true

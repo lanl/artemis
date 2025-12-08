@@ -29,6 +29,7 @@ namespace Diffusion {
 //! \brief Zeroes diffusion fluxes
 template <typename SparsePackFlux>
 TaskStatus ZeroDiffusionImpl(MeshData<Real> *md, SparsePackFlux vf) {
+  PARTHENON_INSTRUMENT
   auto pm = md->GetParentPointer();
   const auto multi_d = (pm->ndim > 1);
   const auto three_d = (pm->ndim > 2);
@@ -64,6 +65,7 @@ template <Coordinates GEOM, Fluid FLUID_TYPE, DiffType DIFF, typename PKG,
           typename SparsePackPrim>
 Real EstimateTimestep(MeshData<Real> *md, DiffCoeffParams &dp, PKG &pkg, const EOS &eos,
                       SparsePackPrim vprim) {
+  PARTHENON_INSTRUMENT
   using parthenon::MakePackDescriptor;
   auto pm = md->GetParentPointer();
   IndexRange ib = md->GetBoundsI(IndexDomain::interior);
@@ -120,6 +122,7 @@ template <Coordinates GEOM, Fluid FLUID_TYPE, typename PKG, typename SparsePackC
 TaskStatus DiffusionUpdateImpl(MeshData<Real> *md, PKG &pkg, SparsePackCons v0,
                                SparsePackPrim p, SparsePackFlux vf,
                                const bool do_viscosity, const Real dt) {
+  PARTHENON_INSTRUMENT
   using parthenon::MakePackDescriptor;
   using TE = parthenon::TopologicalElement;
 

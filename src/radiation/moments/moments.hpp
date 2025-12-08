@@ -22,7 +22,8 @@ namespace Moments {
 
 //----------------------------------------------------------------------------------------
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
-                                            ArtemisUtils::Constants &Constants);
+                                            ArtemisUtils::Units &units,
+                                            ArtemisUtils::Constants &constants);
 TaskStatus CalculateFluxes(MeshData<Real> *md);
 TaskStatus FluxSource(MeshData<Real> *md, const Real dt);
 
@@ -44,6 +45,7 @@ TaskCollection MomentsTasks(Mesh *pmesh, const SimTime &tm,
 //! \brief Not enrolled in parthenon's determination for global dt
 template <Coordinates GEOM>
 Real EstimateTimeStep(parthenon::Mesh *pmesh) {
+  PARTHENON_INSTRUMENT
   auto &moments_pkg = pmesh->packages.Get("moments");
   auto &params = moments_pkg->AllParams();
 

@@ -47,6 +47,7 @@ static BumpParams bump_params;
 //! \brief
 template <Coordinates GEOM>
 inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
+  PARTHENON_INSTRUMENT
   using parthenon::MakePackDescriptor;
 
   auto pm = pmb->pmy_mesh;

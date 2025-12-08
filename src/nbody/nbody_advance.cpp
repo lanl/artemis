@@ -84,6 +84,7 @@ namespace NBody {
 //!         stage 2 integrates to end
 TaskStatus Advance(Mesh *pm, const Real time, const int stage,
                    const parthenon::LowStorageIntegrator *nbody_integ) {
+  PARTHENON_INSTRUMENT
   auto &nbody_pkg = pm->packages.Get("nbody");
   auto particle_id = nbody_pkg->Param<std::vector<int>>("particle_id");
   auto particles = nbody_pkg->Param<ParArray1D<Particle>>("particles");

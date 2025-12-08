@@ -106,6 +106,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 //! \brief Initializes the geometry meshblock data
 template <Coordinates GEOM>
 void InitBlockGeom(MeshBlock *pmb, ParameterInput *pin) {
+  PARTHENON_INSTRUMENT
   using parthenon::MakePackDescriptor;
   auto pm = pmb->pmy_mesh;
   const int ndim_ = pm->ndim;

@@ -1,29 +1,6 @@
 ---
 gas:
   _description: "Top level gas package"
-  eos:
-    _type: string
-    _default: ideal
-    _description: "Choice of gas EOS"
-    ideal:
-      _type: opt
-      _description: "Ideal EOS"
-
-  gamma:
-    _type: Real
-    _default: "5/3"
-    _description:  "Adiabatic index for ideal EOS"
-
-  mu:
-    _type: Real
-    _default: "1."
-    _description:  "Mean molecular weight for ideal EOS"
-    _units: "amu"
-
-  cv:
-   _type: Real
-   _description: "Optional specific heat for ideal EOS to override mu"
-   _units: "erg g^-1 K^-1"
 
   cfl:
     _type: Real
@@ -97,70 +74,6 @@ gas:
       _type: opt
       _description: "HLLC"
 
-  damping:
-    _type: node
-    _description: "Apply a drag force to the material that lowers the normal velocity to the boundary."
-    inner_x(1,2,3):
-      _type: Real
-      _default: "&infin;"
-      _description: "The end of the inner damping layer in the X(1,2,3)-direction"
-      _units: "au"
-    outer_x(1,2,3):
-      _type: Real
-      _default: "&infin;"
-      _description: "The beginning of the outer damping layer in the X(1,2,3)-direction"
-      _units: "au"
-    inner_x(1,2,3)_rate:
-      _type: Real
-      _default: "0.0"
-      _description: "The inner damping rate."
-      _units: "yr^-1"
-    outer_x(1,2,3)_rate:
-      _type: Real
-      _default: "0.0"
-      _description: "The outer damping rate."
-      _units: "yr^-1"
-    damp_to_visc:
-      _type: bool
-      _description: "Damp the gas to the viscous velocity (if defined)."
-
-  viscosity:
-    _type: node
-    _description: "Viscosity models"
-    type:
-      _type: string
-      _description: "Viscosity model"
-      alpha:
-        _type: opt
-        _description: "Alpha viscosity"
-      powerlaw:
-        _type: opt
-        _description: "Powerlaw kinematic viscosity"
-    averaging:
-      _type: string
-      _default: "arithmetic"
-      _description: "Averaging method for the face diffusion coefficient"
-      arithmetic:
-        _type: opt
-        _description: "Simple average (L+R)/2"
-      harmonic:
-        _type: opt
-        _description: "Harmonic average 2*(L*R)/(L+R)"
-    alpha:
-      _type: Real
-      _description: "Value of alpha"
-    nu:
-      _type: Real
-      _description: "Value of the kinematic shear viscosity"
-      _units: "cm^2 s^-1"
-    r_exp:
-      _type: Real
-      _description: "Value of the cylindrical powerlaw exponent"
-    eta_bulk:
-      _type: Real
-      _default: "0.0"
-      _description: "bulk viscosity multiplier on the shear viscosity"
-
   conductivity:
     _type: node
     _description: "Conductivity models"
@@ -207,6 +120,112 @@ gas:
       _description: "Reference density"
       _units: "g cm^-3"
 
+
+  damping:
+    _type: node
+    _description: "Apply a drag force to the material that lowers the normal velocity to the boundary."
+    inner_x(1,2,3):
+      _type: Real
+      _default: "&infin;"
+      _description: "The end of the inner damping layer in the X(1,2,3)-direction"
+      _units: "au"
+    outer_x(1,2,3):
+      _type: Real
+      _default: "&infin;"
+      _description: "The beginning of the outer damping layer in the X(1,2,3)-direction"
+      _units: "au"
+    inner_x(1,2,3)_rate:
+      _type: Real
+      _default: "0.0"
+      _description: "The inner damping rate."
+      _units: "yr^-1"
+    outer_x(1,2,3)_rate:
+      _type: Real
+      _default: "0.0"
+      _description: "The outer damping rate."
+      _units: "yr^-1"
+    damp_to_visc:
+      _type: bool
+      _description: "Damp the gas to the viscous velocity (if defined)."
+
+  eos:
+    _type: node
+    _description: "Equation of State models"
+    h-he:
+      _type: node
+      _description: "The ideal gas hydrogen-helium mixture from D'Angelo et al. 2013. A Spiner table will be generated."
+      ldmin:
+        _type: Real
+        _description: "Minimum log10(density) of the table. In CGS."
+        _default: "-15.0"
+      ldmax:
+        _type: Real
+        _description: "Maximum log10(density) of the table. In CGS."
+        _default: "-3.0"
+      ltmin:
+        _type: Real
+        _description: "Minimum log10(temp) of the table. In CGS."
+        _default: "0.0"
+      ltmax:
+        _type: Real
+        _description: "Maximum log10(temp) of the table. In CGS."
+        _default: "6.0"          
+      mu:
+        _type: Real
+        _description: "Nominal mean mass of the material. This is only used when an EOS call cannot determine mu."   
+        _default: "1.0"
+      nd:
+        _type: int
+        _description: "Number of density points in the table."
+        _default: "100"
+      nt:
+        _type: int
+        _description: "Number of temperature points in the table."
+        _default: "100"     
+      save_to_file:
+        _type: string
+        _description: "Save and/or load the generated table to this file. The default will not save/load the table."
+        _default: ""
+      x:
+        _type: Real
+        _description: "Hydrogen mass fraction of the material."
+      y:
+        _type: Real
+        _description: "Helium mass fraction of the material."
+    ideal:
+      _type: node
+      _description: "A (perfect) ideal gas."
+      gamma:
+        _type: Real
+        _description: "Adiabatic index."
+        _default: "1.66666666667"
+      mu:
+        _type: Real
+        _description: "Mean mass of the material. This is exclusive with cv."
+      cv:
+        _type: Real
+        _description: "Specific heat of the material. This is exclusive with mu."
+
+    sesame_re:
+      _type: node
+      _description: "Tabular (SESAME) EOS. Density/internal energy inputs. Requires ARTEMIS_ENABLE_SESAME_EOS and Spiner."
+      eos_file:
+        _type: string
+        _description: "The filename of the .sp5 file."
+      mu:
+        _type: Real
+        _description: "Nominal mean mass of the material. This is only used when an EOS call cannot determine mu."   
+        _default: "1.0" 
+    sesame_rt:
+      _type: node
+      _description: "Tabular (SESAME) EOS. Density/temperature inputs. Requires ARTEMIS_ENABLE_SESAME_EOS and Spiner."
+      eos_file:
+        _type: string
+        _description: "The filename of the .sp5 file."
+      mu:
+        _type: Real
+        _description: "Nominal mean mass of the material. This is only used when an EOS call cannot determine mu."   
+        _default: "1.0" 
 
   opacity/absorption:
     _type: node
@@ -263,6 +282,42 @@ gas:
       _default: "0.0"
       _description: "Specific scattering opacity"
       _units: "cm^2 g^-1 (unless invoking custom scattering model)"
+  viscosity:
+    _type: node
+    _description: "Viscosity models"
+    type:
+      _type: string
+      _description: "Viscosity model"
+      alpha:
+        _type: opt
+        _description: "Alpha viscosity"
+      powerlaw:
+        _type: opt
+        _description: "Powerlaw kinematic viscosity"
+    averaging:
+      _type: string
+      _default: "arithmetic"
+      _description: "Averaging method for the face diffusion coefficient"
+      arithmetic:
+        _type: opt
+        _description: "Simple average (L+R)/2"
+      harmonic:
+        _type: opt
+        _description: "Harmonic average 2*(L*R)/(L+R)"
+    alpha:
+      _type: Real
+      _description: "Value of alpha"
+    nu:
+      _type: Real
+      _description: "Value of the kinematic shear viscosity"
+      _units: "cm^2 s^-1"
+    r_exp:
+      _type: Real
+      _description: "Value of the cylindrical powerlaw exponent"
+    eta_bulk:
+      _type: Real
+      _default: "0.0"
+      _description: "bulk viscosity multiplier on the shear viscosity"
 
 cooling:
   type:

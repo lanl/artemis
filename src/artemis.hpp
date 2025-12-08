@@ -162,7 +162,7 @@ enum class Coordinates {
 };
 
 // ...Riemann solvers
-enum class RSolver { hllc, hlle, llf, ghllc, null };
+enum class RSolver { hllc_general, hlle, llf, hllc_gamma, null };
 // ... Upwinding (left vs right state)
 enum class Upwind { l, r, null };
 // ...Reconstruction algorithms

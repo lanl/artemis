@@ -62,7 +62,7 @@ gas:
       _description: "Piecewise Parabolic"
   riemann:
     _type: string
-    _default: hllc
+    _default: hllc-general
     _description: "Riemann solver option."
     llf:
       _type: opt
@@ -70,9 +70,12 @@ gas:
     hlle:
       _type: opt
       _description: "HLLE"
-    hllc:
+    hllc-general:
       _type: opt
-      _description: "HLLC"
+      _description: "HLLC for a general EOS."
+    hllc-gamma:
+      _type: opt
+      _description: "HLLC for a a perfect, gamma-law EOS."
 
   conductivity:
     _type: node

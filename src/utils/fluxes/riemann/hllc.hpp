@@ -16,7 +16,7 @@
 //========================================================================================
 //! \file hllc.hpp
 //! \brief The HLLC Riemann solver for hydrodynamics, an extension of the HLLE fluxes to
-//! include the contact wave.  Only works for ideal gas EOS in hydrodynamics.
+//! include the contact wave.
 //!
 //! REFERENCES:
 //! - E.F. Toro, "Riemann Solvers and numerical methods for fluid dynamics", 2nd ed.,
@@ -41,10 +41,10 @@
 namespace ArtemisUtils {
 
 //----------------------------------------------------------------------------------------
-//! \class ArtemisUtils::RiemannSolver<RSolver::hllc, ...>
+//! \class ArtemisUtils::RiemannSolver<RSolver::hllc_gamma, ...>
 //! \brief The HLLC Riemann solver for ideal gas hydrodynamics
 template <Fluid FLUID_TYPE, Closure CTYPE>
-struct RiemannSolver<RSolver::ghllc, FLUID_TYPE, CTYPE,
+struct RiemannSolver<RSolver::hllc_gamma, FLUID_TYPE, CTYPE,
                      std::enable_if_t<FLUID_TYPE == Fluid::gas>> {
   template <typename V1, typename V2, typename V3>
   KOKKOS_INLINE_FUNCTION void operator()(const EOS &eos, const Real c, const Real chat,
@@ -187,10 +187,10 @@ struct RiemannSolver<RSolver::ghllc, FLUID_TYPE, CTYPE,
 };
 
 //----------------------------------------------------------------------------------------
-//! \class ArtemisUtils::RiemannSolver<RSolver::hllc, ...>
-//! \brief The HLLC Riemann solver for ideal gas hydrodynamics
+//! \class ArtemisUtils::RiemannSolver<RSolver::hllc_general, ...>
+//! \brief The HLLC Riemann solver for general equations of state
 template <Fluid FLUID_TYPE, Closure CTYPE>
-struct RiemannSolver<RSolver::hllc, FLUID_TYPE, CTYPE,
+struct RiemannSolver<RSolver::hllc_general, FLUID_TYPE, CTYPE,
                      std::enable_if_t<FLUID_TYPE == Fluid::gas>> {
   template <typename V1, typename V2, typename V3>
   KOKKOS_INLINE_FUNCTION void operator()(const EOS &eos, const Real c, const Real chat,

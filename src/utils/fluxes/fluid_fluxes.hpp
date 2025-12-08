@@ -445,17 +445,17 @@ TaskStatus CalculateFluxesRiemannSelect(MeshData<Real> *md, PKG &pkg, PRIM vp, F
 
   // Select CalculateFluxesReconSelect based on Riemann solver
   typedef RSolver R;
-  if (riemann_method == R::hllc) {
+  if (riemann_method == R::hllc_general) {
     if constexpr (F != Fluid::radiation && F != Fluid::dust) {
-      return CalculateFluxesReconSelect<G, F, C, R::hllc>(md, pkg, vp, vflx, vface, vg,
-                                                          pcm);
+      return CalculateFluxesReconSelect<G, F, C, R::hllc_general>(md, pkg, vp, vflx,
+                                                                  vface, vg, pcm);
     } else {
       PARTHENON_FAIL("Radiation fluid does not support an HLLC solver")
     }
-  } else if (riemann_method == R::ghllc) {
+  } else if (riemann_method == R::hllc_gamma) {
     if constexpr (F != Fluid::radiation && F != Fluid::dust) {
-      return CalculateFluxesReconSelect<G, F, C, R::ghllc>(md, pkg, vp, vflx, vface, vg,
-                                                           pcm);
+      return CalculateFluxesReconSelect<G, F, C, R::hllc_gamma>(md, pkg, vp, vflx, vface,
+                                                                vg, pcm);
     } else {
       PARTHENON_FAIL("Radiation fluid does not support an HLLC solver")
     }

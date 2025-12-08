@@ -143,10 +143,10 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
       params.Add("eos_d", eos_device);
     }
 #ifdef WITH_SESAME
-  } else if (pin->DoesBlockExist("gas/eos/table_re")) {
-    eos_type = "table_re";
+  } else if (pin->DoesBlockExist("gas/eos/sesame_re")) {
+    eos_type = "sesame_re";
     params.Add("eos_type", eos_type);
-    const std::string block_name = "gas/eos/table_re";
+    const std::string block_name = "gas/eos/sesame_re";
     std::string filename = pin->GetString(block_name, "eos_file");
     EOS eos_host = singularity::UnitSystem<singularity::SpinerEOSDependsRhoSie>(
         singularity::SpinerEOSDependsRhoSie(filename, "gas"),
@@ -157,9 +157,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
     params.Add("eos_h", eos_host);
     params.Add("eos_d", eos_device);
     params.Add("mu", pin->GetOrAddReal(block_name, "mu", 1.));
-  } else if (pin->DoesBlockExist("gas/eos/table_rt")) {
-    eos_type = "table_rt";
-    const std::string block_name = "gas/eos/table_rt";
+  } else if (pin->DoesBlockExist("gas/eos/sesame_rt")) {
+    eos_type = "sesame_rt";
+    const std::string block_name = "gas/eos/sesame_rt";
     std::string filename = pin->GetString(block_name, "eos_file");
     EOS eos_host = singularity::UnitSystem<singularity::SpinerEOSDependsRhoT>(
         singularity::SpinerEOSDependsRhoT(filename, "gas"),

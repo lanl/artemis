@@ -177,6 +177,11 @@ TaskListStatus CoagulationDriver(Mesh *pm, parthenon::SimTime &tm) {
       std::vector<std::string>{dust::cons::density::name(), dust::cons::momentum::name(),
                                dust::prim::density::name(), dust::prim::velocity::name()},
       std::vector<int>{});
+    //include geom info to the variables
+  parthenon::Metadata::FlagCollection geom_flags;
+  geom_flags.TakeUnion(pm->packages.Get("geometry")->GetMetadataFlag());
+  auto geom_names = pm->GetVariableNames(geom_flags); 
+  coag_names.insert(coag_names.end(), geom_names.begin(), geom_names.end());
   auto &md_coag = pm->mesh_data.AddShallow("md_coag", pm->mesh_data.Get(), coag_names);
 
   // Assemble tasks

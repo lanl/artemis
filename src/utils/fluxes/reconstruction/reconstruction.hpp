@@ -44,8 +44,9 @@ struct ReconGradient {
 };
 
 //----------------------------------------------------------------------------------------
-//! \class  TaskStatus ArtemisUtils::correct_recon
-//! \brief Utility to zero radiation fluxes when near ~round-off
+//! \class  TaskStatus ArtemisUtils::post_recon
+//! \brief Utility to apply floors, make thermodynamically consistent, or zero radiation
+//! fluxes when near ~round-off
 template <Fluid F, typename V>
 KOKKOS_INLINE_FUNCTION void
 post_recon(const EOS &eos, const Real dfloor, const Real siefloor,
@@ -78,31 +79,34 @@ post_recon(const EOS &eos, const Real dfloor, const Real siefloor,
       const int IPR = nspecies * 4 + n;
       const int ISE = nspecies * 5 + n;
       const int IBL = nspecies * 6 + n;
-      parthenon::par_for_inner(
-          DEFAULT_INNER_LOOP_PATTERN, member, il, iu, [&](const int i) {
-            const int ipl = i + (dir == 1);
-            Real &dL = ql(IDN, ipl);
-            Real &pL = ql(IPR, ipl);
-            Real &eL = ql(ISE, ipl);
-            Real &dR = qr(IDN, i);
-            Real &pR = qr(IPR, i);
-            Real &eR = qr(ISE, i);
-            // Floor everything
-            dL = std::max(dL, dfloor);
-            dR = std::max(dR, dfloor);
+      parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, member, il, iu,
+                               [&](const int i) {
+                                 const int ipl = i + (dir == 1);
+                                 Real &dL = ql(IDN, ipl);
+                                 Real &pL = ql(IPR, ipl);
+                                 Real &eL = ql(ISE, ipl);
+                                 Real &bL = qr(IBL, ipl);
+                                 Real &dR = qr(IDN, i);
+                                 Real &pR = qr(IPR, i);
+                                 Real &eR = qr(ISE, i);
+                                 Real &bR = qr(IBL, i);
 
-            pL = std::max(
-                pL, eos.PressureFromDensityInternalEnergy(dL, std::max(eL, siefloor)));
-            pR = std::max(
-                pR, eos.PressureFromDensityInternalEnergy(dR, std::max(eR, siefloor)));
+                                 // Floor everything
+                                 dL = std::max(dL, dfloor);
+                                 dR = std::max(dR, dfloor);
+                                 eL = std::max(eL, siefloor);
+                                 eR = std::max(eR, siefloor);
 
-            // Calculate derived EOS quantities
-            eL = ArtemisUtils::EofPR(eos, pL, dL);
-            ql(IBL, ipl) = eos.BulkModulusFromDensityInternalEnergy(dL, eL);
-
-            eR = ArtemisUtils::EofPR(eos, pR, dR);
-            qr(IBL, i) = eos.BulkModulusFromDensityInternalEnergy(dR, eR);
-          });
+                                 // Only correct these if something is wrong
+                                 if ((pL <= 0.0) || (bL <= 0.0)) {
+                                   pL = eos.PressureFromDensityInternalEnergy(dL, eL);
+                                   bL = eos.BulkModulusFromDensityInternalEnergy(dL, eL);
+                                 }
+                                 if ((pR <= 0.0) || (bR <= 0.0)) {
+                                   pR = eos.PressureFromDensityInternalEnergy(dR, eR);
+                                   bR = eos.BulkModulusFromDensityInternalEnergy(dR, eR);
+                                 }
+                               });
     }
   }
 }

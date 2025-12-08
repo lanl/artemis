@@ -71,8 +71,7 @@ post_recon(const EOS &eos, const Real dfloor, const Real siefloor,
                                });
     }
   } else if constexpr (F == Fluid::gas) {
-    // Make sure reconstructed values are thermodynamically consistent with the density &
-    // pressure
+    // Make sure the reconstructed states make sense
     const int nspecies = q.GetSize(b, gas::prim::density());
     for (int n = 0; n < nspecies; ++n) {
       const int IDN = n;

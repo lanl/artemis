@@ -33,9 +33,12 @@ using EOS =
     singularity::Variant<singularity::UnitSystem<singularity::IdealGas>
 #ifdef SPINER_USE_HDF
                          ,
-                         singularity::UnitSystem<ArtemisEOS::IdealHHe>,
+                         singularity::UnitSystem<ArtemisEOS::IdealHHe>
+#ifdef WITH_SESAME
+                         ,
                          singularity::UnitSystem<singularity::SpinerEOSDependsRhoT>,
                          singularity::UnitSystem<singularity::SpinerEOSDependsRhoSie>
+#endif
 #endif
                          >;
 

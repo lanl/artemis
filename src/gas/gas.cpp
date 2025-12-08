@@ -142,6 +142,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
       params.Add("eos_h", eos_host);
       params.Add("eos_d", eos_device);
     }
+#ifdef WITH_SESAME
   } else if (pin->DoesBlockExist("gas/eos/table_re")) {
     eos_type = "table_re";
     params.Add("eos_type", eos_type);
@@ -169,7 +170,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
     params.Add("eos_h", eos_host);
     params.Add("eos_d", eos_device);
     params.Add("mu", pin->GetOrAddReal(block_name, "mu", 1.));
-#endif
+#endif // WITH_SESAME
+#endif // SPINER_USE_HDF
   } else {
     PARTHENON_FAIL("Unsupported gas EOS!");
   }

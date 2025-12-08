@@ -69,7 +69,7 @@ gravity = true
 <gas>
 cfl = 0.3
 reconstruct = ppm
-riemann = hllc
+riemann = hllc-general
 dfloor = 1.0e-10
 siefloor = 1.0e-10
 

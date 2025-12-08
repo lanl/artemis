@@ -73,7 +73,7 @@ radiation = true  # enable IMC radiation
 <gas>
 cfl = 0.3           # CFL number
 reconstruct = plm   # reconstruction algorithm
-riemann = hllc      # Riemann solver
+riemann = hllc-general      # Riemann solver
 
 <gas/eos/ideal>
 mu = 1.008          # mean molecular weight

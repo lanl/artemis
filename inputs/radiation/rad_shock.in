@@ -81,7 +81,7 @@ radiation = true  # enable IMC radiation
 <gas>
 cfl = 0.8           # CFL number
 reconstruct = plm   # reconstruction algorithm
-riemann = hllc      # Riemann solver
+riemann = hllc-general      # Riemann solver
 
 <gas/eos/ideal>
 gamma = 1.666666    # adiabatic index

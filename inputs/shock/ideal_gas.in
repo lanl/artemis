@@ -64,7 +64,7 @@ gas = true        # enable gas hydrodynamics
 <gas>
 cfl = 0.8           # CFL number
 reconstruct = plm   # reconstruction algorithm
-riemann = hllc      # Riemann solver
+riemann = hllc-general      # Riemann solver
 
 # Perfect gas
 #<gas/eos/ideal>

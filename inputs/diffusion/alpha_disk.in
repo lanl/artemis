@@ -67,7 +67,7 @@ viscosity = true
 <gas>
 cfl = 0.3
 reconstruct = plm
-riemann = hllc
+riemann = hllc-general
 dfloor = 1.0e-10
 siefloor = 1.0e-15
 

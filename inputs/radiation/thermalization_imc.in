@@ -64,13 +64,15 @@ gas = true
 radiation = true
 
 <gas>
-gamma = 1.4  # adiabatic index
-mu = 28.96   # mean molecular weight
 cfl = 0.8
 reconstruct = plm
-riemann = hllc
+riemann = hllc-general
 dfloor = 1.0e-10
 siefloor = 1.0e-10
+
+<gas/eos/ideal>
+gamma = 1.4  # adiabatic index
+mu = 28.96   # mean molecular weight
 
 <gas/opacity/absorption>
 opacity_model = constant

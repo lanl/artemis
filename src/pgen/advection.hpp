@@ -152,6 +152,8 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   av.v1_0 = av.vflow;
   if (do_gas) {
     auto gas_pkg = pmb->packages.Get("gas");
+    PARTHENON_REQUIRE(gas_pkg->Param<std::string>("eos_type") == "ideal",
+                      "advection pgen requires an ideal gas");
     PARTHENON_REQUIRE((gas_pkg->Param<int>("nspecies") == 1),
                       "Advection pgen requires a single gas species.")
     av.gamma = gas_pkg->Param<Real>("adiabatic_index");

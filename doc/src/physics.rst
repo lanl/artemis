@@ -54,10 +54,12 @@ An example input block for a gas could read
 
   <gas>
   cfl = 0.3
-  eos = ideal
-  gamma = 1.4
   riemann = hllc     # llf, hlle, hllc Riemann solvers
   reconstruct = plm  # pcm, plm, ppm reconstructions
+  
+  <gas/eos/ideal>
+  gamma = 1.4
+
 
 In order to safely model kinetic energy dominated flows, |code| uses a dual energy formalism controlled by the ``de_switch`` parameter under ``<gas>``.
 When the fraction of the internal energy to the total energy in a cell is less than ``de_switch``, |code| will recover the internal energy from a separately evolved internal energy variable.

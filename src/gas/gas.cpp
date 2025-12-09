@@ -64,41 +64,30 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   recon_method = ArtemisUtils::ChooseReconMethod(recon);
   params.Add("recon", recon_method);
 
-  // Riemann solver
-  RSolver riemann_solver = RSolver::null;
-  const std::string riemann = pin->GetOrAddString("gas", "riemann", "hllc");
-  if (riemann.compare("hllc") == 0) {
-    riemann_solver = RSolver::hllc;
-  } else if (riemann.compare("hlle") == 0) {
-    riemann_solver = RSolver::hlle;
-  } else if (riemann.compare("llf") == 0) {
-    riemann_solver = RSolver::llf;
-  } else {
-    PARTHENON_FAIL("Riemann solver (gas) not recognized.");
-  }
-  params.Add("rsolver", riemann_solver);
-
   // Courant, Friedrichs, & Lewy (CFL) Number
   const Real cfl_number = pin->GetOrAddReal("gas", "cfl", 0.8);
   params.Add("cfl", cfl_number);
 
   // Equation of state
-  const std::string eos_name = pin->GetOrAddString("gas", "eos", "ideal");
-  if (eos_name == "ideal") {
-    const Real gamma = pin->GetOrAddReal("gas", "gamma", 1.66666666667);
+  std::string eos_type = "none";
+  if (pin->DoesBlockExist("gas/eos/ideal") || (pin->DoesParameterExist("gas", "gamma"))) {
+    const std::string block_name =
+        pin->DoesBlockExist("gas/eos/ideal") ? "gas/eos/ideal" : "gas";
+    const Real gamma = pin->GetOrAddReal(block_name, "gamma", 1.66666666667);
     auto cv = Null<Real>();
     auto mu = Null<Real>();
-    if (pin->DoesParameterExist("gas", "cv")) {
+    if (pin->DoesParameterExist(block_name, "cv")) {
       PARTHENON_REQUIRE(!pin->DoesParameterExist("gas", "mu"),
                         "Cannot specify both cv and mu");
-      cv = pin->GetReal("gas", "cv");
+      cv = pin->GetReal(block_name, "cv");
       PARTHENON_REQUIRE(cv > 0, "Only positive cv allowed!");
       mu = constants.GetKBCode() / ((gamma - 1.) * constants.GetAMUCode() * cv);
     } else {
-      mu = pin->GetOrAddReal("gas", "mu", 1.);
+      mu = pin->GetOrAddReal(block_name, "mu", 1.);
       PARTHENON_REQUIRE(mu > 0, "Only positive mean molecular weight allowed!");
       cv = constants.GetKBCode() / ((gamma - 1.) * constants.GetAMUCode() * mu);
     }
+    eos_type = "ideal";
     params.Add("kbmu", constants.GetKBCode() / (mu * constants.GetAMUCode()));
     params.Add("mu", mu);
     params.Add("cv", cv);
@@ -115,7 +104,98 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
     params.Add("eos_d", eos_device);
     // TODO This needs to be removed when we convert everything to EOS calls
     params.Add("adiabatic_index", gamma);
+#ifdef SPINER_USE_HDF
+  } else if (pin->DoesBlockExist("gas/eos/h-he")) {
+    eos_type = "h-he";
+    const std::string block_name = "gas/eos/h-he";
+    if (pin->DoesParameterExist(block_name, "eos_file")) {
+      // load from file
+      const std::string filename = pin->GetString(block_name, "eos_file");
+      EOS eos_host = singularity::UnitSystem<ArtemisEOS::IdealHHe>(
+          ArtemisEOS::IdealHHe(filename),
+          singularity::eos_units_init::LengthTimeUnitsInit(),
+          units.GetTimeCodeToPhysical(), units.GetMassCodeToPhysical(),
+          units.GetLengthCodeToPhysical(), units.GetTemperatureCodeToPhysical());
+      EOS eos_device = eos_host.GetOnDevice();
+      params.Add("mu", pin->GetOrAddReal(block_name, "mu", 1.));
+      params.Add("eos_h", eos_host);
+      params.Add("eos_d", eos_device);
+    } else {
+      const std::string save_to_file =
+          pin->GetOrAddString(block_name, "save_to_file", "");
+      const Real X = pin->GetReal(block_name, "x");
+      const Real Y = pin->GetReal(block_name, "y");
+      const Real ltmin = pin->GetOrAddReal(block_name, "ltmin", 0);
+      const Real ltmax = pin->GetOrAddReal(block_name, "ltmax", 6);
+      const Real ldmin = pin->GetOrAddReal(block_name, "ldmin", -15);
+      const Real ldmax = pin->GetOrAddReal(block_name, "ldmax", -3);
+      const int nd = pin->GetOrAddInteger(block_name, "nd", 100);
+      const int nt = pin->GetOrAddInteger(block_name, "nt", 100);
+      EOS eos_host = singularity::UnitSystem<ArtemisEOS::IdealHHe>(
+          ArtemisEOS::IdealHHe(X, Y, ltmin, ltmax, nt, ldmin, ldmax, nd, save_to_file,
+                               true),
+          singularity::eos_units_init::LengthTimeUnitsInit(),
+          units.GetTimeCodeToPhysical(), units.GetMassCodeToPhysical(),
+          units.GetLengthCodeToPhysical(), units.GetTemperatureCodeToPhysical());
+      EOS eos_device = eos_host.GetOnDevice();
+      params.Add("mu", pin->GetOrAddReal(block_name, "mu", 1.));
+      params.Add("eos_h", eos_host);
+      params.Add("eos_d", eos_device);
+    }
+#ifdef WITH_SESAME
+  } else if (pin->DoesBlockExist("gas/eos/sesame_re")) {
+    eos_type = "sesame_re";
+    params.Add("eos_type", eos_type);
+    const std::string block_name = "gas/eos/sesame_re";
+    std::string filename = pin->GetString(block_name, "eos_file");
+    EOS eos_host = singularity::UnitSystem<singularity::SpinerEOSDependsRhoSie>(
+        singularity::SpinerEOSDependsRhoSie(filename, "gas"),
+        singularity::eos_units_init::LengthTimeUnitsInit(), units.GetTimeCodeToPhysical(),
+        units.GetMassCodeToPhysical(), units.GetLengthCodeToPhysical(),
+        units.GetTemperatureCodeToPhysical());
+    EOS eos_device = eos_host.GetOnDevice();
+    params.Add("eos_h", eos_host);
+    params.Add("eos_d", eos_device);
+    params.Add("mu", pin->GetOrAddReal(block_name, "mu", 1.));
+  } else if (pin->DoesBlockExist("gas/eos/sesame_rt")) {
+    eos_type = "sesame_rt";
+    const std::string block_name = "gas/eos/sesame_rt";
+    std::string filename = pin->GetString(block_name, "eos_file");
+    EOS eos_host = singularity::UnitSystem<singularity::SpinerEOSDependsRhoT>(
+        singularity::SpinerEOSDependsRhoT(filename, "gas"),
+        singularity::eos_units_init::LengthTimeUnitsInit(), units.GetTimeCodeToPhysical(),
+        units.GetMassCodeToPhysical(), units.GetLengthCodeToPhysical(),
+        units.GetTemperatureCodeToPhysical());
+    EOS eos_device = eos_host.GetOnDevice();
+    params.Add("eos_h", eos_host);
+    params.Add("eos_d", eos_device);
+    params.Add("mu", pin->GetOrAddReal(block_name, "mu", 1.));
+#endif // WITH_SESAME
+#endif // SPINER_USE_HDF
+  } else {
+    PARTHENON_FAIL("Unsupported gas EOS!");
   }
+
+  params.Add("eos_type", eos_type);
+
+  // Riemann solver
+  RSolver riemann_solver = RSolver::null;
+  const std::string riemann = pin->GetOrAddString("gas", "riemann", "hllc-general");
+  if (riemann.compare("hllc-general") == 0) {
+    riemann_solver = RSolver::hllc_general;
+  } else if (riemann.compare("hllc-gamma") == 0) {
+    PARTHENON_REQUIRE(eos_type == "ideal",
+                      "The hllc-gamma Riemann solver requires the ideal eos.");
+
+    riemann_solver = RSolver::hllc_gamma;
+  } else if (riemann.compare("hlle") == 0) {
+    riemann_solver = RSolver::hlle;
+  } else if (riemann.compare("llf") == 0) {
+    riemann_solver = RSolver::llf;
+  } else {
+    PARTHENON_FAIL("Riemann solver (gas) not recognized.");
+  }
+  params.Add("rsolver", riemann_solver);
 
   // Opacity models
   const Real time = units.GetTimeCodeToPhysical();
@@ -303,6 +383,16 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   m.SetSparseThresholds(0.0, 0.0, 0.0);
   gas->AddSparsePool<gas::prim::pressure>(m, control_field, fluidids);
 
+  // Bulk modulus
+  m = Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy, Metadata::Sparse});
+  m.SetSparseThresholds(0.0, 0.0, 0.0);
+  gas->AddSparsePool<gas::prim::bmod>(m, control_field, fluidids);
+
+  // Temperature
+  m = Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy, Metadata::Sparse});
+  m.SetSparseThresholds(0.0, 0.0, 0.0);
+  gas->AddSparsePool<gas::prim::temperature>(m, control_field, fluidids);
+
   // Primitive Velocities
   m = Metadata({Metadata::Cell, Metadata::Vector, Metadata::Derived, Metadata::Intensive,
                 Metadata::OneCopy, Metadata::FillGhost, Metadata::Sparse},
@@ -450,8 +540,8 @@ Real EstimateTimestepMesh(MeshData<Real> *md) {
   auto eos_d = params.template Get<EOS>("eos_d");
 
   static auto desc =
-      MakePackDescriptor<gas::prim::density, gas::prim::velocity, gas::prim::sie>(
-          resolved_pkgs.get());
+      MakePackDescriptor<gas::prim::density, gas::prim::velocity, gas::prim::sie,
+                         gas::prim::bmod>(resolved_pkgs.get());
   auto vmesh = desc.GetPack(md);
   static auto desc_g =
       MakePackDescriptor<geom::dx1, geom::dx2, geom::dx3>(resolved_pkgs.get());
@@ -474,8 +564,7 @@ Real EstimateTimestepMesh(MeshData<Real> *md) {
 
         for (int n = 0; n < vmesh.GetSize(b, gas::prim::density()); ++n) {
           const Real &dens = vmesh(b, gas::prim::density(n), k, j, i);
-          const Real &sie = vmesh(b, gas::prim::sie(n), k, j, i);
-          const Real bulk = eos_d.BulkModulusFromDensityInternalEnergy(dens, sie);
+          const Real &bulk = vmesh(b, gas::prim::bmod(n), k, j, i);
           const Real cs = std::sqrt(bulk / dens);
           Real denom = 0.0;
           for (int d = 0; d < ndim; d++) {
@@ -536,7 +625,7 @@ TaskStatus CalculateFluxes(MeshData<Real> *md, const bool pcm) {
 
   static auto desc_prim =
       parthenon::MakePackDescriptor<gas::prim::density, gas::prim::velocity,
-                                    gas::prim::pressure, gas::prim::sie>(
+                                    gas::prim::pressure, gas::prim::sie, gas::prim::bmod>(
           resolved_pkgs.get(), {}, {parthenon::PDOpt::WithFluxes});
   static auto desc_flux =
       parthenon::MakePackDescriptor<gas::cons::density, gas::cons::momentum,

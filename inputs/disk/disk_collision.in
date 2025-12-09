@@ -73,11 +73,13 @@ cooling = true
 
 <gas>
 cfl = 0.3
-gamma = 1.4
 reconstruct = plm
-riemann = hllc
+riemann = hllc-general
 dfloor = 1.0e-10
 siefloor = 1.0e-10
+
+<gas/eos/ideal>
+gamma = 1.4
 
 <gravity/nbody>
 mtot = 1.0

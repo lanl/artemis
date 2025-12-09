@@ -64,7 +64,6 @@ gas = true
 
 <gas>
 cfl = 0.3
-gamma  = 1.4  # gamma = C_p/C_v
 reconstruct = plm
 riemann = hlle
 dfloor = 1.0e-10
@@ -72,6 +71,9 @@ siefloor = 1.0e-10
 refine_field = pressure
 refine_type = gradient
 refine_thr = 10.0
+
+<gas/eos/ideal>
+gamma  = 1.4  # gamma = C_p/C_v
 
 <problem>
 d0 = 1.0

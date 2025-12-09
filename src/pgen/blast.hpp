@@ -154,7 +154,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const bool do_dust = artemis_pkg->Param<bool>("do_dust");
   // TODO(PDM): Replace the below with a call to singularity-eos
   auto gas_pkg = pmb->packages.Get("gas");
-  const Real gm1 = gas_pkg->Param<Real>("adiabatic_index") - 1.0;
+  const auto &eos = gas_pkg->Param<ArtemisUtils::EOS>("eos_d");
 
   // packing and capture variables for kernel
   auto &md = pmb->meshblock_data.Get();
@@ -184,7 +184,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         Real total_vol = coords.GetVolume(vg, 0, k, j, i);
         const auto &xv = coords.GetCellCenter(vg, 0, k, j, i);
         Real den = pars.d0;
-        Real e0 = pars.p0 / gm1;
+        Real e0 = ArtemisUtils::EofPR(eos, pars.p0, den);
         Real internal_energy = 0.0;
         auto xcart = coords.ConvertToCart(xv);
         const auto &xc = coords.ConvertToCart(pars.x0);

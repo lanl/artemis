@@ -25,7 +25,6 @@ namespace {
 struct LWParams {
   Real rho0, rho1;
   Real pres0, pres1;
-  Real sie0, sie1;
   Real y0;
 };
 } // end anonymous namespace
@@ -53,10 +52,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   lw_params.rho1 = pin->GetOrAddReal("problem", "rho1", 1.0);
   lw_params.pres1 = pin->GetOrAddReal("problem", "pres1", 1.0);
 
-  const auto gm1 = gas_pkg->Param<Real>("adiabatic_index") - 1.0;
-
-  lw_params.sie0 = lw_params.pres0 / (lw_params.rho0 * gm1);
-  lw_params.sie1 = lw_params.pres1 / (lw_params.rho1 * gm1);
+  const auto &eos = gas_pkg->Param<ArtemisUtils::EOS>("eos_d");
 
   // packing and capture variables for kernel
   auto &md = pmb->meshblock_data.Get();
@@ -93,7 +89,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         const Real pres = vf1 * pars.pres1 + vf2 * pars.pres0;
 
         v(0, gas::prim::density(0), k, j, i) = dens;
-        v(0, gas::prim::sie(0), k, j, i) = pres / (dens * gm1);
+        v(0, gas::prim::sie(0), k, j, i) = ArtemisUtils::EofPR(eos, pres, dens);
         v(0, gas::prim::velocity(0), k, j, i) = 0.0;
         v(0, gas::prim::velocity(1), k, j, i) = 0.0;
         v(0, gas::prim::velocity(2), k, j, i) = 0.0;

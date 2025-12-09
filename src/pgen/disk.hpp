@@ -60,7 +60,7 @@ struct DiskParams {
   Real dust_to_gas;
   Real rexp, exp_pow;
   Real rcav;
-  Real Gamma, gamma_gas;
+  Real Gamma;
   Real alpha, nu0, nu_indx;
   Real mdot;
   Real temp_soft2;
@@ -130,7 +130,7 @@ Real TempProfile(struct DiskParams pgen, const Real R, const Real z) {
 //! \fn Real PresProfile
 //! \brief Computes pressure profile at cylindrical R and z (via dens and temp profiles)
 KOKKOS_INLINE_FUNCTION
-Real PresProfile(struct DiskParams pgen, EOS eos, const Real tf, const Real R,
+Real PresProfile(struct DiskParams pgen, const EOS &eos, const Real tf, const Real R,
                  const Real z) {
   const Real df = DenProfile(pgen, R, z);
   return std::max(pgen.pres_min, eos.PressureFromDensityTemperature(df, tf));
@@ -140,7 +140,8 @@ Real PresProfile(struct DiskParams pgen, EOS eos, const Real tf, const Real R,
 //! \fn Real ViscosityProfile
 //! \brief Computes viscosity profile at cylindrical R and z (via dens and temp profiles)
 KOKKOS_INLINE_FUNCTION
-Real ViscosityProfile(struct DiskParams pgen, EOS eos, const Real R, const Real z) {
+Real ViscosityProfile(struct DiskParams pgen, const EOS &eos, const Real R,
+                      const Real z) {
   return pgen.nu0 * std::pow(R / pgen.r0, pgen.nu_indx);
 }
 
@@ -152,7 +153,7 @@ template <Coordinates GEOM>
 KOKKOS_INLINE_FUNCTION State ComputeDiskProfile(
     const struct DiskParams pgen, const geometry::Coords<GEOM> &coords,
     const std::array<Real, 3> &xv, const std::array<Real, 3> &dx, const int k,
-    const int j, const int i, EOS eos_d, const bool do_gas, const bool do_dust,
+    const int j, const int i, const EOS &eos_d, const bool do_gas, const bool do_dust,
     ParArray1D<NBody::Particle> particles, const int npart) {
   // Extract coordinates
 
@@ -244,9 +245,7 @@ inline void InitDiskParams(MeshBlock *pmb, ParameterInput *pin) {
     disk_params.rho0 = pin->GetOrAddReal("problem", "rho0", 1.0);
     disk_params.p = pin->GetOrAddReal("problem", "dslope", -2.25);
     disk_params.h0 = pin->GetOrAddReal("problem", "h0", 0.05);
-    disk_params.gamma_gas = gas_pkg->Param<Real>("adiabatic_index");
-    disk_params.Gamma =
-        pin->GetOrAddReal("problem", "polytropic_index", disk_params.gamma_gas);
+    disk_params.Gamma = pin->GetOrAddReal("problem", "polytropic_index", 1.0);
 
     PARTHENON_REQUIRE(disk_params.Gamma >= 1, "problem/gamma needs to be >= 1");
 
@@ -276,6 +275,7 @@ inline void InitDiskParams(MeshBlock *pmb, ParameterInput *pin) {
 
     disk_params.do_imc = params.Get<bool>("do_imc");
     disk_params.do_moment = params.Get<bool>("do_moment");
+
     disk_params.ar = constants.GetARCode();
 
     Real q = pin->GetOrAddReal("problem", "tslope", -Big<Real>());
@@ -309,8 +309,8 @@ inline void InitDiskParams(MeshBlock *pmb, ParameterInput *pin) {
       const auto vtype = pin->GetString("gas/viscosity", "type");
       if (vtype == "alpha") {
         disk_params.alpha = pin->GetReal("gas/viscosity", "alpha");
-        disk_params.nu0 = disk_params.alpha * disk_params.gamma_gas *
-                          SQR(disk_params.h0 * disk_params.r0 * disk_params.Omega0);
+        disk_params.nu0 =
+            disk_params.alpha * SQR(disk_params.h0 * disk_params.r0 * disk_params.Omega0);
         disk_params.nu_indx = 1.5 + disk_params.q;
       } else if ((vtype == "powerlaw") || (vtype == "constant")) {
         disk_params.nu0 = pin->GetReal("gas/viscosity", "nu");
@@ -337,8 +337,9 @@ inline void InitDiskParams(MeshBlock *pmb, ParameterInput *pin) {
 
 template <Coordinates GEOM, typename V1, typename V2>
 KOKKOS_INLINE_FUNCTION void
-DiskICImpl(V1 v, const int b, const int k, const int j, const int i, V2 pco, EOS eos_d,
-           DiskParams dp, ParArray1D<NBody::Particle> particles, const int npart) {
+DiskICImpl(V1 v, const int b, const int k, const int j, const int i, V2 pco,
+           const EOS &eos_d, DiskParams dp, ParArray1D<NBody::Particle> particles,
+           const int npart) {
 
   geometry::Coords<GEOM> coords(dp.log, pco, k, j, i);
   const auto &xv = coords.GetCellCenter();
@@ -390,7 +391,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   // Extract gas package and params
   auto &gas_pkg = pmb->packages.Get("gas");
-  auto eos_d = gas_pkg->template Param<EOS>("eos_d");
+  const auto &eos_d = gas_pkg->template Param<EOS>("eos_d");
 
   // Disk parameters
   auto disk_params = artemis_pkg->Param<DiskParams>("disk_params");

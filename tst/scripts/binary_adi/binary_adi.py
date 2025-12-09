@@ -37,7 +37,7 @@ import matplotlib.pyplot as plt
 _nranks = 1
 _file_id = "binary_adi"
 _cooling = ["adi"]
-_flux = ["llf", "hlle", "hllc"]
+_flux = ["llf", "hlle", "hllc-general"]
 _de_switch = [0.2, 1.0]
 
 

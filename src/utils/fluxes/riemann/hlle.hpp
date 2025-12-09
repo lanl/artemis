@@ -65,9 +65,6 @@ struct RiemannSolver<RSolver::hlle, FLUID_TYPE, CTYPE,
     PARTHENON_REQUIRE(dir > 0 && dir <= 3, "Invalid flux direction!");
     [[maybe_unused]] auto fdir = (dir == 1) ? TE::F1 : ((dir == 2) ? TE::F2 : TE::F3);
 
-    // TODO(BRR) temporary
-    const Real gm1 = eos.GruneisenParamFromDensityTemperature(Null<Real>(), Null<Real>());
-
     // Obtain number of species
     int nspecies = Null<int>();
     if constexpr (FLUID_TYPE == Fluid::gas) {
@@ -84,15 +81,9 @@ struct RiemannSolver<RSolver::hlle, FLUID_TYPE, CTYPE,
       // Unused indices for dust hydrodynamics
       const int IPR = nspecies * 4 + n;
       const int ISE = nspecies * 5 + n;
+      const int IBL = nspecies * 6 + n;
       [[maybe_unused]] const int IEN = IPR;
       [[maybe_unused]] const int IEG = ISE;
-
-      [[maybe_unused]] Real igm1 = Null<Real>();
-      [[maybe_unused]] Real gamma = Null<Real>();
-      if constexpr (FLUID_TYPE == Fluid::gas) {
-        igm1 = 1.0 / gm1;
-        gamma = gm1 + 1.0;
-      }
 
       parthenon::par_for_inner(
           DEFAULT_INNER_LOOP_PATTERN, member, il, iu, [&](const int i) {
@@ -111,16 +102,20 @@ struct RiemannSolver<RSolver::hlle, FLUID_TYPE, CTYPE,
             [[maybe_unused]] Real wr_ipr = Null<Real>();
             [[maybe_unused]] Real wl_ise = Null<Real>();
             [[maybe_unused]] Real wr_ise = Null<Real>();
+            [[maybe_unused]] Real wl_ibl = Null<Real>();
+            [[maybe_unused]] Real wr_ibl = Null<Real>();
             if constexpr (FLUID_TYPE == Fluid::gas) {
               wl_ipr = wl(IPR, i);
               wl_ise = wl(ISE, i);
+              wl_ibl = wl(IBL, i);
               wr_ipr = wr(IPR, i);
               wr_ise = wr(ISE, i);
+              wr_ibl = wr(IBL, i);
             }
 
             // Compute Roe-averaged state
-            Real sqrtdl = sqrt(wl_idn);
-            Real sqrtdr = sqrt(wr_idn);
+            Real sqrtdl = std::sqrt(wl_idn);
+            Real sqrtdr = std::sqrt(wr_idn);
             Real isdlpdr = 1.0 / (sqrtdl + sqrtdr);
 
             Real wroe_ivx = (sqrtdl * wl_ivx + sqrtdr * wr_ivx) * isdlpdr;
@@ -134,9 +129,9 @@ struct RiemannSolver<RSolver::hlle, FLUID_TYPE, CTYPE,
               // Following Roe(1981), the enthalpy H=(E+P)/d is averaged for ideal gas
               // EOS, rather than E or P directly. sqrtdl*hl = sqrtdl*(el+pl)/dl =
               // (el+pl)/sqrtdl
-              el = wl_ipr * igm1 +
+              el = wl_idn * wl_ise +
                    0.5 * wl_idn * (SQR(wl_ivx) + SQR(wl_ivy) + SQR(wl_ivz));
-              er = wr_ipr * igm1 +
+              er = wr_idn * wr_ise +
                    0.5 * wr_idn * (SQR(wr_ivx) + SQR(wr_ivy) + SQR(wr_ivz));
               hroe = ((el + wl_ipr) / sqrtdl + (er + wr_ipr) / sqrtdr) * isdlpdr;
             }
@@ -144,8 +139,8 @@ struct RiemannSolver<RSolver::hlle, FLUID_TYPE, CTYPE,
             // Compute the L/R wave speeds based on L/R and Roe-averaged values
             Real qa = Null<Real>(), qb = Null<Real>();
             if constexpr (FLUID_TYPE == Fluid::gas) {
-              qa = std::sqrt(gamma * wl_ipr / wl_idn);
-              qb = std::sqrt(gamma * wr_ipr / wr_idn);
+              qa = std::sqrt(wl_ibl / wl_idn);
+              qb = std::sqrt(wr_ibl / wr_idn);
             }
 
             [[maybe_unused]] Real sl = Null<Real>();
@@ -153,8 +148,12 @@ struct RiemannSolver<RSolver::hlle, FLUID_TYPE, CTYPE,
             [[maybe_unused]] Real al = Null<Real>();
             [[maybe_unused]] Real ar = Null<Real>();
             if constexpr (FLUID_TYPE == Fluid::gas) {
-              Real a = hroe - 0.5 * (SQR(wroe_ivx) + SQR(wroe_ivy) + SQR(wroe_ivz));
-              a = (a < 0.0) ? 0.0 : sqrt(gm1 * a);
+              // Real a = hroe - 0.5 * (SQR(wroe_ivx) + SQR(wroe_ivy) + SQR(wroe_ivz));
+              // a = (a < 0.0) ? 0.0 : sqrt(gm1 * a);
+              // Einfeldt (1988)
+              const Real ngam = 0.5 * sqrtdl * sqrtdr * SQR(isdlpdr);
+              Real a =
+                  (qa * sqrtdl + qb * sqrtdr) * isdlpdr + ngam * SQR((wr_ivx - wl_ivx));
               Real sla = wroe_ivx - a;
               Real slb = wl_ivx - qa;
               Real sra = wroe_ivx + a;

@@ -46,8 +46,10 @@ ARTEMIS_VARIABLE(gas.cons, momentum);
 namespace prim {
 ARTEMIS_VARIABLE(gas.prim, density);
 ARTEMIS_VARIABLE(gas.prim, pressure);
+ARTEMIS_VARIABLE(gas.prim, temperature);
 ARTEMIS_VARIABLE(gas.prim, velocity);
 ARTEMIS_VARIABLE(gas.prim, sie);
+ARTEMIS_VARIABLE(gas.prim, bmod);
 } // namespace prim
 namespace diff {
 ARTEMIS_VARIABLE(gas.diff, momentum);
@@ -160,7 +162,7 @@ enum class Coordinates {
 };
 
 // ...Riemann solvers
-enum class RSolver { hllc, hlle, llf, null };
+enum class RSolver { hllc_general, hlle, llf, hllc_gamma, null };
 // ... Upwinding (left vs right state)
 enum class Upwind { l, r, null };
 // ...Reconstruction algorithms
@@ -190,6 +192,10 @@ enum TensIdx { X11 = 0, X22 = 1, X33 = 2, X23 = 3, X13 = 4, X12 = 5 };
 template <typename T = Real>
 KOKKOS_FORCEINLINE_FUNCTION constexpr auto Big() {
   return std::numeric_limits<T>::max();
+}
+template <typename T = Real>
+KOKKOS_FORCEINLINE_FUNCTION constexpr auto Tiny() {
+  return std::numeric_limits<T>::lowest();
 }
 template <typename T = Real>
 KOKKOS_FORCEINLINE_FUNCTION constexpr auto Fuzz() {

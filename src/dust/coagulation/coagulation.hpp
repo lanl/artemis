@@ -229,7 +229,7 @@ KOKKOS_INLINE_FUNCTION Real CoagulationRate(const int &i, const int &j, const in
   // Calculate turbulent relative velocity
   // turbulent + brownian + actual
   Real dv = GetRelativeTurbulentVelocity(tau_i, tau_j, tn, vn, ts, vs, re) +
-            std::min(cs * cs, 8 / M_PI * kernel.kT * muij) + SQR(vel_i[0] - vel_j[0]) +
+            std::min(cs * cs, 8 / M_PI * kernel.kT / muij) + SQR(vel_i[0] - vel_j[0]) +
             SQR(vel_i[1] - vel_j[1]) + (!surface) * SQR(vel_i[2] - vel_j[2]);
   ;
   Real hij = 1.0;
@@ -755,7 +755,7 @@ Real ComputeError(parthenon::team_mbr_t const &mbr, const int &mimax, const int 
                   const Real &err_eps) {
   Real errmax = 0.0;
   parthenon::par_reduce_inner(
-      parthenon::inner_loop_pattern_ttr_tag, mbr, 0, std::min(mimax, mimax2),
+      parthenon::inner_loop_pattern_ttr_tag, mbr, 0, std::min(mimax, mimax2) - 1,
       [&](const int i, Real &lmax) {
         const Real dscale = std::abs(dustdens(i)) + std::abs(h0 * source(i));
         lmax = std::max(lmax, std::abs(0.5 * h * (nQs(i) - source(i)) / dscale));

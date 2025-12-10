@@ -170,7 +170,7 @@ Real GetRelativeTurbulentVelocity(const Real &tau_1, const Real &tau_2, const Re
 
 //----------------------------------------------------------------------------------------
 //! \fn  Real Dust::Coagulation::iHeaviSide
-//  \brief
+//  \brief inverted Heviside function
 KOKKOS_FORCEINLINE_FUNCTION
 Real iHeaviSide(const Real &x) { return (x < 0 ? 0.0 : 1.0); }
 
@@ -185,7 +185,7 @@ Real Qplus(const Real &m1, const Real &Q1, const Real &m2, const Real &Q2) {
 
 //----------------------------------------------------------------------------------------
 //! \fn  Real Dust::Coagulation::CoagulationRate
-//  \brief
+//  \brief Calculate Rij
 template <DustInteractionType DIT>
 KOKKOS_INLINE_FUNCTION Real CoagulationRate(const int &i, const int &j, const int &nm1,
                                             const StateParams &kernel,
@@ -280,7 +280,7 @@ KOKKOS_INLINE_FUNCTION Real CoagulationRate(const int &i, const int &j, const in
 
 //----------------------------------------------------------------------------------------
 //! \fn  void Dust::Coagulation::ConvertToNumberDensity
-//  \brief
+//  \brief convert to number density
 KOKKOS_INLINE_FUNCTION
 void ConvertToNumberDensity(const parthenon::team_mbr_t &mbr, const int &nm1,
                             const ScratchPad1D<Real> &dustdens,
@@ -295,7 +295,7 @@ void ConvertToNumberDensity(const parthenon::team_mbr_t &mbr, const int &nm1,
 
 //----------------------------------------------------------------------------------------
 //! \fn  void Dust::Coagulation::ConvertToVolumeDensity
-//  \brief
+//  \brief convert to volume density
 KOKKOS_INLINE_FUNCTION
 void ConvertToVolumeDensity(const parthenon::team_mbr_t &mbr, const int &nm1,
                             const ScratchPad1D<Real> &dustdens,
@@ -307,7 +307,7 @@ void ConvertToVolumeDensity(const parthenon::team_mbr_t &mbr, const int &nm1,
 
 //----------------------------------------------------------------------------------------
 //! \fn  void Dust::Coagulation::TimeStepControl
-//  \brief
+//  \brief set the coagulation time step
 KOKKOS_INLINE_FUNCTION
 Real TimeStepControl(const parthenon::team_mbr_t &mbr, const int &nm1,
                      const ScratchPad1D<Real> &dustdens, const ScratchPad1D<Real> &source,
@@ -328,7 +328,7 @@ Real TimeStepControl(const parthenon::team_mbr_t &mbr, const int &nm1,
 
 //----------------------------------------------------------------------------------------
 //! \fn  void Dust::Coagulation::ZeroSource
-//  \brief
+//  \brief zero out the mass source
 KOKKOS_INLINE_FUNCTION
 void ZeroSource(const parthenon::team_mbr_t &mbr, const int &nm1,
                 const ScratchPad1D<Real> &source) {
@@ -339,7 +339,7 @@ void ZeroSource(const parthenon::team_mbr_t &mbr, const int &nm1,
 
 //----------------------------------------------------------------------------------------
 //! \fn  void Dust::Coagulation::InitializeSource
-//  \brief
+//  \brief initialize the mass source
 KOKKOS_INLINE_FUNCTION
 void InitializeSource(const parthenon::team_mbr_t &mbr, const int &nm1, const int &mimax,
                       const ScratchPad1D<Real> &source,
@@ -369,7 +369,7 @@ void InitializeSource(const parthenon::team_mbr_t &mbr, const int &nm1, const in
 
 //----------------------------------------------------------------------------------------
 //! \fn  void Dust::Coagulation::FragmentationSource
-//  \brief
+//  \brief compute the fragmentation source
 KOKKOS_INLINE_FUNCTION
 void FragmentationSource(const parthenon::team_mbr_t &mbr, const int &nm1,
                          const int &mimax, const ScratchPad1D<Real> &source,
@@ -401,7 +401,7 @@ void FragmentationSource(const parthenon::team_mbr_t &mbr, const int &nm1,
 
 //----------------------------------------------------------------------------------------
 //! \fn  void Dust::Coagulation::CrateringSource
-//  \brief
+//  \brief compute the cratering source
 KOKKOS_INLINE_FUNCTION
 void CrateringSource(const parthenon::team_mbr_t &mbr, const int &nm1, const int &mimax,
                      const ScratchPad1D<Real> &source, const ScratchPad1D<Real> &dustdens,
@@ -423,7 +423,7 @@ void CrateringSource(const parthenon::team_mbr_t &mbr, const int &nm1, const int
 
 //----------------------------------------------------------------------------------------
 //! \fn  void Dust::Coagulation::FinalizeSource
-//  \brief
+//  \brief Finish up the mass source
 KOKKOS_INLINE_FUNCTION
 void FinalizeSource(const parthenon::team_mbr_t &mbr, const int &nm1, const int &mimax,
                     const int &pgrid, const ScratchPad1D<Real> &source,
@@ -460,7 +460,7 @@ void FinalizeSource(const parthenon::team_mbr_t &mbr, const int &nm1, const int 
 
 //----------------------------------------------------------------------------------------
 //! \fn  void Dust::Coagulation::ZeroSourceNQ
-//  \brief
+//  \brief Zero the momentum source for direction n
 KOKKOS_INLINE_FUNCTION
 void ZeroSourceNQ(const parthenon::team_mbr_t &mbr, const int &n, const int &nm1,
                   const ScratchPad1D<Real> &Q, const ScratchPad1D<Real> &nQs,
@@ -474,7 +474,7 @@ void ZeroSourceNQ(const parthenon::team_mbr_t &mbr, const int &n, const int &nm1
 
 //----------------------------------------------------------------------------------------
 //! \fn  void Dust::Coagulation::InitializeSourceNQ
-//  \brief
+//  \brief Initialize the momentum source for direction n
 KOKKOS_INLINE_FUNCTION
 void InitializeSourceNQ(const parthenon::team_mbr_t &mbr, const int &nm1,
                         const int &mimax, const ScratchPad1D<Real> &Q,
@@ -519,7 +519,7 @@ void InitializeSourceNQ(const parthenon::team_mbr_t &mbr, const int &nm1,
 
 //----------------------------------------------------------------------------------------
 //! \fn  void Dust::Coagulation::FragmentationSourceNQ
-//  \brief
+//  \brief Fragmentation momentum source for direction n
 KOKKOS_INLINE_FUNCTION
 void FragmentationSourceNQ(const parthenon::team_mbr_t &mbr, const int &nm1,
                            const int &mimax, const int &pgrid,
@@ -557,7 +557,7 @@ void FragmentationSourceNQ(const parthenon::team_mbr_t &mbr, const int &nm1,
 
 //----------------------------------------------------------------------------------------
 //! \fn  void Dust::Coagulation::CrateringSourceNQ
-//  \brief
+//  \brief Cratering momentum source for direction n
 KOKKOS_INLINE_FUNCTION
 void CrateringSourceNQ(const parthenon::team_mbr_t &mbr, const int &nm1, const int &mimax,
                        const ScratchPad1D<Real> &Q, const ScratchPad1D<Real> &nQs,
@@ -580,7 +580,7 @@ void CrateringSourceNQ(const parthenon::team_mbr_t &mbr, const int &nm1, const i
 
 //----------------------------------------------------------------------------------------
 //! \fn  void Dust::Coagulation::FinalizeSourceNQ
-//  \brief
+//  \brief Finalize momentum source for direction n
 KOKKOS_INLINE_FUNCTION
 void FinalizeSourceNQ(const parthenon::team_mbr_t &mbr, const int &nm1, const int &mimax,
                       const int &pgrid, const ScratchPad1D<Real> &Q,
@@ -617,7 +617,7 @@ void FinalizeSourceNQ(const parthenon::team_mbr_t &mbr, const int &nm1, const in
 
 //----------------------------------------------------------------------------------------
 //! \fn  void Dust::Coagulation::UpdateVelocityNQ
-//  \brief
+//  \brief Update velocity from momentum evolution for direction n
 KOKKOS_INLINE_FUNCTION
 void UpdateVelocityNQ(const parthenon::team_mbr_t &mbr, const int &n, const int &nm1,
                       const ScratchPad1D<Real> &Q, const ScratchPad1D<Real> &nQs,
@@ -636,7 +636,7 @@ void UpdateVelocityNQ(const parthenon::team_mbr_t &mbr, const int &n, const int 
 
 //----------------------------------------------------------------------------------------
 //! \fn  void Dust::Coagulation::UpdateDensity
-//  \brief
+//  \brief Update density from new mass
 KOKKOS_INLINE_FUNCTION
 void UpdateDensity(const parthenon::team_mbr_t &mbr, const int &nm1,
                    const ScratchPad1D<Real> &dustdens, const ScratchPad1D<Real> &source,
@@ -649,7 +649,7 @@ void UpdateDensity(const parthenon::team_mbr_t &mbr, const int &nm1,
 
 //----------------------------------------------------------------------------------------
 //! \fn  void Dust::Coagulation::FindMIMax
-//  \brief
+//  \brief Find mimax
 KOKKOS_INLINE_FUNCTION
 int FindMIMax(parthenon::team_mbr_t const &mbr, const int &nm1,
               const ScratchPad1D<Real> &dustdens, const ParArray1D<Real> &mass_grid,
@@ -665,7 +665,7 @@ int FindMIMax(parthenon::team_mbr_t const &mbr, const int &nm1,
 }
 
 //----------------------------------------------------------------------------------------
-//! \fn  void Dust::Coagulation::
+//! \fn  void Dust::Coagulation::UpdateDensityNQS3
 //  \brief
 KOKKOS_INLINE_FUNCTION
 void UpdateDensityNQS3(const parthenon::team_mbr_t &mbr, const int &nm1,
@@ -680,7 +680,7 @@ void UpdateDensityNQS3(const parthenon::team_mbr_t &mbr, const int &nm1,
 }
 
 //----------------------------------------------------------------------------------------
-//! \fn  void Dust::Coagulation::FindMIMax
+//! \fn  void Dust::Coagulation::FindMIMaxNQS3
 //  \brief
 KOKKOS_INLINE_FUNCTION
 int FindMIMaxNQS3(parthenon::team_mbr_t const &mbr, const int &nm1, const Real &h,
@@ -699,7 +699,7 @@ int FindMIMaxNQS3(parthenon::team_mbr_t const &mbr, const int &nm1, const Real &
 }
 
 //----------------------------------------------------------------------------------------
-//! \fn  void Dust::Coagulation::
+//! \fn  void Dust::Coagulation::InitializeTempNQS3
 //  \brief
 KOKKOS_INLINE_FUNCTION
 void InitializeTempNQS3(const parthenon::team_mbr_t &mbr, const int &n, const int &nm1,
@@ -710,7 +710,7 @@ void InitializeTempNQS3(const parthenon::team_mbr_t &mbr, const int &n, const in
 }
 
 //----------------------------------------------------------------------------------------
-//! \fn  void Dust::Coagulation::
+//! \fn  void Dust::Coagulation::IntermediateNQS3
 //  \brief
 KOKKOS_INLINE_FUNCTION
 void IntermediateNQS3(const parthenon::team_mbr_t &mbr, const int &nm1,
@@ -765,8 +765,8 @@ Real ComputeError(parthenon::team_mbr_t const &mbr, const int &mimax, const int 
 }
 
 //----------------------------------------------------------------------------------------
-//! \fn  void Dust::Coagulation::
-//  \brief
+//! \fn  void Dust::Coagulation::Source
+//  \brief Source driver
 KOKKOS_INLINE_FUNCTION
 void Source(const parthenon::team_mbr_t &mbr, const int &nm1, const int &mimax,
             const int &pgrid, const ScratchPad1D<Real> &source,
@@ -788,8 +788,8 @@ void Source(const parthenon::team_mbr_t &mbr, const int &nm1, const int &mimax,
 }
 
 //----------------------------------------------------------------------------------------
-//! \fn  void Dust::Coagulation::
-//  \brief
+//! \fn  void Dust::Coagulation::SourceNQ
+//  \brief Momentum source driver
 KOKKOS_INLINE_FUNCTION
 void SourceNQ(const parthenon::team_mbr_t &mbr, const int &n, const int &nm1,
               const int &mimax, const int &pgrid, const ScratchPad1D<Real> &Q,
@@ -810,7 +810,7 @@ void SourceNQ(const parthenon::team_mbr_t &mbr, const int &n, const int &nm1,
 }
 
 //----------------------------------------------------------------------------------------
-//! \fn  void Dust::Coagulation::
+//! \fn  void Dust::Coagulation::SourceNQS3
 //  \brief
 KOKKOS_INLINE_FUNCTION
 void SourceNQS3(const parthenon::team_mbr_t &mbr, const int &n, const int &nm1,

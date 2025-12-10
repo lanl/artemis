@@ -14,7 +14,7 @@
 #define UTILS_EOS_IDEAL_H_HE_HPP_
 
 #include <cstdio>
-#ifdef SINGULARITY_USE_SPINER_WITH_HDF5
+#ifdef SPINER_USE_HDF
 #include <hdf5.h>
 #include <hdf5_hl.h>
 #endif
@@ -694,6 +694,7 @@ inline void IdealHHe::FillTable(const std::string &filename) {
 
 constexpr char METADATA_NAME[] = "Params";
 inline void IdealHHe::Save(const std::string &filename) {
+#ifdef SPINER_USE_HDF
   herr_t status = H5_SUCCESS;
   hid_t file = H5Fcreate(filename.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
 
@@ -721,8 +722,10 @@ inline void IdealHHe::Save(const std::string &filename) {
   if (status != H5_SUCCESS) {
     EOS_ERROR("[IdealHHe::Save]: There was a problem with HDF5\n");
   }
+#endif
 }
 inline void IdealHHe::Load(const std::string &filename) {
+#ifdef SPINER_USE_HDF
   herr_t status = H5_SUCCESS;
   hid_t file = H5Fopen(filename.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
 
@@ -749,6 +752,7 @@ inline void IdealHHe::Load(const std::string &filename) {
   if (status != H5_SUCCESS) {
     EOS_ERROR("[IdealHHe::Save]: There was a problem with HDF5\n");
   }
+#endif
 }
 
 inline IdealHHe IdealHHe::GetOnDevice() {

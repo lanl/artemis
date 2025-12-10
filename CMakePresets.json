@@ -67,7 +67,7 @@
         "HDF5_INCLUDE_DIR": "$env{HDF5_ROOT}/include",
         "HDF5_INCLUDE_DIRS": "$env{HDF5_ROOT}/include",
         "HDF5_LIBRARIES": "$env{HDF5_ROOT}/lib",
-        "HDF5_HL_LIBRARIES": "$env{HDF5_ROOT}/lib",
+        "HDF5_HL_LIBRARIES": "$env{HDF5_ROOT}/lib"
       }
     },
     {
@@ -79,7 +79,7 @@
         "HDF5_INCLUDE_DIR": "$env{HDF5_ROOT}/include",
         "HDF5_INCLUDE_DIRS": "$env{HDF5_ROOT}/include",
         "HDF5_LIBRARIES": "$env{HDF5_ROOT}/lib",
-        "HDF5_HL_LIBRARIES": "$env{HDF5_ROOT}/lib",
+        "HDF5_HL_LIBRARIES": "$env{HDF5_ROOT}/lib"
       }
     },
     {

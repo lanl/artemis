@@ -275,7 +275,7 @@ TaskStatus CoagulationStep(MeshData<Real> *md, const Real time, const Real dt) {
   }
 
   // Coagulation
-  size_t isize = (5 + nvel + (coag.integrator == 3 && coag.mom_coag)) * nspecies;
+  size_t isize = (5 + 3 + (coag.integrator == 3 && coag.mom_coag)) * nspecies;
   size_t scr_size = ScratchPad1D<Real>::shmem_size(isize);
   ArtemisUtils::par_for_outer(
       DEFAULT_OUTER_LOOP_PATTERN, "Dust::Coagulation", parthenon::DevExecSpace(),
@@ -285,7 +285,8 @@ TaskStatus CoagulationStep(MeshData<Real> *md, const Real time, const Real dt) {
         // Allocate scratch
         ScratchPad1D<Real> stime(mbr.team_scratch(scr_level), nspecies);
         ScratchPad1D<Real> rhod(mbr.team_scratch(scr_level), nspecies);
-        ScratchPad1D<Real> vel(mbr.team_scratch(scr_level), nvel * nspecies);
+        // TODO(AMD): Thread nvel through all call sites, for now it is = 3
+        ScratchPad1D<Real> vel(mbr.team_scratch(scr_level), 3 * nspecies);
         ScratchPad1D<Real> source(mbr.team_scratch(scr_level), nspecies);
         ScratchPad1D<Real> Q(mbr.team_scratch(scr_level), nspecies);
         ScratchPad1D<Real> nQs(mbr.team_scratch(scr_level), nspecies);
@@ -329,8 +330,9 @@ TaskStatus CoagulationStep(MeshData<Real> *md, const Real time, const Real dt) {
               const bool gtf = vmesh(b, dust::prim::density(n), k, j, i) > dfloor;
               rhod(n) = gtf * vmesh(b, dust::prim::density(n), k, j, i) * rho0;
               for (int d = 0; d < nvel; d++) {
-                vel(VI(n, d)) =
-                    gtf * vmesh(b, dust::prim::velocity(VI(n, d)), k, j, i) * vel0;
+                const auto vidx = d + 3 * n;
+                Real &vd = vmesh(b, dust::prim::velocity(VI(n, d)), k, j, i);
+                vel(vidx) = gtf * vd * vel0;
               }
             });
         mbr.team_barrier();
@@ -348,8 +350,8 @@ TaskStatus CoagulationStep(MeshData<Real> *md, const Real time, const Real dt) {
               const bool gt0 = (rhod(n) > 0.0);
               vmesh(b, dust::cons::density(n), k, j, i) = gt0 * (rhod(n) / rho0);
               for (int d = 0; d < nvel; d++) {
-                const int vidx = VI(n, d);
-                vmesh(b, dust::cons::momentum(vidx), k, j, i) =
+                const auto vidx = d + 3 * n;
+                vmesh(b, dust::cons::momentum(VI(n, d)), k, j, i) =
                     gt0 * rhod(n) * vel(vidx) * hx[d] / (rho0 * vel0);
               }
             });

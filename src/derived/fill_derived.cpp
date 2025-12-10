@@ -269,10 +269,10 @@ void PrimToCons(T *md) {
       MakePackDescriptor<gas::cons::density, gas::cons::momentum, gas::cons::total_energy,
                          gas::cons::internal_energy, gas::prim::density,
                          gas::prim::velocity, gas::prim::pressure, gas::prim::sie,
-                         dust::cons::density, dust::cons::momentum, dust::prim::density,
-                         dust::prim::velocity, rad::cons::energy, rad::cons::flux,
-                         rad::prim::energy, rad::prim::flux, rad::prim::pressure>(
-          resolved_pkgs.get());
+                         gas::prim::bmod, gas::prim::temperature, dust::cons::density,
+                         dust::cons::momentum, dust::prim::density, dust::prim::velocity,
+                         rad::cons::energy, rad::cons::flux, rad::prim::energy,
+                         rad::prim::flux, rad::prim::pressure>(resolved_pkgs.get());
   auto vmesh = desc.GetPack(md);
   static auto desc_g = MakePackDescriptor<geom::x1v, geom::x2v, geom::x3v, geom::hx1v,
                                           geom::hx2v, geom::hx3v>(resolved_pkgs.get());
@@ -314,11 +314,15 @@ void PrimToCons(T *md) {
             // Sync primtive sie, pressure, and conserved internal energy
             Real &w_s = vmesh(b, gas::prim::sie(n), k, j, i);
             Real &w_p = vmesh(b, gas::prim::pressure(n), k, j, i);
+            Real &w_b = vmesh(b, gas::prim::bmod(n), k, j, i);
+            Real &w_t = vmesh(b, gas::prim::temperature(n), k, j, i);
             Real &u_u = vmesh(b, gas::cons::internal_energy(n), k, j, i);
             const bool siefloor = (w_s > sieflr_gas);
             w_s = (siefloor)*w_s + (!siefloor) * sieflr_gas;
             u_u = w_s * u_d;
             w_p = eos_d.PressureFromDensityInternalEnergy(w_d, w_s, lambda);
+            w_b = eos_d.BulkModulusFromDensityInternalEnergy(w_d, w_s, lambda);
+            w_t = eos_d.TemperatureFromDensityInternalEnergy(w_d, w_s, lambda);
 
             // Sync conserved total energy
             const Real ke = 0.5 * w_d * (SQR(vel1) + SQR(vel2) + SQR(vel3));

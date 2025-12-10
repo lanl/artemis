@@ -75,14 +75,16 @@ rotating_frame = true
 
 <gas>
 cfl = 0.3
-gamma = 1.00001
 reconstruct = plm
-riemann = hllc
+riemann = hllc-general
 dfloor = 1.0e-10
 siefloor = 1.0e-10
 refine_field = pressure
 refine_type = gradient
 refine_thr = 3.0
+
+<gas/eos/ideal>
+gamma = 1.00001
 
 
 <rotating_frame>

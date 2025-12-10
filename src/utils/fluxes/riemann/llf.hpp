@@ -57,9 +57,6 @@ struct RiemannSolver<RSolver::llf, FLUID_TYPE, CTYPE,
     PARTHENON_REQUIRE(dir > 0 && dir <= 3, "Invalid flux direction!");
     [[maybe_unused]] auto fdir = (dir == 1) ? TE::F1 : ((dir == 2) ? TE::F2 : TE::F3);
 
-    // TODO(BRR) temporary
-    const Real gm1 = eos.GruneisenParamFromDensityTemperature(Null<Real>(), Null<Real>());
-
     // Obtain number of species
     int nspecies = Null<int>();
     if constexpr (FLUID_TYPE == Fluid::gas) {
@@ -76,15 +73,9 @@ struct RiemannSolver<RSolver::llf, FLUID_TYPE, CTYPE,
       // Unused indices for dust hydrodynamics
       const int IPR = nspecies * 4 + n;
       const int ISE = nspecies * 5 + n;
+      const int IBL = nspecies * 6 + n;
       [[maybe_unused]] const int IEN = IPR;
       [[maybe_unused]] const int IEG = ISE;
-
-      [[maybe_unused]] Real igm1 = Null<Real>();
-      [[maybe_unused]] Real gamma = Null<Real>();
-      if constexpr (FLUID_TYPE == Fluid::gas) {
-        igm1 = 1.0 / gm1;
-        gamma = gm1 + 1.0;
-      }
 
       parthenon::par_for_inner(
           DEFAULT_INNER_LOOP_PATTERN, member, il, iu, [&](const int i) {
@@ -103,11 +94,15 @@ struct RiemannSolver<RSolver::llf, FLUID_TYPE, CTYPE,
             [[maybe_unused]] Real wr_ipr = Null<Real>();
             [[maybe_unused]] Real wl_ise = Null<Real>();
             [[maybe_unused]] Real wr_ise = Null<Real>();
+            [[maybe_unused]] Real wl_ibl = Null<Real>();
+            [[maybe_unused]] Real wr_ibl = Null<Real>();
             if constexpr (FLUID_TYPE == Fluid::gas) {
               wl_ipr = wl(IPR, i);
               wl_ise = wl(ISE, i);
+              wl_ibl = wr(IBL, i);
               wr_ipr = wr(IPR, i);
               wr_ise = wr(ISE, i);
+              wr_ibl = wr(IBL, i);
             }
 
             // Compute sum of L/R fluxes
@@ -122,9 +117,9 @@ struct RiemannSolver<RSolver::llf, FLUID_TYPE, CTYPE,
             [[maybe_unused]] Real er = Null<Real>();
             [[maybe_unused]] Real fsum_e = Null<Real>();
             if constexpr (FLUID_TYPE == Fluid::gas) {
-              el = wl_ipr * igm1 +
+              el = wl_ise * wl_idn +
                    0.5 * wl_idn * (SQR(wl_ivx) + SQR(wl_ivy) + SQR(wl_ivz));
-              er = wr_ipr * igm1 +
+              er = wr_ise * wr_idn +
                    0.5 * wr_idn * (SQR(wr_ivx) + SQR(wr_ivy) + SQR(wr_ivz));
               fsum_e = (el + wl_ipr) * wl_ivx + (er + wr_ipr) * wr_ivx;
             }
@@ -132,8 +127,8 @@ struct RiemannSolver<RSolver::llf, FLUID_TYPE, CTYPE,
             // Compute max wave speed in L/R states (see Toro eq. 10.43)
             Real a = Null<Real>();
             if constexpr (FLUID_TYPE == Fluid::gas) {
-              qa = std::sqrt(gamma * wl_ipr / wl_idn);
-              qb = std::sqrt(gamma * wr_ipr / wr_idn);
+              qa = std::sqrt(wl_ibl / wl_idn);
+              qb = std::sqrt(wr_ibl / wr_idn);
               a = std::max((std::abs(wl_ivx) + qa), (std::abs(wr_ivx) + qb));
             } else if constexpr (FLUID_TYPE == Fluid::dust) {
               a = std::max(std::abs(wl_ivx), std::abs(wr_ivx));

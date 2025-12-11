@@ -68,6 +68,7 @@ struct StateParams {
   Real cs;
   Real kT;
   Real omega;
+  int nvel;
 };
 
 // Struct that holds coagulation parameters
@@ -203,10 +204,11 @@ KOKKOS_INLINE_FUNCTION Real CoagulationRate(const int &i, const int &j, const in
   const Real &alpha = kernel.alpha;
   const Real &cs = kernel.cs;
   const Real &omega = kernel.omega;
+  const int &nvel = kernel.nvel;
   const Real &tau_i = stime(i);
   const Real &tau_j = stime(j);
-  const Real *vel_i = &vel(3 * i);
-  const Real *vel_j = &vel(3 * j);
+  const Real *vel_i = &vel(nvel * i);
+  const Real *vel_j = &vel(nvel * j);
 
   const Real &sig = rate.cross_section; //! cross section of gas species
   const Real &mmw = rate.mmw;           //! mean molecular weight (mu * mp)
@@ -230,8 +232,10 @@ KOKKOS_INLINE_FUNCTION Real CoagulationRate(const int &i, const int &j, const in
   // turbulent + brownian + actual
   Real dv = GetRelativeTurbulentVelocity(tau_i, tau_j, tn, vn, ts, vs, re) +
             std::min(cs * cs, 8 / M_PI * kernel.kT / muij) + SQR(vel_i[0] - vel_j[0]) +
-            SQR(vel_i[1] - vel_j[1]) + (!surface) * SQR(vel_i[2] - vel_j[2]);
-  ;
+            SQR(vel_i[1] - vel_j[1]);
+  if (surface) {
+    dv += SQR(vel_i[2] - vel_j[2]);
+  }
   Real hij = 1.0;
   if (surface) { // surface density
     const Real hi =
@@ -464,9 +468,9 @@ void FinalizeSource(const parthenon::team_mbr_t &mbr, const int &nm1, const int 
 KOKKOS_INLINE_FUNCTION
 void ZeroSourceNQ(const parthenon::team_mbr_t &mbr, const int &n, const int &nm1,
                   const ScratchPad1D<Real> &Q, const ScratchPad1D<Real> &nQs,
-                  const ScratchPad1D<Real> &vel) {
+                  const ScratchPad1D<Real> &vel, const int nvel) {
   parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, mbr, 0, nm1, [&](const int i) {
-    Q(i) = vel(n + i * 3) * mom_scale;
+    Q(i) = vel(n + i * nvel) * mom_scale;
     nQs(i) = 0.0;
   });
   mbr.team_barrier();
@@ -621,14 +625,15 @@ void FinalizeSourceNQ(const parthenon::team_mbr_t &mbr, const int &nm1, const in
 KOKKOS_INLINE_FUNCTION
 void UpdateVelocityNQ(const parthenon::team_mbr_t &mbr, const int &n, const int &nm1,
                       const ScratchPad1D<Real> &Q, const ScratchPad1D<Real> &nQs,
-                      const ScratchPad1D<Real> &vel, const ScratchPad1D<Real> &dustdens,
+                      const ScratchPad1D<Real> &vel, const int nvel,
+                      const ScratchPad1D<Real> &dustdens,
                       const ScratchPad1D<Real> &source, const ParArray1D<Real> &mass_grid,
                       const Real &dt, const Real &dfloor) {
   parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, mbr, 0, nm1, [&](const int i) {
     const Real distri_i = dustdens(i) + dt * source(i);
     if (distri_i > dfloor / mass_grid(i)) {
       const Real nQ1 = dustdens(i) * Q(i) + dt * nQs(i);
-      vel(VI(i, n)) = nQ1 / distri_i * mom_iscale;
+      vel(n + nvel * i) = nQ1 / distri_i * mom_iscale;
     }
   });
   mbr.team_barrier();
@@ -731,15 +736,16 @@ void IntermediateNQS3(const parthenon::team_mbr_t &mbr, const int &nm1,
 KOKKOS_INLINE_FUNCTION
 void UpdateVelocityNQS3(const parthenon::team_mbr_t &mbr, const int &n, const int &nm1,
                         const ScratchPad1D<Real> &Q2, const ScratchPad1D<Real> &nQs,
-                        const ScratchPad1D<Real> &vel, const ScratchPad1D<Real> &dustdens,
+                        const ScratchPad1D<Real> &vel, const int nvel,
+                        const ScratchPad1D<Real> &dustdens,
                         const ScratchPad1D<Real> &source,
                         const ParArray1D<Real> &mass_grid, const Real &dt,
                         const Real &dfloor) {
   parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, mbr, 0, nm1, [&](const int i) {
     const Real distri_i = dustdens(i) + 0.5 * dt * (source(i) + Q2(i));
     if (distri_i > dfloor / mass_grid(i)) {
-      const Real nQ1 = (dustdens(i) * vel(VI(i, n)) * mom_scale) + 0.5 * dt * nQs(i);
-      vel(VI(i, n)) = nQ1 / distri_i * mom_iscale;
+      const Real nQ1 = (dustdens(i) * vel(n + i * nvel) * mom_scale) + 0.5 * dt * nQs(i);
+      vel(n + i * nvel) = nQ1 / distri_i * mom_iscale;
     }
   });
   mbr.team_barrier();
@@ -917,11 +923,11 @@ int CoagulationOneCell(parthenon::team_mbr_t const &mbr, const bool &surface,
     if (coag_int == 1) {
       // Momentum Conserving Update (iff do_momentum_conserving_update)
       for (int n = 0; n < do_momentum_conserving_update * nvel; n++) {
-        ZeroSourceNQ(mbr, n, nm1, Q, nQs, vel);
+        ZeroSourceNQ(mbr, n, nm1, Q, nQs, vel, kernel.nvel);
         SourceNQ(mbr, n, nm1, mimax, pgrid, Q, nQs, dustdens, vel, stime, kernel,
                  mass_grid, coagR3D, Kijk_sym_ind, Kijk_sym, chi, surface, rate);
-        UpdateVelocityNQ(mbr, n, nm1, Q, nQs, vel, dustdens, source, mass_grid, dt,
-                         dfloor);
+        UpdateVelocityNQ(mbr, n, nm1, Q, nQs, vel, kernel.nvel, dustdens, source,
+                         mass_grid, dt, dfloor);
       }
 
       // Update dust density
@@ -932,12 +938,12 @@ int CoagulationOneCell(parthenon::team_mbr_t const &mbr, const bool &surface,
       // Momentum Conserving Update (iff do_momentum_conserving_update)
       for (int n = 0; n < do_momentum_conserving_update * nvel; n++) {
         if (n == 0) InitializeTempNQS3(mbr, n, nm1, Q2, nQs);
-        ZeroSourceNQ(mbr, n, nm1, Q, nQs, vel);
+        ZeroSourceNQ(mbr, n, nm1, Q, nQs, vel, kernel.nvel);
         SourceNQS3(mbr, n, nm1, mimax, mimax2, pgrid, Q, Q2, source, nQs, dustdens, vel,
                    stime, kernel, mass_grid, coagR3D, Kijk_sym_ind, Kijk_sym, chi,
                    surface, rate, dt);
-        UpdateVelocityNQS3(mbr, n, nm1, Q2, nQs, vel, dustdens, source, mass_grid, dt,
-                           dfloor);
+        UpdateVelocityNQS3(mbr, n, nm1, Q2, nQs, vel, kernel.nvel, dustdens, source,
+                           mass_grid, dt, dfloor);
       }
 
       // Update dust density

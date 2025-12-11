@@ -169,6 +169,38 @@ void EnrollArtemisRefinementOps(parthenon::Metadata &m, Coordinates coords,
                                 const bool log);
 std::vector<std::vector<Real>> loadtxt(std::string fname);
 
+// 4D  outer parallel loop using Kokkos Teams
+template <typename Function>
+inline void par_for_outer(OuterLoopPatternTeams, const std::string &name,
+                          DevExecSpace exec_space, size_t scratch_size_in_bytes,
+                          const int scratch_level, const int nl, const int nu,
+                          const int kl, const int ku, const int jl, const int ju,
+                          const int il, const int iu, const Function &function) {
+  const int Nn = nu - nl + 1;
+  const int Nk = ku - kl + 1;
+  const int Nj = ju - jl + 1;
+  const int Ni = iu - il + 1;
+  const int NjNi = Nj * Ni;
+  const int NkNjNi = Nk * Nj * Ni;
+  const int NnNkNjNi = Nn * Nk * Nj * Ni;
+
+  team_policy policy(exec_space, NnNkNjNi, Kokkos::AUTO);
+
+  Kokkos::parallel_for(
+      name,
+      policy.set_scratch_size(scratch_level, Kokkos::PerTeam(scratch_size_in_bytes)),
+      KOKKOS_LAMBDA(team_mbr_t team_member) {
+        int n = team_member.league_rank() / NkNjNi;
+        int k = (team_member.league_rank() - n * NkNjNi) / NjNi;
+        int j = (team_member.league_rank() - n * NkNjNi - k * NjNi) / Ni;
+        const int i = team_member.league_rank() - n * NkNjNi - k * NjNi - j * Ni + il;
+        n += nl;
+        k += kl;
+        j += jl;
+        function(team_member, n, k, j, i);
+      });
+}
+
 //----------------------------------------------------------------------------------------
 //! \fn  std::vector<std::vector<Real>> NBody::loadtxt
 //! \brief Cuts a 2D rectangle with the given plane

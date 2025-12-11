@@ -67,8 +67,7 @@
         "HDF5_INCLUDE_DIR": "$env{HDF5_ROOT}/include",
         "HDF5_INCLUDE_DIRS": "$env{HDF5_ROOT}/include",
         "HDF5_LIBRARIES": "$env{HDF5_ROOT}/lib",
-        "HDF5_HL_LIBRARIES": "$env{HDF5_ROOT}/lib",
-        "PARTHENON_DISABLE_HDF5_COMPRESSION": "ON"
+        "HDF5_HL_LIBRARIES": "$env{HDF5_ROOT}/lib"
       }
     },
     {
@@ -80,8 +79,7 @@
         "HDF5_INCLUDE_DIR": "$env{HDF5_ROOT}/include",
         "HDF5_INCLUDE_DIRS": "$env{HDF5_ROOT}/include",
         "HDF5_LIBRARIES": "$env{HDF5_ROOT}/lib",
-        "HDF5_HL_LIBRARIES": "$env{HDF5_ROOT}/lib",
-        "PARTHENON_DISABLE_HDF5_COMPRESSION": "ON"
+        "HDF5_HL_LIBRARIES": "$env{HDF5_ROOT}/lib"
       }
     },
     {
@@ -98,7 +96,6 @@
         "HDF5_INCLUDE_DIRS": "$env{HDF5_ROOT}/include",
         "HDF5_LIBRARIES": "$env{HDF5_ROOT}/lib",
         "HDF5_HL_LIBRARIES": "$env{HDF5_ROOT}/lib",
-        "PARTHENON_DISABLE_HDF5_COMPRESSION": "ON",
         "NUM_GPU_DEVICES_PER_NODE": "4"
       }
     },
@@ -115,7 +112,6 @@
         "HDF5_INCLUDE_DIRS": "$env{HDF5_ROOT}/include",
         "HDF5_LIBRARIES": "$env{HDF5_ROOT}/lib",
         "HDF5_HL_LIBRARIES": "$env{HDF5_ROOT}/lib",
-        "PARTHENON_DISABLE_HDF5_COMPRESSION": "ON",
         "NUM_GPU_DEVICES_PER_NODE": "4"
       }
     },
@@ -133,7 +129,6 @@
         "HDF5_INCLUDE_DIRS": "$env{HDF5_ROOT}/include",
         "HDF5_LIBRARIES": "$env{HDF5_ROOT}/lib",
         "HDF5_HL_LIBRARIES": "$env{HDF5_ROOT}/lib",
-        "PARTHENON_DISABLE_HDF5_COMPRESSION": "ON",
         "NUM_GPU_DEVICES_PER_NODE": "4"
       }
     },
@@ -149,7 +144,6 @@
         "HDF5_INCLUDE_DIRS": "$env{HDF5_ROOT}/include",
         "HDF5_LIBRARIES": "$env{HDF5_ROOT}/lib",
         "HDF5_HL_LIBRARIES": "$env{HDF5_ROOT}/lib",
-        "PARTHENON_DISABLE_HDF5_COMPRESSION": "ON",
         "Kokkos_ARCH_HOPPER90": "ON",
         "NUM_GPU_DEVICES_PER_NODE": "4"
       }

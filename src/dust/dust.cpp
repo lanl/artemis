@@ -20,6 +20,7 @@
 
 // Artemis includes
 #include "artemis.hpp"
+#include "dust/coagulation/coagulation.hpp"
 #include "dust/dust.hpp"
 #include "geometry/geometry.hpp"
 #include "rotating_frame/rotating_frame.hpp"
@@ -28,6 +29,7 @@
 #include "utils/history.hpp"
 #include "utils/units.hpp"
 
+using ArtemisUtils::EOS;
 using ArtemisUtils::VI;
 
 namespace Dust {
@@ -84,6 +86,13 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
 
   // Dust sizes
   const auto size_dist = pin->GetOrAddString("dust", "size_input", "direct");
+
+  // Check compatibility with coagulation
+  const bool do_coagulation = pin->GetOrAddBoolean("physics", "coagulation", false);
+  PARTHENON_REQUIRE(!(do_coagulation) || size_dist == "logspace",
+                    "dust coagulation requires size_input = logspace!");
+
+  // Units
   const Real length_conv = units.GetLengthPhysicalToCode();
   const Real rho_conv = units.GetMassDensityPhysicalToCode();
 
@@ -162,6 +171,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   const int scr_level = pin->GetOrAddInteger("dust", "scr_level", 0);
   params.Add("scr_level", scr_level);
 
+  // Logarithmic gridding?
   const bool log =
       pin->GetOrAddString("artemis", "radial_spacing", "uniform") == "logarithmic";
 
@@ -383,11 +393,15 @@ void AddHistory(Coordinates coords, Params &params) {
 
 //----------------------------------------------------------------------------------------
 //! template instantiations
-template Real EstimateTimestepMesh<Coordinates::cartesian>(MeshData<Real> *md);
-template Real EstimateTimestepMesh<Coordinates::cylindrical>(MeshData<Real> *md);
-template Real EstimateTimestepMesh<Coordinates::spherical1D>(MeshData<Real> *md);
-template Real EstimateTimestepMesh<Coordinates::spherical2D>(MeshData<Real> *md);
-template Real EstimateTimestepMesh<Coordinates::spherical3D>(MeshData<Real> *md);
-template Real EstimateTimestepMesh<Coordinates::axisymmetric>(MeshData<Real> *md);
+typedef Coordinates G;
+typedef Mesh M;
+typedef MeshData<Real> MD;
+typedef parthenon::SimTime ST;
+template Real EstimateTimestepMesh<G::cartesian>(MD *md);
+template Real EstimateTimestepMesh<G::cylindrical>(MD *md);
+template Real EstimateTimestepMesh<G::spherical1D>(MD *md);
+template Real EstimateTimestepMesh<G::spherical2D>(MD *md);
+template Real EstimateTimestepMesh<G::spherical3D>(MD *md);
+template Real EstimateTimestepMesh<G::axisymmetric>(MD *md);
 
 } // namespace Dust

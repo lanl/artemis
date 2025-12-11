@@ -21,6 +21,7 @@
 #include "advection.hpp"
 #include "beam.hpp"
 #include "blast.hpp"
+#include "coag.hpp"
 #include "conduction.hpp"
 #include "constant.hpp"
 #include "disk.hpp"
@@ -50,6 +51,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
     beam::ProblemGenerator<T>(pmb, pin);
   } else if (name == "blast") {
     blast::ProblemGenerator<T>(pmb, pin);
+  } else if (name == "coag") {
+    coag::ProblemGenerator<T>(pmb, pin);
   } else if (name == "conduction") {
     cond::ProblemGenerator<T>(pmb, pin);
   } else if (name == "constant") {

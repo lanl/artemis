@@ -26,6 +26,8 @@ set (SRC_LIST
 
   dust/dust.cpp
   dust/dust.hpp
+  dust/coagulation/coagulation.cpp
+  dust/coagulation/coagulation.hpp
 
   gas/gas.cpp
   gas/gas.hpp
@@ -58,6 +60,7 @@ set (SRC_LIST
   pgen/advection.hpp
   pgen/beam.hpp
   pgen/blast.hpp
+  pgen/coag.hpp
   pgen/conduction.hpp
   pgen/constant.hpp
   pgen/disk.hpp

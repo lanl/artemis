@@ -34,6 +34,7 @@
 #include "shock.hpp"
 #include "strat.hpp"
 #include "thermalization.hpp"
+#include "crooked_pipe.hpp"
 
 using namespace parthenon::package::prelude;
 
@@ -75,6 +76,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
     strat::ProblemGenerator<T>(pmb, pin);
   } else if (name == "thermalization") {
     thermalization::ProblemGenerator<T>(pmb, pin);
+  } else if (name == "crooked_pipe") {
+    crooked_pipe::ProblemGenerator<T>(pmb, pin);
   } else {
     PARTHENON_FAIL("Invalid problem name!");
   }

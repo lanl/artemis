@@ -44,9 +44,9 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const bool do_radiation = artemis_pkg->Param<bool>("do_radiation");
   const bool do_imc = artemis_pkg->Param<bool>("do_imc");
   const bool do_moment = artemis_pkg->Param<bool>("do_moment");
-  //PARTHENON_REQUIRE(do_gas, "Thermalization problem requires gas!");
+  PARTHENON_REQUIRE(do_gas, "Crooked pipe problem requires gas!");
   PARTHENON_REQUIRE(!(do_dust), "Crooked pipe problem does not permit dust!");
-  PARTHENON_REQUIRE(!(do_gas), "Crooked pipe problem does not permit gas!");
+  //PARTHENON_REQUIRE(!(do_gas), "Crooked pipe problem does not permit gas!");
   auto gas_pkg = pmb->packages.Get("gas");
   const auto eos = gas_pkg->Param<EOS>("eos_d");
   Real ar = Null<Real>();
@@ -72,7 +72,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       MakePackDescriptor<gas::prim::density, gas::prim::velocity, gas::prim::sie,
                          rad::prim::energy, rad::prim::flux>(
           (pmb->resolved_packages).get());
-  auto v = desc.GetPack(pmb);
+  auto v = desc.GetPack(md.get());
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);

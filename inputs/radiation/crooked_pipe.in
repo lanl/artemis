@@ -2,7 +2,7 @@
 problem = crooked_pipe  # name of the pgen
 coordinates = cartesian
 physical_units = cgs     # not scale-free
-unit_conversion = ppd   # [L/T/M/Temp] = 1
+unit_conversion = base   # [L/T/M/Temp] = 1
 
 <parthenon/job>
 problem_id = crooked_pipe  # problem ID: basename of output filenames
@@ -24,11 +24,6 @@ integrator = rk2    # time integration algorithm
 ncycle_out = 1      # interval for stdout summary info
 dt_force = 1.0e-10
 
-<crooked_pipe>
-t_init = 1.1e4
-t_source = 5.8e6
-rho_thin = 1.0
-rho_thick = 100.0
 
 <parthenon/mesh>
 #refinement = static # Enable static mesh refinement
@@ -58,8 +53,6 @@ nx3 = 1   # Number of cells in each MeshBlock, X3-dir
 
 <physics>
 gas = true
-gravity = false
-rotating_frame = false
 radiation = true
 
 # from thermalization
@@ -74,25 +67,38 @@ siefloor = 1.0e-10
 <gas/eos/ideal>
 gamma = 1.4  # adiabatic index
 mu = 28.96   # mean molecular weight
+
 <gas/opacity/absorption>
 opacity_model = constant
 kappa_a = 2.0
 
 # from thermalization
 <problem>
-rho0 = 1.0
-h  = 0.1
+t_init = 1.1e4
+t_source = 5.8e6
+rho_thin = 1.0
+rho_thick = 100.0
 
-<parthenon/swarm>
-ix1_bc = jaybenne_reflecting # inner-X1 boundary flag for swarms
-ox1_bc = outflow  # outer-X1 boundary flag for swarms
-ix2_bc = jaybenne_reflecting  # inner-X2 boundary flag for swarms
-ox2_bc = outflow  # outer-X2 boundary flag for swarms
-ix3_bc = jaybenne_reflecting # inner-X3 boundary flag for swarms
-ox3_bc = jaybenne_reflecting # outer-X3 boundary flag for swarms
 
-<radiation/imc>
-do_emission = true
-num_particles = 32000000 # particle resolution
-use_ddmc = true          # use DDMC?
-#min_swarm_occupancy = 0.5
+<radiation/moment>
+cfl = 0.3
+riemann = hlle
+reconstruct = plm
+efloor = 1e-16
+closure = p1
+creduc = 43.3526011561
+
+
+#<parthenon/swarm>
+#ix1_bc = jaybenne_reflecting # inner-X1 boundary flag for swarms
+#ox1_bc = outflow  # outer-X1 boundary flag for swarms
+#ix2_bc = jaybenne_reflecting  # inner-X2 boundary flag for swarms
+#ox2_bc = outflow  # outer-X2 boundary flag for swarms
+#ix3_bc = jaybenne_reflecting # inner-X3 boundary flag for swarms
+#ox3_bc = jaybenne_reflecting # outer-X3 boundary flag for swarms
+#
+#<radiation/imc>
+#do_emission = true
+#num_particles = 32000000 # particle resolution
+#use_ddmc = true          # use DDMC?
+##min_swarm_occupancy = 0.5

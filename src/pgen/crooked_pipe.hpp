@@ -29,6 +29,21 @@ using ArtemisUtils::EOS;
 
 namespace crooked_pipe {
 
+
+template<Coordinates GEOM>
+KOKKOS_INLINE_FUNCTION
+Real volume(const geometry::BBox &rect) {
+  Real dx = rect.x1[1] - rect.x1[0];
+  Real dy = rect.x2[1] - rect.x2[0];
+  Real dz = rect.x3[1] - rect.x3[0];
+
+  if constexpr(GEOM == Coordinates::axisymmetric) {
+    dx *= 0.5*(rect.x1[0] + rect.x1[1]);
+  }
+
+  return dx*dy*dz;
+}
+
 //----------------------------------------------------------------------------------------
 //! \fn void ProblemGenerator::Crooked_Pipe()
 //! \brief Sets initial conditions for crooked pipe radiation flow problem
@@ -55,6 +70,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
     ar = rad_pkg->Param<Real>("arad");
   }
 
+  const Real x2min = artemis_pkg->Param<Real>("x2min");
   // Initial conditions
   const Real rho_thin = pin->GetOrAddReal("problem", "rho_thin", 1.0);
   const Real rho_thick = pin->GetOrAddReal("problem", "rho_thick", 1000.0);
@@ -77,15 +93,6 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
 
-  std::vector<std::array<double, 4>> thick_regions = {{3.0,4.0, -1.0,1.0},
-                                                      {-2.0,2.5, -2.0, 0.5}, // extended xl to -2 for thick region above source
-                                                      {-2.0, 2.5, 0.5, 2.0}, // extended xl to -2 for thick region above source
-                                                      {4.5, 7.0, -2.0, 0.5},
-                                                      {4.5, 7.0, 0.5, 2.0},
-                                                      {2.5, 4.5, 1.5, 2.5}};
-
-  std::vector<std::array<double, 4>> thin_source_regions= {{-2.0,0.0,-1.0,1.0}};
-
   const auto &cpars =
       pmb->packages.Get("artemis")->template Param<geometry::CoordParams>("coord_params");
   auto &pco = pmb->coords;
@@ -99,62 +106,80 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   // * density of thin regions using rho_thin
   // * density of thick regions using rho_thick
   // * initial material and radiation temperature of all cell using t_init
-  if (do_imc) {
-    pmb->par_for(
-      "crooked_pipe::trad", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
-      KOKKOS_LAMBDA(const int k, const int j, const int i) {
-
+  pmb->par_for(
+    "crooked_pipe::trad", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+     KOKKOS_LAMBDA(const int k, const int j, const int i) {
       geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
-      const auto &xv = coords.GetCellCenter(vg, 0, k, j, i);
+      Real tot = 0.0;
+      geometry::BBox rect;
+      rect.x3 = {-0.5, 0.5};
+ 
+      // Box 1
+      rect.x1 = {0.0, 0.5};
+      rect.x2 = {0.0, 2.5};
+      auto intersect = coords.bnds.intersect(rect);
+      tot += volume<GEOM>(intersect);
+ 
+      // Box 2
+      rect.x1 = {0.0, 1.5};
+      rect.x2 = {2.5, 3.0};
+      intersect = coords.bnds.intersect(rect);
+      tot += volume<GEOM>(intersect);
+ 
+      // Box 3
+      rect.x1 = {1.0, 1.5};
+      rect.x2 = {3.0, 4.0};
+      intersect = coords.bnds.intersect(rect);
+      tot += volume<GEOM>(intersect);
 
-      const Real xl = xv[0];
-      const Real xu = xv[0];
-      const Real yl = xv[1];
-      const Real yu = xv[1];
+      // Box 4
+      rect.x1 = {0.0, 1.5};
+      rect.x2 = {4.0, 4.5};
+      intersect = coords.bnds.intersect(rect);
+      tot += volume<GEOM>(intersect);
+ 
+      // Box 5
+      rect.x1 = {0.0, 0.5};
+      rect.x2 = {4.5, 8.0};
+      intersect = coords.bnds.intersect(rect);
+      tot += volume<GEOM>(intersect);
 
-      // default thin cell
-      v(0, gas::prim::density(), k, j, i) = rho_thin;
-      v(0, gas::prim::sie(), k, j, i) =
-          eos.InternalEnergyFromDensityTemperature(rho_thin, t_init);
+      // Source region
+      rect.x1 = {0.0, 0.5};
+      rect.x2 = {x2min, 0.0};
+      intersect = coords.bnds.intersect(rect);
+      Real src = volume<GEOM>(intersect);
 
-      for( const auto &iregion : thick_regions) {
-        if (xl >= iregion[0] && xu < iregion[1] && yl >= iregion[2] && yu <= iregion[3]) {
-          v(0, gas::prim::density(), k, j, i) = rho_thick;
-          v(0, gas::prim::sie(), k, j, i) =
-              eos.InternalEnergyFromDensityTemperature(rho_thick, t_init);
-        }
+ 
+      const Real vol = coords.Volume();
+ 
+      const Real w = tot/vol;
+      src /= vol;
+      
+      const Real sie_source = eos.InternalEnergyFromDensityTemperature(rho_thin, t_source);
+      const Real sie_thin = eos.InternalEnergyFromDensityTemperature(rho_thin, t_init);
+      const Real sie_thick = eos.InternalEnergyFromDensityTemperature(rho_thick, t_init);
+      const Real rho = (src + w)*rho_thin + (1.0 - src - w)*rho_thick;
+      const Real energy = (src * sie_source + w * sie_thin) * rho_thin + (1.0 - src - w)*rho_thick * sie_thick;
+ 
+      const Real T = eos.TemperatureFromDensityInternalEnergy(rho, energy/rho);
+
+      v(0, gas::prim::density(),k,j,i) = rho;
+      v(0, gas::prim::velocity(0),k,j,i) = 0.0;
+      v(0, gas::prim::velocity(1),k,j,i) = 0.0;
+      v(0, gas::prim::velocity(2),k,j,i) = 0.0;
+      v(0, gas::prim::sie(),k,j,i) = energy/rho;
+      if (do_moment) {
+        v(0, rad::prim::energy(), k, j, i) = ar*SQR(SQR(T));
+        v(0, rad::prim::flux(0), k, j, i) =  0.0;
+        v(0, rad::prim::flux(1), k, j, i) =  1.0;
+        v(0, rad::prim::flux(2), k, j, i) =  0.0;
       }
-      for( const auto &iregion : thin_source_regions) {
-        if (xl >= iregion[0] && xu < iregion[1] && yl >= iregion[2] && yu <= iregion[3]) {
-          v(0, gas::prim::density(), k, j, i) = rho_thin;
-          v(0, gas::prim::sie(), k, j, i) =
-              eos.InternalEnergyFromDensityTemperature(rho_thin, t_source);
-        }
-      }
-    });
+  });
+  if (do_imc) {
     jaybenne::InitializeRadiation(md.get(), true);
   }
 
-  /*
-  // Now reset fluid state out of thermal equilibrium via tgas
-  pmb->par_for(
-      "thermalization::tgas", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
-      KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        v(0, gas::prim::density(), k, j, i) = rho;
-        v(0, gas::prim::velocity(0), k, j, i) = vx;
-        v(0, gas::prim::velocity(1), k, j, i) = 0.0;
-        v(0, gas::prim::velocity(2), k, j, i) = 0.0;
-        v(0, gas::prim::sie(), k, j, i) =
-            eos.InternalEnergyFromDensityTemperature(rho, tgas);
-
-        if (do_moment) {
-          v(0, rad::prim::energy(), k, j, i) = ar * SQR(SQR(trad));
-          v(0, rad::prim::flux(0), k, j, i) = 0.0;
-          v(0, rad::prim::flux(1), k, j, i) = 0.0;
-          v(0, rad::prim::flux(2), k, j, i) = 0.0;
-        }
-      });
-  */
 }
 
 } // namespace crooked_pipe

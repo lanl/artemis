@@ -58,6 +58,7 @@ ArtemisDriver<GEOM>::ArtemisDriver(ParameterInput *pin, ApplicationInput *app_in
   artemis_pkg = pm->packages.Get("artemis").get();
 
   // Fluids and/or physics requested
+  do_hydro = artemis_pkg->template Param<bool>("do_hydro");
   do_gas = artemis_pkg->template Param<bool>("do_gas");
   do_dust = artemis_pkg->template Param<bool>("do_dust");
   do_gravity = artemis_pkg->template Param<bool>("do_gravity");
@@ -130,7 +131,7 @@ TaskListStatus ArtemisDriver<GEOM>::Step() {
   if (status != TaskListStatus::complete) return status;
 
   // Operator split, background linear advection (for shearing box)
-  if (do_shear) {
+  if (do_hydro && do_shear) {
     status = RotatingFrame::Advect(pmesh, tm);
     if (status != TaskListStatus::complete) return status;
   }
@@ -245,8 +246,12 @@ TaskCollection ArtemisDriver<GEOM>::StepTasks() {
       // NOTE(@adempsey): 1st stage of VL2 uses piecewise constant reconstruction
       const bool do_pcm = ((stage == 1) && (integrator->GetName() == "vl2"));
       TaskID gas_flx = none, dust_flx = none;
-      if (do_gas) gas_flx = tl.AddTask(none, Gas::CalculateFluxes, u0.get(), do_pcm);
-      if (do_dust) dust_flx = tl.AddTask(none, Dust::CalculateFluxes, u0.get(), do_pcm);
+      if (do_hydro) {
+        if (do_gas) gas_flx = tl.AddTask(none, Gas::CalculateFluxes, u0.get(), do_pcm);
+        if (do_dust) dust_flx = tl.AddTask(none, Dust::CalculateFluxes, u0.get(), do_pcm);
+      } else {
+        if (do_gas) gas_flx = tl.AddTask(none, Gas::ZeroFluxes, u0.get());
+      }
 
       // Compute (gas) diffusive fluxes
       TaskID diff_flx = none;
@@ -266,14 +271,14 @@ TaskCollection ArtemisDriver<GEOM>::StepTasks() {
       auto set_flx = tl.AddTask(recv_flx, parthenon::SetFluxCorrections, u0);
 
       // Apply flux divergence
-      auto update =
+      auto update = 
           tl.AddTask(gas_flx | dust_flx | set_flx, ArtemisUtils::ApplyUpdate<GEOM>,
                      u0.get(), u1.get(), g0, g1, bdt);
 
       // Apply "coordinate source terms"
       TaskID gas_coord_src = update, dust_coord_src = update;
-      if (do_gas) gas_coord_src = tl.AddTask(update, Gas::FluxSource, u0.get(), bdt);
-      if (do_dust) dust_coord_src = tl.AddTask(update, Dust::FluxSource, u0.get(), bdt);
+      if (do_hydro && do_gas) gas_coord_src = tl.AddTask(update, Gas::FluxSource, u0.get(), bdt);
+      if (do_hydro && do_dust) dust_coord_src = tl.AddTask(update, Dust::FluxSource, u0.get(), bdt);
 
       // Apply (gas) diffusion sources
       TaskID gas_diff_src = gas_coord_src | diff_flx | set_flx;
@@ -284,7 +289,7 @@ TaskCollection ArtemisDriver<GEOM>::StepTasks() {
 
       // Apply gravity source term
       TaskID gravity_src = gas_coord_src | dust_coord_src | gas_diff_src;
-      if (do_gravity) {
+      if (do_hydro && do_gravity) {
         gravity_src = tl.AddTask(gas_coord_src | dust_coord_src | gas_diff_src,
                                  Gravity::ExternalGravity<GEOM>, u0.get(), time, bdt);
       }
@@ -297,7 +302,7 @@ TaskCollection ArtemisDriver<GEOM>::StepTasks() {
 
       // Apply rotating frame source term
       TaskID rframe_src = rt_src;
-      if (do_rotating_frame) {
+      if (do_hydro && do_rotating_frame) {
         rframe_src =
             tl.AddTask(rt_src, RotatingFrame::RotatingFrameForce, u0.get(), time, bdt);
       }
@@ -305,7 +310,7 @@ TaskCollection ArtemisDriver<GEOM>::StepTasks() {
       // Apply drag source term
       // NOTE(@pdmullen): RK integrated, operator split drag (RHS computed from U)
       TaskID drag_src = rframe_src;
-      if (do_drag) {
+      if (do_hydro && do_drag) {
         drag_src = tl.AddTask(rframe_src, Drag::DragSource<GEOM>, u0.get(), time, bdt);
       }
 

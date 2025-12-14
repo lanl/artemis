@@ -52,7 +52,7 @@ class ArtemisDriver : public EvolutionDriver {
  protected:
   IntegratorPtr_t integrator, nbody_integrator, rad_integrator;
   StateDescriptor *artemis_pkg;
-  bool do_gas, do_dust, do_moment, do_imc;
+  bool do_hydro, do_gas, do_dust, do_moment, do_imc;
   bool do_gravity, do_nbody, do_rotating_frame, do_shear;
   bool do_cooling, do_drag, do_viscosity, do_conduction, do_diffusion;
   bool do_coagulation, do_raytrace;

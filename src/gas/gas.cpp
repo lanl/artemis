@@ -535,6 +535,8 @@ Real EstimateTimestepMesh(MeshData<Real> *md) {
   using RotatingFrame::BackgroundVelocity;
   auto pm = md->GetParentPointer();
   auto &resolved_pkgs = pm->resolved_packages;
+  auto &art_pkg = pm->packages.Get("artemis");
+  if (!art_pkg->template Param<bool>("do_hydro")) return Big<Real>();
 
   auto &gas_pkg = pm->packages.Get("gas");
   auto &params = gas_pkg->AllParams();
@@ -552,7 +554,7 @@ Real EstimateTimestepMesh(MeshData<Real> *md) {
   IndexRange kb = md->GetBoundsK(IndexDomain::interior);
   const int ndim = pm->ndim;
   const auto &cpars =
-      pm->packages.Get("artemis")->template Param<geometry::CoordParams>("coord_params");
+      art_pkg->template Param<geometry::CoordParams>("coord_params");
 
   Real min_dt = Big<Real>();
   parthenon::par_reduce(
@@ -646,6 +648,63 @@ TaskStatus CalculateFluxes(MeshData<Real> *md, const bool pcm) {
 
   return ArtemisUtils::CalculateFluxes<Fluid::gas>(md, pkg, vprim, vflux, vface, vg, pcm);
 }
+
+TaskStatus ZeroFluxes(MeshData<Real> *md) {
+  PARTHENON_INSTRUMENT
+  auto pm = md->GetParentPointer();
+  auto &resolved_pkgs = pm->resolved_packages;
+
+  auto &pkg = pm->packages.Get("gas");
+  auto &art_pkg = pm->packages.Get("artemis");
+  const bool multi_d = art_pkg->Param<bool>("multi_d");
+  const bool three_d = art_pkg->Param<bool>("three_d");
+
+  static auto desc_flux =
+      parthenon::MakePackDescriptor<gas::cons::density, gas::cons::momentum,
+                                    gas::cons::total_energy, gas::cons::internal_energy, gas::prim::pressure>(
+          resolved_pkgs.get(), {}, {parthenon::PDOpt::WithFluxes});
+  auto vflux = desc_flux.GetPack(md);
+
+  const auto ib = md->GetBoundsI(IndexDomain::interior);
+  const auto jb = md->GetBoundsJ(IndexDomain::interior);
+  const auto kb = md->GetBoundsK(IndexDomain::interior);
+
+  // Add additional energy sources
+  parthenon::par_for(
+      DEFAULT_LOOP_PATTERN, "DepositEnergy", parthenon::DevExecSpace(), 0,
+      md->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e+1,
+      KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
+        for (int n = vflux.GetLowerBound(b); n <= vflux.GetUpperBound(b); ++n) {
+          vflux.flux(b, n, k, j, i) = 0.0;
+        }
+      });
+
+
+  if (multi_d) {
+    parthenon::par_for(
+      DEFAULT_LOOP_PATTERN, "DepositEnergy", parthenon::DevExecSpace(), 0,
+      md->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e+1, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
+        for (int n = vflux.GetLowerBound(b); n <= vflux.GetUpperBound(b); ++n) {
+          vflux.flux(b, n, k, j, i) = 0.0;
+        }
+      });
+  }
+
+  if (three_d) {
+    parthenon::par_for(
+      DEFAULT_LOOP_PATTERN, "DepositEnergy", parthenon::DevExecSpace(), 0,
+      md->NumBlocks() - 1, kb.s, kb.e+1, jb.s, jb.e, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
+        for (int n = vflux.GetLowerBound(b); n <= vflux.GetUpperBound(b); ++n) {
+          vflux.flux(b, n, k, j, i) = 0.0;
+        }
+      });
+  }
+
+  return TaskStatus::complete;
+}
+
 
 //----------------------------------------------------------------------------------------
 //! \fn  TaskStatus Gas::FluxSource

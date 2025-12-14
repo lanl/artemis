@@ -128,9 +128,22 @@ struct BBox {
   KOKKOS_FUNCTION
   BBox() {}
 
-  Real x1[2] = {Null<Real>(), Null<Real>()};
-  Real x2[2] = {Null<Real>(), Null<Real>()};
-  Real x3[2] = {Null<Real>(), Null<Real>()};
+  std::array<Real,2> x1 = {Null<Real>(), Null<Real>()};
+  std::array<Real,2> x2 = {Null<Real>(), Null<Real>()};
+  std::array<Real,2> x3 = {Null<Real>(), Null<Real>()};
+
+  KOKKOS_INLINE_FUNCTION
+  BBox intersect(const BBox &other) {
+    // Intersect with another axis-aligned BBox
+    BBox res;
+    res.x1[0] = std::max(x1[0], other.x1[0]);
+    res.x1[1] = std::min(x1[1], other.x1[1]);
+    res.x2[0] = std::max(x2[0], other.x2[0]);
+    res.x2[1] = std::min(x2[1], other.x2[1]);
+    res.x3[0] = std::max(x3[0], other.x3[0]);
+    res.x3[1] = std::min(x3[1], other.x3[1]);
+    return res;
+  }
 };
 
 //----------------------------------------------------------------------------------------

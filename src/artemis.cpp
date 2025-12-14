@@ -88,6 +88,7 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
       parthenon::Metadata::AddUserFlag("OperatorSplit");
 
   // Determine input file specified physics
+  const bool do_hydro = pin->GetOrAddBoolean("physics", "hydro", true);
   const bool do_gas = pin->GetOrAddBoolean("physics", "gas", true);
   const bool do_dust = pin->GetOrAddBoolean("physics", "dust", false);
   const bool do_gravity = pin->GetOrAddBoolean("physics", "gravity", false);
@@ -124,6 +125,7 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   }
 
   // Store configuration choices in params
+  artemis->AddParam("do_hydro", do_hydro);
   artemis->AddParam("do_gas", do_gas);
   artemis->AddParam("do_dust", do_dust);
   artemis->AddParam("do_gravity", do_gravity);

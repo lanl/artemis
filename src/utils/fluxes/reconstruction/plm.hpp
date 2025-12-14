@@ -52,7 +52,7 @@ void PLM(const Real &q_im1, const Real &q_i, const Real &q_ip1, Real &ql_ip1,
 KOKKOS_INLINE_FUNCTION
 void PLM_G(const Real &q_im1, const Real &q_i, const Real &q_ip1, Real &ql_ip1,
            Real &qr_i, const Real x_im1, const Real x_i, const Real x_ip1,
-           const Real xf[2], const Real dx) {
+           const std::array<Real,2> &xf, const Real dx) {
   // compute L/R slopes
   const Real dql = (q_i - q_im1) * dx / (x_i - x_im1);
   const Real dqr = (q_ip1 - q_i) * dx / (x_ip1 - x_i);

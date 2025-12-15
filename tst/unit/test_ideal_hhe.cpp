@@ -26,25 +26,32 @@ using singularity::IdealGas;
 
 #ifdef SPINER_USE_HDF
 TEST_CASE("IdealHHe EOS basic construction and properties", "[IdealHHe][EOS]") {
-  // Use solar composition: X = 0.7, Y = 0.28 (Z = 0.02)
   const Real X = 0.7;
-  const Real Y = 0.28;
+  const Real Y = 0.3;
 
-  // Temperature range: 1 K to 1e6 K (ltmin=0, ltmax=6 in log10)
-  const Real ltmin = 0.0;
-  const Real ltmax = 6.0;
-  const int nt = 50;
+  IdealHHe eos(X, Y);
 
-  // Density range: 1e-15 to 1e-3 g/cc (ldmin=-15, ldmax=-3 in log10)
-  const Real ldmin = -15.0;
-  const Real ldmax = -3.0;
-  const int nd = 50;
-
-  // Create EOS without table lookup for testing
-  const bool use_table = false;
-  const std::string save_to_file = "";
-
-  IdealHHe eos(X, Y, ltmin, ltmax, nt, ldmin, ldmax, nd, save_to_file, use_table);
+  SECTION("2D Grid") {
+    const Real lTmin = -2;
+    const Real lTmax = 6.;
+    const int nt = 10;
+    const int nd = 4;
+    const Real lDmin = -25.0;
+    const Real lDmax = 5.;
+    const Real dlT = (lTmax - lTmin) / static_cast<Real>(nt);
+    const Real dlD = (lDmax - lDmin) / static_cast<Real>(nd);
+    for (int i = 0; i <= nd; i++) {
+      const Real rho = std::pow(10., lDmin + i * dlD);
+      for (int j = 0; j <= nt; j++) {
+        const Real T = std::pow(10., lTmin + j * dlT);
+        const Real sie = eos.InternalEnergyFromDensityTemperature(rho, T);
+        const Real cv = eos.SpecificHeatFromDensityTemperature(rho, T);
+        // invert
+        const Real T_ = eos.TemperatureFromDensityInternalEnergy(rho, sie);
+        REQUIRE(T_ == Approx(T).epsilon(1e-12));
+      }
+    }
+  }
 
   SECTION("Temperature recovery from density and internal energy") {
     const Real rho = 1.0e-10;    // g/cc
@@ -57,7 +64,7 @@ TEST_CASE("IdealHHe EOS basic construction and properties", "[IdealHHe][EOS]") {
     const Real T_recovered = eos.TemperatureFromDensityInternalEnergy(rho, sie);
 
     // Temperature should be recovered to within 1%
-    REQUIRE(T_recovered == Approx(T_input).epsilon(0.01));
+    REQUIRE(T_recovered == Approx(T_input).epsilon(1e-15));
   }
 
   SECTION("Pressure calculation from density and temperature") {
@@ -97,19 +104,60 @@ TEST_CASE("IdealHHe EOS basic construction and properties", "[IdealHHe][EOS]") {
   }
 }
 
+TEST_CASE("IdealHHE EOS with X = 0") {
+  IdealHHe eos(0.0, 1.0);
+  SECTION("2D Grid") {
+    const Real lTmin = -2;
+    const Real lTmax = 6.;
+    const int nt = 10;
+    const int nd = 4;
+    const Real lDmin = -25.0;
+    const Real lDmax = 5.;
+    const Real dlT = (lTmax - lTmin) / static_cast<Real>(nt);
+    const Real dlD = (lDmax - lDmin) / static_cast<Real>(nd);
+    for (int i = 0; i <= nd; i++) {
+      const Real rho = std::pow(10., lDmin + i * dlD);
+      for (int j = 0; j <= nt; j++) {
+        const Real T = std::pow(10., lTmin + j * dlT);
+        const Real sie = eos.InternalEnergyFromDensityTemperature(rho, T);
+        const Real cv = eos.SpecificHeatFromDensityTemperature(rho, T);
+        // invert
+        const Real T_ = eos.TemperatureFromDensityInternalEnergy(rho, sie);
+        REQUIRE(T_ == Approx(T).epsilon(1e-12));
+      }
+    }
+  }
+}
+
+TEST_CASE("IdealHHE EOS with Y = 0") {
+  IdealHHe eos(1.0, 0.0);
+  SECTION("2D Grid") {
+    const Real lTmin = -2;
+    const Real lTmax = 6.;
+    const int nt = 10;
+    const int nd = 4;
+    const Real lDmin = -25.0;
+    const Real lDmax = 5.;
+    const Real dlT = (lTmax - lTmin) / static_cast<Real>(nt);
+    const Real dlD = (lDmax - lDmin) / static_cast<Real>(nd);
+    for (int i = 0; i <= nd; i++) {
+      const Real rho = std::pow(10., lDmin + i * dlD);
+      for (int j = 0; j <= nt; j++) {
+        const Real T = std::pow(10., lTmin + j * dlT);
+        const Real sie = eos.InternalEnergyFromDensityTemperature(rho, T);
+        const Real cv = eos.SpecificHeatFromDensityTemperature(rho, T);
+        // invert
+        const Real T_ = eos.TemperatureFromDensityInternalEnergy(rho, sie);
+        REQUIRE(T_ == Approx(T).epsilon(1e-12));
+      }
+    }
+  }
+}
+
 TEST_CASE("IdealHHe EOS with different compositions", "[IdealHHe][EOS]") {
-  const Real ltmin = 0.0;
-  const Real ltmax = 6.0;
-  const int nt = 50;
-  const Real ldmin = -15.0;
-  const Real ldmax = -3.0;
-  const int nd = 50;
-  const bool use_table = false;
-  const std::string save_to_file = "";
 
   SECTION("Hydrogen-rich composition (X=0.9, Y=0.1)") {
-    IdealHHe eos_H_rich(0.9, 0.1, ltmin, ltmax, nt, ldmin, ldmax, nd, save_to_file,
-                        use_table);
+    IdealHHe eos_H_rich(0.9, 0.1);
 
     const Real rho = 1.0e-10;
     const Real T = 1000.0;
@@ -122,8 +170,7 @@ TEST_CASE("IdealHHe EOS with different compositions", "[IdealHHe][EOS]") {
   }
 
   SECTION("Helium-rich composition (X=0.3, Y=0.7)") {
-    IdealHHe eos_He_rich(0.3, 0.7, ltmin, ltmax, nt, ldmin, ldmax, nd, save_to_file,
-                         use_table);
+    IdealHHe eos_He_rich(0.3, 0.7);
 
     const Real rho = 1.0e-10;
     const Real T = 1000.0;
@@ -140,16 +187,8 @@ TEST_CASE("IdealHHe EOS with UnitSystem wrapper", "[IdealHHe][EOS][UnitSystem]")
   // Use solar composition
   const Real X = 0.7;
   const Real Y = 0.28;
-  const Real ltmin = 0.0;
-  const Real ltmax = 6.0;
-  const int nt = 50;
-  const Real ldmin = -15.0;
-  const Real ldmax = -3.0;
-  const int nd = 50;
-  const bool use_table = false;
-  const std::string save_to_file = "";
 
-  IdealHHe eos_base(X, Y, ltmin, ltmax, nt, ldmin, ldmax, nd, save_to_file, use_table);
+  IdealHHe eos_base(X, Y);
 
   SECTION("Unit conversion with CGS units") {
     // Define unit system: time [s], mass [g], length [cm], temperature [K]
@@ -160,9 +199,8 @@ TEST_CASE("IdealHHe EOS with UnitSystem wrapper", "[IdealHHe][EOS][UnitSystem]")
 
     // Create IdealHHe inline as temporary for UnitSystem
     auto eos = singularity::UnitSystem<IdealHHe>(
-        IdealHHe(X, Y, ltmin, ltmax, nt, ldmin, ldmax, nd, save_to_file, use_table),
-        singularity::eos_units_init::LengthTimeUnitsInit(), time_cgs, mass_cgs,
-        length_cgs, temp_cgs);
+        IdealHHe(X, Y), singularity::eos_units_init::LengthTimeUnitsInit(), time_cgs,
+        mass_cgs, length_cgs, temp_cgs);
 
     const Real rho = 1.0e-10; // g/cc
     const Real T = 1000.0;    // K
@@ -187,9 +225,8 @@ TEST_CASE("IdealHHe EOS with UnitSystem wrapper", "[IdealHHe][EOS][UnitSystem]")
 
     // Create IdealHHe inline as temporary for UnitSystem
     auto eos = singularity::UnitSystem<IdealHHe>(
-        IdealHHe(X, Y, ltmin, ltmax, nt, ldmin, ldmax, nd, save_to_file, use_table),
-        singularity::eos_units_init::LengthTimeUnitsInit(), time_scale, mass_scale,
-        length_scale, temp_scale);
+        IdealHHe(X, Y), singularity::eos_units_init::LengthTimeUnitsInit(), time_scale,
+        mass_scale, length_scale, temp_scale);
 
     // Density in code units (Msun/AU^3)
     // Convert 1e-10 g/cc to Msun/AU^3: 1e-10 * (AU^3/Msun)
@@ -214,8 +251,8 @@ TEST_CASE("IdealHHe EOS with UnitSystem wrapper", "[IdealHHe][EOS][UnitSystem]")
   SECTION("Consistency between wrapped and unwrapped EOS in CGS units") {
     // Wrap with CGS units (scale factors = 1)
     auto eos_wrapped = singularity::UnitSystem<IdealHHe>(
-        IdealHHe(X, Y, ltmin, ltmax, nt, ldmin, ldmax, nd, save_to_file, use_table),
-        singularity::eos_units_init::LengthTimeUnitsInit(), 1.0, 1.0, 1.0, 1.0);
+        IdealHHe(X, Y), singularity::eos_units_init::LengthTimeUnitsInit(), 1.0, 1.0, 1.0,
+        1.0);
 
     const Real rho = 1.0e-10; // g/cc
     const Real T = 1000.0;    // K
@@ -241,9 +278,8 @@ TEST_CASE("IdealHHe EOS with UnitSystem wrapper", "[IdealHHe][EOS][UnitSystem]")
 
     // Create IdealHHe inline as temporary for UnitSystem
     auto eos = singularity::UnitSystem<IdealHHe>(
-        IdealHHe(X, Y, ltmin, ltmax, nt, ldmin, ldmax, nd, save_to_file, use_table),
-        singularity::eos_units_init::LengthTimeUnitsInit(), time_scale, mass_scale,
-        length_scale, temp_scale);
+        IdealHHe(X, Y), singularity::eos_units_init::LengthTimeUnitsInit(), time_scale,
+        mass_scale, length_scale, temp_scale);
 
     // Density in code units
     const Real rho_cgs = 1.0e-10;

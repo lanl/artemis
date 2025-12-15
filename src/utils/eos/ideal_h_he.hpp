@@ -1,5 +1,5 @@
 //========================================================================================
-// (C) (or copyright) 2023. Triad National Security, LLC. All rights reserved.
+// (C) (or copyright) 2025. Triad National Security, LLC. All rights reserved.
 //
 // This program was produced under U.S. Government contract 89233218CNA000001 for Los
 // Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -54,6 +54,15 @@ class IdealHHe : public singularity::eos_base::EosBase<IdealHHe> {
     CheckParams();
     FillTable(save_to_file);
   }
+  IdealHHe(Real X, Real Y, Real dlnT = 1e-6,
+           const singularity::MeanAtomicProperties &AZbar =
+               singularity::MeanAtomicProperties())
+      : _X(X), _Y(Y), lTmin(0.0), lTmax(0.0), nt(0), lDmin(0.0), lDmax(0.0), nd(0),
+        use_table(false), _dlnT(dlnT), _AZbar(AZbar) {
+    _fp = 0.25;
+    _fo = 1. - _fp;
+    CheckParams();
+  }
   IdealHHe(const std::string &filename) {
     // Load from file
     Load(filename);
@@ -99,7 +108,7 @@ class IdealHHe : public singularity::eos_base::EosBase<IdealHHe> {
     const Real efac = singularity::robust::safe_arg_exp(-lnx);
     const Real EH2 = 0.5 * _X * (1. - r.y) *
                      (1.5 + lnx * singularity::robust::ratio(efac, 1. - efac) +
-                      _fp * dlnp + _fo * (dlno - 2. * 85.5 / temperature));
+                      (_fp * xp.dZ + _fo * xo.dZ) / (_fp * xp.Z + _fo * xo.Z));
 
     Real sie = EH2 + EH + EHe + (EHpH + EHp + EHep + EHepp) / temperature;
     sie = std::max(_small, sie * temperature * _kb / _mp);
@@ -131,8 +140,6 @@ class IdealHHe : public singularity::eos_base::EosBase<IdealHHe> {
   PORTABLE_INLINE_FUNCTION Real
   EntropyFromDensityTemperature(const Real rho, const Real temperature,
                                 Indexer_t &&lambda = static_cast<Real *>(nullptr)) const {
-    // ? kb log(T)?
-    // ln(P/rho^g) ?
     return 0.0;
   }
   template <typename Indexer_t = Real *>
@@ -145,71 +152,6 @@ class IdealHHe : public singularity::eos_base::EosBase<IdealHHe> {
   PORTABLE_INLINE_FUNCTION Real SpecificHeatFromDensityTemperature(
       const Real rho, const Real temperature,
       Indexer_t &&lambda = static_cast<Real *>(nullptr)) const {
-
-    // NOTE(@adempsey)
-    // Uncomment if you want the analytic Cv
-
-    // const auto &r = GetMassFractions(rho, temperature);
-    // const Real kT = _eV * temperature;
-    // const Real henorm = 1. + r.z2 * (r.z1 - 1.0);
-    // const Real dhenorm = r.z2 * r.dz1dt + (r.z1 - 1.0) * r.dz2dt;
-
-    // Real EH = 1.5 * _X * (1. + r.x) * r.y; // H
-    // Real cH = EH + 1.5 * _X * ((1. + r.x) * r.dydt + r.y * r.dxdt);
-
-    // Real EHe = 0.375 * _Y * (1. + (r.z1 + r.z1 * r.z2) / henorm); // He
-    // Real cHe = EHe + 0.375 * _Y *
-    //                      (((1. + r.z2) * r.dz1dt + r.z1 * r.dz2dt) / henorm -
-    //                       r.z1 * (1. + r.z2) * dhenorm / (henorm * henorm));
-
-    // Real EHpH = _ye * _X * r.y * 0.5;
-    // Real cHpH = _ye * _X * r.dydt * 0.5;
-
-    // Real EHp = _xe * _X * r.x * r.y;
-    // Real cHp = _xe * _X * (r.x * r.dydt + r.y * r.dxdt);
-
-    // Real EHep = _z1e * 0.25 * _Y * r.z1 / henorm;
-    // Real cHep =
-    //     _z1e * 0.25 * _Y * (r.dz1dt / henorm - r.z1 * dhenorm / (henorm * henorm));
-
-    // Real EHepp = _z2e * 0.25 * _Y * (r.z1 * r.z2 / henorm);
-    // Real cHepp = _z2e * 0.25 * _Y *
-    //              ((r.z1 * r.dz2dt + r.z2 * r.dz1dt) / henorm -
-    //               r.z1 * r.z2 * dhenorm / (henorm * henorm));
-
-    // // molecular hydrogen
-    // // NOTE: yes, the coefficients are in K
-    // constexpr Real tiny = std::numeric_limits<Real>::min();
-    // const auto &[xp, xo] = H2PartitionFunctions(temperature);
-    // const Real dlno = (xo.Z > tiny) ? singularity::robust::ratio(xo.dZ, xo.Z) : 0.0;
-    // const Real dlnp = singularity::robust::ratio(xp.dZ, xp.Z);
-    // const Real d2lno = (xo.Z > tiny) ? singularity::robust::ratio(xo.d2Z, xo.Z) : 0.0;
-    // const Real d2lnp = singularity::robust::ratio(xp.d2Z, xp.Z);
-    // const Real lnx = 6140. / temperature;
-    // const Real xv = std::min(dlno * 0.5, 85.5 / temperature);
-    // const Real efac = singularity::robust::safe_arg_exp(-lnx);
-    // const Real evf = lnx * singularity::robust::ratio(efac, 1. - efac);
-    // // d1= 0.25 * (58.4792 / 58.6465) + 0.997148 * (0.00855 - 2*0)
-    // const Real d1 = _fp * dlnp + _fo * (dlno - 2. * xv);
-    // Real d2 = _fp * d2lnp + _fo * d2lno - 4. * _fo * (_fo * dlno + _fp * dlnp) * xv -
-    //           _fp * _fo * SQR(dlnp - dlno) + 4. * _fo * (1. + _fo * xv) * xv;
-
-    // // d2 = 0.0;
-    // Real EH2 = 0.5 * (1.5 + evf + _fp * dlnp + _fo * (dlno - 2. * xv));
-    // Real cH2 = (1.5 + 2. * d1 + d2 - d1 * d1 +
-    //             SQR(lnx) * singularity::robust::ratio(efac, SQR(1. - efac))) *
-    //            0.5;
-    // cH2 = _X * ((1. - r.y) * cH2 - EH2 * r.dydt);
-
-    // // const Real EH2 = 0.5 * _X * (1. - r.y) *
-    // //                  (1.5 + lnx * singularity::robust::ratio(efac, 1. - efac) +
-    // //                   _fp * dlnp + _fo * (dlno - 2. * 85.5 / temperature));
-
-    // EH2 *= _X * (1. - r.y);
-    // Real cv = cH2 + cH + cHe + (cHpH + cHp + cHep + cHepp) / temperature;
-
-    // cv = std::max(_small, cv * _kb / _mp);
-    // return cv;
 
     Real tp = temperature * (1.0 + _dlnT);
     Real tm = temperature * (1.0 - _dlnT);
@@ -415,7 +357,7 @@ class IdealHHe : public singularity::eos_base::EosBase<IdealHHe> {
     // x
     Real a = f1 / _X * f2e * singularity::robust::safe_arg_exp(-_xe / (T));
     Real dlat = _xe / (T) + 1.5;
-    res.x = quadratic_root(a, 0., 1.0);
+    res.x = (_X == 0.0) ? 0.0 : quadratic_root(a, 0., 1.0);
     if ((std::abs(a) > _small) && (res.x > 0.0) && (res.x < 1.0)) {
       res.dxdt = singularity::robust::ratio(dlat * a * (1. - res.x), 2 * res.x + a);
       res.dxdr = singularity::robust::ratio(-a * (1. - res.x), (2 * res.x + a));
@@ -425,7 +367,7 @@ class IdealHHe : public singularity::eos_base::EosBase<IdealHHe> {
     Real efac_ = singularity::robust::safe_arg_exp(-_ye / (T));
     Real fac1_ = f1 * f2p;
     a = 0.5 * f1 / _X * f2p * singularity::robust::safe_arg_exp(-_ye / (T));
-    res.y = quadratic_root(a, 0.0, 1.0);
+    res.y = (_X == 0.0) ? 0.0 : quadratic_root(a, 0.0, 1.0);
     dlat = _ye / (T) + 1.5;
     if ((std::abs(a) > _small) || (res.y > 0.0) && (res.y < 1.0)) {
       res.dydt = singularity::robust::ratio(dlat * a * (1. - res.y), 2 * res.y + a);
@@ -457,46 +399,56 @@ class IdealHHe : public singularity::eos_base::EosBase<IdealHHe> {
     return res;
   }
 
-  PORTABLE_INLINE_FUNCTION std::tuple<H2Partition, H2Partition>
-  H2PartitionFunctions(const Real T) const {
+  PORTABLE_INLINE_FUNCTION H2Partition
+  H2PartitionFunction_(const Real T, std::array<Real, 3> jstart) const {
     const Real x = 85.5 / T;
 
-    // para
-    H2Partition para{0.0};
-    for (int j = 0; j < 1000; j += 2) {
-      const int jj = j * (j + 1);
-      const Real dr = (2 * j + 1) * singularity::robust::safe_arg_exp(-jj * x);
-      para.Z += dr;
-      if (j >= 2) {
-        para.dZ += jj * dr;
-        para.d2Z += jj * (jj * x - 2.0) * dr;
-        if (singularity::robust::ratio(dr * std::abs(jj * (jj * x - 2.0)),
-                                       std::abs(para.d2Z)) < 1e-12) {
-          break;
-        }
-      }
-    }
-    para.dZ *= x;
-    para.d2Z *= x;
+    H2Partition part{0.0};
 
-    // ortho
-    H2Partition ortho{0.0};
-    for (int j = 1; j < 1000; j += 2) {
-      const int jj = j * (j + 1);
-      const Real dr = (2 * j + 1) * singularity::robust::safe_arg_exp(-jj * x);
-      ortho.Z += dr;
-      ortho.dZ += jj * dr;
-      // if (jj * x > 2.0) {
-      ortho.d2Z += jj * (jj * x - 2.0) * dr;
-      /// }
-      if (singularity::robust::ratio(dr * std::abs(jj * (jj * x - 2.0)),
-                                     std::abs(ortho.d2Z)) < 3e-16) {
-        break;
-      }
-    }
-    ortho.dZ *= x;
-    ortho.d2Z *= x;
+    Real j = jstart[0];
+    Real dr = 0.0;
+    Real dr_p = 0.0;
+    do {
+      part.Z += dr;
+      dr_p = dr;
+      const Real jj = j * (j + 1.);
+      dr = (2. * j + 1.) * singularity::robust::safe_arg_exp(-jj * x);
+      j += 2.0;
+    } while (dr > dr_p || dr > 3e-16 * part.Z);
 
+    j = jstart[1];
+    dr = 0.0;
+    dr_p = 0.0;
+    do {
+      part.dZ += dr;
+      dr_p = dr;
+      const Real jj = j * (j + 1.);
+      dr = jj * (2. * j + 1.) * singularity::robust::safe_arg_exp(-jj * x);
+      j += 2.0;
+    } while (dr > dr_p || dr > 3e-16 * part.dZ);
+
+    j = jstart[2];
+    dr = 0.0;
+    dr_p = 0.0;
+    while (true) {
+      part.d2Z += dr;
+      dr_p = dr;
+      const Real jj = j * (j + 1.);
+      dr = (2. * j + 1.) * jj * (jj * x - 2.0) *
+           singularity::robust::safe_arg_exp(-jj * x);
+      j += 2.0;
+      if (dr < 0.0 || dr > dr_p || dr > 3e-16 * std::abs(part.d2Z)) continue;
+      break;
+    }
+    part.dZ *= x;
+    part.d2Z *= x;
+    return part;
+  }
+
+  PORTABLE_INLINE_FUNCTION std::tuple<H2Partition, H2Partition>
+  H2PartitionFunctions(const Real T) const {
+    auto para = H2PartitionFunction_(T, {0.0, 2.0, 2.0});
+    auto ortho = H2PartitionFunction_(T, {1.0, 1.0, 1.0});
     return {para, ortho};
   }
   PORTABLE_INLINE_FUNCTION std::tuple<Real, Real, Real> MeanMass(const Real rho,
@@ -516,75 +468,27 @@ class IdealHHe : public singularity::eos_base::EosBase<IdealHHe> {
     Real dlmut = (get_mu(_X, _Y, rtp) - get_mu(_X, _Y, rtm)) / (2. * _dlnT * mu);
     Real dlmur = (get_mu(_X, _Y, rdp) - get_mu(_X, _Y, rdm)) / (2. * _dlnT * mu);
 
-    // NOTE(@adempsey)
-    // Uncomment for the analytic derivatives
-
-    // const auto &r = GetMassFractions(rho, T);
-    // Real imu =
-    //     0.25 * (2. * _X * (1. + r.y * (1. + 2. * r.x)) + _Y * (1. + r.z1 * (1. +
-    //     r.z2)));
-    // const Real mu = singularity::robust::ratio(1.0, imu);
-    // const Real dlmut = -0.25 * mu *
-    //                    (2 * _X * (r.dydt * (1.0 + 2 * r.x) + 2 * r.dxdt * r.y) +
-    //                     _Y * (r.dz1dt * (1.0 + r.z2) + r.dz2dt * r.z1));
-    // const Real dlmur = -0.25 * mu *
-    //                    (2 * _X * (r.dydr * (1.0 + 2 * r.x) + 2 * r.dxdr * r.y) +
-    //                     _Y * (r.dz1dr * (1.0 + r.z2) + r.dz2dr * r.z1));
     return {mu, dlmut, dlmur};
   }
   template <typename Indexer_t = Real *>
   PORTABLE_INLINE_FUNCTION Real
   TofRE(const Real rho, const Real sie,
         Indexer_t &&lambda = static_cast<Real *>(nullptr)) const {
-    // Root finding version.
 
-    // T_k+1 = T_k - (E(T) - E0)/cv(T)
+    using RootFinding1D::regula_falsi;
+    using RootFinding1D::Status;
 
-    // Use ideal gas as guess
-    // kb/(2.*mp) * T = E
-    Real T = sie * _mp / _kb;
-    int iter = 0;
-    Real sie_new = 0.0;
-    bool conv = false;
-    Real lower = std::pow(10., lTmin) * .01;
-    Real upper = std::pow(10., lTmax) * 100;
-    Real E_low = InternalEnergyFromDensityTemperature(rho, lower);
-    ;
-    Real E_high = InternalEnergyFromDensityTemperature(rho, upper);
-    Real dE_low = E_low - sie;
-    Real dE_high = E_high - sie;
-
-    if (dE_low * dE_high > 0.0) {
-      printf("Initial sie %lg not bracketed at density %lg by temperature bounds [%lg, "
-             "%lg], [%lg, %lg]\n",
-             sie, rho, lower, upper, E_low, E_high);
+    const Real tmin = 1e-10;
+    const Real tmax = 1e10;
+    Real temp;
+    auto status = regula_falsi(
+        [&](const Real t) { return InternalEnergyFromDensityTemperature(rho, t); }, sie,
+        std::sqrt(tmin * tmax), tmin, tmax, 1e-12, 1e-12, temp);
+    if (status != Status::SUCCESS) {
+      PARTHENON_DEBUG_WARN("TofRE did not converge");
+      return Tiny<Real>();
     }
-
-    for (iter = 0; iter < 100; iter++) {
-      T = std::sqrt(lower * upper);
-      sie_new = InternalEnergyFromDensityTemperature(rho, T);
-      const Real dE = sie_new - sie;
-      if (std::abs(dE) <= 1e-8 * sie) {
-        conv = true;
-        break;
-      }
-      if (dE * dE_low < 0.0) {
-        upper = T;
-        dE_high = dE;
-      } else if (dE * dE_high < 0.0) {
-        lower = T;
-        dE_low = dE;
-      } else {
-        printf("Failed to converge %lg %lg %lg %lg\n", rho, sie, T,
-               InternalEnergyFromDensityTemperature(rho, T, lambda));
-        break;
-      }
-    }
-    if (!conv) {
-      printf("Failed to converge %lg %lg %lg %lg\n", rho, sie, T,
-             InternalEnergyFromDensityTemperature(rho, T, lambda));
-    }
-    return std::max(_small, T);
+    return std::max(_small, temp);
   }
 };
 
@@ -705,6 +609,8 @@ inline void IdealHHe::Save(const std::string &filename) {
   status += H5LTset_attribute_double(file, METADATA_NAME, "ltmax", &lTmax, 1);
   status += H5LTset_attribute_double(file, METADATA_NAME, "ldmin", &lDmin, 1);
   status += H5LTset_attribute_double(file, METADATA_NAME, "ldmax", &lDmax, 1);
+  status += H5LTset_attribute_double(file, METADATA_NAME, "lemin", &lEmin, 1);
+  status += H5LTset_attribute_double(file, METADATA_NAME, "lemax", &lEmax, 1);
   status += H5LTset_attribute_double(file, METADATA_NAME, "dlnT", &_dlnT, 1);
   status += H5LTset_attribute_double(file, METADATA_NAME, "fp", &_fp, 1);
   status += H5LTset_attribute_double(file, METADATA_NAME, "fm", &_fo, 1);
@@ -736,6 +642,8 @@ inline void IdealHHe::Load(const std::string &filename) {
   status += H5LTget_attribute_double(file, METADATA_NAME, "ltmax", &lTmax);
   status += H5LTget_attribute_double(file, METADATA_NAME, "ldmin", &lDmin);
   status += H5LTget_attribute_double(file, METADATA_NAME, "ldmax", &lDmax);
+  status += H5LTget_attribute_double(file, METADATA_NAME, "lemin", &lEmin);
+  status += H5LTget_attribute_double(file, METADATA_NAME, "lemax", &lEmax);
   status += H5LTget_attribute_double(file, METADATA_NAME, "dlnT", &_dlnT);
   status += H5LTget_attribute_double(file, METADATA_NAME, "fp", &_fp);
   status += H5LTget_attribute_double(file, METADATA_NAME, "fm", &_fo);

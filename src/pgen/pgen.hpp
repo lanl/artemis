@@ -19,6 +19,7 @@
 
 // Artemis includes
 #include "advection.hpp"
+#include "atmosphere.hpp"
 #include "beam.hpp"
 #include "blast.hpp"
 #include "coag.hpp"
@@ -47,6 +48,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   std::string name = pin->GetString("artemis", "problem");
   if (name == "advection") {
     advection::ProblemGenerator<T>(pmb, pin);
+  } else if (name == "atmosphere") {
+    atmosphere::ProblemGenerator<T>(pmb, pin);
   } else if (name == "beam") {
     beam::ProblemGenerator<T>(pmb, pin);
   } else if (name == "blast") {
@@ -92,6 +95,8 @@ void InitMeshBlockData(MeshBlock *pmb, ParameterInput *pin) {
   std::string name = pin->GetString("artemis", "problem");
   if (name == "beam") {
     beam::InitBeamParams(pmb, pin);
+  } else if (name == "atmosphere") {
+    atmosphere::InitAtmosphereParams(pmb, pin);
   } else if (name == "conduction") {
     cond::InitCondParams(pmb, pin);
   } else if (name == "disk") {

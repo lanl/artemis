@@ -58,6 +58,7 @@ set (SRC_LIST
   nbody/particle_base.hpp
 
   pgen/advection.hpp
+  pgen/atmosphere.hpp
   pgen/beam.hpp
   pgen/blast.hpp
   pgen/coag.hpp

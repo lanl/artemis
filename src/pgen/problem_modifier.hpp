@@ -50,6 +50,11 @@ void ProblemModifier(parthenon::ParthenonManager *pman) {
   // Enroll artemis problem-specific function calls and boundary conditions
   if (artemis_problem == "advection") {
     pman->app_input->UserWorkAfterLoop = advection::UserWorkAfterLoop<G>;
+  } else if (artemis_problem == "atmosphere") {
+    pman->app_input->RegisterBoundaryCondition(BF::inner_x1, "extrap",
+                                               atmosphere::ExtrapInnerX1<G>);
+    pman->app_input->RegisterBoundaryCondition(BF::outer_x1, "extrap",
+                                               atmosphere::ExtrapOuterX1<G>);
   } else if (artemis_problem == "conduction") {
     pman->app_input->RegisterBoundaryCondition(BF::inner_x1, "conductive",
                                                cond::CondBoundary<G, ID::inner_x1>);

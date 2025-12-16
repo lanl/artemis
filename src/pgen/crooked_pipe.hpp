@@ -78,13 +78,14 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
 
   std::vector<std::array<double, 4>> thick_regions = {{3.0,4.0, -1.0,1.0},
-                                                      {-2.0,2.5, -2.0, 0.5}, // extended xl to -2 for thick region above source
+                                                      {-2.0,2.5, -2.0, -0.5}, // extended xl to -2 for thick region above source
                                                       {-2.0, 2.5, 0.5, 2.0}, // extended xl to -2 for thick region above source
-                                                      {4.5, 7.0, -2.0, 0.5},
+                                                      {4.5, 7.0, -2.0, -0.5},
                                                       {4.5, 7.0, 0.5, 2.0},
+                                                      {2.5, 4.5, -2.0, -1.5},
                                                       {2.5, 4.5, 1.5, 2.5}};
 
-  std::vector<std::array<double, 4>> thin_source_regions= {{-2.0,0.0,-1.0,1.0}};
+  std::vector<std::array<double, 4>> thin_source_regions= {{-2.0,0.0,-0.5,0.5}};
 
   const auto &cpars =
       pmb->packages.Get("artemis")->template Param<geometry::CoordParams>("coord_params");
@@ -118,15 +119,14 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           eos.InternalEnergyFromDensityTemperature(rho_thin, t_init);
 
       for( const auto &iregion : thick_regions) {
-        if (xl >= iregion[0] && xu < iregion[1] && yl >= iregion[2] && yu <= iregion[3]) {
+        if (xl >= iregion[0] && xu <= iregion[1] && yl >= iregion[2] && yu <= iregion[3]) {
           v(0, gas::prim::density(), k, j, i) = rho_thick;
           v(0, gas::prim::sie(), k, j, i) =
               eos.InternalEnergyFromDensityTemperature(rho_thick, t_init);
         }
       }
       for( const auto &iregion : thin_source_regions) {
-        if (xl >= iregion[0] && xu < iregion[1] && yl >= iregion[2] && yu <= iregion[3]) {
-          v(0, gas::prim::density(), k, j, i) = rho_thin;
+        if (xl >= iregion[0] && xu <= iregion[1] && yl >= iregion[2] && yu <= iregion[3]) {
           v(0, gas::prim::sie(), k, j, i) =
               eos.InternalEnergyFromDensityTemperature(rho_thin, t_source);
         }

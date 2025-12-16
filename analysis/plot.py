@@ -19,6 +19,7 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import numpy as np
 import ahdf
+import h5py
 
 
 # Plot a 2D slice of a variable to a provided axis.
@@ -36,6 +37,11 @@ def plot(
     scale,
 ):
     dump = ahdf.ahdf(filename)
+
+    time = 0.0
+    with h5py.File(filename, 'r') as f:
+      info_group = f["Info"]
+      time = info_group.attrs["Time"]
 
     # Coordinate-dependent defaults
     if dump.coordinates == "cartesian":
@@ -88,6 +94,12 @@ def plot(
                 assert idx >= 0 and idx < dump.NX2, "Slice index is out of bounds!"
                 vmin = min(vmin, np.min(variable[b, :, idx, :]))
                 vmax = max(vmax, np.max(variable[b, :, idx, :]))
+    print("vmin: {0}, vmax: {1}".format(vmin, vmax))
+    if vmin <= 0:
+      vmin = 0.01
+      vmin = vmax / 1.0e7
+      #vmin = np.log(vmax)/2.0
+      print("rescaled vmin: {0}".format(vmin))
 
     # Plot all meshblocks within slice
     for b in range(dump.NumBlocks):
@@ -135,7 +147,7 @@ def plot(
     fig.colorbar(im, cax=cax, orientation="vertical")
 
     # Label axes
-    ax.set_title(f"{variable_name}")
+    ax.set_title("{0} at {1}".format(variable_name, time))
     if coords == "cartesian":
         if slice == "xy":
             ax.set_xlabel("x")
@@ -341,7 +353,6 @@ if __name__ == "__main__":
     )
 
     if args.show:
-        print("Showing figure ...")
         plt.show()
     else:
         savename = os.path.basename(args.filename)[:-5] + ".png"

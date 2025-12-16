@@ -2,7 +2,7 @@
 problem = crooked_pipe  # name of the pgen
 coordinates = cartesian
 physical_units = cgs     # not scale-free
-unit_conversion = ppd   # [L/T/M/Temp] = 1
+unit_conversion = base   # [L/T/M/Temp] = 1
 
 <parthenon/job>
 problem_id = crooked_pipe  # problem ID: basename of output filenames
@@ -13,38 +13,34 @@ variables = gas.prim.density,   &
             gas.prim.sie,      &
             field.jaybenne.energy_tally
 file_type = hdf5  # HDF5 data dump
-dt        = 1.0e-11 # time increment between outputs
+dt        = 5.0e-8 # time increment between outputs, 5 shakes (50 nanoseconds)
 #ghost_zones = true # output ghost zones
 use_final_label  = false
 
 <parthenon/time>
-nlim       = 10     # cycle limit
-tlim       = 1.0e-6 # time limit
+nlim       = 3000   # cycle limit
+tlim       = 2.5e-6 # time limit, 250 shakes
 integrator = rk2    # time integration algorithm
 ncycle_out = 1      # interval for stdout summary info
-dt_force = 1.0e-10
-
-<crooked_pipe>
-t_init = 1.1e4
-t_source = 5.8e6
-rho_thin = 1.0
-rho_thick = 100.0
+dt_init = 1.0e-11
+dt_factor = 1.1
+dt_ceil = 1.0e-8
 
 <parthenon/mesh>
 #refinement = static # Enable static mesh refinement
-nx1 = 900
+nx1 = 180
 x1min  = -2.0      # minimum value of X1
 x1max  = 7.0    # maximum value of X1
 ix1_bc = reflecting  # Inner-X1 boundary condition flag
 ox1_bc = outflow    # Outer-X1 boundary condition flag
-nx2    = 400        # Number of zones in X2-direction
+nx2    = 80        # Number of zones in X2-direction
 x2min  = -2.0       # minimum value of X2
 x2max  = 2.0       # maximum value of X2
 ix2_bc = reflecting   # Inner-X2 boundary condition flag
 ox2_bc = outflow   # Outer-X2 boundary condition flag
 nx3    = 1        # Number of zones in X3-direction
-x3min  = 0      # minimum value of X3
-x3max  = 1   # maximum value of X3
+x3min  = -0.5      # minimum value of X3
+x3max  = 0.5   # maximum value of X3
 ix3_bc = reflecting  # Inner-X3 boundary condition flag
 ox3_bc = reflecting  # Outer-X3 boundary condition flag
 nghost = 2
@@ -52,8 +48,8 @@ nghost = 2
 #numlevel = 2
 
 <parthenon/meshblock>
-nx1 = 90  # Number of cells in each MeshBlock, X1-dir
-nx2 = 40  # Number of cells in each MeshBlock, X2-dir
+nx1 = 20  # Number of cells in each MeshBlock, X1-dir
+nx2 = 20  # Number of cells in each MeshBlock, X2-dir
 nx3 = 1   # Number of cells in each MeshBlock, X3-dir
 
 <physics>
@@ -76,12 +72,17 @@ gamma = 1.4  # adiabatic index
 mu = 28.96   # mean molecular weight
 <gas/opacity/absorption>
 opacity_model = constant
-kappa_a = 2.0
+kappa_a = 0.2
 
 # from thermalization
 <problem>
 rho0 = 1.0
 h  = 0.1
+t_init = 1.1e4
+t_source = 5.8e6
+rho_thin = 0.01
+#rho_thick = 10.0 // trying 10x less to get wave propagation
+rho_thick = 1.0
 
 <parthenon/swarm>
 ix1_bc = jaybenne_reflecting # inner-X1 boundary flag for swarms
@@ -91,8 +92,10 @@ ox2_bc = outflow  # outer-X2 boundary flag for swarms
 ix3_bc = jaybenne_reflecting # inner-X3 boundary flag for swarms
 ox3_bc = jaybenne_reflecting # outer-X3 boundary flag for swarms
 
+<crooked_pipe>
+
 <radiation/imc>
 do_emission = true
-num_particles = 32000000 # particle resolution
+num_particles = 4000000 # particle resolution
 use_ddmc = true          # use DDMC?
 #min_swarm_occupancy = 0.5

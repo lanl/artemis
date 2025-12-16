@@ -245,7 +245,7 @@ TaskCollection ArtemisDriver<GEOM>::StepTasks() {
       // NOTE(@adempsey): 1st stage of VL2 uses piecewise constant reconstruction
       const bool do_pcm = ((stage == 1) && (integrator->GetName() == "vl2"));
       TaskID gas_flx = none, dust_flx = none;
-      if (do_gas) gas_flx = tl.AddTask(none, Gas::CalculateFluxes, u0.get(), do_pcm);
+      //if (do_gas) gas_flx = tl.AddTask(none, Gas::CalculateFluxes, u0.get(), do_pcm);
       if (do_dust) dust_flx = tl.AddTask(none, Dust::CalculateFluxes, u0.get(), do_pcm);
 
       // Compute (gas) diffusive fluxes

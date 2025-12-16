@@ -115,8 +115,10 @@ TaskListStatus ArtemisDriver<GEOM>::Step() {
   // Prepare registers
   PreStepTasks();
 
+  TaskListStatus status;
+
   // Execute explicit, unsplit physics
-  auto status = StepTasks().Execute();
+  status = StepTasks().Execute();
   if (status != TaskListStatus::complete) return status;
 
   // Operator split, background linear advection (for shearing box)
@@ -205,6 +207,9 @@ TaskCollection ArtemisDriver<GEOM>::StepTasks() {
     const Real g0 = integrator->gam0[stage - 1];
     const Real g1 = integrator->gam1[stage - 1];
     const Real bdt = integrator->beta[stage - 1] * integrator->dt;
+
+    // Compute gravitational potential
+    if (do_gravity) Gravity::SolvePoisson(tc, pmesh);
 
     TaskRegion &tr = tc.AddRegion(num_partitions);
     for (int i = 0; i < num_partitions; i++) {

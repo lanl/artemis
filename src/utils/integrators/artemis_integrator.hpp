@@ -88,19 +88,19 @@ TaskStatus ApplyUpdate(MeshData<Real> *u0, MeshData<Real> *u1, const Real g0,
         const Real bdt_vol = beta_dt / coords.Volume();
 
         // Advance state vector with flux divergence
-        for (int n = v0.GetLowerBound(b); n <= v0.GetUpperBound(b); ++n) {
-          Real &v0n = v0(b, n, k, j, i);
-          Real &v1n = v1(b, n, k, j, i);
-          v0n = g0 * v0n + g1 * v1n;
-          if constexpr (include_divf) {
-            v0n += bdt_vol * ((ax1[0] * v0.flux(b, d1, n, k, j, i) -
-                               ax1[1] * v0.flux(b, d1, n, k, j, i + 1)) +
-                              (ax2[0] * v0.flux(b, d2, n, k, j, i) -
-                               ax2[1] * v0.flux(b, d2, n, k, j + multi_d, i)) +
-                              (ax3[0] * v0.flux(b, d3, n, k, j, i) -
-                               ax3[1] * v0.flux(b, d3, n, k + three_d, j, i)));
-          }
-        }
+        // for (int n = v0.GetLowerBound(b); n <= v0.GetUpperBound(b); ++n) {
+        //   Real &v0n = v0(b, n, k, j, i);
+        //   Real &v1n = v1(b, n, k, j, i);
+        //   v0n = g0 * v0n + g1 * v1n;
+        //   if constexpr (include_divf) {
+        //     v0n += bdt_vol * ((ax1[0] * v0.flux(b, d1, n, k, j, i) -
+        //                        ax1[1] * v0.flux(b, d1, n, k, j, i + 1)) +
+        //                       (ax2[0] * v0.flux(b, d2, n, k, j, i) -
+        //                        ax2[1] * v0.flux(b, d2, n, k, j + multi_d, i)) +
+        //                       (ax3[0] * v0.flux(b, d3, n, k, j, i) -
+        //                        ax3[1] * v0.flux(b, d3, n, k + three_d, j, i)));
+        //   }
+        // }
       });
   return TaskStatus::complete;
 }

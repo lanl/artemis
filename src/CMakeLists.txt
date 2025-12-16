@@ -40,10 +40,13 @@ set (SRC_LIST
 
   gravity/binary_mass.cpp
   gravity/gravity.cpp
+  gravity/gravity.hpp
   gravity/nbody_gravity.hpp
   gravity/point_mass.cpp
+  gravity/poisson_driver.cpp
+  gravity/poisson_equation.hpp
+  gravity/self_gravity.cpp
   gravity/uniform.cpp
-  gravity/gravity.hpp
 
   nbody/nbody.cpp
   nbody/nbody.hpp
@@ -64,6 +67,7 @@ set (SRC_LIST
   pgen/kh.hpp
   pgen/linear_wave.hpp
   pgen/lw.hpp
+  pgen/polytrope.hpp
   pgen/pgen.hpp
   pgen/problem_modifier.hpp
   pgen/rt.hpp

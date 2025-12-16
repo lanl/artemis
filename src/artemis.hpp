@@ -85,6 +85,11 @@ ARTEMIS_VARIABLE(rad.opac, scattering);
 } // namespace opac
 } // namespace rad
 
+namespace grav {
+ARTEMIS_VARIABLE(grav, phi);
+ARTEMIS_VARIABLE(grav, rhs);
+} // namespace grav
+
 #undef ARTEMIS_VARIABLE
 
 // Restart options (see Parthenon #1231)

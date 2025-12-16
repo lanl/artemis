@@ -126,7 +126,7 @@ Real InitialDensity(const EOS &eos, const StratParams &pars, const Real z) {
       Real pp = eos.PressureFromDensityTemperature(dens * (1. + dlnr), pars.temp0);
       Real pm = eos.PressureFromDensityTemperature(dens * (1. - dlnr), pars.temp0);
       Real dPdrho = (pp - pm) / (dlnr * dens);
-      ld -= 0.5 * pars.Om0 * (2 * j + 1) * SQR(dz) / (dPdrho + Fuzz<Real>());
+      ld -= 0.5 * (2 * j + 1) * SQR(pars.Om0 * dz) / (dPdrho + Fuzz<Real>());
       dens = std::exp(ld);
       if (dens <= pars.dfloor) return pars.dfloor;
     }

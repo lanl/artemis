@@ -53,6 +53,8 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
                         pin->GetInteger("parthenon/mesh", "nx2"),
                         pin->GetInteger("parthenon/mesh", "nx3")};
   artemis->AddParam("prob_dim", nx);
+  artemis->AddParam("multi_d", (nx[1] > 1) || (nx[2] > 1));
+  artemis->AddParam("three_d", (nx[2] > 1));
   std::array<int, 3> nb{pin->GetInteger("parthenon/meshblock", "nx1"),
                         pin->GetInteger("parthenon/meshblock", "nx2"),
                         pin->GetInteger("parthenon/meshblock", "nx3")};

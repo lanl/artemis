@@ -22,7 +22,7 @@
 
 namespace Gravity {
 
-enum class GravityType { uniform, point, binary, nbody, null };
+enum class GravityType { uniform, linear, point, binary, nbody, null };
 
 //----------------------------------------------------------------------------------------
 //! \struct Orbit
@@ -100,6 +100,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
 
 template <Coordinates GEOM>
 TaskStatus UniformGravity(MeshData<Real> *md, const Real time, const Real dt);
+
+template <Coordinates GEOM>
+TaskStatus LinearGravity(MeshData<Real> *md, const Real time, const Real dt);
 
 template <Coordinates GEOM>
 TaskStatus PointMassGravity(MeshData<Real> *md, const Real time, const Real dt);

@@ -37,9 +37,19 @@ TaskStatus UniformGravity(MeshData<Real> *md, const Real time, const Real dt) {
   const bool do_dust = artemis_pkg->template Param<bool>("do_dust");
 
   auto &gravity_pkg = pm->packages.Get("gravity");
-  const Real gx1 = gravity_pkg->template Param<Real>("gx1");
-  const Real gx2 = gravity_pkg->template Param<Real>("gx2");
-  const Real gx3 = gravity_pkg->template Param<Real>("gx3");
+
+  const bool multi_d = artemis_pkg->template Param<bool>("multi_d");
+  const bool three_d = artemis_pkg->template Param<bool>("three_d");
+
+  const std::array<Real, 3> gx{gravity_pkg->template Param<Real>("gx1"),
+                               gravity_pkg->template Param<Real>("gx2"),
+                               gravity_pkg->template Param<Real>("gx3")};
+  const std::array<Real, 3> dgx{gravity_pkg->template Param<Real>("dgdx1"),
+                                gravity_pkg->template Param<Real>("dgdx2"),
+                                gravity_pkg->template Param<Real>("dgdx3")};
+  const std::array<Real, 3> xc{gravity_pkg->template Param<Real>("xc1"),
+                               gravity_pkg->template Param<Real>("xc2"),
+                               gravity_pkg->template Param<Real>("xc3")};
 
   const auto &cpars = artemis_pkg->template Param<geometry::CoordParams>("coord_params");
 
@@ -48,8 +58,8 @@ TaskStatus UniformGravity(MeshData<Real> *md, const Real time, const Real dt) {
                          dust::cons::momentum, gas::prim::density, gas::prim::velocity,
                          dust::prim::density>(resolved_pkgs.get());
   auto vmesh = desc.GetPack(md);
-  static auto desc_g =
-      MakePackDescriptor<geom::hx1v, geom::hx2v, geom::hx3v>(resolved_pkgs.get());
+  static auto desc_g = MakePackDescriptor<geom::hx1v, geom::hx2v, geom::hx3v, geom::x1v,
+                                          geom::x2v, geom::x3v>(resolved_pkgs.get());
   auto vg = desc_g.GetPack(md);
   const auto ib = md->GetBoundsI(IndexDomain::interior);
   const auto jb = md->GetBoundsJ(IndexDomain::interior);
@@ -62,7 +72,11 @@ TaskStatus UniformGravity(MeshData<Real> *md, const Real time, const Real dt) {
         // Extract coordinates
         geometry::Coords<GEOM> coords(cpars, vmesh.GetCoordinates(b), k, j, i);
         const auto &hx = coords.GetScaleFactors(vg, b, k, j, i);
+        const auto &xv = coords.GetCellCenter(vg, b, k, j, i);
 
+        const Real gx1 = gx[0] + dgx[0] * (xv[0] - xc[0]);
+        const Real gx2 = (multi_d) ? gx[1] + dgx[1] * (xv[1] - xc[1]) : 0.0;
+        const Real gx3 = (three_d) ? gx[2] + dgx[2] * (xv[2] - xc[2]) : 0.0;
         if (do_gas) {
           // Gravitational acceleration and energy release
           // NOTE(PDM): for *self-gravity*, it is fairly well established that a good

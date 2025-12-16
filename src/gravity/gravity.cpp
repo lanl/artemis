@@ -52,6 +52,26 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
     params.Add("gx1", pin->GetReal(block_name, "gx1"));
     params.Add("gx2", pin->GetReal(block_name, "gx2"));
     params.Add("gx3", pin->GetReal(block_name, "gx3"));
+    params.Add("dgdx1", pin->GetOrAddReal(block_name, "dgdx1", 0.0));
+    params.Add("dgdx2", pin->GetOrAddReal(block_name, "dgdx2", 0.0));
+    params.Add("dgdx3", pin->GetOrAddReal(block_name, "dgdx3", 0.0));
+    params.Add("xc1", pin->GetOrAddReal(block_name, "xc1", 0.0));
+    params.Add("xc2", pin->GetOrAddReal(block_name, "xc2", 0.0));
+    params.Add("xc3", pin->GetOrAddReal(block_name, "xc3", 0.0));
+  }
+  if (pin->DoesBlockExist("gravity/linear")) {
+    count++;
+    block_name = "gravity/linear";
+    gtype = GravityType::linear;
+    params.Add("gx1", pin->GetReal(block_name, "gx1"));
+    params.Add("gx2", pin->GetReal(block_name, "gx2"));
+    params.Add("gx3", pin->GetReal(block_name, "gx3"));
+    params.Add("dgdx1", pin->GetOrAddReal(block_name, "dgdx1", 0.0));
+    params.Add("dgdx2", pin->GetOrAddReal(block_name, "dgdx2", 0.0));
+    params.Add("dgdx3", pin->GetOrAddReal(block_name, "dgdx3", 0.0));
+    params.Add("xc1", pin->GetOrAddReal(block_name, "xc1", 0.0));
+    params.Add("xc2", pin->GetOrAddReal(block_name, "xc2", 0.0));
+    params.Add("xc3", pin->GetOrAddReal(block_name, "xc3", 0.0));
   }
   if (pin->DoesBlockExist("gravity/point")) {
     count++;
@@ -142,7 +162,7 @@ TaskStatus ExternalGravity(MeshData<Real> *md, const Real time, const Real dt) {
   const Real tstop = pkg->template Param<Real>("tstop");
 
   if ((time >= tstart) && (time < tstop)) {
-    if (gtype == GravityType::uniform) {
+    if ((gtype == GravityType::uniform) || (gtype == GravityType::linear)) {
       return UniformGravity<GEOM>(md, time, dt);
     } else if (gtype == GravityType::point) {
       return PointMassGravity<GEOM>(md, time, dt);

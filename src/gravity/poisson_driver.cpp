@@ -68,9 +68,12 @@ void SolvePoisson(TaskCollection &tc, Mesh *pmesh) {
     auto setup = psolver->AddSetupTasks(tl, zero_phi, i, pmesh);
     auto solve = psolver->AddTasks(tl, setup, i, pmesh);
 
+    // Set BCs after solve
+    auto bcs = parthenon::AddBoundaryExchangeTasks(solve, tl, md_phi, pmesh->multilevel);
+
     // Move the solution back so it is output
     auto copy_back = tl.AddTask(
-        solve, TF(solvers::utils::CopyData<parthenon::TypeList<grav::phi>>), md_phi, md);
+        bcs, TF(solvers::utils::CopyData<parthenon::TypeList<grav::phi>>), md_phi, md);
   }
 }
 

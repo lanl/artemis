@@ -77,56 +77,37 @@ TaskStatus SelfGravity(MeshData<Real> *md, const Real time, const Real dt) {
         const Real wdt2 = hdtodx2 * (dpl2 + dpr2);
         const Real wdt3 = hdtodx3 * (dpl3 + dpr3);
 
-        // Check answer
-        const Real rho_alt =
-            (6.0 * vmesh(b, grav::phi(), k, j, i) - vmesh(b, grav::phi(), k, j, i - 1) -
-             vmesh(b, grav::phi(), k, j, i + 1) -
-             vmesh(b, grav::phi(), k, j - multi_d, i) -
-             vmesh(b, grav::phi(), k, j + multi_d, i) -
-             vmesh(b, grav::phi(), k - three_d, j, i) -
-             vmesh(b, grav::phi(), k + three_d, j, i)) /
-            (SQR(dx[0]));
-        const Real my_rho = vmesh(b, gas::prim::density(0), k, j, i);
-        if (std::abs(my_rho - rho_alt) / rho_alt > 1.0e-5) {
-          printf("%d %d %d %24.16e %24.16e %24.16e\n", k, j, i, rho_alt, my_rho,
-                 vmesh(b, grav::phi(), k, j, i));
-          std::exit(1);
+        if (do_gas) {
+          // Gravitational acceleration and energy release
+          for (int n = 0; n < vmesh.GetSize(b, gas::prim::density()); ++n) {
+            const Real &rr = vmesh(b, gas::prim::density(n), k, j, i);
+            vmesh(b, gas::cons::momentum(VI(n, 0)), k, j, i) += rr * wdt1;
+            vmesh(b, gas::cons::momentum(VI(n, 1)), k, j, i) += rr * wdt2;
+            vmesh(b, gas::cons::momentum(VI(n, 2)), k, j, i) += rr * wdt3;
+            vmesh(b, gas::cons::total_energy(n), k, j, i) +=
+                hdtodx1 * (vflux.flux(b, d1, gas::cons::density(n), k, j, i) * dpl1 +
+                           vflux.flux(b, d1, gas::cons::density(n), k, j, i + 1) * dpr1);
+            vmesh(b, gas::cons::total_energy(n), k, j, i) +=
+                hdtodx2 *
+                (vflux.flux(b, d2, gas::cons::density(n), k, j, i) * dpl2 +
+                 vflux.flux(b, d2, gas::cons::density(n), k, j + multi_d, i) * dpr2);
+            vmesh(b, gas::cons::total_energy(n), k, j, i) +=
+                hdtodx3 *
+                (vflux.flux(b, d3, gas::cons::density(n), k, j, i) * dpl3 +
+                 vflux.flux(b, d3, gas::cons::density(n), k + three_d, j, i) * dpr3);
+          }
         }
 
-        // if (do_gas) {
-        //   // Gravitational acceleration and energy release
-        //   for (int n = 0; n < vmesh.GetSize(b, gas::prim::density()); ++n) {
-        //     const Real &rr = vmesh(b, gas::prim::density(n), k, j, i);
-        //     vmesh(b, gas::cons::momentum(VI(n, 0)), k, j, i) += rr * wdt1;
-        //     vmesh(b, gas::cons::momentum(VI(n, 1)), k, j, i) += rr * wdt2;
-        //     vmesh(b, gas::cons::momentum(VI(n, 2)), k, j, i) += rr * wdt3;
-        //     vmesh(b, gas::cons::total_energy(n), k, j, i) +=
-        //         hdtodx1 * (vflux.flux(b, d1, gas::cons::density(n), k, j, i) * dpl1 +
-        //                    vflux.flux(b, d1, gas::cons::density(n), k, j, i + 1) *
-        //                    dpr1);
-        //     vmesh(b, gas::cons::total_energy(n), k, j, i) +=
-        //         hdtodx2 *
-        //         (vflux.flux(b, d2, gas::cons::density(n), k, j, i) * dpl2 +
-        //          vflux.flux(b, d2, gas::cons::density(n), k, j + multi_d, i) * dpr2);
-        //     vmesh(b, gas::cons::total_energy(n), k, j, i) +=
-        //         hdtodx3 *
-        //         (vflux.flux(b, d3, gas::cons::density(n), k, j, i) * dpl3 +
-        //          vflux.flux(b, d3, gas::cons::density(n), k + three_d, j, i) * dpr3);
-        //   }
-        // }
-
-        // if (do_dust) {
-        //   for (int n = 0; n < vmesh.GetSize(b, dust::prim::density()); ++n) {
-        //     // Gravitational acceleration
-        //     const Real &rr = vmesh(b, dust::prim::density(n), k, j, i);
-        //     vmesh(b, dust::cons::momentum(VI(n, 0)), k, j, i) += rr * wdt1;
-        //     vmesh(b, dust::cons::momentum(VI(n, 1)), k, j, i) += rr * wdt2;
-        //     vmesh(b, dust::cons::momentum(VI(n, 2)), k, j, i) += rr * wdt3;
-        //   }
-        // }
+        if (do_dust) {
+          for (int n = 0; n < vmesh.GetSize(b, dust::prim::density()); ++n) {
+            // Gravitational acceleration
+            const Real &rr = vmesh(b, dust::prim::density(n), k, j, i);
+            vmesh(b, dust::cons::momentum(VI(n, 0)), k, j, i) += rr * wdt1;
+            vmesh(b, dust::cons::momentum(VI(n, 1)), k, j, i) += rr * wdt2;
+            vmesh(b, dust::cons::momentum(VI(n, 2)), k, j, i) += rr * wdt3;
+          }
+        }
       });
-
-  printf("Success!\n");
 
   return TaskStatus::complete;
 }

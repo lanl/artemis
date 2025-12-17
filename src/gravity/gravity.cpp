@@ -212,19 +212,16 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
         {Metadata::Cell, Metadata::Derived, Metadata::OneCopy, Metadata::FillGhost});
     gravity->AddField<grav::rhs>(mrhs);
 
-    // Multigrid
+    // Solvers
     using PoissEq = PoissonEquation<grav::phi>;
     PoissEq eq(pin, "poisson");
     params.Add("poisson_equation", eq, parthenon::Params::Mutability::Mutable);
-
     std::shared_ptr<parthenon::solvers::SolverBase> psolver;
     using prolongator_t = parthenon::solvers::ProlongationBlockInteriorZeroDirichlet;
     using preconditioner_t = parthenon::solvers::MGSolver<PoissEq, prolongator_t>;
     psolver =
         std::make_shared<parthenon::solvers::BiCGSTABSolver<PoissEq, preconditioner_t>>(
             "base", "phi", "rhs", pin, block_name, PoissEq(pin, block_name));
-    // psolver = std::make_shared<parthenon::solvers::MGSolver<PoissEq, prolongator_t>>(
-    //     "base", "phi", "rhs", pin, block_name, PoissEq(pin, block_name));
 
     params.Add("solver_pointer", psolver);
   }

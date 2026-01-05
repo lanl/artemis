@@ -63,9 +63,9 @@ void SolvePoisson(TaskCollection &tc, Mesh *pmesh) {
                    md, md_rhs);
 
     // Set initial solution guess to zero
-    auto zero_phi =
-        tl.AddTask(copy_rhs, TF(solvers::utils::SetToZero<grav::phi>), md_phi);
-    auto setup = psolver->AddSetupTasks(tl, zero_phi, i, pmesh);
+    // auto zero_phi =
+    //     tl.AddTask(copy_rhs, TF(solvers::utils::SetToZero<grav::phi>), md_phi);
+    auto setup = psolver->AddSetupTasks(tl, copy_rhs, i, pmesh);
     auto solve = psolver->AddTasks(tl, setup, i, pmesh);
 
     // Set BCs after solve

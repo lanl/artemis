@@ -62,9 +62,7 @@ void SolvePoisson(TaskCollection &tc, Mesh *pmesh) {
         tl.AddTask(copy_rhs, TF(solvers::utils::CopyData<parthenon::TypeList<grav::phi>>),
                    md, md_rhs);
 
-    // Set initial solution guess to zero
-    // auto zero_phi =
-    //     tl.AddTask(copy_rhs, TF(solvers::utils::SetToZero<grav::phi>), md_phi);
+    // Solve
     auto setup = psolver->AddSetupTasks(tl, copy_rhs, i, pmesh);
     auto solve = psolver->AddTasks(tl, setup, i, pmesh);
 

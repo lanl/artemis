@@ -17,53 +17,76 @@
 
 namespace ArtemisUtils {
 //----------------------------------------------------------------------------------------
+//! WENO-MZ reconstruction
+//!
+//! REFERENCES:
+//! Wang Y., Zhao K., Yuan L., "A modified fifth-order WENO-Z scheme based on the
+//! weights of the reformulated adaptive order WENO scheme"
+//! Int J Numer Meth Fluids. 2024;96:1631–1652
+//!
 //! \fn ArtemisUtils::WENOZ5()
-//! \brief Improved WENO reconstruction from Borges et al. 2008, Castro+ 2011.  Returns
 //! interpolated values at L/R edges of cell i, that is ql(i+1) and qr(i). Works for
 //! reconstruction in any dimension by passing in the appropriate q_im2,...,q _ip2.
 KOKKOS_INLINE_FUNCTION
 void WENOZ5(const Real &q_im2, const Real &q_im1, const Real &q_i, const Real &q_ip1,
             const Real &q_ip2, Real &ql_ip1, Real &qr_i) {
 
-  // smoothness indicators for each trial stencil [Jiang & Shu 1996]
-  constexpr Real weno_beta_coeff_0 = 13. / 12.;
-  constexpr Real weno_beta_coeff_1 = 0.25;
-  const std::array<Real, 3> beta{weno_beta_coeff_0 * SQR(q_im2 - 2 * q_im1 + q_i) +
-                                     weno_beta_coeff_1 * SQR(q_im2 - 4 * q_im1 + 3 * q_i),
-                                 weno_beta_coeff_0 * SQR(q_im1 - 2 * q_i + q_ip1) +
-                                     weno_beta_coeff_1 * SQR(q_im1 + q_ip1),
-                                 weno_beta_coeff_0 * SQR(q_i - 2 * q_ip1 + q_ip2) +
-                                     weno_beta_coeff_1 *
-                                         SQR(3 * q_i - 4 * q_ip1 + q_ip2)};
+  // Smooth WENO weights: See Jiang & Shu 1996
 
-  const Real tau5 = std::abs(beta[0] - beta[2]); // [Borges+ 2008]
+  constexpr Real beta_coeff0 = 13.0/12.0, beta_coeff1 = 0.25, beta_coeff4 = 1.0/12.0;
+  constexpr Real epsL = 1.0e-40;
+  constexpr Real t1 = 2.0;
 
-  // [Castro, Costa, & Don 2011]
-  const std::array<Real, 3> indicator{SQR(tau5 / (beta[0] + Fuzz<Real>())),
-                                      SQR(tau5 / (beta[1] + Fuzz<Real>())),
-                                      SQR(tau5 / (beta[2] + Fuzz<Real>()))};
+  Real beta0 = beta_coeff0 * SQR(q_im2 +     q_i - 2.0*q_im1) +
+          beta_coeff1 * SQR(q_im2 + 3.0*q_i - 4.0*q_im1);
+
+  Real beta1 = beta_coeff0 * SQR(q_im1 + q_ip1 - 2.0*q_i) +
+          beta_coeff1 * SQR(q_im1 - q_ip1);
+
+  Real beta2 = beta_coeff0 * SQR(q_ip2 +     q_i - 2.0*q_ip1) +
+          beta_coeff1 * SQR(q_ip2 + 3.0*q_i - 4.0*q_ip1);
+
+  Real beta4 = beta_coeff4 * SQR(q_im1 - 2.0*q_i + q_ip1);
+
+  Real tau_5 = fabs(beta0 - beta2);
+  Real r = (fabs(beta2 - beta1) + epsL) / (fabs(beta0 - beta1) + epsL);
+  Real t0 = 1.0 + r;
+  Real t2 = 1.0 + 1.0/r;
+  Real eta = tau_5*SQR(SQR(tau_5/(fmax(beta0, beta2) + epsL) ));
+
+  Real weight_arg[3];
+  weight_arg[0] = eta/(beta0+epsL) + (tau_5 - eta)/(t0*beta4 + epsL);
+  weight_arg[1] = eta/(beta1+epsL) + (tau_5 - eta)/(t1*beta4 + epsL);
+  weight_arg[2] = eta/(beta2+epsL) + (tau_5 - eta)/(t2*beta4 + epsL);
 
   // compute qL_ip1
-  std::array<Real, 3> f{2.0 * q_im2 - 7.0 * q_im1 + 11.0 * q_i,
-                        -1.0 * q_im1 + 5.0 * q_i + 2.0 * q_ip1,
-                        2.0 * q_i + 5.0 * q_ip1 - q_ip2};
+  // Factor of 1/6 in coefficients of f[] array applied to alpha_sum to reduce divisions
+  Real f[3];
+  f[0] = ( 2.0*q_im2 - 7.0*q_im1 + 11.0*q_i  );
+  f[1] = (-1.0*q_im1 + 5.0*q_i   + 2.0 *q_ip1);
+  f[2] = ( 2.0*q_i   + 5.0*q_ip1 -      q_ip2);
 
-  std::array<Real, 3> alpha{0.1 * (1.0 + indicator[0]), 0.6 * (1.0 + indicator[1]),
-                            0.3 * (1.0 + indicator[2])};
-  Real alpha_sum = 6.0 * (alpha[0] + alpha[1] + alpha[2]);
+  Real alpha[3];
+  alpha[0] = 0.1 + 0.1*weight_arg[0];
+  alpha[1] = 0.6 + 0.6*weight_arg[1];
+  alpha[2] = 0.3 + 0.3*weight_arg[2];
 
-  ql_ip1 = (f[0] * alpha[0] + f[1] * alpha[1] + f[2] * alpha[2]) / alpha_sum;
+  Real alpha_sum = 6.0*(alpha[0] + alpha[1] + alpha[2]);
+
+  ql_ip1 = (f[0]*alpha[0] + f[1]*alpha[1] + f[2]*alpha[2])/alpha_sum;
 
   // compute qR_i
-  f[0] = 2.0 * q_ip2 - 7.0 * q_ip1 + 11.0 * q_i;
-  f[1] = -1.0 * q_ip1 + 5.0 * q_i + 2.0 * q_im1;
-  f[2] = 2.0 * q_i + 5.0 * q_im1 - q_im2;
+  // Factor of 1/6 in coefficients of f[] array applied to alpha_sum to reduce divisions
+  f[0] = ( 2.0*q_ip2 - 7.0*q_ip1 + 11.0*q_i  );
+  f[1] = (-1.0*q_ip1 + 5.0*q_i   + 2.0 *q_im1);
+  f[2] = ( 2.0*q_i   + 5.0*q_im1 -      q_im2);
 
-  alpha[0] = 0.1 * (1.0 + indicator[2]);
-  alpha[2] = 0.3 * (1.0 + indicator[0]);
-  alpha_sum = 6.0 * (alpha[0] + alpha[1] + alpha[2]);
+  alpha[0] = 0.1 + 0.1*weight_arg[2];
+  alpha[2] = 0.3 + 0.3*weight_arg[0];
 
-  qr_i = (f[0] * alpha[0] + f[1] * alpha[1] + f[2] * alpha[2]) / alpha_sum;
+  alpha_sum = 6.0*(alpha[0] + alpha[1] + alpha[2]);
+
+  qr_i = (f[0]*alpha[0] + f[1]*alpha[1] + f[2]*alpha[2])/alpha_sum;
 
   return;
 }

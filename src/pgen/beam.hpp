@@ -56,6 +56,7 @@ inline void InitBeamParams(MeshBlock *pmb, ParameterInput *pin) {
 //! \brief Sets initial conditions for BEAM tests
 template <Coordinates GEOM>
 inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
+  PARTHENON_INSTRUMENT
   using parthenon::MakePackDescriptor;
   const Mesh *pmesh = pmb->pmy_mesh;
   const int ndim = pmesh->ndim;
@@ -121,6 +122,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 //! \brief
 template <Coordinates GEOM>
 inline void BeamInnerX2(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) {
+  PARTHENON_INSTRUMENT
   using parthenon::MakePackDescriptor;
   using TE = parthenon::TopologicalElement;
   auto pmb = mbd->GetBlockPointer();
@@ -197,6 +199,7 @@ inline void BeamInnerX2(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) 
 //! \brief
 template <Coordinates GEOM>
 inline void BeamInnerX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) {
+  PARTHENON_INSTRUMENT
   using parthenon::MakePackDescriptor;
   using TE = parthenon::TopologicalElement;
   auto pmb = mbd->GetBlockPointer();

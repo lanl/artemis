@@ -90,6 +90,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 //! \brief Wrapper function for external cooling options
 template <Coordinates GEOM>
 TaskStatus CoolingSource(MeshData<Real> *md, const Real time, const Real dt) {
+  PARTHENON_INSTRUMENT
   auto pm = md->GetParentPointer();
   auto &pkg = pm->packages.Get("cooling");
   CoolingType ctype = pkg->template Param<CoolingType>("type");

@@ -28,12 +28,13 @@ namespace IMC {
 //! \fn TaskListStatus IMC::JaybenneIMC
 //! \brief Executes thermal IMC transport (Jaybenne) and syncs updated fields
 template <Coordinates GEOM>
-TaskListStatus JaybenneIMC(Mesh *pmesh, const Real time, const Real dt) {
+TaskListStatus JaybenneIMC(Mesh *pmesh, const SimTime &tm, const Real dt) {
+  PARTHENON_INSTRUMENT
   auto status = Radiation::UpdateRadiationFields(pmesh).Execute();
   if (status != TaskListStatus::complete) return status;
-  status = jaybenne::RadiationStep(pmesh, time, dt).Execute();
+  status = jaybenne::RadiationStep(pmesh, tm, dt).Execute();
   if (status != TaskListStatus::complete) return status;
-  status = ArtemisDerived::SyncFields<GEOM>(pmesh, time, dt).Execute();
+  status = ArtemisDerived::SyncFields<GEOM>(pmesh, tm.time, dt).Execute();
   return status;
 }
 
@@ -41,11 +42,12 @@ TaskListStatus JaybenneIMC(Mesh *pmesh, const Real time, const Real dt) {
 //! template instantiations
 typedef Coordinates G;
 typedef Mesh M;
-template TaskListStatus JaybenneIMC<G::cartesian>(M *pm, const Real t, const Real dt);
-template TaskListStatus JaybenneIMC<G::cylindrical>(M *pm, const Real t, const Real dt);
-template TaskListStatus JaybenneIMC<G::spherical1D>(M *pm, const Real t, const Real dt);
-template TaskListStatus JaybenneIMC<G::spherical2D>(M *pm, const Real t, const Real dt);
-template TaskListStatus JaybenneIMC<G::spherical3D>(M *pm, const Real t, const Real dt);
-template TaskListStatus JaybenneIMC<G::axisymmetric>(M *pm, const Real t, const Real dt);
+typedef SimTime ST;
+template TaskListStatus JaybenneIMC<G::cartesian>(M *pm, const ST &tm, const Real dt);
+template TaskListStatus JaybenneIMC<G::cylindrical>(M *pm, const ST &tm, const Real dt);
+template TaskListStatus JaybenneIMC<G::spherical1D>(M *pm, const ST &tm, const Real dt);
+template TaskListStatus JaybenneIMC<G::spherical2D>(M *pm, const ST &tm, const Real dt);
+template TaskListStatus JaybenneIMC<G::spherical3D>(M *pm, const ST &tm, const Real dt);
+template TaskListStatus JaybenneIMC<G::axisymmetric>(M *pm, const ST &tm, const Real dt);
 
 } // namespace IMC

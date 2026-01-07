@@ -25,7 +25,7 @@ logger = logging.getLogger("artemis" + __name__[7:])  # set logger name
 
 _int = ["rk2"]
 _recon = ["plm", "ppm"]
-_flux = ["hllc", "hlle", "llf"]
+_flux = ["hllc-general", "hlle", "llf"]
 _wave = ["L-sound", "R-sound", "entropy"]
 _nranks = 1
 _file_id = "linear_wave"

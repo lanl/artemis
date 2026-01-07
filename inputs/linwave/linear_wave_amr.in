@@ -66,12 +66,14 @@ dust = false
 <gas>
 cfl = 0.9
 reconstruct = plm
-riemann = hllc
+riemann = hllc-general
 gamma = 1.66666666667
 refine_field = density
 refine_type = magnitude
 refine_thr = 1.0008
 deref_thr = 1.0008
+
+<gas/eos/ideal>
 
 <problem>
 nperiod   = 5       # Number of wave crossing periods to evolve simulation

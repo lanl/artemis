@@ -57,6 +57,7 @@ struct StratParams {
   bool three_d;
   Real ar;
   bool do_dust, do_moment, do_imc;
+  int npoints;
 };
 
 //----------------------------------------------------------------------------------------
@@ -65,6 +66,7 @@ struct StratParams {
 //! NOTE(PDM): In order for our user-defined BCs to be compatible with restarts, we must
 //! reset the StratParams struct upon initialization.
 inline void InitStratParams(MeshBlock *pmb, ParameterInput *pin) {
+  PARTHENON_INSTRUMENT
   auto &artemis_pkg = pmb->packages.Get("artemis");
   Params &params = artemis_pkg->AllParams();
   if (!(params.hasKey("strat_params"))) {
@@ -76,6 +78,7 @@ inline void InitStratParams(MeshBlock *pmb, ParameterInput *pin) {
     strat_params.rho0 = pin->GetOrAddReal("problem", "rho0", 1.0);
     strat_params.r0 = pin->GetOrAddReal("problem", "r0", 1.0);
     strat_params.d2g = pin->GetOrAddReal("problem", "dust_to_gas", 0.01);
+    strat_params.npoints = pin->GetOrAddReal("problem", "npoints", 50);
     strat_params.do_dust = params.Get<bool>("do_dust");
 
     auto &gas_pkg = pmb->packages.Get("gas");
@@ -99,10 +102,36 @@ inline void InitStratParams(MeshBlock *pmb, ParameterInput *pin) {
 
 KOKKOS_INLINE_FUNCTION
 Real InitialDensity(const StratParams &pars, const Real z) {
-  const Real temp = pars.temp0;
   const Real efac =
       (pars.three_d) ? std::exp(-SQR(z) / (2.0 * SQR(pars.h * pars.r0))) : 1.0;
   return std::max(pars.dfloor, efac * pars.rho0);
+}
+
+KOKKOS_INLINE_FUNCTION
+Real InitialDensity(const EOS &eos, const StratParams &pars, const Real z) {
+  // dP/dz = -rho * g
+  // dP = (dP/drho)_T drho
+  // drho/dz = -rho * g / (dP/drho)_T
+  Real dens = pars.rho0;
+  if ((pars.three_d) && (std::abs(z) > 1e-16)) {
+    const Real dz = std::abs(z) / static_cast<Real>(pars.npoints);
+    const Real dlnr = 1e-6;
+    const Real ldmin = std::log(pars.dfloor / pars.rho0);
+    Real pres = eos.PressureFromDensityTemperature(dens, pars.temp0);
+    Real zj = 0.0;
+    Real ld = 0.0;
+    dens = std::exp(ld);
+    for (int j = 0; j < pars.npoints; j++) {
+      // ln(d/d0) = \int_0^z - Omega^2 z dz
+      Real pp = eos.PressureFromDensityTemperature(dens * (1. + dlnr), pars.temp0);
+      Real pm = eos.PressureFromDensityTemperature(dens * (1. - dlnr), pars.temp0);
+      Real dPdrho = (pp - pm) / (dlnr * dens);
+      ld -= 0.5 * pars.Om0 * (2 * j + 1) * SQR(dz) / (dPdrho + Fuzz<Real>());
+      dens = std::exp(ld);
+      if (dens <= pars.dfloor) return pars.dfloor;
+    }
+  }
+  return std::max(pars.dfloor, dens);
 }
 
 //----------------------------------------------------------------------------------------
@@ -110,6 +139,7 @@ Real InitialDensity(const StratParams &pars, const Real z) {
 //! \brief Sets initial conditions for shearing box problem
 template <Coordinates GEOM>
 inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
+  PARTHENON_INSTRUMENT
   using parthenon::MakePackDescriptor;
 
   // Extract parameters from packages
@@ -120,6 +150,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   auto &gas_pkg = pmb->packages.Get("gas");
   auto eos_d = gas_pkg->template Param<EOS>("eos_d");
+  const bool is_ideal = (gas_pkg->template Param<std::string>("eos_type") == "ideal");
 
   // Dimensionality
   const int ndim = pmb->pmy_mesh->ndim;
@@ -155,7 +186,8 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         const Real dvx2 = 0.0; // residual eq evolution
         const Real vx3 = 0.0;
         const Real temp = pars.temp0;
-        const Real dens = InitialDensity(pars, z);
+        const Real dens =
+            is_ideal ? InitialDensity(pars, z) : InitialDensity(eos_d, pars, z);
         const Real sie = std::max(pars.siefloor,
                                   eos_d.InternalEnergyFromDensityTemperature(dens, temp));
 
@@ -192,6 +224,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 //!        Extrapolation bc + Outflow no inflow
 template <Coordinates GEOM>
 inline void ExtrapInnerX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) {
+  PARTHENON_INSTRUMENT
   using parthenon::MakePackDescriptor;
   using TE = parthenon::TopologicalElement;
   auto pmb = mbd->GetBlockPointer();
@@ -284,6 +317,7 @@ inline void ExtrapInnerX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
 //!        Extrapolation bc + Outflow no inflow
 template <Coordinates GEOM>
 inline void ExtrapOuterX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) {
+  PARTHENON_INSTRUMENT
   using parthenon::MakePackDescriptor;
   using TE = parthenon::TopologicalElement;
   auto pmb = mbd->GetBlockPointer();
@@ -391,6 +425,7 @@ inline void ExtrapOuterX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
 //!
 template <Coordinates GEOM>
 inline void ShearInnerX2(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) {
+  PARTHENON_INSTRUMENT
   using parthenon::MakePackDescriptor;
   using TE = parthenon::TopologicalElement;
   auto pmb = mbd->GetBlockPointer();
@@ -512,6 +547,7 @@ inline void ShearInnerX2(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse)
 //!
 template <Coordinates GEOM>
 inline void ShearOuterX2(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) {
+  PARTHENON_INSTRUMENT
   using parthenon::MakePackDescriptor;
   using TE = parthenon::TopologicalElement;
   auto pmb = mbd->GetBlockPointer();
@@ -621,6 +657,7 @@ inline void ShearOuterX2(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse)
 //! Extrapolation bc + Outflow no inflow
 template <Coordinates GEOM>
 inline void ExtrapInnerX3(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) {
+  PARTHENON_INSTRUMENT
   using parthenon::MakePackDescriptor;
   using TE = parthenon::TopologicalElement;
   auto pmb = mbd->GetBlockPointer();
@@ -661,12 +698,6 @@ inline void ExtrapInnerX3(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
         const Real z0 = coords_s.x3v();
 
         // isothermal through boundary
-        const Real Tg = pars.temp0;
-
-        // asume P/rho is constant as well
-        // probably could just use Bulk modulus here
-        const Real efac =
-            std::exp(-(SQR(z) - SQR(z0)) * SQR(pars.Om0) / (2.0 * pars.kbmu * Tg));
 
         for (int n = 0; n < v.GetSize(0, gas::prim::density()); ++n) {
           const Real vx1g = v(0, gas::prim::velocity(VI(n, 0)), ks, j, i);
@@ -675,6 +706,13 @@ inline void ExtrapInnerX3(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
           const Real vx3g = (gv3 > 0.0) ? 0.0 : gv3;
           const Real &gd = v(0, gas::prim::density(n), ks, j, i);
           const Real &gsie = v(0, gas::prim::sie(n), ks, j, i);
+          const Real Tg = eos_d.TemperatureFromDensityInternalEnergy(gd, gsie);
+
+          const Real pm = eos_d.PressureFromDensityTemperature(gd * (1. - 1e-6), Tg);
+          const Real pp = eos_d.PressureFromDensityTemperature(gd * (1. + 1e-6), Tg);
+          const Real dPdrho = (pp - pm) / (gd * 1e-6);
+          const Real efac = std::exp(-(SQR(z) - SQR(z0)) * SQR(pars.Om0) /
+                                     (2.0 * dPdrho + Fuzz<Real>()));
           const Real rhog = std::max(gd * efac, pars.dfloor);
 
           v(0, gas::prim::velocity(VI(n, 0)), k, j, i) = vx1g;
@@ -696,7 +734,7 @@ inline void ExtrapInnerX3(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
             v(0, dust::prim::velocity(VI(n, 0)), k, j, i) = vx1d;
             v(0, dust::prim::velocity(VI(n, 1)), k, j, i) = vx2d;
             v(0, dust::prim::velocity(VI(n, 2)), k, j, i) = vx3d;
-            v(0, dust::prim::density(n), k, j, i) = dd * efac;
+            v(0, dust::prim::density(n), k, j, i) = dd;
           }
         }
 
@@ -721,6 +759,7 @@ inline void ExtrapInnerX3(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
 //! \brief Sets BCs on +z boundary in shearing box
 template <Coordinates GEOM>
 inline void ExtrapOuterX3(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) {
+  PARTHENON_INSTRUMENT
   //  Extrapolation bc + Outflow no inflow
   using parthenon::MakePackDescriptor;
   using TE = parthenon::TopologicalElement;
@@ -762,12 +801,6 @@ inline void ExtrapOuterX3(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
         const Real z0 = coords_e.x3v();
 
         // isothermal through boundary
-        const Real Tg = pars.temp0;
-
-        // asume P/rho is constant as well
-        // probably could just use Bulk modulus here
-        const Real efac =
-            std::exp(-(SQR(z) - SQR(z0)) * SQR(pars.Om0) / (2.0 * pars.kbmu * Tg));
 
         for (int n = 0; n < v.GetSize(0, gas::prim::density()); ++n) {
           const Real vx1g = v(0, gas::prim::velocity(VI(n, 0)), ke, j, i);
@@ -776,6 +809,12 @@ inline void ExtrapOuterX3(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
           const Real vx3g = (gv3 < 0.0) ? 0.0 : gv3;
           const Real &gd = v(0, gas::prim::density(n), ke, j, i);
           const Real &gsie = v(0, gas::prim::sie(n), ke, j, i);
+          const Real Tg = eos_d.TemperatureFromDensityInternalEnergy(gd, gsie);
+          const Real pm = eos_d.PressureFromDensityTemperature(gd * (1. - 1e-6), Tg);
+          const Real pp = eos_d.PressureFromDensityTemperature(gd * (1. + 1e-6), Tg);
+          const Real dPdrho = (pp - pm) / (gd * 1e-6);
+          const Real efac = std::exp(-(SQR(z) - SQR(z0)) * SQR(pars.Om0) /
+                                     (2.0 * dPdrho + Fuzz<Real>()));
           const Real rhog = std::max(pars.dfloor, gd * efac);
 
           v(0, gas::prim::velocity(VI(n, 0)), k, j, i) = vx1g;
@@ -797,7 +836,7 @@ inline void ExtrapOuterX3(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
             v(0, dust::prim::velocity(VI(n, 0)), k, j, i) = vx1d;
             v(0, dust::prim::velocity(VI(n, 1)), k, j, i) = vx2d;
             v(0, dust::prim::velocity(VI(n, 2)), k, j, i) = vx3d;
-            v(0, dust::prim::density(n), k, j, i) = dd * efac;
+            v(0, dust::prim::density(n), k, j, i) = dd;
           }
         }
 

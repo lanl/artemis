@@ -66,15 +66,17 @@ rotating_frame = true
 
 <gas>
 cfl = 0.3
-gamma = 1.000001
 reconstruct = plm
-riemann = hllc
+riemann = hllc-general
 dfloor = 1.0e-10
 siefloor = 1.0e-10
 refine_field = density
 refine_type = magnitude
 refine_thr = 3.0
 deref_thr = 0.8
+
+<gas/eos/ideal>
+gamma = 1.000001
 
 <gravity/point>
 mass = 1.0e-5

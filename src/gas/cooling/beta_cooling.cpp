@@ -39,6 +39,7 @@ namespace Cooling {
 //!     Tp - T = -om dt (T - T0) / (beta + om dt)
 template <Coordinates GEOM, TempRefType TTYP>
 TaskStatus BetaCooling(MeshData<Real> *md, const Real time, const Real dt) {
+  PARTHENON_INSTRUMENT
   using parthenon::MakePackDescriptor;
   using TE = parthenon::TopologicalElement;
   auto pm = md->GetParentPointer();
@@ -68,6 +69,9 @@ TaskStatus BetaCooling(MeshData<Real> *md, const Real time, const Real dt) {
                                         gas::cons::internal_energy, gas::cons::density>(
       resolved_pkgs.get());
   auto vmesh = desc.GetPack(md);
+  static auto desc_g = MakePackDescriptor<geom::x1v, geom::x2v, geom::x3v, geom::hx1v,
+                                          geom::hx2v, geom::hx3v>(resolved_pkgs.get());
+  auto vg = desc_g.GetPack(md);
   const auto ib = md->GetBoundsI(IndexDomain::interior);
   const auto jb = md->GetBoundsJ(IndexDomain::interior);
   const auto kb = md->GetBoundsK(IndexDomain::interior);
@@ -89,8 +93,8 @@ TaskStatus BetaCooling(MeshData<Real> *md, const Real time, const Real dt) {
       KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
         // Extract coordinates
         geometry::Coords<GEOM> coords(cpars, vmesh.GetCoordinates(b), k, j, i);
-        const auto &xv = coords.GetCellCenter();
-        const auto &hx = coords.GetScaleFactors();
+        const auto &xv = coords.GetCellCenter(vg, b, k, j, i);
+        const auto &hx = coords.GetScaleFactors(vg, b, k, j, i);
         const auto &xcyl = coords.ConvertToCyl(xv);
         const Real rsph2 = xcyl[0] * xcyl[0] + xcyl[2] * xcyl[2];
 

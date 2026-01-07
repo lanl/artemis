@@ -26,6 +26,7 @@ namespace Moments {
 template <Coordinates GEOM>
 TaskListStatus MomentsDriver(Mesh *pmesh, const SimTime &tm,
                              parthenon::LowStorageIntegrator *integrator) {
+  PARTHENON_INSTRUMENT
   // Craft a series of **equal** substeps that sum to the unsplit step
   const Real dtlimit = Moments::EstimateTimeStep<GEOM>(pmesh);
   const int nsteps = static_cast<int>(std::ceil(integrator->dt / dtlimit));
@@ -55,6 +56,7 @@ TaskListStatus MomentsDriver(Mesh *pmesh, const SimTime &tm,
 template <Coordinates GEOM>
 TaskCollection MomentsTasks(Mesh *pmesh, const SimTime &tm,
                             parthenon::LowStorageIntegrator *integrator) {
+  PARTHENON_INSTRUMENT
   using TQ = TaskQualifier;
   TaskCollection tc;
 

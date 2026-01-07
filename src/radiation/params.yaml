@@ -55,6 +55,11 @@ radiation:
       _description: "Radiation energy density floor."
       _default: 1e-20
       _units: "erg cm^-3"
+    tfloor_cgs:
+      _type: Real
+      _description: "Minimum matter temperature, in K, allowed during the matter-coupling solve"
+      _default: 10.0
+      _units: "K"
     nspecies:
       _type: int
       _description: "Number of frequency groups."
@@ -92,6 +97,10 @@ radiation:
     deref_thr:
       _type: Real
       _description: "Threshold for derefinement"
+    fatal_if_unconverged:
+      _type: bool
+      _description: "Crash the code if the matter-coupling step does not converge."
+      _default: true
   imc:
     _description: "IMC radiation model from the Jaybenne library"
     _type: node
@@ -152,3 +161,25 @@ radiation:
       _type: bool
       _description: "Radiation affects host fluid fields."
       _default: true
+  raytrace:
+      _description: "Raytraced radiation model. This is currently designed for raytracing the stellar light from the center of a spherical grid."
+      _type: node
+      band:
+        _type: string
+        _description: "Photon band for this source. The opacity node used for raytraced radiation will read <gas/opacity/band/absorption>."
+        _default: "uv"
+      temperature_cgs:
+        _type: Real
+        _description: "Temperature in K of the central star."
+      radius_solar:
+        _type: Real
+        _description: "Stellar radius in units of the Solar radius."
+      max_iterations: 
+        _type: int
+        _description: "Maximum number of iterations for the particle loop."
+        _default: 1000
+      efloor:
+        _type: Real
+        _description: "Radiation enrgy density floor"
+        _default: 1e-10
+      

@@ -34,6 +34,7 @@ namespace thermalization {
 //! \brief Sets initial conditions for thermal relaxation problem
 template <Coordinates GEOM>
 inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
+  PARTHENON_INSTRUMENT
   using parthenon::MakePackDescriptor;
 
   // Extract parameters from packages

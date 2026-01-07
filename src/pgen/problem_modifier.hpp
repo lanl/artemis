@@ -40,6 +40,7 @@ namespace artemis {
 //! \brief
 template <Coordinates G>
 void ProblemModifier(parthenon::ParthenonManager *pman) {
+  PARTHENON_INSTRUMENT
   using BF = parthenon::BoundaryFace;
   using ID = parthenon::IndexDomain;
 
@@ -50,8 +51,6 @@ void ProblemModifier(parthenon::ParthenonManager *pman) {
   if (artemis_problem == "advection") {
     pman->app_input->UserWorkAfterLoop = advection::UserWorkAfterLoop<G>;
   } else if (artemis_problem == "conduction") {
-    pman->app_input->InitMeshBlockUserData = cond::InitCondParams;
-
     pman->app_input->RegisterBoundaryCondition(BF::inner_x1, "conductive",
                                                cond::CondBoundary<G, ID::inner_x1>);
     pman->app_input->RegisterBoundaryCondition(BF::outer_x1, "conductive",
@@ -65,7 +64,6 @@ void ProblemModifier(parthenon::ParthenonManager *pman) {
     pman->app_input->RegisterBoundaryCondition(BF::outer_x3, "conductive",
                                                cond::CondBoundary<G, ID::outer_x3>);
   } else if (artemis_problem == "disk") {
-    pman->app_input->InitMeshBlockUserData = disk::InitDiskParams;
 
     artemis::ProblemCheckRefinementBlock = disk::ProblemCheckRefinementBlock;
 
@@ -105,15 +103,11 @@ void ProblemModifier(parthenon::ParthenonManager *pman) {
   } else if (artemis_problem == "linear_wave") {
     pman->app_input->UserWorkAfterLoop = linear_wave::UserWorkAfterLoop<G>;
   } else if (artemis_problem == "shock") {
-    pman->app_input->InitMeshBlockUserData = shock::InitShockParams;
-
     pman->app_input->RegisterBoundaryCondition(BF::inner_x1, "ic",
                                                shock::ShockInnerX1<G>);
     pman->app_input->RegisterBoundaryCondition(BF::outer_x1, "ic",
                                                shock::ShockOuterX1<G>);
   } else if (artemis_problem == "strat") {
-    pman->app_input->InitMeshBlockUserData = strat::InitStratParams;
-
     pman->app_input->RegisterBoundaryCondition(BF::inner_x1, "extrap",
                                                strat::ExtrapInnerX1<G>);
     pman->app_input->RegisterBoundaryCondition(BF::outer_x1, "extrap",
@@ -127,8 +121,6 @@ void ProblemModifier(parthenon::ParthenonManager *pman) {
     pman->app_input->RegisterBoundaryCondition(BF::outer_x3, "extrap",
                                                strat::ExtrapOuterX3<G>);
   } else if (artemis_problem == "beam") {
-    pman->app_input->InitMeshBlockUserData = beam::InitBeamParams;
-
     pman->app_input->RegisterBoundaryCondition(BF::inner_x1, "beam",
                                                beam::BeamInnerX1<G>);
     pman->app_input->RegisterBoundaryCondition(BF::inner_x2, "beam",

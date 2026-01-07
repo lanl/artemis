@@ -15,6 +15,7 @@
 #include "artemis.hpp"
 #include "artemis_driver.hpp"
 #include "drag/drag.hpp"
+#include "dust/coagulation/coagulation.hpp"
 #include "dust/dust.hpp"
 #include "gas/cooling/cooling.hpp"
 #include "gas/gas.hpp"
@@ -23,6 +24,7 @@
 #include "nbody/nbody.hpp"
 #include "radiation/moments/moments.hpp"
 #include "radiation/radiation.hpp"
+#include "radiation/raytrace/raytrace.hpp"
 #include "rotating_frame/rotating_frame.hpp"
 #include "utils/artemis_utils.hpp"
 #include "utils/history.hpp"
@@ -96,6 +98,8 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   const bool do_viscosity = pin->GetOrAddBoolean("physics", "viscosity", false);
   const bool do_conduction = pin->GetOrAddBoolean("physics", "conduction", false);
   const bool do_radiation = pin->GetOrAddBoolean("physics", "radiation", false);
+  const bool do_coagulation = pin->GetOrAddBoolean("physics", "coagulation", false);
+  const bool do_raytrace = pin->GetOrAddBoolean("physics", "raytrace", false);
 
   // Determine input file specified algorithms
   const bool do_imc = do_radiation && pin->DoesBlockExist("radiation/imc");
@@ -112,8 +116,12 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
                     "Conduction requires the gas package, but there is not gas!");
   PARTHENON_REQUIRE(!(do_radiation) || (do_radiation && do_gas),
                     "Radiation requires the gas package, but there is not gas!");
-  PARTHENON_REQUIRE(!(do_imc && do_moment),
-                    "Cannot simultaneously evolve IMC and moments radiation");
+  if (do_radiation) {
+    PARTHENON_REQUIRE(!(do_moment && do_imc),
+                      "Radiation cannot have both the moment and IMC method active!");
+    PARTHENON_REQUIRE(do_moment || do_imc,
+                      "Radiation must have one of the moment or IMC method active!");
+  }
 
   // Store configuration choices in params
   artemis->AddParam("do_gas", do_gas);
@@ -127,9 +135,11 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   artemis->AddParam("do_conduction", do_conduction);
   artemis->AddParam("do_diffusion", do_conduction || do_viscosity);
   artemis->AddParam("do_radiation", do_radiation);
+  artemis->AddParam("do_coagulation", do_coagulation);
   artemis->AddParam("do_imc", do_imc);
   artemis->AddParam("do_moment", do_moment);
   artemis->AddParam("do_shear", do_shear);
+  artemis->AddParam("do_raytrace", do_raytrace);
 
   // Set coordinate system
   const int ndim = ProblemDimension(pin.get());
@@ -141,7 +151,13 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   geometry::CoordParams cpars(pin.get());
   artemis->AddParam("coord_params", cpars);
 
+  if (do_raytrace) {
+    PARTHENON_REQUIRE(geometry::is_spherical(coords),
+                      "Raytracing requires spherical coordinates.");
+  }
+
   // Call package initializers here
+  packages.Add(geometry::Initialize(pin.get()));
   if (do_nbody) packages.Add(NBody::Initialize(pin.get(), constants));
   if (do_gravity) packages.Add(Gravity::Initialize(pin.get(), constants, packages));
   if (do_gas) packages.Add(Gas::Initialize(pin.get(), units, constants, packages));
@@ -149,6 +165,16 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   if (do_rotating_frame) packages.Add(RotatingFrame::Initialize(pin.get()));
   if (do_cooling) packages.Add(Gas::Cooling::Initialize(pin.get()));
   if (do_drag) packages.Add(Drag::Initialize(pin.get()));
+
+  // Operator split dust coagulation
+  if (do_coagulation) {
+    auto &gas_params = packages.Get("gas")->AllParams();
+    auto &dust_params = packages.Get("dust")->AllParams();
+    packages.Add(Dust::Coagulation::Initialize(pin.get(), gas_params, dust_params, units,
+                                               constants));
+  }
+
+  // Operator split radiation
   if (do_radiation) {
     // Top-level radiation package
     packages.Add(Radiation::Initialize(pin.get(), constants, do_imc));
@@ -162,11 +188,12 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
       PARTHENON_REQUIRE(coords == Coordinates::cartesian,
                         "Jaybenne currently supports only Cartesian coordinates!");
     } else if (do_moment) {
-      packages.Add(Moments::Initialize(pin.get(), constants));
+      packages.Add(Moments::Initialize(pin.get(), units, constants));
     } else {
       PARTHENON_FAIL("Unknown radiation model!");
     }
   }
+  if (do_raytrace) packages.Add(RT::Initialize(pin.get(), units, constants));
 
   // Assign geometry-specific FillDerived functions
   if (do_gas || do_dust) {

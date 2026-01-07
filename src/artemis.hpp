@@ -46,8 +46,10 @@ ARTEMIS_VARIABLE(gas.cons, momentum);
 namespace prim {
 ARTEMIS_VARIABLE(gas.prim, density);
 ARTEMIS_VARIABLE(gas.prim, pressure);
+ARTEMIS_VARIABLE(gas.prim, temperature);
 ARTEMIS_VARIABLE(gas.prim, velocity);
 ARTEMIS_VARIABLE(gas.prim, sie);
+ARTEMIS_VARIABLE(gas.prim, bmod);
 } // namespace prim
 namespace diff {
 ARTEMIS_VARIABLE(gas.diff, momentum);
@@ -56,6 +58,9 @@ ARTEMIS_VARIABLE(gas.diff, energy);
 namespace face {
 ARTEMIS_VARIABLE(gas.face, velocity);
 } // namespace face
+namespace src {
+ARTEMIS_VARIABLE(gas.src, energy);
+}
 } // namespace gas
 
 namespace dust {
@@ -83,7 +88,54 @@ namespace opac {
 ARTEMIS_VARIABLE(rad.opac, absorption);
 ARTEMIS_VARIABLE(rad.opac, scattering);
 } // namespace opac
+namespace star {
+ARTEMIS_VARIABLE(rad.star, absorption);
+SWARM_VARIABLE(Real, rad.star, flux);
+SWARM_VARIABLE(Real, rad.star, v);
+SWARM_VARIABLE(Real, rad.star, x);
+SWARM_VARIABLE(int, rad.star, ijk);
+} // namespace star
 } // namespace rad
+
+namespace geom {
+ARTEMIS_VARIABLE(geom, x1v);
+ARTEMIS_VARIABLE(geom, x2v);
+ARTEMIS_VARIABLE(geom, x3v);
+ARTEMIS_VARIABLE(geom, hx1v);
+ARTEMIS_VARIABLE(geom, hx2v);
+ARTEMIS_VARIABLE(geom, hx3v);
+ARTEMIS_VARIABLE(geom, hx1f1);
+ARTEMIS_VARIABLE(geom, hx2f1);
+ARTEMIS_VARIABLE(geom, hx3f1);
+ARTEMIS_VARIABLE(geom, hx1f2);
+ARTEMIS_VARIABLE(geom, hx2f2);
+ARTEMIS_VARIABLE(geom, hx3f2);
+ARTEMIS_VARIABLE(geom, hx1f3);
+ARTEMIS_VARIABLE(geom, hx2f3);
+ARTEMIS_VARIABLE(geom, hx3f3);
+ARTEMIS_VARIABLE(geom, dx1);
+ARTEMIS_VARIABLE(geom, dx2);
+ARTEMIS_VARIABLE(geom, dx3);
+ARTEMIS_VARIABLE(geom, vol);
+ARTEMIS_VARIABLE(geom, ax1);
+ARTEMIS_VARIABLE(geom, ax2);
+ARTEMIS_VARIABLE(geom, ax3);
+ARTEMIS_VARIABLE(geom, dh1dx1);
+ARTEMIS_VARIABLE(geom, dh2dx1);
+ARTEMIS_VARIABLE(geom, dh3dx1);
+ARTEMIS_VARIABLE(geom, dh1dx2);
+ARTEMIS_VARIABLE(geom, dh2dx2);
+ARTEMIS_VARIABLE(geom, dh3dx2);
+ARTEMIS_VARIABLE(geom, dh1dx3);
+ARTEMIS_VARIABLE(geom, dh2dx3);
+ARTEMIS_VARIABLE(geom, dh3dx3);
+ARTEMIS_VARIABLE(geom, rfw1m);
+ARTEMIS_VARIABLE(geom, rfw1p);
+ARTEMIS_VARIABLE(geom, rfw2m);
+ARTEMIS_VARIABLE(geom, rfw2p);
+ARTEMIS_VARIABLE(geom, rfw3m);
+ARTEMIS_VARIABLE(geom, rfw3p);
+} // namespace geom
 
 #undef ARTEMIS_VARIABLE
 
@@ -110,7 +162,7 @@ enum class Coordinates {
 };
 
 // ...Riemann solvers
-enum class RSolver { hllc, hlle, llf, null };
+enum class RSolver { hllc_general, hlle, llf, hllc_gamma, null };
 // ... Upwinding (left vs right state)
 enum class Upwind { l, r, null };
 // ...Reconstruction algorithms
@@ -140,6 +192,10 @@ enum TensIdx { X11 = 0, X22 = 1, X33 = 2, X23 = 3, X13 = 4, X12 = 5 };
 template <typename T = Real>
 KOKKOS_FORCEINLINE_FUNCTION constexpr auto Big() {
   return std::numeric_limits<T>::max();
+}
+template <typename T = Real>
+KOKKOS_FORCEINLINE_FUNCTION constexpr auto Tiny() {
+  return std::numeric_limits<T>::lowest();
 }
 template <typename T = Real>
 KOKKOS_FORCEINLINE_FUNCTION constexpr auto Fuzz() {

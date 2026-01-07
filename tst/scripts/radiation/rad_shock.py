@@ -118,7 +118,17 @@ def run(**kwargs):
         "problem/tr={:24.16e}".format(_tr),
         "problem/xdisc={:24.16e}".format(_xdisc),
     ]
-    artemis.run(_nranks, "radiation/rad_shock.in", arguments)
+    artemis.run(
+        _nranks, "radiation/rad_shock.in", ["parthenon/time/nlim=20"] + arguments
+    )
+
+    # restart
+    artemis.run(
+        _nranks,
+        "radiation/rad_shock.in",
+        arguments,
+        restart="{}.out2.final.rhdf".format(_file_id),
+    )
 
 
 # Analyze outputs

@@ -152,10 +152,11 @@ For more details see the :ref:`physics` and :ref:`parameters` sections
 
   <gas>
   cfl = 0.3
-  eos = ideal
-  gamma = 1.4
   riemann = hllc
   reconstruct = plm
+
+  <gas/eos/ideal>
+  gamma = 1.4
 
   <gas/viscosity>
   type = alpha

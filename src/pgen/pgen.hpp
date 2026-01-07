@@ -21,10 +21,12 @@
 #include "advection.hpp"
 #include "beam.hpp"
 #include "blast.hpp"
+#include "coag.hpp"
 #include "conduction.hpp"
 #include "constant.hpp"
 #include "disk.hpp"
 #include "gaussian_bump.hpp"
+#include "geometry/geometry.hpp"
 #include "kh.hpp"
 #include "linear_wave.hpp"
 #include "lw.hpp"
@@ -41,6 +43,7 @@ namespace artemis {
 //! \brief
 template <Coordinates T>
 void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
+  PARTHENON_INSTRUMENT
   std::string name = pin->GetString("artemis", "problem");
   if (name == "advection") {
     advection::ProblemGenerator<T>(pmb, pin);
@@ -48,6 +51,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
     beam::ProblemGenerator<T>(pmb, pin);
   } else if (name == "blast") {
     blast::ProblemGenerator<T>(pmb, pin);
+  } else if (name == "coag") {
+    coag::ProblemGenerator<T>(pmb, pin);
   } else if (name == "conduction") {
     cond::ProblemGenerator<T>(pmb, pin);
   } else if (name == "constant") {
@@ -72,6 +77,29 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
     thermalization::ProblemGenerator<T>(pmb, pin);
   } else {
     PARTHENON_FAIL("Invalid problem name!");
+  }
+}
+
+//----------------------------------------------------------------------------------------
+//! \fn  StateDescriptor artemis::InitMeshBlockData
+//! \brief Driver routine to initialize meshblock data when meshblocks are created
+template <Coordinates GEOM>
+void InitMeshBlockData(MeshBlock *pmb, ParameterInput *pin) {
+  PARTHENON_INSTRUMENT
+
+  geometry::InitBlockGeom<GEOM>(pmb, pin);
+
+  std::string name = pin->GetString("artemis", "problem");
+  if (name == "beam") {
+    beam::InitBeamParams(pmb, pin);
+  } else if (name == "conduction") {
+    cond::InitCondParams(pmb, pin);
+  } else if (name == "disk") {
+    disk::InitDiskParams(pmb, pin);
+  } else if (name == "shock") {
+    shock::InitShockParams(pmb, pin);
+  } else if (name == "strat") {
+    strat::InitStratParams(pmb, pin);
   }
 }
 

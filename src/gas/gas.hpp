@@ -39,6 +39,7 @@ TaskStatus ViscousFlux(MeshData<Real> *md);
 
 TaskStatus ZeroDiffusionFlux(MeshData<Real> *md);
 TaskStatus ZeroFluxes(MeshData<Real> *md);
+TaskStatus DepositEnergy(MeshData<Real> *md, const Real dt);
 
 void AddHistory(Coordinates coords, Params &params);
 

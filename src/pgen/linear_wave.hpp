@@ -114,6 +114,7 @@ KOKKOS_INLINE_FUNCTION void HydroEigensystem(const Real d, const Real v1, const 
 //! \brief Sets initial conditions for linear wave tests
 template <Coordinates GEOM>
 inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
+  PARTHENON_INSTRUMENT
   using parthenon::MakePackDescriptor;
   const Mesh *pmesh = pmb->pmy_mesh;
   const int ndim = pmesh->ndim;
@@ -198,6 +199,8 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   lwv.v1_0 = lwv.vflow;
   // TODO(PDM): Replace the below with a call to singularity-eos
   auto gas_pkg = pmb->packages.Get("gas");
+  PARTHENON_REQUIRE(gas_pkg->Param<std::string>("eos_type") == "ideal",
+                    "linear_wave pgen requires an ideal gas");
   lwv.gamma = gas_pkg->Param<Real>("adiabatic_index");
   lwv.gm1 = lwv.gamma - 1.0;
   lwv.p0 = 1.0 / lwv.gamma;
@@ -219,6 +222,9 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       MakePackDescriptor<gas::prim::density, gas::prim::velocity, gas::prim::sie>(
           (pmb->resolved_packages).get());
   auto v = desc.GetPack(md.get());
+  static auto desc_g =
+      MakePackDescriptor<geom::x1v, geom::x2v, geom::x3v>((pmb->resolved_packages).get());
+  auto vg = desc_g.GetPack(md.get());
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
@@ -232,7 +238,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
         // cell-centered coordinates
         geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
-        const auto &xv = coords.GetCellCenter();
+        const auto &xv = coords.GetCellCenter(vg, 0, k, j, i);
         const Real x1v = xv[0];
         const Real x2v = xv[1];
         const Real x3v = xv[2];
@@ -267,6 +273,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 //! periods.
 template <Coordinates GEOM>
 inline void UserWorkAfterLoop(Mesh *pmesh, ParameterInput *pin, parthenon::SimTime &tm) {
+  PARTHENON_INSTRUMENT
   using parthenon::MakePackDescriptor;
   const int nhydro = 5;
   const int nvars = nhydro;
@@ -278,6 +285,9 @@ inline void UserWorkAfterLoop(Mesh *pmesh, ParameterInput *pin, parthenon::SimTi
       MakePackDescriptor<gas::cons::density, gas::cons::momentum,
                          gas::cons::total_energy>((pmb->resolved_packages).get());
   auto v = desc.GetPack(md.get());
+  static auto desc_g = MakePackDescriptor<geom::vol, geom::x1v, geom::x2v, geom::x3v>(
+      (pmb->resolved_packages).get());
+  auto vg = desc_g.GetPack(md.get());
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
@@ -294,11 +304,11 @@ inline void UserWorkAfterLoop(Mesh *pmesh, ParameterInput *pin, parthenon::SimTi
                     ArtemisUtils::array_type<Real, nvars> &lsum) {
         // Capture coordinates this Meshblock
         geometry::Coords<GEOM> coords(cpars, v.GetCoordinates(b), k, j, i);
-        const auto &xv = coords.GetCellCenter();
+        const auto &xv = coords.GetCellCenter(vg, b, k, j, i);
         Real x1v = xv[0];
         Real x2v = xv[1];
         Real x3v = xv[2];
-        Real vol = coords.Volume();
+        Real vol = coords.GetVolume(vg, b, k, j, i);
 
         Real x = lin.cos_a2 * (x1v * lin.cos_a3 + x2v * lin.sin_a3) + x3v * lin.sin_a2;
         Real sn = std::sin(lin.k_par * x);

@@ -20,60 +20,59 @@
 namespace RotatingFrame {
 
 //----------------------------------------------------------------------------------------
-//! \fn  StateDescriptor RotatingFrame::Initialize
-//! \brief Adds intialization function for rotating frame package
-std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
-  auto rframe_pkg = std::make_shared<StateDescriptor>("rotating_frame");
-  Params &params = rframe_pkg->AllParams();
+//! \fn TaskListStatus RotatingFrame::Advect
+//! \brief Executes linear advection term for orbital advection
+TaskListStatus Advect(Mesh *pmesh, const SimTime &tm) {
+  PARTHENON_INSTRUMENT
+  // Craft a series of **equal** subsetps that sum to the unsplit step
+  const Real dtlimit = EstimateTimestep(pmesh, 1.0);
+  const int nsteps = static_cast<int>(std::ceil(tm.dt / dtlimit));
+  const Real scdt = tm.dt / nsteps;
 
-  const Real omega = pin->GetReal("rotating_frame", "omega");
-  const Real qshear = pin->GetOrAddReal("rotating_frame", "qshear", 0.0);
-  PARTHENON_REQUIRE(omega != 0.0, "rotating_frame/omega cannot be zero! To disable, set "
-                                  "physics/rotating_frame = false");
-  if (qshear != 0) {
-    const std::string sys = pin->GetString("artemis", "coordinates");
-    PARTHENON_REQUIRE(
-        sys == "cartesian",
-        "rotating_frame/qshear must be zero for non-Cartesian coordinate systems!");
-    PARTHENON_REQUIRE(parthenon::Globals::nghost >= 2,
-                      "Rotating frame advection step requires at least 2 ghost cells.");
+  // Report number of substeps
+  if (tm.ncycle % tm.ncycle_out == 0) {
+    if (Globals::my_rank == 0) {
+      std::cout << "(Linear Advection) "
+                << "Executing " << nsteps << " substeps"
+                << " with dt=" << scdt << std::endl;
+    }
   }
-  params.Add("omega", omega);
-  params.Add("qshear", qshear);
 
-  // Linear advection timestep controls
-  const Real cfl = pin->GetOrAddReal("rotating_frame", "cfl", 0.9);
-  const Real dt_ratio = pin->GetOrAddReal("rotating_frame", "dt_ratio", 100.0);
-  params.Add("cfl", cfl);
-  params.Add("dt_ratio", dt_ratio);
+  // Execute LinearAdvectionStep over substeps
+  for (int step = 1; step <= nsteps; step++) {
+    auto status = LinearAdvectionStep(pmesh, tm, scdt).Execute();
+    if (status != TaskListStatus::complete) return status;
+  }
 
-  // Reconstruction algorithm for remap
-  ReconstructionMethod recon_method = ReconstructionMethod::null;
-  const std::string recon = pin->GetOrAddString("rotating_frame", "reconstruct", "plm");
-  recon_method = ArtemisUtils::ChooseReconMethod(recon);
-  params.Add("recon", recon_method);
+  return TaskListStatus::complete;
+}
 
-  // Coordinates
-  const int ndim = ProblemDimension(pin);
-  std::string sys = pin->GetOrAddString("artemis", "coordinates", "cartesian");
-  Coordinates coords = geometry::CoordSelect(sys, ndim);
-  params.Add("coords", coords);
+//----------------------------------------------------------------------------------------
+//! \fn  TaskCollection LinearAdvectionStep
+TaskCollection LinearAdvectionStep(Mesh *pmesh, const SimTime &tm, const Real scdt) {
+  PARTHENON_INSTRUMENT
+  TaskCollection tc;
+  if (!(pmesh->ndim >= 2)) return tc;
 
-  // Rotating frame timestep (if do_shear)
-  if (coords == Coordinates::cartesian) {
-    rframe_pkg->EstimateTimestepMesh = EstimateTimestepMesh<Coordinates::cartesian>;
-  } else if (coords == Coordinates::spherical1D) {
-    rframe_pkg->EstimateTimestepMesh = EstimateTimestepMesh<Coordinates::spherical1D>;
-  } else if (coords == Coordinates::spherical2D) {
-    rframe_pkg->EstimateTimestepMesh = EstimateTimestepMesh<Coordinates::spherical2D>;
-  } else if (coords == Coordinates::spherical3D) {
-    rframe_pkg->EstimateTimestepMesh = EstimateTimestepMesh<Coordinates::spherical3D>;
-  } else if (coords == Coordinates::cylindrical) {
-    rframe_pkg->EstimateTimestepMesh = EstimateTimestepMesh<Coordinates::cylindrical>;
-  } else if (coords == Coordinates::axisymmetric) {
-    rframe_pkg->EstimateTimestepMesh = EstimateTimestepMesh<Coordinates::axisymmetric>;
-  } else {
-    PARTHENON_FAIL("Invalid artemis/coordinate system!");
+  // Construct TaskCollection
+  using namespace ::parthenon::Update;
+  TaskID none(0);
+  const auto any = parthenon::BoundaryType::any;
+  const int num_partitions = pmesh->DefaultNumPartitions();
+
+  // Operator split linear advection
+  TaskRegion &tr = tc.AddRegion(num_partitions);
+  for (int i = 0; i < num_partitions; i++) {
+    auto &tl = tr[i];
+    auto &u0 = pmesh->mesh_data.GetOrAdd("u0", i);
+
+    auto start_recv = tl.AddTask(none, parthenon::StartReceiveBoundBufs<any>, u0);
+    auto update = tl.AddTask(start_recv, LagrangeRemap, u0.get(), scdt);
+    auto set_aux = tl.AddTask(
+        update, ArtemisDerived::SetAuxillaryFields<Coordinates::cartesian>, u0.get());
+    auto c2p = tl.AddTask(set_aux, PreCommFillDerived<MeshData<Real>>, u0.get());
+    auto bcs = parthenon::AddBoundaryExchangeTasks(c2p, tl, u0, pmesh->multilevel);
+    auto p2c = tl.AddTask(bcs, FillDerived<MeshData<Real>>, u0.get());
   }
 
   return rframe_pkg;
@@ -82,7 +81,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 //----------------------------------------------------------------------------------------
 //! \fn  TaskStatus RotatingFrame::RotatingFrameForce
 //! \brief
-TaskStatus RotatingFrameForce(MeshData<Real> *md, const Real time, const Real dt) {
+TaskStatus LagrangeRemap(MeshData<Real> *u0, const Real scdt) {
   PARTHENON_INSTRUMENT
   using parthenon::MakePackDescriptor;
   using TE = parthenon::TopologicalElement;
@@ -94,22 +93,31 @@ TaskStatus RotatingFrameForce(MeshData<Real> *md, const Real time, const Real dt
   const auto coords = artemis_pkg->Param<Coordinates>("coords");
 
   auto &rframe_pkg = pm->packages.Get("rotating_frame");
-  const Real om0 = rframe_pkg->Param<Real>("omega");
-  const Real qshear = rframe_pkg->Param<Real>("qshear");
+  const Real qshear = rframe_pkg->template Param<Real>("qshear");
+  const Real om0 = rframe_pkg->template Param<Real>("omega");
+  const auto recon = rframe_pkg->template Param<ReconstructionMethod>("recon");
 
-  // Switch for the different implementations based on coordinate system
-  if (coords == Coordinates::cartesian) {
-    return ShearingBoxImpl(md, om0, qshear, do_gas, do_dust, dt);
-  } else if (coords == Coordinates::axisymmetric) {
-    return RotatingFrameImpl<Coordinates::axisymmetric>(md, om0, do_gas, do_dust, dt);
-  } else if (coords == Coordinates::spherical1D) {
-    return RotatingFrameImpl<Coordinates::spherical1D>(md, om0, do_gas, do_dust, dt);
-  } else if (coords == Coordinates::spherical2D) {
-    return RotatingFrameImpl<Coordinates::spherical2D>(md, om0, do_gas, do_dust, dt);
-  } else if (coords == Coordinates::spherical3D) {
-    return RotatingFrameImpl<Coordinates::spherical3D>(md, om0, do_gas, do_dust, dt);
-  } else if (coords == Coordinates::cylindrical) {
-    return RotatingFrameImpl<Coordinates::cylindrical>(md, om0, do_gas, do_dust, dt);
+  // Extract integrator weights
+  const Real dwdt = -qshear * om0 * scdt;
+
+  // Packing and indexing
+  static auto desc =
+      MakePackDescriptor<gas::cons::density, gas::cons::momentum, gas::cons::total_energy,
+                         gas::cons::internal_energy, dust::cons::density,
+                         dust::cons::momentum>(resolved_pkgs.get());
+  auto v0 = desc.GetPack(u0);
+  static auto desc_g =
+      MakePackDescriptor<geom::vol, geom::x1v, geom::x2v, geom::x3v, geom::dx1, geom::dx2,
+                         geom::dx3>(resolved_pkgs.get());
+  auto vg = desc_g.GetPack(u0);
+
+  // Call upwind advection routines with requested recon
+  if (recon == ReconstructionMethod::pcm) {
+    return LagrangeRemapImpl<ReconstructionMethod::pcm>(u0, v0, vg, dwdt);
+  } else if (recon == ReconstructionMethod::plm) {
+    return LagrangeRemapImpl<ReconstructionMethod::plm>(u0, v0, vg, dwdt);
+  } else if (recon == ReconstructionMethod::ppm) {
+    return LagrangeRemapImpl<ReconstructionMethod::ppm>(u0, v0, vg, dwdt);
   } else {
     PARTHENON_FAIL("Rotating frame is not consistent with this coordinate system");
   }

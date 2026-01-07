@@ -1,6 +1,6 @@
 #!/bin/bash
 # ========================================================================================
-#  (C) (or copyright) 2023-2024. Triad National Security, LLC. All rights reserved.
+#  (C) (or copyright) 2023-2025. Triad National Security, LLC. All rights reserved.
 #
 #  This program was produced under U.S. Government contract 89233218CNA000001 for Los
 #  Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -34,7 +34,11 @@ elif [[ "$HOST" =~ ^ve-rfe[1-7]$ || "$HOST" =~ ^ve-fe[1-7]$ ]]; then
         PARTITION="venado-gg"
     fi
 elif [[ $LMOD_SYSTEM_NAME == frontier ]]; then
-    PARTITION="frontier-gpu"	
+    PARTITION="frontier-gpu"
+elif [[ $HOSTNAME == rzvernal* || $CLUSTER == rzvernal ]]; then
+    PARTITION="rzvernal-gpu"
+elif [[ $HOSTNAME == rzadams* || $CLUSTER == rzadams ]]; then
+    PARTITION="rzadams-gpu"
 else # Catch-all for Darwin
     if [[ $HOSTNAME == darwin-fe* ]]; then
         echo "Currently on darwin frontend node; formatting is supported but not compilation"
@@ -65,8 +69,8 @@ if [[ $PARTITION == "unknown" ]]; then
 elif [[ $PARTITION == "chicoma-gpu" ]]; then
     module unload cray-libsci
     module load PrgEnv-gnu
-    module load cudatoolkit/24.7_12.5
-    module load craype-accel-nvidia80
+    module load cudatoolkit
+    export CRAY_ACCEL_TARGET=nvidia80
     export MPICH_GPU_SUPPORT_ENABLED=1
     export MPICH_GPU_MANAGED_MEMORY_SUPPORT_ENABLED=1
     module load cray-hdf5-parallel
@@ -80,8 +84,8 @@ elif [[ $PARTITION == "chicoma-cpu" ]]; then
     module swap PrgEnv-cray PrgEnv-gnu
     module load cray-hdf5-parallel
     module load cray-python/3.11.5
-    module load gcc-native/12.3
-    module load cray-mpich/8.1.28.1
+    module load gcc/12.3.0
+    module load cray-mpich/8.1.28
     source /usr/projects/jovian/dependencies/python/chicoma-cpu/bin/activate
     module load cmake
     export ARTEMIS_SUITE=chicoma-cpu
@@ -96,6 +100,32 @@ elif [[ $PARTITION == "frontier-gpu" ]]; then
     source $JOVIAN_DIR/dependencies/python/frontier-gpu/bin/activate
     module load cmake
     export ARTEMIS_SUITE=frontier-gpu
+    export HDF5_USE_FILE_LOCKING='FALSE'
+    echo "...setup SUCCEEDED"
+elif [[ $PARTITION == "rzvernal-gpu" ]]; then
+    module load PrgEnv-amd
+    module load craype-accel-amd-gfx90a
+    module load cray-hdf5-parallel
+    export MPICH_GPU_SUPPORT_ENABLED=1
+    export MPICH_GPU_MANAGED_MEMORY_SUPPORT_ENABLED=1
+    module load cray-python/3.11.5
+    # -- may need miniconda script
+    module load cmake
+    export ARTEMIS_SUITE=rzvernal-gpu
+    export HDF5_USE_FILE_LOCKING='FALSE'
+    echo "...setup SUCCEEDED"
+elif [[ $PARTITION == "rzadams-gpu" ]]; then
+    module load PrgEnv-amd
+    module load craype-accel-amd-gfx942
+    module load cray-hdf5-parallel
+    export MPICH_GPU_SUPPORT_ENABLED=1
+    export MPICH_GPU_MANAGED_MEMORY_SUPPORT_ENABLED=1
+    export MPICH_GPU_IPC_ENABLED=1
+    export MPICH_GPU_NO_ASYNC_COPY=1
+    module load cray-python/3.11.5
+    # -- may need miniconda script
+    module load cmake
+    export ARTEMIS_SUITE=rzadams-gpu
     export HDF5_USE_FILE_LOCKING='FALSE'
     echo "...setup SUCCEEDED"
 elif [[ $PARTITION == "darwin-fe" ]]; then
@@ -121,8 +151,8 @@ elif [[ $PARTITION == "darwin-skylake-gold" ]]; then
 elif [[ $PARTITION == "darwin-volta-x86" ]]; then
     module purge
     module load clang/12.0.1
-    module load nvhpc/23.5
-    module load cuda/11.4.2
+    module load nvhpc/25.1
+    module load cuda/12.3.1
     module load gcc/9.4.0 # must load gcc after nvcc so REBOUND uses gcc
     module load hdf5/1.12.2
     module load miniconda3/py311_23.11.0

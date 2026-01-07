@@ -124,6 +124,7 @@ struct StoppingTimeParams {
   Real scale;
   DragModel model;
   ParArray1D<Real> tau;
+  Real tau_max, tau_min;
 
   StoppingTimeParams(std::string block_name, ParameterInput *pin) {
     const std::string choice = pin->GetString(block_name, "type");
@@ -143,6 +144,8 @@ struct StoppingTimeParams {
 
       model = DragModel::stokes;
       scale = pin->GetOrAddReal(block_name, "scale", 1.0);
+      tau_max = pin->GetOrAddReal(block_name, "maximum", 1e99);
+      tau_min = pin->GetOrAddReal(block_name, "minimum", 0.0);
       auto h_tau = tau.GetHostMirror();
       for (int n = 0; n < nd; n++) {
         h_tau(n) = scale;
@@ -161,6 +164,7 @@ template <Diffusion::DiffType DTYP, Coordinates GEOM>
 TaskStatus SelfDragSourceImpl(MeshData<Real> *md, const Real time, const Real dt,
                               const Diffusion::DiffCoeffParams &dp, const EOS &eos_d,
                               const SelfDragParams &gasp, const SelfDragParams &dustp) {
+  PARTHENON_INSTRUMENT
   using TE = parthenon::TopologicalElement;
   auto pm = md->GetParentPointer();
   auto &resolved_pkgs = pm->resolved_packages;
@@ -207,6 +211,9 @@ TaskStatus SelfDragSourceImpl(MeshData<Real> *md, const Real time, const Real dt
                          gas::cons::internal_energy, dust::cons::momentum,
                          dust::cons::density>(resolved_pkgs.get());
   auto vmesh = desc.GetPack(md);
+  static auto desc_g = MakePackDescriptor<geom::x1v, geom::x2v, geom::x3v, geom::hx1v,
+                                          geom::hx2v, geom::hx3v>(resolved_pkgs.get());
+  auto vg = desc_g.GetPack(md);
   const auto ib = md->GetBoundsI(IndexDomain::interior);
   const auto jb = md->GetBoundsJ(IndexDomain::interior);
   const auto kb = md->GetBoundsK(IndexDomain::interior);
@@ -217,8 +224,8 @@ TaskStatus SelfDragSourceImpl(MeshData<Real> *md, const Real time, const Real dt
       KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
         // Extract coordinates
         geometry::Coords<GEOM> coords(cpars, vmesh.GetCoordinates(b), k, j, i);
-        const auto &xv = coords.GetCellCenter();
-        const auto &hx = coords.GetScaleFactors();
+        const auto &xv = coords.GetCellCenter(vg, b, k, j, i);
+        const auto &hx = coords.GetScaleFactors(vg, b, k, j, i);
         const auto &[xcyl, ex1, ex2, ex3] = coords.ConvertToCylWithVec(xv);
 
         // Compute the (gas) ramp for this cell
@@ -262,7 +269,7 @@ TaskStatus SelfDragSourceImpl(MeshData<Real> *md, const Real time, const Real dt
 
             // Get diffusion coefficient
             Diffusion::DiffusionCoeff<DTYP, GEOM, Fluid::gas> dcoeff;
-            const Real mu = dcoeff.Get(dp, coords, dens, sieg, eos_d);
+            const Real mu = dcoeff.Get(dp, coords, xv, dens, sieg, eos_d);
             const Real vR = -1.5 * mu / (xcyl[0] * dens);
             const Real vg[3] = {mom1 / (hx[0] * dens), mom2 / (hx[1] * dens),
                                 mom3 / (hx[2] * dens)};
@@ -338,6 +345,7 @@ TaskStatus SimpleDragSourceImpl(MeshData<Real> *md, const Real time, const Real 
                                 const Diffusion::DiffCoeffParams &dp, const EOS &eos_d,
                                 const SelfDragParams &gasp, const SelfDragParams &dustp,
                                 const StoppingTimeParams &tp) {
+  PARTHENON_INSTRUMENT
   using TE = parthenon::TopologicalElement;
   auto pm = md->GetParentPointer();
   auto &resolved_pkgs = pm->resolved_packages;
@@ -375,6 +383,9 @@ TaskStatus SimpleDragSourceImpl(MeshData<Real> *md, const Real time, const Real 
                          gas::cons::internal_energy, dust::cons::momentum,
                          dust::cons::density>(resolved_pkgs.get());
   auto vmesh = desc.GetPack(md);
+  static auto desc_g = MakePackDescriptor<geom::x1v, geom::x2v, geom::x3v, geom::hx1v,
+                                          geom::hx2v, geom::hx3v>(resolved_pkgs.get());
+  auto vg = desc_g.GetPack(md);
   const auto ib = md->GetBoundsI(IndexDomain::interior);
   const auto jb = md->GetBoundsJ(IndexDomain::interior);
   const auto kb = md->GetBoundsK(IndexDomain::interior);
@@ -385,8 +396,8 @@ TaskStatus SimpleDragSourceImpl(MeshData<Real> *md, const Real time, const Real 
       KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
         // Extract coordinates
         geometry::Coords<GEOM> coords(cpars, vmesh.GetCoordinates(b), k, j, i);
-        const auto &xv = coords.GetCellCenter();
-        const auto &hx = coords.GetScaleFactors();
+        const auto &xv = coords.GetCellCenter(vg, b, k, j, i);
+        const auto &hx = coords.GetScaleFactors(vg, b, k, j, i);
         const auto &[xcyl, ex1, ex2, ex3] = coords.ConvertToCylWithVec(xv);
 
         // Compute the ramp for this cell
@@ -445,7 +456,7 @@ TaskStatus SimpleDragSourceImpl(MeshData<Real> *md, const Real time, const Real 
 
         // Target gas velocity
         Diffusion::DiffusionCoeff<DTYP, GEOM, Fluid::gas> dcoeff;
-        const Real mu = dcoeff.Get(dp, coords, dg, sieg, eos_d);
+        const Real mu = dcoeff.Get(dp, coords, xv, dg, sieg, eos_d);
         const Real vR = -1.5 * mu / (xcyl[0] * dg);
         const std::array<Real, 3> vt{ex1[0] * vR, ex2[0] * vR, ex3[0] * vR};
 
@@ -482,7 +493,8 @@ TaskStatus SimpleDragSourceImpl(MeshData<Real> *md, const Real time, const Real 
           Real tc = tp.tau(id);
           [[maybe_unused]] auto &sizes_ = sizes;
           if constexpr (DRAG == DragModel::stokes) {
-            tc = tp.scale * grain_density_ / dg * sizes_(id) / vth;
+            tc = std::max(tp.tau_min, std::min(tp.tau_max, tp.scale * grain_density_ /
+                                                               dg * sizes_(id) / vth));
           }
           const Real alpha = dt * ((tc <= 0.0) ? Big<Real>() : 1.0 / tc);
           for (int d = 0; d < 3; d++) {
@@ -517,7 +529,8 @@ TaskStatus SimpleDragSourceImpl(MeshData<Real> *md, const Real time, const Real 
           Real tc = tp.tau(id);
           [[maybe_unused]] auto &sizes_ = sizes;
           if constexpr (DRAG == DragModel::stokes) {
-            tc = tp.scale * grain_density_ / dg * sizes_(id) / vth;
+            tc = std::max(tp.tau_min, std::min(tp.tau_max, tp.scale * grain_density_ /
+                                                               dg * sizes_(id) / vth));
           }
           const Real alpha = dt * ((tc <= 0.0) ? Big<Real>() : 1.0 / tc);
           // Update dust momenta

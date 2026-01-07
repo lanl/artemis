@@ -133,6 +133,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
 //! \brief Wrapper function for external gravity options
 template <Coordinates GEOM>
 TaskStatus ExternalGravity(MeshData<Real> *md, const Real time, const Real dt) {
+  PARTHENON_INSTRUMENT
   auto pm = md->GetParentPointer();
 
   auto &pkg = pm->packages.Get("gravity");

@@ -62,6 +62,7 @@ static AdvectionVariables av;
 //! \brief Sets initial conditions for advection tests
 template <Coordinates GEOM>
 inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
+  PARTHENON_INSTRUMENT
   using parthenon::MakePackDescriptor;
   const Mesh *pmesh = pmb->pmy_mesh;
   const int ndim = pmesh->ndim;
@@ -151,6 +152,8 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   av.v1_0 = av.vflow;
   if (do_gas) {
     auto gas_pkg = pmb->packages.Get("gas");
+    PARTHENON_REQUIRE(gas_pkg->Param<std::string>("eos_type") == "ideal",
+                      "advection pgen requires an ideal gas");
     PARTHENON_REQUIRE((gas_pkg->Param<int>("nspecies") == 1),
                       "Advection pgen requires a single gas species.")
     av.gamma = gas_pkg->Param<Real>("adiabatic_index");
@@ -177,6 +180,9 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
                          dust::prim::density, dust::prim::velocity>(
           (pmb->resolved_packages).get());
   auto v = desc.GetPack(md.get());
+  static auto desc_g =
+      MakePackDescriptor<geom::x1v, geom::x2v, geom::x3v>((pmb->resolved_packages).get());
+  auto vg = desc_g.GetPack(md.get());
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
@@ -190,8 +196,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         // cell-centered coordinates
 
         geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
-        const auto &xv = coords.GetCellCenter();
-
+        const auto &xv = coords.GetCellCenter(vg, 0, k, j, i);
         const Real x1v = xv[0];
         const Real x2v = xv[1];
         const Real x3v = xv[2];
@@ -238,6 +243,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 //! periods.
 template <Coordinates GEOM>
 inline void UserWorkAfterLoop(Mesh *pmesh, ParameterInput *pin, parthenon::SimTime &tm) {
+  PARTHENON_INSTRUMENT
   using parthenon::MakePackDescriptor;
   const int nhyd_vars = 5;
   const int nspec_vars = 4;
@@ -252,6 +258,9 @@ inline void UserWorkAfterLoop(Mesh *pmesh, ParameterInput *pin, parthenon::SimTi
                          dust::cons::density, dust::cons::momentum>(
           (pmb->resolved_packages).get());
   auto v = desc.GetPack(md.get());
+  static auto desc_g = MakePackDescriptor<geom::vol, geom::x1v, geom::x2v, geom::x3v>(
+      (pmb->resolved_packages).get());
+  auto vg = desc_g.GetPack(md.get());
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
@@ -271,11 +280,11 @@ inline void UserWorkAfterLoop(Mesh *pmesh, ParameterInput *pin, parthenon::SimTi
                     ArtemisUtils::array_type<Real, nvars> &lsum) {
         // Capture coordinates this Meshblock
         geometry::Coords<GEOM> coords(cpars, v.GetCoordinates(b), k, j, i);
-        const auto &xv = coords.GetCellCenter();
+        const auto &xv = coords.GetCellCenter(vg, b, k, j, i);
         Real x1v = xv[0];
         Real x2v = xv[1];
         Real x3v = xv[2];
-        Real vol = coords.Volume();
+        Real vol = coords.GetVolume(vg, b, k, j, i);
 
         Real x = adv.cos_a2 * (x1v * adv.cos_a3 + x2v * adv.sin_a3) + x3v * adv.sin_a2;
         Real sn = std::sin(adv.k_par * x);

@@ -128,6 +128,7 @@ if __name__ == "__main__":
                 "projects",
                 "jovian",
                 "ci",
+                "artemis",
                 f"pr_{args.pr_number}",
                 current_date_time,
             )

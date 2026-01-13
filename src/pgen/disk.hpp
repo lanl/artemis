@@ -203,7 +203,11 @@ KOKKOS_INLINE_FUNCTION State ComputeDiskProfile(
   const Real vp2 = vk2 + (dpdr / res.gdens) * xcyl[0];
   const Real vp = (vp2 < 0.0) ? 0.0 : std::sqrt(vp2);
   const Real nu = ViscosityProfile(pgen, eos_d, rt, xcyl[2]);
-  const Real vr = pgen.quiet_start ? 0.0 : -1.5 * nu / xcyl[0];
+  const Real vr_visc = pgen.alpha > 0.0
+                           ? (-3.0 * pgen.alpha / std::sqrt(xcyl[0]) / res.gdens *
+                              (SQR(xcyl[0]) * dpdr + pres * 2.0 * xcyl[0]))
+                           : (-1.5 * nu / xcyl[0]);
+  const Real vr = pgen.quiet_start ? 0.0 : vr_visc;
 
   // Construct the total cylindrical velocity
   const Real vcyl[3] = {vr, vp - pgen.omf * xcyl[0], 0.0};
@@ -938,7 +942,7 @@ TaskStatus UserSourceTerm(MeshData<Real> *md, const Real time, const Real dt) {
           geometry::Coords<GEOM> coords(cpars, vmesh.GetCoordinates(b), k, j, i);
           const auto &hx = coords.GetScaleFactors();
           const auto &xv = coords.GetCellCenter();
-          const auto &[xcyl, ex1, ex2, ex3] = coords.ConvertToCylWithVec(xv);
+          const auto &xcyl = coords.ConvertToCyl(xv);
           const Real H = xcyl[0] * pgen.h0 * std::pow(xcyl[0] / pgen.r0, pgen.flare);
           if (std::abs(xcyl[2]) > pgen.nH_reset * H) {
             if (do_gas) {

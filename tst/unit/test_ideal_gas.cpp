@@ -97,7 +97,7 @@ TEST_CASE("IdealGas EOS with different gamma values", "[eos][ideal_gas]") {
 TEST_CASE("IdealGas EOS with UnitSystem wrapper", "[eos][ideal_gas][units]") {
   // Set up unit conversions (example values similar to gas.cpp)
   constexpr Real gamma = 5.0 / 3.0;
-  constexpr Real cv_physical = 1.0e7; // Physical units (e.g., cm^2/s^2/K)
+  constexpr Real cv_physical = 1.0e7; // Physical units (e.g., erg/g/K)
   constexpr Real time_code_to_physical = 1.0;
   constexpr Real mass_code_to_physical = 1.0;
   constexpr Real length_code_to_physical = 1.0;

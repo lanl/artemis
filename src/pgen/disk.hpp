@@ -1,3 +1,4 @@
+
 //========================================================================================
 // (C) (or copyright) 2023-2025. Triad National Security, LLC. All rights reserved.
 //
@@ -65,6 +66,7 @@ struct DiskParams {
   Real mdot;
   Real temp_soft2;
   Real kbmu, ar;
+  Real nH_reset;
   bool do_gas, do_dust, do_moment, do_imc;
   bool nbody_temp;
   bool quiet_start;
@@ -257,6 +259,7 @@ inline void InitDiskParams(MeshBlock *pmb, ParameterInput *pin) {
     disk_params.l0 = pin->GetOrAddReal("problem", "l0", 0.0);
     disk_params.dust_to_gas = pin->GetOrAddReal("problem", "dust_to_gas", 0.01);
     disk_params.temp_soft2 = pin->GetOrAddReal("problem", "temp_soft", 0.0);
+    disk_params.nH_reset = pin->GetOrAddReal("problem", "nH_reset", 0.0);
     const auto mu = gas_pkg->Param<Real>("mu");
     auto &constants = artemis_pkg->Param<ArtemisUtils::Constants>("constants");
     const auto &eos = gas_pkg->Param<ArtemisUtils::EOS>("eos_h");
@@ -891,17 +894,27 @@ void DiskBoundaryExtrap(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) 
 }
 
 //----------------------------------------------------------------------------------------
-//! \fn TaskStatus ProblemGeneratorSourceTerm()
+//! \fn TaskStatus UserSourceTerm()
 //! \brief Custom source term for disk pgen
 template <Coordinates GEOM>
 TaskStatus UserSourceTerm(MeshData<Real> *md, const Real time, const Real dt) {
   if (GEOM == Coordinates::spherical3D || GEOM == Coordinates::spherical2D) {
-    // reset the gas and dust state above nH_init to initial values
+    // reset the gas and dust state above nH_reset: gas to initial values, dust to zeros
     using parthenon::MakePackDescriptor;
     auto pm = md->GetParentPointer();
-    auto &resolved_pkgs = pm->resolved_packages;
 
     auto &artemis_pkg = pm->packages.Get("artemis");
+
+    // Disk parameters
+    const auto &pgen = artemis_pkg->template Param<DiskParams>("disk_params");
+    if (pgen.nH_reset <= 0.0) return TaskStatus::complete;
+
+    // Extract gas package and params
+    auto &gas_pkg = pm->packages.Get("gas");
+    const auto &eos_d = gas_pkg->template Param<EOS>("eos_d");
+
+    auto &resolved_pkgs = pm->resolved_packages;
+
     const bool do_gas = artemis_pkg->template Param<bool>("do_gas");
     const bool do_dust = artemis_pkg->template Param<bool>("do_dust");
 
@@ -917,29 +930,35 @@ TaskStatus UserSourceTerm(MeshData<Real> *md, const Real time, const Real dt) {
     const auto jb = md->GetBoundsJ(IndexDomain::interior);
     const auto kb = md->GetBoundsK(IndexDomain::interior);
 
-    // Disk parameters
-    const auto &pgen = artemis_pkg->template Param<DiskParams>("disk_params");
-
     parthenon::par_for(
-        DEFAULT_LOOP_PATTERN, "UniformGravity", parthenon::DevExecSpace(), 0,
+        DEFAULT_LOOP_PATTERN, "UserSourceTerm", parthenon::DevExecSpace(), 0,
         md->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
         KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
           // Extract coordinates
           geometry::Coords<GEOM> coords(cpars, vmesh.GetCoordinates(b), k, j, i);
           const auto &hx = coords.GetScaleFactors();
           const auto &xv = coords.GetCellCenter();
-          const auto &xcyl = coords.ConvertToCyl(xv);
+          const auto &[xcyl, ex1, ex2, ex3] = coords.ConvertToCylWithVec(xv);
           const Real H = xcyl[0] * pgen.h0 * std::pow(xcyl[0] / pgen.r0, pgen.flare);
-          if (std::abs(xcyl[2]) > 5.0 * H) {
+          if (std::abs(xcyl[2]) > pgen.nH_reset * H) {
             if (do_gas) {
+              const Real nu = ViscosityProfile(pgen, eos_d, xcyl[0], xcyl[2]);
+              const Real vr = pgen.quiet_start ? 0.0 : -1.5 * nu / xcyl[0];
               for (int n = 0; n < vmesh.GetSize(b, gas::prim::density()); ++n) {
-                vmesh(b, gas::cons::momentum(VI(n, 0)), k, j, i) = 0.0;
-                vmesh(b, gas::cons::momentum(VI(n, 1)), k, j, i) = 0.0;
-                vmesh(b, gas::cons::total_energy(n), k, j, i) -=
+                const Real etot_res =
+                    vmesh(b, gas::cons::total_energy(n), k, j, i) -
                     0.5 *
-                    (SQR(vmesh(b, gas::cons::momentum(VI(n, 0)), k, j, i)) +
-                     SQR(vmesh(b, gas::cons::momentum(VI(n, 1)), k, j, i))) /
-                    vmesh(b, gas::cons::density(n), k, j, i);
+                        (SQR(vmesh(b, gas::cons::momentum(VI(n, 0)), k, j, i)) +
+                         SQR(vmesh(b, gas::cons::momentum(VI(n, 1)), k, j, i))) /
+                        vmesh(b, gas::cons::density(n), k, j, i);
+                vmesh(b, gas::cons::momentum(VI(n, 0)), k, j, i) = vr * xcyl[0] / xv[0];
+                vmesh(b, gas::cons::momentum(VI(n, 1)), k, j, i) = vr * xcyl[2] / xv[0];
+                vmesh(b, gas::cons::total_energy(n), k, j, i) =
+                    etot_res +
+                    0.5 *
+                        (SQR(vmesh(b, gas::cons::momentum(VI(n, 0)), k, j, i)) +
+                         SQR(vmesh(b, gas::cons::momentum(VI(n, 1)), k, j, i))) /
+                        vmesh(b, gas::cons::density(n), k, j, i);
               }
             }
 

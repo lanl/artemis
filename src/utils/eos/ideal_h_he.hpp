@@ -45,20 +45,21 @@ class IdealHHe : public singularity::eos_base::EosBase<IdealHHe> {
   IdealHHe() = default;
   IdealHHe(Real X, Real Y, Real ltmin, Real ltmax, int nt, Real ldmin, Real ldmax, int nd,
            const std::string &save_to_file, bool use_table = true, Real dlnT = 1e-6,
+           int max_iters = 100,
            const singularity::MeanAtomicProperties &AZbar =
                singularity::MeanAtomicProperties())
       : _X(X), _Y(Y), lTmin(ltmin), lTmax(ltmax), nt(nt), lDmin(ldmin), lDmax(ldmax),
-        nd(nd), use_table(use_table), _dlnT(dlnT), _AZbar(AZbar) {
+        nd(nd), use_table(use_table), _dlnT(dlnT), ITER_MAX(max_iters), _AZbar(AZbar) {
     _fp = 0.25;
     _fo = 1. - _fp;
     CheckParams();
     FillTable(save_to_file);
   }
-  IdealHHe(Real X, Real Y, Real dlnT = 1e-6,
+  IdealHHe(Real X, Real Y, Real dlnT = 1e-6, int max_iters = 100,
            const singularity::MeanAtomicProperties &AZbar =
                singularity::MeanAtomicProperties())
       : _X(X), _Y(Y), lTmin(0.0), lTmax(0.0), nt(0), lDmin(0.0), lDmax(0.0), nd(0),
-        use_table(false), _dlnT(dlnT), _AZbar(AZbar) {
+        use_table(false), _dlnT(dlnT), ITER_MAX(max_iters), _AZbar(AZbar) {
     _fp = 0.25;
     _fo = 1. - _fp;
     CheckParams();
@@ -287,6 +288,7 @@ class IdealHHe : public singularity::eos_base::EosBase<IdealHHe> {
   Real _xe = 13.598433 / _eV;
   Real _z1e = 24.587387 / _eV;
   Real _z2e = 54.417760 / _eV;
+  int ITER_MAX = 100;
 
   singularity::MeanAtomicProperties _AZbar;
   static constexpr const unsigned long _preferred_input =
@@ -302,7 +304,6 @@ class IdealHHe : public singularity::eos_base::EosBase<IdealHHe> {
   PORTABLE_INLINE_FUNCTION
   Real root_solve(const Real x, const Real a, const Real b, const Real c) const {
     // Newton-Raphson on the polynomial (b + c*y)*y - a*(1-y)
-    constexpr int ITER_MAX = 100;
     constexpr Real tol = 1e-15;
     // return x;
     Real f = (a + b + c * x) * x - a;
@@ -401,6 +402,7 @@ class IdealHHe : public singularity::eos_base::EosBase<IdealHHe> {
 
   PORTABLE_INLINE_FUNCTION H2Partition
   H2PartitionFunction_(const Real T, std::array<Real, 3> jstart) const {
+    const int max_iters = ITER_MAX * 200;
     const Real x = 85.5 / T;
 
     H2Partition part{0.0};
@@ -414,7 +416,7 @@ class IdealHHe : public singularity::eos_base::EosBase<IdealHHe> {
       const Real jj = j * (j + 1.);
       dr = (2. * j + 1.) * singularity::robust::safe_arg_exp(-jj * x);
       j += 2.0;
-    } while (dr > dr_p || dr > 3e-16 * part.Z);
+    } while ((dr > dr_p || dr > 3e-16 * part.Z) && (j < max_iters));
 
     j = jstart[1];
     dr = 0.0;
@@ -425,12 +427,12 @@ class IdealHHe : public singularity::eos_base::EosBase<IdealHHe> {
       const Real jj = j * (j + 1.);
       dr = jj * (2. * j + 1.) * singularity::robust::safe_arg_exp(-jj * x);
       j += 2.0;
-    } while (dr > dr_p || dr > 3e-16 * part.dZ);
+    } while ((dr > dr_p || dr > 3e-16 * part.dZ) && (j < max_iters));
 
     j = jstart[2];
     dr = 0.0;
     dr_p = 0.0;
-    while (true) {
+    while (j < max_iters) {
       part.d2Z += dr;
       dr_p = dr;
       const Real jj = j * (j + 1.);

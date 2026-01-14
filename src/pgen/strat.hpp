@@ -116,18 +116,17 @@ Real InitialDensity(const EOS &eos, const StratParams &pars, const Real z) {
   if ((pars.three_d) && (std::abs(z) > 1e-16)) {
     const Real dz = std::abs(z) / static_cast<Real>(pars.npoints);
     const Real dlnr = 1e-6;
-    const Real ldmin = std::log(pars.dfloor / pars.rho0);
     Real pres = eos.PressureFromDensityTemperature(dens, pars.temp0);
     Real zj = 0.0;
     Real ld = 0.0;
-    dens = std::exp(ld);
+    dens = pars.rho0 * std::exp(ld);
     for (int j = 0; j < pars.npoints; j++) {
       // ln(d/d0) = \int_0^z - Omega^2 z dz
       Real pp = eos.PressureFromDensityTemperature(dens * (1. + dlnr), pars.temp0);
       Real pm = eos.PressureFromDensityTemperature(dens * (1. - dlnr), pars.temp0);
       Real dPdrho = (pp - pm) / (dlnr * dens);
       ld -= 0.5 * pars.Om0 * (2 * j + 1) * SQR(dz) / (dPdrho + Fuzz<Real>());
-      dens = std::exp(ld);
+      dens = pars.rho0 * std::exp(ld);
       if (dens <= pars.dfloor) return pars.dfloor;
     }
   }

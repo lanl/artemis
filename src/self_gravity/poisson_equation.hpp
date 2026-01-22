@@ -1,5 +1,5 @@
 //========================================================================================
-// (C) (or copyright) 2023-2025. Triad National Security, LLC. All rights reserved.
+// (C) (or copyright) 2023-2026. Triad National Security, LLC. All rights reserved.
 //
 // This program was produced under U.S. Government contract 89233218CNA000001 for Los
 // Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -10,8 +10,8 @@
 // license in this material to reproduce, prepare derivative works, distribute copies to
 // the public, perform publicly and display publicly, and to permit others to do so.
 //========================================================================================
-#ifndef GRAVITY_POISSON_EQUATION_HPP_
-#define GRAVITY_POISSON_EQUATION_HPP_
+#ifndef SELF_GRAVITY_POISSON_EQUATION_HPP_
+#define SELF_GRAVITY_POISSON_EQUATION_HPP_
 
 // Parthenon includes
 #include <bvals/boundary_conditions_generic.hpp>
@@ -23,7 +23,10 @@
 #include <solvers/solver_utils.hpp>
 #include <solvers/tridiag_solver.hpp>
 
-namespace Gravity {
+using namespace parthenon::package::prelude;
+
+namespace SelfGravity {
+
 constexpr parthenon::TopologicalElement te = parthenon::TopologicalElement::CC;
 
 // This class implement methods for calculating A.x = y and returning the diagonal of A,
@@ -217,6 +220,6 @@ class PoissonEquation {
   }
 };
 
-} // namespace Gravity
+} // namespace SelfGravity
 
-#endif // GRAVITY_POISSON_EQUATION_HPP_
+#endif // SELF_GRAVITY_POISSON_EQUATION_HPP_

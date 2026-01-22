@@ -1,5 +1,5 @@
 //========================================================================================
-// (C) (or copyright) 2025. Triad National Security, LLC. All rights reserved.
+// (C) (or copyright) 2025-2026. Triad National Security, LLC. All rights reserved.
 //
 // This program was produced under U.S. Government contract 89233218CNA000001 for Los
 // Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -11,6 +11,7 @@
 // the public, perform publicly and display publicly, and to permit others to do so.
 //========================================================================================
 
+// C++ includes
 #include <algorithm>
 #include <cstdio>
 #include <memory>
@@ -28,21 +29,21 @@
 #include <solvers/tridiag_solver.hpp>
 
 // Artemis includes
-#include "gravity/gravity.hpp"
-#include "gravity/poisson_equation.hpp"
+#include "self_gravity/poisson_equation.hpp"
+#include "self_gravity/self_gravity.hpp"
 
 using namespace parthenon::driver::prelude;
 
-namespace Gravity {
+namespace SelfGravity {
 
 //----------------------------------------------------------------------------------------
-//! \fn TaskListStatus Gravity::PoissonDriver
+//! \fn TaskListStatus SelfGravity::PoissonDriver
 //! \brief
 void SolvePoisson(TaskCollection &tc, Mesh *pmesh) {
   using namespace parthenon;
   TaskID none(0);
 
-  auto pkg = pmesh->packages.Get("gravity");
+  auto pkg = pmesh->packages.Get("self_gravity");
   auto psolver =
       pkg->Param<std::shared_ptr<parthenon::solvers::SolverBase>>("solver_pointer");
 
@@ -75,4 +76,4 @@ void SolvePoisson(TaskCollection &tc, Mesh *pmesh) {
   }
 }
 
-} // namespace Gravity
+} // namespace SelfGravity

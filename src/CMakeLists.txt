@@ -43,9 +43,6 @@ set (SRC_LIST
   gravity/gravity.hpp
   gravity/nbody_gravity.hpp
   gravity/point_mass.cpp
-  gravity/poisson_driver.cpp
-  gravity/poisson_equation.hpp
-  gravity/self_gravity.cpp
   gravity/uniform.cpp
 
   nbody/nbody.cpp
@@ -88,6 +85,12 @@ set (SRC_LIST
   rotating_frame/rotating_frame.cpp
   rotating_frame/rotating_frame_impl.hpp
   rotating_frame/rotating_frame.hpp
+
+  self_gravity/self_gravity.cpp
+  self_gravity/self_gravity.hpp
+  self_gravity/poisson_driver.cpp
+  self_gravity/poisson_equation.hpp
+  self_gravity/self_gravity.cpp
 
   utils/artemis_utils.cpp
   utils/artemis_utils.hpp

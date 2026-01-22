@@ -22,7 +22,7 @@
 
 namespace Gravity {
 
-enum class GravityType { uniform, point, binary, nbody, self, null };
+enum class GravityType { uniform, point, binary, nbody, null };
 
 //----------------------------------------------------------------------------------------
 //! \struct Orbit
@@ -112,14 +112,6 @@ TaskStatus NBodyGravityFixed(MeshData<Real> *md, const Real time, const Real dt)
 
 template <Coordinates GEOM>
 TaskStatus ExternalGravity(MeshData<Real> *md, const Real time, const Real dt);
-
-template <Coordinates GEOM>
-void FillPoissonRHS(MeshData<Real> *md);
-
-template <Coordinates GEOM>
-TaskStatus SelfGravity(MeshData<Real> *md, const Real time, const Real dt);
-
-void SolvePoisson(TaskCollection &tc, Mesh *pmesh);
 
 KOKKOS_INLINE_FUNCTION Real quad_ramp(const Real x) { return SQR(x); }
 

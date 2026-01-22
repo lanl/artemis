@@ -1,0 +1,14 @@
+---
+self_gravity:
+  _description: "Self Gravity"
+  units_override:
+    _type: bool
+    _description: "Override artemis unit system and manually set 4piG."
+    _default: "false"
+  four_pi_G:
+    _type: Real
+    _description: "Sets 4piG constant.  Only applicable when units_override=true"
+    _default: "1.0"
+  use_swindle:
+    _type: bool
+    _description: "Invoke Jeans swindle.  Required when fully periodic."

@@ -30,6 +30,7 @@
 #include "radiation/imc/imc.hpp"
 #include "radiation/moments/moments.hpp"
 #include "rotating_frame/rotating_frame.hpp"
+#include "self_gravity/self_gravity.hpp"
 #include "utils/integrators/artemis_integrator.hpp"
 
 using namespace parthenon::driver::prelude;
@@ -59,6 +60,7 @@ ArtemisDriver<GEOM>::ArtemisDriver(ParameterInput *pin, ApplicationInput *app_in
   do_gas = artemis_pkg->template Param<bool>("do_gas");
   do_dust = artemis_pkg->template Param<bool>("do_dust");
   do_gravity = artemis_pkg->template Param<bool>("do_gravity");
+  do_self_gravity = artemis_pkg->template Param<bool>("do_self_gravity");
   do_rotating_frame = artemis_pkg->template Param<bool>("do_rotating_frame");
   do_shear = artemis_pkg->template Param<bool>("do_shear");
   do_cooling = artemis_pkg->template Param<bool>("do_cooling");
@@ -115,10 +117,8 @@ TaskListStatus ArtemisDriver<GEOM>::Step() {
   // Prepare registers
   PreStepTasks();
 
-  TaskListStatus status;
-
   // Execute explicit, unsplit physics
-  status = StepTasks().Execute();
+  auto status = StepTasks().Execute();
   if (status != TaskListStatus::complete) return status;
 
   // Operator split, background linear advection (for shearing box)
@@ -209,7 +209,7 @@ TaskCollection ArtemisDriver<GEOM>::StepTasks() {
     const Real bdt = integrator->beta[stage - 1] * integrator->dt;
 
     // Compute gravitational potential
-    if (do_gravity) Gravity::SolvePoisson(tc, pmesh);
+    if (do_self_gravity) SelfGravity::SolvePoisson(tc, pmesh);
 
     TaskRegion &tr = tc.AddRegion(num_partitions);
     for (int i = 0; i < num_partitions; i++) {
@@ -269,11 +269,19 @@ TaskCollection ArtemisDriver<GEOM>::StepTasks() {
                                  Gravity::ExternalGravity<GEOM>, u0.get(), time, bdt);
       }
 
+      // Apply self-gravity source term
+      TaskID self_gravity_src = gas_coord_src | dust_coord_src | gas_diff_src;
+      if (do_self_gravity) {
+        self_gravity_src =
+            tl.AddTask(gas_coord_src | dust_coord_src | gas_diff_src,
+                       SelfGravity::SelfGravity<GEOM>, u0.get(), time, bdt);
+      }
+
       // Apply rotating frame source term
-      TaskID rframe_src = gravity_src;
+      TaskID rframe_src = gravity_src | self_gravity_src;
       if (do_rotating_frame) {
-        rframe_src = tl.AddTask(gravity_src, RotatingFrame::RotatingFrameForce, u0.get(),
-                                time, bdt);
+        rframe_src = tl.AddTask(gravity_src | self_gravity_src,
+                                RotatingFrame::RotatingFrameForce, u0.get(), time, bdt);
       }
 
       // Apply drag source term

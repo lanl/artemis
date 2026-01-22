@@ -75,7 +75,7 @@ derefine_tol = 0.1
 
 <physics>
 gas = true
-gravity = true
+self_gravity = true
 
 <gas>
 cfl = 0.9
@@ -83,7 +83,7 @@ reconstruct = plm
 riemann = hllc
 gamma = 2.0
 
-<gravity/self>
+<self_gravity>
 precondition = true
 print_per_step = true
 max_iterations = 100

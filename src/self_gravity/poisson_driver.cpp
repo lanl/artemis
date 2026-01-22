@@ -10,6 +10,8 @@
 // license in this material to reproduce, prepare derivative works, distribute copies to
 // the public, perform publicly and display publicly, and to permit others to do so.
 //========================================================================================
+//! \file poisson_driver.cpp
+//! \brief The code here is largely borrowed from the poisson_gmg example in Parthenon.
 
 // C++ includes
 #include <algorithm>

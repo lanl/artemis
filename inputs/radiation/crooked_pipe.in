@@ -13,13 +13,13 @@ variables = gas.prim.density,   &
             gas.prim.sie,      &
             field.jaybenne.energy_tally
 file_type = hdf5  # HDF5 data dump
-dt        = 5.0e-8 # time increment between outputs, 5 shakes (50 nanoseconds)
+dt        = 5.0e-8 # time increment between outputs
 #ghost_zones = true # output ghost zones
 use_final_label  = false
 
 <parthenon/time>
-nlim       = 3000   # cycle limit
-tlim       = 2.5e-6 # time limit, 250 shakes
+nlim       = 1500   # cycle limit
+tlim       = 2.5e-6 # time limit
 integrator = rk2    # time integration algorithm
 ncycle_out = 1      # interval for stdout summary info
 dt_init = 1.0e-11
@@ -65,6 +65,7 @@ reconstruct = plm
 riemann = hllc-general
 dfloor = 1.0e-10
 siefloor = 1.0e-10
+update_fluxes= false # radiation only problem
 
 # from thermalization
 <gas/eos/ideal>
@@ -81,8 +82,7 @@ h  = 0.1
 t_init = 1.1e4
 t_source = 5.8e6
 rho_thin = 0.01
-#rho_thick = 10.0 // trying 10x less to get wave propagation
-rho_thick = 1.0
+rho_thick = 10.0
 
 <parthenon/swarm>
 ix1_bc = jaybenne_reflecting # inner-X1 boundary flag for swarms
@@ -96,6 +96,8 @@ ox3_bc = jaybenne_reflecting # outer-X3 boundary flag for swarms
 
 <radiation/imc>
 do_emission = true
-num_particles = 4000000 # particle resolution
-use_ddmc = true          # use DDMC?
+num_particles = 8000000 # particle resolution
+use_ddmc = false          # use DDMC?
+cutoff = 1.0e-6           # default is 1.0e-6
+emit_temp_threshold = 1.2e4 # from ryan, 1.1e4 is background
 #min_swarm_occupancy = 0.5

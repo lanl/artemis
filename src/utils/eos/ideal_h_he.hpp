@@ -45,11 +45,12 @@ class IdealHHe : public singularity::eos_base::EosBase<IdealHHe> {
   IdealHHe() = default;
   IdealHHe(Real X, Real Y, Real ltmin, Real ltmax, int nt, Real ldmin, Real ldmax, int nd,
            const std::string &save_to_file, bool use_table = true, Real dlnT = 1e-6,
-           int max_iters = 100,
+           Real Eoffset = 0, int max_iters = 100,
            const singularity::MeanAtomicProperties &AZbar =
                singularity::MeanAtomicProperties())
       : _X(X), _Y(Y), lTmin(ltmin), lTmax(ltmax), nt(nt), lDmin(ldmin), lDmax(ldmax),
-        nd(nd), use_table(use_table), _dlnT(dlnT), ITER_MAX(max_iters), _AZbar(AZbar) {
+        nd(nd), use_table(use_table), _dlnT(dlnT), Eoffset(Eoffset), ITER_MAX(max_iters),
+        _AZbar(AZbar) {
     _fp = 0.25;
     _fo = 1. - _fp;
     CheckParams();
@@ -59,7 +60,7 @@ class IdealHHe : public singularity::eos_base::EosBase<IdealHHe> {
            const singularity::MeanAtomicProperties &AZbar =
                singularity::MeanAtomicProperties())
       : _X(X), _Y(Y), lTmin(0.0), lTmax(0.0), nt(0), lDmin(0.0), lDmax(0.0), nd(0),
-        use_table(false), _dlnT(dlnT), ITER_MAX(max_iters), _AZbar(AZbar) {
+        Eoffset(0), use_table(false), _dlnT(dlnT), ITER_MAX(max_iters), _AZbar(AZbar) {
     _fp = 0.25;
     _fo = 1. - _fp;
     CheckParams();
@@ -78,18 +79,11 @@ class IdealHHe : public singularity::eos_base::EosBase<IdealHHe> {
     PORTABLE_ALWAYS_REQUIRE(_Y >= 0, "Y must be positive");
     _AZbar.CheckParams();
   }
-  template <typename Indexer_t = Real *>
-  PORTABLE_INLINE_FUNCTION Real TemperatureFromDensityInternalEnergy(
-      const Real rho, const Real sie,
-      Indexer_t &&lambda = static_cast<Real *>(nullptr)) const {
 
-    const Real T = TofRE(rho, sie, lambda);
-    return T;
-  }
   template <typename Indexer_t = Real *>
-  PORTABLE_INLINE_FUNCTION Real InternalEnergyFromDensityTemperature(
-      const Real rho, const Real temperature,
-      Indexer_t &&lambda = static_cast<Real *>(nullptr)) const {
+  PORTABLE_INLINE_FUNCTION Real
+  EofRT(const Real rho, const Real temperature,
+        Indexer_t &&lambda = static_cast<Real *>(nullptr)) const {
     const auto &r = GetMassFractions(rho, temperature);
     const Real kT = _eV * temperature;
     const Real henorm = 1. + r.z2 * (r.z1 - 1.0);
@@ -116,25 +110,108 @@ class IdealHHe : public singularity::eos_base::EosBase<IdealHHe> {
     return sie;
   }
   template <typename Indexer_t = Real *>
-  PORTABLE_INLINE_FUNCTION Real PressureFromDensityTemperature(
-      const Real rho, const Real temperature,
-      Indexer_t &&lambda = static_cast<Real *>(nullptr)) const {
+  PORTABLE_INLINE_FUNCTION Real
+  PofRT(const Real rho, const Real temperature,
+        Indexer_t &&lambda = static_cast<Real *>(nullptr)) const {
     const auto &[mu, dlmut, dlmur] = MeanMass(rho, temperature);
     const Real P = _kb / (mu * _mp) * rho * temperature;
     return std::max(_small, P);
+  }
+  template <typename Indexer_t = Real *>
+  PORTABLE_INLINE_FUNCTION Real
+  CvofRT(const Real rho, const Real temperature,
+         Indexer_t &&lambda = static_cast<Real *>(nullptr)) const {
+
+    Real tp = temperature * (1.0 + _dlnT);
+    Real tm = temperature * (1.0 - _dlnT);
+
+    Real ep = EofRT(rho, tp);
+    Real em = EofRT(rho, tm);
+    Real cv = singularity::robust::ratio(ep - em, 2 * _dlnT * temperature);
+    return std::max(_small, cv);
+  }
+  template <typename Indexer_t = Real *>
+  PORTABLE_INLINE_FUNCTION Real
+  G1ofRT(const Real rho, const Real temperature,
+         Indexer_t &&lambda = static_cast<Real *>(nullptr)) const {
+    // Gamma*rho  = (dP/dT) / Cv
+    const Real Cv = CvofRT(rho, temperature);
+    const Real P = PofRT(rho, temperature);
+
+    const auto &[mu, dlmudt, dlmudr] = MeanMass(rho, temperature);
+    // dln(P)/dln(T)
+    // dln(P)/dln(rho)
+    const Real xt = std::max(0.0, 1. - dlmudt);
+    const Real xd = std::max(0.0, 1. - dlmudr);
+    const Real denom = Cv * rho * temperature;
+    const Real fac1 = singularity::robust::ratio(P, Cv * rho * temperature);
+    const Real G1 = fac1 * xt * xt + xd;
+    return singularity::robust::ratio(P, Cv * rho * temperature) * xt * xt + xd;
+  }
+  template <typename Indexer_t = Real *>
+  PORTABLE_INLINE_FUNCTION Real
+  BofRT(const Real rho, const Real temperature,
+        Indexer_t &&lambda = static_cast<Real *>(nullptr)) const {
+    const Real P = PofRT(rho, temperature);
+    const Real G1 = G1ofRT(rho, temperature);
+    return std::max(_small, G1 * P);
+  }
+  PORTABLE_INLINE_FUNCTION std::tuple<Real, Real, Real, Real> FillEosofRT(const Real rho,
+                                                                          const Real T) {
+    const Real P = PofRT(rho, T);
+    const Real G1 = G1ofRT(rho, T);
+    const Real B = std::max(_small, G1 * P);
+    const Real Cv = CvofRT(rho, T);
+    return {P, B, Cv, G1};
+  }
+
+  template <typename Indexer_t = Real *>
+  PORTABLE_INLINE_FUNCTION Real TemperatureFromDensityInternalEnergy(
+      const Real rho, const Real sie,
+      Indexer_t &&lambda = static_cast<Real *>(nullptr)) const {
+
+    const Real ld = std::log10(rho);
+    const Real lE = std::log10(sie + Eoffset);
+    if (use_table && ((ld >= lDmin) && (ld <= lDmax) && (lE >= lEmin) && (lE <= lEmax))) {
+      return std::pow(10., lT_.interpToReal(ld, lE));
+    }
+    // fall back to inline
+    const Real T = TofRE(rho, sie);
+    return T;
+  }
+  template <typename Indexer_t = Real *>
+  PORTABLE_INLINE_FUNCTION Real InternalEnergyFromDensityTemperature(
+      const Real rho, const Real temperature,
+      Indexer_t &&lambda = static_cast<Real *>(nullptr)) const {
+
+    const Real ld = std::log10(rho);
+    const Real lT = std::log10(temperature);
+    if (use_table && ((ld >= lDmin) && (ld <= lDmax) && (lT >= lTmin) && (lT <= lTmax))) {
+      Real sie = std::pow(10., lE_.interpToReal(ld, lT));
+      return sie - Eoffset;
+    }
+    Real sie = EofRT(rho, temperature);
+    return sie;
+  }
+  template <typename Indexer_t = Real *>
+  PORTABLE_INLINE_FUNCTION Real PressureFromDensityTemperature(
+      const Real rho, const Real temperature,
+      Indexer_t &&lambda = static_cast<Real *>(nullptr)) const {
+    const Real sie = InternalEnergyFromDensityTemperature(rho, temperature);
+    return PressureFromDensityInternalEnergy(rho, sie);
   }
   template <typename Indexer_t = Real *>
   PORTABLE_INLINE_FUNCTION Real PressureFromDensityInternalEnergy(
       const Real rho, const Real sie,
       Indexer_t &&lambda = static_cast<Real *>(nullptr)) const {
     const Real ld = std::log10(rho);
-    const Real lE = std::log10(sie);
+    const Real lE = std::log10(sie + Eoffset);
     if (use_table && ((ld >= lDmin) && (ld <= lDmax) && (lE >= lEmin) && (lE <= lEmax))) {
       return std::pow(10., lP_.interpToReal(ld, lE));
     }
     // fall back to inline
     const Real T = TofRE(rho, sie);
-    return PressureFromDensityTemperature(rho, T);
+    return PofRT(rho, T);
   }
 
   template <typename Indexer_t = Real *>
@@ -154,78 +231,64 @@ class IdealHHe : public singularity::eos_base::EosBase<IdealHHe> {
       const Real rho, const Real temperature,
       Indexer_t &&lambda = static_cast<Real *>(nullptr)) const {
 
-    Real tp = temperature * (1.0 + _dlnT);
-    Real tm = temperature * (1.0 - _dlnT);
-
-    Real ep = InternalEnergyFromDensityTemperature(rho, tp);
-    Real em = InternalEnergyFromDensityTemperature(rho, tm);
-    Real cv = singularity::robust::ratio(ep - em, 2 * _dlnT * temperature);
-    return std::max(_small, cv);
+    const Real sie = InternalEnergyFromDensityTemperature(rho, temperature);
+    return SpecificHeatFromDensityInternalEnergy(rho, sie);
   }
+
   template <typename Indexer_t = Real *>
   PORTABLE_INLINE_FUNCTION Real SpecificHeatFromDensityInternalEnergy(
       const Real rho, const Real sie,
       Indexer_t &&lambda = static_cast<Real *>(nullptr)) const {
     const Real ld = std::log10(rho);
-    const Real lE = std::log10(sie);
+    const Real lE = std::log10(sie + Eoffset);
     if (use_table && ((ld >= lDmin) && (ld <= lDmax) && (lE >= lEmin) && (lE <= lEmax))) {
       return Cv_.interpToReal(ld, lE);
     }
     // fall back to inline
     const Real T = TofRE(rho, sie);
-    return SpecificHeatFromDensityTemperature(rho, T);
+    return CvofRT(rho, T);
   }
+
   template <typename Indexer_t = Real *>
   PORTABLE_INLINE_FUNCTION Real BulkModulusFromDensityTemperature(
       const Real rho, const Real temperature,
       Indexer_t &&lambda = static_cast<Real *>(nullptr)) const {
-    const Real P = PressureFromDensityTemperature(rho, temperature);
-    const Real G1 = GruneisenParamFromDensityTemperature(rho, temperature);
-    return std::max(_small, G1 * P);
+    const Real sie = InternalEnergyFromDensityTemperature(rho, temperature);
+    return BulkModulusFromDensityInternalEnergy(rho, sie);
   }
   template <typename Indexer_t = Real *>
   PORTABLE_INLINE_FUNCTION Real BulkModulusFromDensityInternalEnergy(
       const Real rho, const Real sie,
       Indexer_t &&lambda = static_cast<Real *>(nullptr)) const {
     const Real ld = std::log10(rho);
-    const Real lE = std::log10(sie);
+    const Real lE = std::log10(sie + Eoffset);
     if (use_table && ((ld >= lDmin) && (ld <= lDmax) && (lE >= lEmin) && (lE <= lEmax))) {
       return std::pow(10., lB_.interpToReal(ld, lE));
     }
     // fall back to inline
     const Real T = TofRE(rho, sie);
-    return BulkModulusFromDensityTemperature(rho, T);
+    return BofRT(rho, T);
   }
+
   template <typename Indexer_t = Real *>
   PORTABLE_INLINE_FUNCTION Real GruneisenParamFromDensityTemperature(
       const Real rho, const Real temperature,
       Indexer_t &&lambda = static_cast<Real *>(nullptr)) const {
-    // Gamma*rho  = (dP/dT) / Cv
-    const Real Cv = SpecificHeatFromDensityTemperature(rho, temperature);
-    const Real P = PressureFromDensityTemperature(rho, temperature);
-
-    const auto &[mu, dlmudt, dlmudr] = MeanMass(rho, temperature);
-    // dln(P)/dln(T)
-    // dln(P)/dln(rho)
-    const Real xt = std::max(0.0, 1. - dlmudt);
-    const Real xd = std::max(0.0, 1. - dlmudr);
-    const Real denom = Cv * rho * temperature;
-    const Real fac1 = singularity::robust::ratio(P, Cv * rho * temperature);
-    const Real G1 = fac1 * xt * xt + xd;
-    return singularity::robust::ratio(P, Cv * rho * temperature) * xt * xt + xd;
+    const Real sie = GruneisenParamFromDensityTemperature(rho, temperature);
+    return GruneisenParamFromDensityInternalEnergy(rho, sie);
   }
   template <typename Indexer_t = Real *>
   PORTABLE_INLINE_FUNCTION Real GruneisenParamFromDensityInternalEnergy(
       const Real rho, const Real sie,
       Indexer_t &&lambda = static_cast<Real *>(nullptr)) const {
     const Real ld = std::log10(rho);
-    const Real lE = std::log10(sie);
+    const Real lE = std::log10(sie + Eoffset);
     if (use_table && ((ld >= lDmin) && (ld <= lDmax) && (lE >= lEmin) && (lE <= lEmax))) {
       return Gm_.interpToReal(ld, lE);
     }
     // fall back to inline
     const Real T = TofRE(rho, sie);
-    return GruneisenParamFromDensityTemperature(rho, T);
+    return G1ofRT(rho, T);
   }
   template <typename Indexer_t = Real *>
   PORTABLE_INLINE_FUNCTION void
@@ -245,22 +308,7 @@ class IdealHHe : public singularity::eos_base::EosBase<IdealHHe> {
   SG_ADD_DEFAULT_MEAN_ATOMIC_FUNCTIONS(_AZbar)
 
   static constexpr unsigned long PreferredInput() { return _preferred_input; }
-  PORTABLE_INLINE_FUNCTION void PrintParams() const {
-    printf("Ideal H-He Parameters:\nX = %g\nY    = %g\n", _X, _Y);
-    _AZbar.PrintParams();
-  }
-  //   template <typename Indexer_t>
-  //   DensityEnergyFromPressureTemperature(const Real press, const Real temp,
-  //                                        Indexer_t &&lambda, Real &rho, Real &sie)
-  //                                        const {
-  //     sie = std::max(
-  //         _qq, singularity::robust::ratio(press + (_gm1 + 1.0) * _Pinf, press + _Pinf)
-  //         *
-  //                      _Cv * temp +
-  //                  _qq);
-  //     rho = std::max(singularity::robust::SMALL(),
-  //                    singularity::robust::ratio(press + _Pinf, _gm1 * _Cv * temp));
-  //   }
+  PORTABLE_INLINE_FUNCTION void PrintParams() const { _AZbar.PrintParams(); }
   inline void Finalize();
   static std::string EosType() { return std::string("IdealHHe"); }
   static std::string EosPyType() { return EosType(); }
@@ -270,11 +318,12 @@ class IdealHHe : public singularity::eos_base::EosBase<IdealHHe> {
                                               singularity::DEFAULT_SHMEM_STNGS);
 
  private:
-  bool use_table;
+  bool use_table = true;
   Real _X, _Y, _fp, _fo;
   Real lTmin, lTmax, lDmin, lDmax, _dlnT, lEmin, lEmax;
+  Real Eoffset = 0.0;
   int nd, nt;
-  DataBox lP_, lB_, lT_, Cv_, Gm_;
+  DataBox lP_, lB_, lT_, lE_, Cv_, Gm_;
   Real _small = 1e-15;
   Real _na = 6.02214129e23;
   Real _hbar = 1.0546e-27; // cm^2 g/s
@@ -293,7 +342,7 @@ class IdealHHe : public singularity::eos_base::EosBase<IdealHHe> {
   singularity::MeanAtomicProperties _AZbar;
   static constexpr const unsigned long _preferred_input =
       singularity::thermalqs::density | singularity::thermalqs::temperature;
-#define DBLIST &lP_, &lB_, &lT_, &Cv_, &Gm_
+#define DBLIST &lP_, &lB_, &lT_, &lE_, &Cv_, &Gm_
   auto GetDataBoxPointers_() const { return std::vector<const DataBox *>{DBLIST}; }
   auto GetDataBoxPointers_() { return std::vector<DataBox *>{DBLIST}; }
 #undef DBLIST
@@ -483,9 +532,8 @@ class IdealHHe : public singularity::eos_base::EosBase<IdealHHe> {
     const Real tmin = 1e-10;
     const Real tmax = 1e10;
     Real temp;
-    auto status = regula_falsi(
-        [&](const Real t) { return InternalEnergyFromDensityTemperature(rho, t); }, sie,
-        std::sqrt(tmin * tmax), tmin, tmax, 1e-12, 1e-12, temp);
+    auto status = regula_falsi([&](const Real t) { return EofRT(rho, t); }, sie,
+                               std::sqrt(tmin * tmax), tmin, tmax, 1e-12, 1e-12, temp);
     if (status != Status::SUCCESS) {
       PARTHENON_DEBUG_WARN("TofRE did not converge");
       return Tiny<Real>();
@@ -532,6 +580,7 @@ inline void IdealHHe::FillTable(const std::string &filename) {
   lT_.resize(nd, nt);
   lT_.setRange(0, lTmin, lTmax, nt);
   lT_.setRange(1, lDmin, lDmax, nd);
+  lE_.copyMetadata(lT_);
   // Determine the energy grid
   lEmin = std::numeric_limits<Real>::max();
   lEmax = std::numeric_limits<Real>::min();
@@ -542,21 +591,17 @@ inline void IdealHHe::FillTable(const std::string &filename) {
       const Real T = std::pow(10., lT_.range(0).x(i));
       const auto &[mu, dlmut, dlmur] = MeanMass(d, T);
       const auto &r = GetMassFractions(d, T);
-      const Real E = InternalEnergyFromDensityTemperature(d, T);
-      const Real P = PressureFromDensityTemperature(d, T);
-      const Real cv = SpecificHeatFromDensityTemperature(d, T);
-      const Real G = GruneisenParamFromDensityTemperature(d, T);
-      const Real B = BulkModulusFromDensityTemperature(d, T);
-      lEmin = std::min(lEmin, E);
-      lEmax = std::max(lEmax, E);
+      const Real E = EofRT(d, T);
+      const Real lE = std::log10(E + Eoffset);
+      lE_(j, i) = lE;
+      lEmin = std::min(lEmin, lE);
+      lEmax = std::max(lEmax, lE);
     }
   }
   if (lEmin <= 0.0 || (lEmax <= 0.0) || std::isnan(lEmin) || std::isnan(lEmax)) {
     PORTABLE_THROW_OR_ABORT("Failed to find positive or real energy values from given "
                             "temperature and density grid.");
   }
-  lEmin = std::log10(lEmin);
-  lEmax = std::log10(lEmax);
   lT_.setRange(0, lEmin, lEmax, nt);
   lP_.copyMetadata(lT_);
   lB_.copyMetadata(lT_);
@@ -567,13 +612,14 @@ inline void IdealHHe::FillTable(const std::string &filename) {
   for (int j = 0; j < nd; j++) {
     const Real d = std::pow(10., lT_.range(1).x(j));
     for (int i = 0; i < nt; i++) {
-      const Real e = std::pow(10., lT_.range(0).x(i));
+      const Real e = std::pow(10., lT_.range(0).x(i)) - Eoffset;
       const Real T = TofRE(d, e);
       lT_(j, i) = std::log10(T);
-      lP_(j, i) = std::log10(PressureFromDensityTemperature(d, T));
-      lB_(j, i) = std::log10(BulkModulusFromDensityTemperature(d, T));
-      Cv_(j, i) = SpecificHeatFromDensityTemperature(d, T);
-      Gm_(j, i) = GruneisenParamFromDensityTemperature(d, T);
+      const auto &[P, B, Cv, G1] = FillEosofRT(d, T);
+      lP_(j, i) = std::log10(P);
+      lB_(j, i) = std::log10(B);
+      Cv_(j, i) = Cv;
+      Gm_(j, i) = G1;
     }
   }
 
@@ -583,7 +629,7 @@ inline void IdealHHe::FillTable(const std::string &filename) {
     const Real d = std::pow(10., lT_.range(1).x(j));
     for (int i = 0; i < nt; i++) {
       const Real lE = lT_.range(0).x(i);
-      const Real e = std::pow(10., lT_.range(0).x(i));
+      const Real e = std::pow(10., lT_.range(0).x(i)) - Eoffset;
       const Real T = TofRE(d, e);
       assert(std::abs(std::pow(10., lT_.interpToReal(ld, lE)) / T - 1) <= 1e-4);
     }
@@ -613,6 +659,7 @@ inline void IdealHHe::Save(const std::string &filename) {
   status += H5LTset_attribute_double(file, METADATA_NAME, "ldmax", &lDmax, 1);
   status += H5LTset_attribute_double(file, METADATA_NAME, "lemin", &lEmin, 1);
   status += H5LTset_attribute_double(file, METADATA_NAME, "lemax", &lEmax, 1);
+  status += H5LTset_attribute_double(file, METADATA_NAME, "eoffset", &Eoffset, 1);
   status += H5LTset_attribute_double(file, METADATA_NAME, "dlnT", &_dlnT, 1);
   status += H5LTset_attribute_double(file, METADATA_NAME, "fp", &_fp, 1);
   status += H5LTset_attribute_double(file, METADATA_NAME, "fm", &_fo, 1);
@@ -625,6 +672,7 @@ inline void IdealHHe::Save(const std::string &filename) {
   status += Cv_.saveHDF(file, "cv");
   status += lB_.saveHDF(file, "logbulkmodulus");
   status += Gm_.saveHDF(file, "grun");
+  status += lE_.saveHDF(file, "logsie");
 
   status += H5Fclose(file);
   if (status != H5_SUCCESS) {
@@ -646,6 +694,7 @@ inline void IdealHHe::Load(const std::string &filename) {
   status += H5LTget_attribute_double(file, METADATA_NAME, "ldmax", &lDmax);
   status += H5LTget_attribute_double(file, METADATA_NAME, "lemin", &lEmin);
   status += H5LTget_attribute_double(file, METADATA_NAME, "lemax", &lEmax);
+  status += H5LTget_attribute_double(file, METADATA_NAME, "eoffset", &Eoffset);
   status += H5LTget_attribute_double(file, METADATA_NAME, "dlnT", &_dlnT);
   status += H5LTget_attribute_double(file, METADATA_NAME, "fp", &_fp);
   status += H5LTget_attribute_double(file, METADATA_NAME, "fm", &_fo);
@@ -658,6 +707,7 @@ inline void IdealHHe::Load(const std::string &filename) {
   status += Cv_.loadHDF(file, "cv");
   status += lB_.loadHDF(file, "logbulkmodulus");
   status += Gm_.loadHDF(file, "grun");
+  status += lE_.loadHDF(file, "logsie");
   status += H5Fclose(file);
   if (status != H5_SUCCESS) {
     EOS_ERROR("[IdealHHe::Save]: There was a problem with HDF5\n");

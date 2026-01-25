@@ -172,9 +172,12 @@ class IdealHHe : public singularity::eos_base::EosBase<IdealHHe> {
 
     const Real ld = std::log10(rho);
     const Real lE = std::log10(sie + Eoffset);
+    if ((lE <= lEmin) || (rho <= rho_floor)) return std::pow(10., lTmin);
+
     if (use_table && ((ld >= lDmin) && (ld <= lDmax) && (lE >= lEmin) && (lE <= lEmax))) {
       return std::pow(10., lT_.interpToReal(ld, lE));
     }
+
     // fall back to inline
     const Real T = TofRE(rho, sie);
     return T;
@@ -186,10 +189,13 @@ class IdealHHe : public singularity::eos_base::EosBase<IdealHHe> {
 
     const Real ld = std::log10(rho);
     const Real lT = std::log10(temperature);
+    if ((lT <= lTmin) || (rho <= rho_floor)) return std::pow(10., lEmin) - Eoffset;
+
     if (use_table && ((ld >= lDmin) && (ld <= lDmax) && (lT >= lTmin) && (lT <= lTmax))) {
       Real sie = std::pow(10., lE_.interpToReal(ld, lT));
       return sie - Eoffset;
     }
+
     Real sie = EofRT(rho, temperature);
     return sie;
   }
@@ -206,9 +212,12 @@ class IdealHHe : public singularity::eos_base::EosBase<IdealHHe> {
       Indexer_t &&lambda = static_cast<Real *>(nullptr)) const {
     const Real ld = std::log10(rho);
     const Real lE = std::log10(sie + Eoffset);
+    if ((lE <= lEmin) || (rho <= rho_floor)) return p_floor;
+
     if (use_table && ((ld >= lDmin) && (ld <= lDmax) && (lE >= lEmin) && (lE <= lEmax))) {
       return std::pow(10., lP_.interpToReal(ld, lE));
     }
+
     // fall back to inline
     const Real T = TofRE(rho, sie);
     return PofRT(rho, T);
@@ -241,6 +250,8 @@ class IdealHHe : public singularity::eos_base::EosBase<IdealHHe> {
       Indexer_t &&lambda = static_cast<Real *>(nullptr)) const {
     const Real ld = std::log10(rho);
     const Real lE = std::log10(sie + Eoffset);
+    if ((lE <= lEmin) || (rho <= rho_floor)) return std::pow(10., lEmin - lTmin);
+
     if (use_table && ((ld >= lDmin) && (ld <= lDmax) && (lE >= lEmin) && (lE <= lEmax))) {
       return Cv_.interpToReal(ld, lE);
     }
@@ -262,9 +273,12 @@ class IdealHHe : public singularity::eos_base::EosBase<IdealHHe> {
       Indexer_t &&lambda = static_cast<Real *>(nullptr)) const {
     const Real ld = std::log10(rho);
     const Real lE = std::log10(sie + Eoffset);
+    if ((lE <= lEmin) || (rho <= rho_floor)) return p_floor;
+
     if (use_table && ((ld >= lDmin) && (ld <= lDmax) && (lE >= lEmin) && (lE <= lEmax))) {
       return std::pow(10., lB_.interpToReal(ld, lE));
     }
+
     // fall back to inline
     const Real T = TofRE(rho, sie);
     return BofRT(rho, T);
@@ -283,9 +297,12 @@ class IdealHHe : public singularity::eos_base::EosBase<IdealHHe> {
       Indexer_t &&lambda = static_cast<Real *>(nullptr)) const {
     const Real ld = std::log10(rho);
     const Real lE = std::log10(sie + Eoffset);
+    if ((lE <= lEmin) || (rho <= rho_floor)) return 0.0;
+
     if (use_table && ((ld >= lDmin) && (ld <= lDmax) && (lE >= lEmin) && (lE <= lEmax))) {
       return Gm_.interpToReal(ld, lE);
     }
+
     // fall back to inline
     const Real T = TofRE(rho, sie);
     return G1ofRT(rho, T);
@@ -322,6 +339,10 @@ class IdealHHe : public singularity::eos_base::EosBase<IdealHHe> {
   Real _X, _Y, _fp, _fo;
   Real lTmin, lTmax, lDmin, lDmax, _dlnT, lEmin, lEmax;
   Real Eoffset = 0.0;
+  Real sie_floor = 1e-10;
+  Real t_floor = 1e-10;
+  Real rho_floor = 1e-20;
+  Real p_floor = 1e-20;
   int nd, nt;
   DataBox lP_, lB_, lT_, lE_, Cv_, Gm_;
   Real _small = 1e-15;
@@ -526,15 +547,15 @@ class IdealHHe : public singularity::eos_base::EosBase<IdealHHe> {
   TofRE(const Real rho, const Real sie,
         Indexer_t &&lambda = static_cast<Real *>(nullptr)) const {
 
-    using RootFinding1D::regula_falsi;
+    using RootFinding1D::findRoot;
     using RootFinding1D::Status;
 
     const Real tmin = 1e-10;
     const Real tmax = 1e10;
     Real temp;
-    auto status = regula_falsi([&](const Real t) { return EofRT(rho, t); }, sie,
-                               std::sqrt(tmin * tmax), tmin, tmax, 1e-12, 1e-12, temp);
-    if (status != Status::SUCCESS) {
+    const Real t_guess = 1e3;
+    if (findRoot([&](const Real t) { return EofRT(rho, t); }, sie, t_guess, tmin, tmax,
+                 1e-8 * t_guess, 1e-8, temp) != Status::SUCCESS) {
       PARTHENON_DEBUG_WARN("TofRE did not converge");
       return Tiny<Real>();
     }

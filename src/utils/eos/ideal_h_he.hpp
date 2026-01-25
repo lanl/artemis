@@ -69,6 +69,13 @@ class IdealHHe : public singularity::eos_base::EosBase<IdealHHe> {
     // Load from file
     Load(filename);
   }
+  void SetFloors(const Real sie_floor_, const Real t_floor_, const Real rho_floor_,
+                 const Real p_floor_) {
+    rho_floor = rho_floor_;
+    t_floor = t_floor_;
+    sie_floor = sie_floor_;
+    p_floor = p_floor_;
+  }
   inline void FillTable(const std::string &filename);
   inline void Save(const std::string &filename);
   inline void Load(const std::string &filename);
@@ -187,9 +194,10 @@ class IdealHHe : public singularity::eos_base::EosBase<IdealHHe> {
       const Real rho, const Real temperature,
       Indexer_t &&lambda = static_cast<Real *>(nullptr)) const {
 
+    if ((temperature <= t_floor) || (rho <= rho_floor)) return sie_floor;
+
     const Real ld = std::log10(rho);
     const Real lT = std::log10(temperature);
-    if ((lT <= lTmin) || (rho <= rho_floor)) return std::pow(10., lEmin) - Eoffset;
 
     if (use_table && ((ld >= lDmin) && (ld <= lDmax) && (lT >= lTmin) && (lT <= lTmax))) {
       Real sie = std::pow(10., lE_.interpToReal(ld, lT));
@@ -210,9 +218,10 @@ class IdealHHe : public singularity::eos_base::EosBase<IdealHHe> {
   PORTABLE_INLINE_FUNCTION Real PressureFromDensityInternalEnergy(
       const Real rho, const Real sie,
       Indexer_t &&lambda = static_cast<Real *>(nullptr)) const {
+    if ((sie <= sie_floor) || (rho <= rho_floor)) return p_floor;
+
     const Real ld = std::log10(rho);
     const Real lE = std::log10(sie + Eoffset);
-    if ((lE <= lEmin) || (rho <= rho_floor)) return p_floor;
 
     if (use_table && ((ld >= lDmin) && (ld <= lDmax) && (lE >= lEmin) && (lE <= lEmax))) {
       return std::pow(10., lP_.interpToReal(ld, lE));
@@ -248,9 +257,10 @@ class IdealHHe : public singularity::eos_base::EosBase<IdealHHe> {
   PORTABLE_INLINE_FUNCTION Real SpecificHeatFromDensityInternalEnergy(
       const Real rho, const Real sie,
       Indexer_t &&lambda = static_cast<Real *>(nullptr)) const {
+    if ((sie <= sie_floor) || (rho <= rho_floor)) return sie_floor / t_floor;
+
     const Real ld = std::log10(rho);
     const Real lE = std::log10(sie + Eoffset);
-    if ((lE <= lEmin) || (rho <= rho_floor)) return std::pow(10., lEmin - lTmin);
 
     if (use_table && ((ld >= lDmin) && (ld <= lDmax) && (lE >= lEmin) && (lE <= lEmax))) {
       return Cv_.interpToReal(ld, lE);
@@ -271,9 +281,10 @@ class IdealHHe : public singularity::eos_base::EosBase<IdealHHe> {
   PORTABLE_INLINE_FUNCTION Real BulkModulusFromDensityInternalEnergy(
       const Real rho, const Real sie,
       Indexer_t &&lambda = static_cast<Real *>(nullptr)) const {
+    if ((sie <= sie_floor) || (rho <= rho_floor)) return p_floor;
+
     const Real ld = std::log10(rho);
     const Real lE = std::log10(sie + Eoffset);
-    if ((lE <= lEmin) || (rho <= rho_floor)) return p_floor;
 
     if (use_table && ((ld >= lDmin) && (ld <= lDmax) && (lE >= lEmin) && (lE <= lEmax))) {
       return std::pow(10., lB_.interpToReal(ld, lE));
@@ -295,9 +306,10 @@ class IdealHHe : public singularity::eos_base::EosBase<IdealHHe> {
   PORTABLE_INLINE_FUNCTION Real GruneisenParamFromDensityInternalEnergy(
       const Real rho, const Real sie,
       Indexer_t &&lambda = static_cast<Real *>(nullptr)) const {
+    if ((sie <= sie_floor) || (rho <= rho_floor)) return 0.0;
+
     const Real ld = std::log10(rho);
     const Real lE = std::log10(sie + Eoffset);
-    if ((lE <= lEmin) || (rho <= rho_floor)) return 0.0;
 
     if (use_table && ((ld >= lDmin) && (ld <= lDmax) && (lE >= lEmin) && (lE <= lEmax))) {
       return Gm_.interpToReal(ld, lE);
@@ -555,7 +567,7 @@ class IdealHHe : public singularity::eos_base::EosBase<IdealHHe> {
     Real temp;
     const Real t_guess = 1e3;
     if (findRoot([&](const Real t) { return EofRT(rho, t); }, sie, t_guess, tmin, tmax,
-                 1e-8 * t_guess, 1e-8, temp) != Status::SUCCESS) {
+                 1e-12 * t_guess, 1e-12, temp) != Status::SUCCESS) {
       PARTHENON_DEBUG_WARN("TofRE did not converge");
       return Tiny<Real>();
     }

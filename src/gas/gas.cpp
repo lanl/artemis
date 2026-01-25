@@ -68,6 +68,12 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   const Real cfl_number = pin->GetOrAddReal("gas", "cfl", 0.8);
   params.Add("cfl", cfl_number);
 
+  // Floors
+  const Real dfloor = pin->GetOrAddReal("gas", "dfloor", 1.0e-20);
+  const Real siefloor = pin->GetOrAddReal("gas", "siefloor", 1.0e-20);
+  params.Add("dfloor", dfloor);
+  params.Add("siefloor", siefloor);
+
   // Equation of state
   std::string eos_type = "none";
   if (pin->DoesBlockExist("gas/eos/ideal") || (pin->DoesParameterExist("gas", "gamma"))) {
@@ -131,10 +137,12 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
       const Real ldmax = pin->GetOrAddReal(block_name, "ldmax", -3);
       const int nd = pin->GetOrAddInteger(block_name, "nd", 100);
       const int nt = pin->GetOrAddInteger(block_name, "nt", 100);
+      ArtemisEOS::IdealHHe eos_base(X, Y, ltmin, ltmax, nt, ldmin, ldmax, nd,
+                                    save_to_file, true);
+      eos_base.SetFloors(siefloor, 0.0, dfloor, 0.0);
+
       EOS eos_host = singularity::UnitSystem<ArtemisEOS::IdealHHe>(
-          ArtemisEOS::IdealHHe(X, Y, ltmin, ltmax, nt, ldmin, ldmax, nd, save_to_file,
-                               true),
-          singularity::eos_units_init::LengthTimeUnitsInit(),
+          std::move(eos_base), singularity::eos_units_init::LengthTimeUnitsInit(),
           units.GetTimeCodeToPhysical(), units.GetMassCodeToPhysical(),
           units.GetLengthCodeToPhysical(), units.GetTemperatureCodeToPhysical());
       EOS eos_device = eos_host.GetOnDevice();
@@ -292,12 +300,6 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
 
   params.Add("scattering_h", scattering);
   params.Add("scattering_d", scattering.GetOnDevice());
-
-  // Floors
-  const Real dfloor = pin->GetOrAddReal("gas", "dfloor", 1.0e-20);
-  const Real siefloor = pin->GetOrAddReal("gas", "siefloor", 1.0e-20);
-  params.Add("dfloor", dfloor);
-  params.Add("siefloor", siefloor);
 
   // Dual energy switch
   // When internal > de_switch * total we use the total

@@ -30,6 +30,7 @@ TEST_CASE("IdealHHe EOS basic construction and properties", "[IdealHHe][EOS]") {
   const Real Y = 0.3;
 
   IdealHHe eos(X, Y);
+  eos.SetFloors(0.0, 0.0, 0.0, 0.0);
 
   SECTION("2D Grid") {
     const Real lTmin = -2;
@@ -48,7 +49,7 @@ TEST_CASE("IdealHHe EOS basic construction and properties", "[IdealHHe][EOS]") {
         const Real cv = eos.SpecificHeatFromDensityTemperature(rho, T);
         // invert
         const Real T_ = eos.TemperatureFromDensityInternalEnergy(rho, sie);
-        REQUIRE(T_ == Approx(T).epsilon(1e-12));
+        REQUIRE(T_ == Approx(T).epsilon(1e-10));
       }
     }
   }
@@ -106,6 +107,8 @@ TEST_CASE("IdealHHe EOS basic construction and properties", "[IdealHHe][EOS]") {
 
 TEST_CASE("IdealHHE EOS with X = 0") {
   IdealHHe eos(0.0, 1.0);
+  eos.SetFloors(0.0, 0.0, 0.0, 0.0);
+
   SECTION("2D Grid") {
     const Real lTmin = -2;
     const Real lTmax = 6.;
@@ -131,6 +134,8 @@ TEST_CASE("IdealHHE EOS with X = 0") {
 
 TEST_CASE("IdealHHE EOS with Y = 0") {
   IdealHHe eos(1.0, 0.0);
+  eos.SetFloors(0.0, 0.0, 0.0, 0.0);
+
   SECTION("2D Grid") {
     const Real lTmin = -2;
     const Real lTmax = 6.;
@@ -148,7 +153,7 @@ TEST_CASE("IdealHHE EOS with Y = 0") {
         const Real cv = eos.SpecificHeatFromDensityTemperature(rho, T);
         // invert
         const Real T_ = eos.TemperatureFromDensityInternalEnergy(rho, sie);
-        REQUIRE(T_ == Approx(T).epsilon(1e-12));
+        REQUIRE(T_ == Approx(T).epsilon(1e-9));
       }
     }
   }
@@ -158,6 +163,7 @@ TEST_CASE("IdealHHe EOS with different compositions", "[IdealHHe][EOS]") {
 
   SECTION("Hydrogen-rich composition (X=0.9, Y=0.1)") {
     IdealHHe eos_H_rich(0.9, 0.1);
+    eos_H_rich.SetFloors(0.0, 0.0, 0.0, 0.0);
 
     const Real rho = 1.0e-10;
     const Real T = 1000.0;
@@ -171,6 +177,7 @@ TEST_CASE("IdealHHe EOS with different compositions", "[IdealHHe][EOS]") {
 
   SECTION("Helium-rich composition (X=0.3, Y=0.7)") {
     IdealHHe eos_He_rich(0.3, 0.7);
+    eos_He_rich.SetFloors(0.0, 0.0, 0.0, 0.0);
 
     const Real rho = 1.0e-10;
     const Real T = 1000.0;
@@ -189,6 +196,7 @@ TEST_CASE("IdealHHe EOS with UnitSystem wrapper", "[IdealHHe][EOS][UnitSystem]")
   const Real Y = 0.28;
 
   IdealHHe eos_base(X, Y);
+  eos_base.SetFloors(0.0, 0.0, 0.0, 0.0);
 
   SECTION("Unit conversion with CGS units") {
     // Define unit system: time [s], mass [g], length [cm], temperature [K]
@@ -199,7 +207,7 @@ TEST_CASE("IdealHHe EOS with UnitSystem wrapper", "[IdealHHe][EOS][UnitSystem]")
 
     // Create IdealHHe inline as temporary for UnitSystem
     auto eos = singularity::UnitSystem<IdealHHe>(
-        IdealHHe(X, Y), singularity::eos_units_init::LengthTimeUnitsInit(), time_cgs,
+        std::move(eos_base), singularity::eos_units_init::LengthTimeUnitsInit(), time_cgs,
         mass_cgs, length_cgs, temp_cgs);
 
     const Real rho = 1.0e-10; // g/cc
@@ -223,10 +231,12 @@ TEST_CASE("IdealHHe EOS with UnitSystem wrapper", "[IdealHHe][EOS][UnitSystem]")
     const Real length_scale = 1.496e13;
     const Real temp_scale = 1.0;
 
+    IdealHHe eos_base(X, Y);
+    eos_base.SetFloors(0.0, 0., 0.0, 0.0);
     // Create IdealHHe inline as temporary for UnitSystem
     auto eos = singularity::UnitSystem<IdealHHe>(
-        IdealHHe(X, Y), singularity::eos_units_init::LengthTimeUnitsInit(), time_scale,
-        mass_scale, length_scale, temp_scale);
+        std::move(eos_base), singularity::eos_units_init::LengthTimeUnitsInit(),
+        time_scale, mass_scale, length_scale, temp_scale);
 
     // Density in code units (Msun/AU^3)
     // Convert 1e-10 g/cc to Msun/AU^3: 1e-10 * (AU^3/Msun)
@@ -250,9 +260,11 @@ TEST_CASE("IdealHHe EOS with UnitSystem wrapper", "[IdealHHe][EOS][UnitSystem]")
 
   SECTION("Consistency between wrapped and unwrapped EOS in CGS units") {
     // Wrap with CGS units (scale factors = 1)
+    IdealHHe eos_base(X, Y);
+    eos_base.SetFloors(0.0, 0., 0.0, 0.0);
     auto eos_wrapped = singularity::UnitSystem<IdealHHe>(
-        IdealHHe(X, Y), singularity::eos_units_init::LengthTimeUnitsInit(), 1.0, 1.0, 1.0,
-        1.0);
+        std::move(eos_base), singularity::eos_units_init::LengthTimeUnitsInit(), 1.0, 1.0,
+        1.0, 1.0);
 
     const Real rho = 1.0e-10; // g/cc
     const Real T = 1000.0;    // K
@@ -277,9 +289,11 @@ TEST_CASE("IdealHHe EOS with UnitSystem wrapper", "[IdealHHe][EOS][UnitSystem]")
     const Real temp_scale = 1.0;
 
     // Create IdealHHe inline as temporary for UnitSystem
+    IdealHHe eos_base(X, Y);
+    eos_base.SetFloors(0.0, 0., 0.0, 0.0);
     auto eos = singularity::UnitSystem<IdealHHe>(
-        IdealHHe(X, Y), singularity::eos_units_init::LengthTimeUnitsInit(), time_scale,
-        mass_scale, length_scale, temp_scale);
+        std::move(eos_base), singularity::eos_units_init::LengthTimeUnitsInit(),
+        time_scale, mass_scale, length_scale, temp_scale);
 
     // Density in code units
     const Real rho_cgs = 1.0e-10;

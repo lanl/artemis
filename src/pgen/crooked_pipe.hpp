@@ -47,7 +47,8 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const bool update_fluxes = artemis_pkg->Param<bool>("update_fluxes");
   PARTHENON_REQUIRE(do_gas, "Crooked pipe problem requires gas!");
   PARTHENON_REQUIRE(!(do_dust), "Crooked pipe problem does not permit dust!");
-  PARTHENON_REQUIRE(!(update_fluxes), "Crooked pipe problem requires update fluxes to be off!");
+  PARTHENON_REQUIRE(!(update_fluxes),
+                    "Crooked pipe problem requires update fluxes to be off!");
   auto gas_pkg = pmb->packages.Get("gas");
   const auto eos = gas_pkg->Param<EOS>("eos_d");
   Real ar = Null<Real>();

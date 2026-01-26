@@ -24,6 +24,7 @@
 #include "coag.hpp"
 #include "conduction.hpp"
 #include "constant.hpp"
+#include "crooked_pipe.hpp"
 #include "disk.hpp"
 #include "gaussian_bump.hpp"
 #include "geometry/geometry.hpp"
@@ -34,7 +35,6 @@
 #include "shock.hpp"
 #include "strat.hpp"
 #include "thermalization.hpp"
-#include "crooked_pipe.hpp"
 
 using namespace parthenon::package::prelude;
 

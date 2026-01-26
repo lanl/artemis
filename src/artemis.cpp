@@ -106,7 +106,7 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   const bool do_moment = do_radiation && pin->DoesBlockExist("radiation/moment");
   const bool do_shear =
       do_rotating_frame ? (pin->GetOrAddReal("rotating_frame", "qshear", 0) > 0) : false;
-  const bool update_fluxes= pin->GetOrAddBoolean("gas", "update_fluxes", true);
+  const bool update_fluxes = pin->GetOrAddBoolean("gas", "update_fluxes", true);
 
   // Check configuration selection compatibility
   PARTHENON_REQUIRE(!(do_cooling) || (do_cooling && do_gas),

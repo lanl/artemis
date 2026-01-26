@@ -39,9 +39,9 @@ def plot(
     dump = ahdf.ahdf(filename)
 
     time = 0.0
-    with h5py.File(filename, 'r') as f:
-      info_group = f["Info"]
-      time = info_group.attrs["Time"]
+    with h5py.File(filename, "r") as f:
+        info_group = f["Info"]
+        time = info_group.attrs["Time"]
 
     # Coordinate-dependent defaults
     if dump.coordinates == "cartesian":
@@ -96,10 +96,10 @@ def plot(
                 vmax = max(vmax, np.max(variable[b, :, idx, :]))
     print("vmin: {0}, vmax: {1}".format(vmin, vmax))
     if vmin <= 0:
-      vmin = 0.01
-      vmin = vmax / 1.0e7
-      #vmin = np.log(vmax)/2.0
-      print("rescaled vmin: {0}".format(vmin))
+        vmin = 0.01
+        vmin = vmax / 1.0e7
+        # vmin = np.log(vmax)/2.0
+        print("rescaled vmin: {0}".format(vmin))
 
     # Plot all meshblocks within slice
     for b in range(dump.NumBlocks):

@@ -74,8 +74,8 @@ ArtemisDriver<GEOM>::ArtemisDriver(ParameterInput *pin, ApplicationInput *app_in
   do_coagulation = artemis_pkg->template Param<bool>("do_coagulation");
   do_raytrace = artemis_pkg->template Param<bool>("do_raytrace");
 
-  // Update fluxes option--gas fields are needed for radiation temperature updates but for rad-only
-  // test problems turn off advection
+  // Update fluxes option--gas fields are needed for radiation temperature updates but for
+  // rad-only test problems turn off advection
   update_fluxes = artemis_pkg->template Param<bool>("update_fluxes");
 
   // Moments integrator
@@ -249,7 +249,8 @@ TaskCollection ArtemisDriver<GEOM>::StepTasks() {
       // NOTE(@adempsey): 1st stage of VL2 uses piecewise constant reconstruction
       const bool do_pcm = ((stage == 1) && (integrator->GetName() == "vl2"));
       TaskID gas_flx = none, dust_flx = none;
-      if (do_gas && update_fluxes) gas_flx = tl.AddTask(none, Gas::CalculateFluxes, u0.get(), do_pcm);
+      if (do_gas && update_fluxes)
+        gas_flx = tl.AddTask(none, Gas::CalculateFluxes, u0.get(), do_pcm);
       if (do_dust) dust_flx = tl.AddTask(none, Dust::CalculateFluxes, u0.get(), do_pcm);
 
       // Compute (gas) diffusive fluxes

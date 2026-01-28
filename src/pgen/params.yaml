@@ -296,3 +296,22 @@ problem(thermalization):
     _type: Real
     _default: 1.0
     _description: "Background radiation temperature."
+
+problem(crooked_pipe):
+  _description: "<problem> block parameters when artemis/problem=crooked_pipe"
+  rho_thick:
+    _type: Real
+    _default: 100.0
+    _description: "Thick material density."
+  rho_thin:
+    _type: Real
+    _default: 1.0
+    _description: "Thin material density."
+  t_source:
+    _type: Real
+    _default: 100.0
+    _description: "Source region temperature."
+  t_init:
+    _type: Real
+    _default: 1.0
+    _description: "Non-source initial temperature."

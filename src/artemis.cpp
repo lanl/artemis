@@ -106,6 +106,7 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   const bool do_moment = do_radiation && pin->DoesBlockExist("radiation/moment");
   const bool do_shear =
       do_rotating_frame ? (pin->GetOrAddReal("rotating_frame", "qshear", 0) > 0) : false;
+  const bool update_fluxes = pin->GetOrAddBoolean("gas", "update_fluxes", true);
 
   // Check configuration selection compatibility
   PARTHENON_REQUIRE(!(do_cooling) || (do_cooling && do_gas),
@@ -140,6 +141,7 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   artemis->AddParam("do_moment", do_moment);
   artemis->AddParam("do_shear", do_shear);
   artemis->AddParam("do_raytrace", do_raytrace);
+  artemis->AddParam("update_fluxes", update_fluxes);
 
   // Set coordinate system
   const int ndim = ProblemDimension(pin.get());

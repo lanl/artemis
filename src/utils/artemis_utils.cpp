@@ -200,4 +200,16 @@ ReconstructionMethod ChooseReconMethod(std::string recon) {
   return ReconstructionMethod::pcm;
 }
 
+bool FineNeighbor(MeshBlock *pmb) {
+  bool has_finer = false;
+  const int mylevel = pmb->loc.level();
+  for (const auto &nb : pmb->neighbors) {
+    if (nb.origin_loc.level() > mylevel) {
+      has_finer = true;
+      break;
+    }
+  }
+  return has_finer;
+}
+
 } // namespace ArtemisUtils

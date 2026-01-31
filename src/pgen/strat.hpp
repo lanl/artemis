@@ -687,7 +687,6 @@ inline void ExtrapInnerX3(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
   const auto &bounds = coarse ? pmb->c_cellbounds : pmb->cellbounds;
   const auto &range = bounds.GetBoundsK(IndexDomain::interior, TE::CC);
   const int ks = range.s;
-  const int ke = range.e;
   const auto &cpars = artemis_pkg->template Param<geometry::CoordParams>("coord_params");
 
   pmb->par_for_bndry(
@@ -710,7 +709,6 @@ inline void ExtrapInnerX3(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
           const Real vx3g = (gv3 > 0.0) ? 0.0 : gv3;
           const Real &gd = v(0, gas::prim::density(n), ks, j, i);
           const Real &gsie = v(0, gas::prim::sie(n), ks, j, i);
-
           const Real Tg = eos_d.TemperatureFromDensityInternalEnergy(gd, gsie);
           const Real pm = eos_d.PressureFromDensityTemperature(gd * (1. - 1e-6), Tg);
           const Real pp = eos_d.PressureFromDensityTemperature(gd * (1. + 1e-6), Tg);
@@ -814,7 +812,6 @@ inline void ExtrapOuterX3(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
           const Real vx3g = (gv3 < 0.0) ? 0.0 : gv3;
           const Real &gd = v(0, gas::prim::density(n), ke, j, i);
           const Real &gsie = v(0, gas::prim::sie(n), ke, j, i);
-
           const Real Tg = eos_d.TemperatureFromDensityInternalEnergy(gd, gsie);
           const Real pm = eos_d.PressureFromDensityTemperature(gd * (1. - 1e-6), Tg);
           const Real pp = eos_d.PressureFromDensityTemperature(gd * (1. + 1e-6), Tg);

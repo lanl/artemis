@@ -251,7 +251,7 @@ Real CutCell2D(const std::array<Real, 4> &x, const std::array<Real, 4> &y,
   return vol_inside / vol;
 }
 
-bool FineNeighbor(MeshBlock *pmb);
+bool CoarseNeighbor(MeshBlock *pmb);
 
 } // namespace ArtemisUtils
 

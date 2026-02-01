@@ -201,16 +201,16 @@ ReconstructionMethod ChooseReconMethod(std::string recon) {
   return ReconstructionMethod::pcm;
 }
 
-bool FineNeighbor(MeshBlock *pmb) {
-  bool has_finer = false;
+bool CoarseNeighbor(MeshBlock *pmb) {
+  bool has_coarser = false;
   const int mylevel = pmb->loc.level();
   for (const auto &nb : pmb->neighbors) {
-    if (nb.origin_loc.level() > mylevel) {
-      has_finer = true;
+    if (nb.origin_loc.level() < mylevel) {
+      has_coarser = true;
       break;
     }
   }
-  return has_finer;
+  return has_coarser;
 }
 
 } // namespace ArtemisUtils

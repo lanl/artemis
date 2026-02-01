@@ -20,7 +20,6 @@ import os
 import scripts.utils.artemis as artemis
 from scipy.interpolate import interp1d
 
-
 logger = logging.getLogger("artemis" + __name__[7:])  # set logger name
 
 _nranks = 1

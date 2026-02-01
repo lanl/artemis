@@ -24,6 +24,7 @@
 #include "coag.hpp"
 #include "conduction.hpp"
 #include "constant.hpp"
+#include "crooked_pipe.hpp"
 #include "disk.hpp"
 #include "gaussian_bump.hpp"
 #include "geometry/geometry.hpp"
@@ -75,6 +76,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
     strat::ProblemGenerator<T>(pmb, pin);
   } else if (name == "thermalization") {
     thermalization::ProblemGenerator<T>(pmb, pin);
+  } else if (name == "crooked_pipe") {
+    crooked_pipe::ProblemGenerator<T>(pmb, pin);
   } else {
     PARTHENON_FAIL("Invalid problem name!");
   }

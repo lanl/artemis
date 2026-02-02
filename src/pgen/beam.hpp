@@ -126,6 +126,7 @@ inline void BeamInnerX2(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) 
   using parthenon::MakePackDescriptor;
   using TE = parthenon::TopologicalElement;
   auto pmb = mbd->GetBlockPointer();
+  if (coarse && !ArtemisUtils::CoarseNeighbor(pmb)) return;
 
   // Extract artemis package and params
   auto artemis_pkg = pmb->packages.Get("artemis");
@@ -203,6 +204,7 @@ inline void BeamInnerX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) 
   using parthenon::MakePackDescriptor;
   using TE = parthenon::TopologicalElement;
   auto pmb = mbd->GetBlockPointer();
+  if (coarse && !ArtemisUtils::CoarseNeighbor(pmb)) return;
 
   // Extract artemis package and params
   auto artemis_pkg = pmb->packages.Get("artemis");

@@ -116,18 +116,17 @@ Real InitialDensity(const EOS &eos, const StratParams &pars, const Real z) {
   if ((pars.three_d) && (std::abs(z) > 1e-16)) {
     const Real dz = std::abs(z) / static_cast<Real>(pars.npoints);
     const Real dlnr = 1e-6;
-    const Real ldmin = std::log(pars.dfloor / pars.rho0);
     Real pres = eos.PressureFromDensityTemperature(dens, pars.temp0);
     Real zj = 0.0;
     Real ld = 0.0;
-    dens = std::exp(ld);
+    dens = pars.rho0 * std::exp(ld);
     for (int j = 0; j < pars.npoints; j++) {
       // ln(d/d0) = \int_0^z - Omega^2 z dz
       Real pp = eos.PressureFromDensityTemperature(dens * (1. + dlnr), pars.temp0);
       Real pm = eos.PressureFromDensityTemperature(dens * (1. - dlnr), pars.temp0);
       Real dPdrho = (pp - pm) / (dlnr * dens);
       ld -= 0.5 * pars.Om0 * (2 * j + 1) * SQR(dz) / (dPdrho + Fuzz<Real>());
-      dens = std::exp(ld);
+      dens = pars.rho0 * std::exp(ld);
       if (dens <= pars.dfloor) return pars.dfloor;
     }
   }
@@ -228,6 +227,7 @@ inline void ExtrapInnerX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
   using parthenon::MakePackDescriptor;
   using TE = parthenon::TopologicalElement;
   auto pmb = mbd->GetBlockPointer();
+  if (coarse && !ArtemisUtils::CoarseNeighbor(pmb)) return;
 
   // Packing
   static auto descriptors = ArtemisUtils::GetBoundaryPackDescriptorMap<
@@ -321,6 +321,7 @@ inline void ExtrapOuterX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
   using parthenon::MakePackDescriptor;
   using TE = parthenon::TopologicalElement;
   auto pmb = mbd->GetBlockPointer();
+  if (coarse && !ArtemisUtils::CoarseNeighbor(pmb)) return;
 
   // Packing
   static auto descriptors = ArtemisUtils::GetBoundaryPackDescriptorMap<
@@ -429,6 +430,7 @@ inline void ShearInnerX2(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse)
   using parthenon::MakePackDescriptor;
   using TE = parthenon::TopologicalElement;
   auto pmb = mbd->GetBlockPointer();
+  if (coarse && !ArtemisUtils::CoarseNeighbor(pmb)) return;
 
   // Packing
   static auto descriptors = ArtemisUtils::GetBoundaryPackDescriptorMap<
@@ -551,6 +553,7 @@ inline void ShearOuterX2(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse)
   using parthenon::MakePackDescriptor;
   using TE = parthenon::TopologicalElement;
   auto pmb = mbd->GetBlockPointer();
+  if (coarse && !ArtemisUtils::CoarseNeighbor(pmb)) return;
 
   // Packing
   static auto descriptors = ArtemisUtils::GetBoundaryPackDescriptorMap<
@@ -600,7 +603,6 @@ inline void ShearOuterX2(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse)
           const Real vx3g = outflow ? gv3 : 0.0;
           const Real densg =
               outflow ? v(0, gas::prim::density(n), k, je, i) : InitialDensity(pars, z);
-          ;
           const Real sieg = outflow ? v(0, gas::prim::sie(n), k, je, i)
                                     : std::max(pars.siefloor,
                                                eos_d.InternalEnergyFromDensityTemperature(
@@ -661,6 +663,7 @@ inline void ExtrapInnerX3(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
   using parthenon::MakePackDescriptor;
   using TE = parthenon::TopologicalElement;
   auto pmb = mbd->GetBlockPointer();
+  if (coarse && !ArtemisUtils::CoarseNeighbor(pmb)) return;
 
   // Packing
   static auto descriptors = ArtemisUtils::GetBoundaryPackDescriptorMap<
@@ -707,7 +710,6 @@ inline void ExtrapInnerX3(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
           const Real &gd = v(0, gas::prim::density(n), ks, j, i);
           const Real &gsie = v(0, gas::prim::sie(n), ks, j, i);
           const Real Tg = eos_d.TemperatureFromDensityInternalEnergy(gd, gsie);
-
           const Real pm = eos_d.PressureFromDensityTemperature(gd * (1. - 1e-6), Tg);
           const Real pp = eos_d.PressureFromDensityTemperature(gd * (1. + 1e-6), Tg);
           const Real dPdrho = (pp - pm) / (gd * 1e-6);
@@ -764,6 +766,7 @@ inline void ExtrapOuterX3(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
   using parthenon::MakePackDescriptor;
   using TE = parthenon::TopologicalElement;
   auto pmb = mbd->GetBlockPointer();
+  if (coarse && !ArtemisUtils::CoarseNeighbor(pmb)) return;
 
   // Packing
   static auto descriptors = ArtemisUtils::GetBoundaryPackDescriptorMap<

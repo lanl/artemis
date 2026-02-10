@@ -176,6 +176,10 @@ set(CMAKE_FIND_PACKAGE_NO_SYSTEM_PACKAGE_REGISTRY ON CACHE BOOL "" FORCE)
 message("Configuring singularity-eos")
 add_subdirectory(external/singularity-eos singularity-eos)
 
+# Kokkos kernels
+message("Configuring Kokkos Kernels")
+add_subdirectory(external/kokkos-kernels)
+
 # REBOUND
 message("Configuring REBOUND")
 # Define the source and destination directories

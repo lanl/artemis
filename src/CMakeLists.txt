@@ -31,6 +31,7 @@ set (SRC_LIST
 
   gas/gas.cpp
   gas/gas.hpp
+  gas/closure.cpp
   gas/cooling/beta_cooling.cpp
   gas/cooling/cooling.cpp
   gas/cooling/cooling.hpp
@@ -156,6 +157,7 @@ endif()
 
 # Link libraries
 target_link_libraries(artemislib PUBLIC parthenon
+  KokkosKernels::kokkoskernels
   singularity-eos
   ${CMAKE_BINARY_DIR}/rebound/librebound.so
   lib_jaybenne_package

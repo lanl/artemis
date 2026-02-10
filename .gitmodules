@@ -16,3 +16,6 @@
 [submodule "external/Catch2"]
 	path = external/Catch2
 	url = https://github.com/catchorg/Catch2.git
+[submodule "external/kokkos-kernels"]
+	path = external/kokkos-kernels
+	url = https://github.com/kokkos/kokkos-kernels

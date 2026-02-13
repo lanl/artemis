@@ -212,8 +212,7 @@ void FillPoissonRHS(MeshData<Real> *md) {
         for (int n = 0; n < do_dust * vmesh.GetSize(b, dust::prim::density()); ++n) {
           rhs += vmesh(b, dust::prim::density(n), k, j, i);
         }
-        rhs -= use_swindle * grav_mean_rho;
-        rhs *= four_pi_G;
+        rhs = four_pi_G * (rhs - grav_mean_rho); // grav_mean_rho = 0 when !use_swindle
       });
 }
 

@@ -33,6 +33,10 @@ variables = gas.prim.density,  &
 file_type = hdf5  # HDF5 data dump
 dt        = 1.0   # time increment between outputs
 
+<parthenon/output2>
+file_type = rst
+dt = 6.0
+
 <parthenon/time>
 nlim       = -1   # cycle limit
 tlim       = 6.0  # time limit
@@ -75,11 +79,13 @@ gas = true        # enable gas hydrodynamics
 radiation = true  # enable IMC radiation
 
 <gas>
-gamma = 1.666666    # adiabatic index
-mu = 1.008          # mean molecular weight
 cfl = 0.8           # CFL number
 reconstruct = plm   # reconstruction algorithm
-riemann = hllc      # Riemann solver
+riemann = hllc-general      # Riemann solver
+
+<gas/eos/ideal>
+gamma = 1.666666    # adiabatic index
+mu = 1.008          # mean molecular weight
 
 <gas/opacity/absorption>
 opacity_model = powerlaw  # absorption opacity model

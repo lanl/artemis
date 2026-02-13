@@ -20,6 +20,7 @@
 
 // Artemis includes
 #include "artemis.hpp"
+#include "dust/coagulation/coagulation.hpp"
 #include "dust/dust.hpp"
 #include "geometry/geometry.hpp"
 #include "rotating_frame/rotating_frame.hpp"
@@ -28,6 +29,7 @@
 #include "utils/history.hpp"
 #include "utils/units.hpp"
 
+using ArtemisUtils::EOS;
 using ArtemisUtils::VI;
 
 namespace Dust {
@@ -84,6 +86,13 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
 
   // Dust sizes
   const auto size_dist = pin->GetOrAddString("dust", "size_input", "direct");
+
+  // Check compatibility with coagulation
+  const bool do_coagulation = pin->GetOrAddBoolean("physics", "coagulation", false);
+  PARTHENON_REQUIRE(!(do_coagulation) || size_dist == "logspace",
+                    "dust coagulation requires size_input = logspace!");
+
+  // Units
   const Real length_conv = units.GetLengthPhysicalToCode();
   const Real rho_conv = units.GetMassDensityPhysicalToCode();
 
@@ -162,6 +171,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   const int scr_level = pin->GetOrAddInteger("dust", "scr_level", 0);
   params.Add("scr_level", scr_level);
 
+  // Logarithmic gridding?
   const bool log =
       pin->GetOrAddString("artemis", "radial_spacing", "uniform") == "logarithmic";
 
@@ -223,6 +233,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
 //! \brief Compute dust hydrodynamics timestep
 template <Coordinates GEOM>
 Real EstimateTimestepMesh(MeshData<Real> *md) {
+  PARTHENON_INSTRUMENT
   using parthenon::MakePackDescriptor;
   using RotatingFrame::BackgroundVelocity;
   auto pm = md->GetParentPointer();
@@ -234,6 +245,9 @@ Real EstimateTimestepMesh(MeshData<Real> *md) {
   static auto desc =
       MakePackDescriptor<dust::prim::density, dust::prim::velocity>(resolved_pkgs.get());
   auto vmesh = desc.GetPack(md);
+  static auto desc_g =
+      MakePackDescriptor<geom::dx1, geom::dx2, geom::dx3>(resolved_pkgs.get());
+  auto vg = desc_g.GetPack(md);
   IndexRange ib = md->GetBoundsI(IndexDomain::interior);
   IndexRange jb = md->GetBoundsJ(IndexDomain::interior);
   IndexRange kb = md->GetBoundsK(IndexDomain::interior);
@@ -248,7 +262,7 @@ Real EstimateTimestepMesh(MeshData<Real> *md) {
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, Real &ldt) {
         // Extract coordinates
         geometry::Coords<GEOM> coords(cpars, vmesh.GetCoordinates(b), k, j, i);
-        const auto &dx = coords.GetCellWidths();
+        const auto &dx = coords.GetCellWidths(vg, b, k, j, i);
 
         for (int n = 0; n < vmesh.GetSize(b, dust::prim::density()); ++n) {
           Real denom = 0.0;
@@ -268,6 +282,7 @@ Real EstimateTimestepMesh(MeshData<Real> *md) {
 //! \fn  TaskStatus Dust::CalculateFluxes
 //! \brief Evaluates advective fluxes for dust evolution
 TaskStatus CalculateFluxes(MeshData<Real> *md, const bool pcm) {
+  PARTHENON_INSTRUMENT
   auto pm = md->GetParentPointer();
   auto &resolved_pkgs = pm->resolved_packages;
 
@@ -279,17 +294,25 @@ TaskStatus CalculateFluxes(MeshData<Real> *md, const bool pcm) {
   static auto desc_flux =
       parthenon::MakePackDescriptor<dust::cons::density, dust::cons::momentum>(
           resolved_pkgs.get(), {}, {parthenon::PDOpt::WithFluxes});
+  static auto desc_g =
+      parthenon::MakePackDescriptor<geom::x1v, geom::x2v, geom::x3v, geom::dx1, geom::dx2,
+                                    geom::dx3, geom::hx1f1, geom::hx2f1, geom::hx3f1,
+                                    geom::hx1f2, geom::hx2f2, geom::hx3f2, geom::hx1f3,
+                                    geom::hx2f3, geom::hx3f3>(resolved_pkgs.get());
   auto vprim = desc_prim.GetPack(md);
   auto vflux = desc_flux.GetPack(md);
   SparsePack vface;
+  auto vg = desc_g.GetPack(md);
 
-  return ArtemisUtils::CalculateFluxes<Fluid::dust>(md, pkg, vprim, vflux, vface, pcm);
+  return ArtemisUtils::CalculateFluxes<Fluid::dust>(md, pkg, vprim, vflux, vface, vg,
+                                                    pcm);
 }
 
 //----------------------------------------------------------------------------------------
 //! \fn  TaskStatus Dust::FluxSource
 //! \brief Evaluates coordinate terms from advective fluxes for dust evolution
 TaskStatus FluxSource(MeshData<Real> *md, const Real dt) {
+  PARTHENON_INSTRUMENT
   auto pm = md->GetParentPointer();
   auto &resolved_pkgs = pm->resolved_packages;
 
@@ -304,11 +327,18 @@ TaskStatus FluxSource(MeshData<Real> *md, const Real dt) {
             resolved_pkgs.get(), {}, {parthenon::PDOpt::WithFluxes});
     static auto desc_cons =
         parthenon::MakePackDescriptor<dust::cons::momentum>(resolved_pkgs.get());
+    static auto desc_g =
+        parthenon::MakePackDescriptor<geom::vol, geom::x1v, geom::x2v, geom::x3v,
+                                      geom::dh1dx1, geom::dh2dx1, geom::dh3dx1,
+                                      geom::dh1dx2, geom::dh2dx2, geom::dh3dx2,
+                                      geom::dh1dx3, geom::dh2dx3, geom::dh3dx3>(
+            resolved_pkgs.get());
     auto vprim = desc_prim.GetPack(md);
     auto vcons = desc_cons.GetPack(md);
+    auto vg = desc_g.GetPack(md);
     SparsePack vface;
 
-    return ArtemisUtils::FluxSource<Fluid::dust>(md, pkg, vprim, vcons, vface, dt);
+    return ArtemisUtils::FluxSource<Fluid::dust>(md, pkg, vprim, vcons, vface, vg, dt);
   }
 
   return TaskStatus::complete;
@@ -319,6 +349,7 @@ TaskStatus FluxSource(MeshData<Real> *md, const Real dt) {
 //! \brief Add history outputs for dust quantities for generic coordinate system
 template <Coordinates GEOM>
 void AddHistoryImpl(Params &params) {
+  PARTHENON_INSTRUMENT
   using namespace ArtemisUtils;
   auto HstSum = parthenon::UserHistoryOperation::sum;
   using parthenon::HistoryOutputVar;
@@ -344,6 +375,7 @@ void AddHistoryImpl(Params &params) {
 //! \fn  void Dust::AddHistory
 //! \brief Add history outputs for dust quantities
 void AddHistory(Coordinates coords, Params &params) {
+  PARTHENON_INSTRUMENT
   if (coords == Coordinates::cartesian) {
     AddHistoryImpl<Coordinates::cartesian>(params);
   } else if (coords == Coordinates::cylindrical) {
@@ -361,11 +393,15 @@ void AddHistory(Coordinates coords, Params &params) {
 
 //----------------------------------------------------------------------------------------
 //! template instantiations
-template Real EstimateTimestepMesh<Coordinates::cartesian>(MeshData<Real> *md);
-template Real EstimateTimestepMesh<Coordinates::cylindrical>(MeshData<Real> *md);
-template Real EstimateTimestepMesh<Coordinates::spherical1D>(MeshData<Real> *md);
-template Real EstimateTimestepMesh<Coordinates::spherical2D>(MeshData<Real> *md);
-template Real EstimateTimestepMesh<Coordinates::spherical3D>(MeshData<Real> *md);
-template Real EstimateTimestepMesh<Coordinates::axisymmetric>(MeshData<Real> *md);
+typedef Coordinates G;
+typedef Mesh M;
+typedef MeshData<Real> MD;
+typedef parthenon::SimTime ST;
+template Real EstimateTimestepMesh<G::cartesian>(MD *md);
+template Real EstimateTimestepMesh<G::cylindrical>(MD *md);
+template Real EstimateTimestepMesh<G::spherical1D>(MD *md);
+template Real EstimateTimestepMesh<G::spherical2D>(MD *md);
+template Real EstimateTimestepMesh<G::spherical3D>(MD *md);
+template Real EstimateTimestepMesh<G::axisymmetric>(MD *md);
 
 } // namespace Dust

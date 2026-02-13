@@ -127,6 +127,7 @@ KOKKOS_INLINE_FUNCTION Real compute_overlap_sph(geometry::BBox bnds, Real rad,
 //! \brief Sedov blast wave
 template <Coordinates GEOM>
 inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
+  PARTHENON_INSTRUMENT
   using parthenon::MakePackDescriptor;
 
   // Extract blast parameters
@@ -153,7 +154,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const bool do_dust = artemis_pkg->Param<bool>("do_dust");
   // TODO(PDM): Replace the below with a call to singularity-eos
   auto gas_pkg = pmb->packages.Get("gas");
-  const Real gm1 = gas_pkg->Param<Real>("adiabatic_index") - 1.0;
+  const auto &eos = gas_pkg->Param<ArtemisUtils::EOS>("eos_d");
 
   // packing and capture variables for kernel
   auto &md = pmb->meshblock_data.Get();
@@ -165,6 +166,9 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
                          dust::prim::density, dust::prim::velocity>(
           (pmb->resolved_packages).get());
   auto v = desc.GetPack(md.get());
+  static auto desc_g = MakePackDescriptor<geom::vol, geom::x1v, geom::x2v, geom::x3v>(
+      (pmb->resolved_packages).get());
+  auto vg = desc_g.GetPack(md.get());
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
@@ -177,10 +181,10 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       "blast", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
         geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
-        Real total_vol = coords.Volume();
-        const auto &xv = coords.GetCellCenter();
+        Real total_vol = coords.GetVolume(vg, 0, k, j, i);
+        const auto &xv = coords.GetCellCenter(vg, 0, k, j, i);
         Real den = pars.d0;
-        Real e0 = pars.p0 / gm1;
+        Real e0 = ArtemisUtils::EofPR(eos, pars.p0, den);
         Real internal_energy = 0.0;
         auto xcart = coords.ConvertToCart(xv);
         const auto &xc = coords.ConvertToCart(pars.x0);

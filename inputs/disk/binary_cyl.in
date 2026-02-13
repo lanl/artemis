@@ -72,13 +72,15 @@ rotating_frame = true
 <gas>
 cfl = 0.3
 reconstruct = plm
-riemann = hllc
-gamma = 1.00001
+riemann = hllc-general
 dfloor = 1.0e-10
 siefloor = 1.0e-10
 refine_field = pressure
 refine_type = gradient
 refine_thr = 3.0
+
+<gas/eos/ideal>
+gamma = 1.00001
 
 <rotating_frame>
 omega = 1.0
@@ -108,7 +110,7 @@ type = self
 <cooling>
 type = beta
 tref = powerlaw
-beta0 = 1.0e8
+beta0 = 1e-8
 tcyl = 0.0025
 cyl_plaw = -1.0
 
@@ -118,5 +120,3 @@ rho0 = 1.0
 dslope = -0.5
 tslope = -1.0
 h0 = 0.05
-dens_min = 1.0e-10
-pres_min = 1.0e-13

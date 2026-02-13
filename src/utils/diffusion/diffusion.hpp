@@ -29,6 +29,7 @@ namespace Diffusion {
 //! \brief Zeroes diffusion fluxes
 template <typename SparsePackFlux>
 TaskStatus ZeroDiffusionImpl(MeshData<Real> *md, SparsePackFlux vf) {
+  PARTHENON_INSTRUMENT
   auto pm = md->GetParentPointer();
   const auto multi_d = (pm->ndim > 1);
   const auto three_d = (pm->ndim > 2);
@@ -64,12 +65,17 @@ template <Coordinates GEOM, Fluid FLUID_TYPE, DiffType DIFF, typename PKG,
           typename SparsePackPrim>
 Real EstimateTimestep(MeshData<Real> *md, DiffCoeffParams &dp, PKG &pkg, const EOS &eos,
                       SparsePackPrim vprim) {
-
+  PARTHENON_INSTRUMENT
+  using parthenon::MakePackDescriptor;
   auto pm = md->GetParentPointer();
   IndexRange ib = md->GetBoundsI(IndexDomain::interior);
   IndexRange jb = md->GetBoundsJ(IndexDomain::interior);
   IndexRange kb = md->GetBoundsK(IndexDomain::interior);
   const int ndim = pm->ndim;
+  static auto desc_g =
+      MakePackDescriptor<geom::x1v, geom::x2v, geom::x3v, geom::dx1, geom::dx2,
+                         geom::dx3>((pm->resolved_packages).get());
+  auto vg = desc_g.GetPack(md);
 
   const auto &cpars =
       pm->packages.Get("artemis")->template Param<geometry::CoordParams>("coord_params");
@@ -80,7 +86,8 @@ Real EstimateTimestep(MeshData<Real> *md, DiffCoeffParams &dp, PKG &pkg, const E
       md->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, Real &ldt) {
         geometry::Coords<GEOM> coords(cpars, vprim.GetCoordinates(b), k, j, i);
-        const auto &dx = coords.GetCellWidths();
+        const auto &dx = coords.GetCellWidths(vg, b, k, j, i);
+        const auto &xv = coords.GetCellCenter(vg, b, k, j, i);
         Real min_dx = Big<Real>();
         for (int d = 0; d < ndim; d++) {
           min_dx = std::min(min_dx, dx[d]);
@@ -92,7 +99,7 @@ Real EstimateTimestep(MeshData<Real> *md, DiffCoeffParams &dp, PKG &pkg, const E
 
           // Get the maximum diffusion coefficient (if there's more than one)
           DiffusionCoeff<DIFF, GEOM, FLUID_TYPE> diffcoeff;
-          Real mu = diffcoeff.Get(dp, coords, dens, sie, eos);
+          Real mu = diffcoeff.Get(dp, coords, xv, dens, sie, eos);
           if constexpr (DIFF == DiffType::conductivity_plaw) {
             mu /= (dens * eos.SpecificHeatFromDensityInternalEnergy(dens, sie));
           } else if constexpr ((DIFF == DiffType::viscosity_plaw) ||
@@ -115,12 +122,20 @@ template <Coordinates GEOM, Fluid FLUID_TYPE, typename PKG, typename SparsePackC
 TaskStatus DiffusionUpdateImpl(MeshData<Real> *md, PKG &pkg, SparsePackCons v0,
                                SparsePackPrim p, SparsePackFlux vf,
                                const bool do_viscosity, const Real dt) {
+  PARTHENON_INSTRUMENT
+  using parthenon::MakePackDescriptor;
   using TE = parthenon::TopologicalElement;
 
   PARTHENON_DEBUG_REQUIRE(FLUID_TYPE == Fluid::gas,
                           "Momentum diffusion only works with a gas fluid");
 
   auto pm = md->GetParentPointer();
+  static auto desc_g = MakePackDescriptor<
+      geom::x1v, geom::x2v, geom::x3v, geom::hx1v, geom::hx2v, geom::hx3v, geom::vol,
+      geom::ax1, geom::ax2, geom::ax3, geom::dh1dx1, geom::dh2dx1, geom::dh3dx1,
+      geom::dh1dx2, geom::dh2dx2, geom::dh3dx2, geom::dh1dx3, geom::dh2dx3, geom::dh3dx3>(
+      (pm->resolved_packages).get());
+  auto vg = desc_g.GetPack(md);
   const auto &cpars =
       pm->packages.Get("artemis")->template Param<geometry::CoordParams>("coord_params");
 
@@ -141,18 +156,18 @@ TaskStatus DiffusionUpdateImpl(MeshData<Real> *md, PKG &pkg, SparsePackCons v0,
         using parthenon::TopologicalElement;
         geometry::Coords<GEOM> coords(cpars, v0.GetCoordinates(b), k, j, i);
 
-        const auto ax1 = coords.GetFaceAreaX1();
-        const auto ax2 = (multi_d) ? coords.GetFaceAreaX2() : NewArray<Real, 2>(0.0);
-        const auto ax3 = (three_d) ? coords.GetFaceAreaX3() : NewArray<Real, 2>(0.0);
+        const auto &ax1 = coords.GetFaceAreaX1(vg, b, k, j, i);
+        const auto &ax2 = coords.GetFaceAreaX2(vg, b, k, j, i);
+        const auto &ax3 = coords.GetFaceAreaX3(vg, b, k, j, i);
 
-        const auto dhdx1 = (x1dep) ? coords.GetConnX1() : NewArray<Real, 3>(0.0);
-        const auto dhdx2 = (x2dep) ? coords.GetConnX2() : NewArray<Real, 3>(0.0);
-        const auto dhdx3 = (x3dep) ? coords.GetConnX3() : NewArray<Real, 3>(0.0);
+        const auto &dhdx1 = coords.GetConnX1(vg, b, k, j, i);
+        const auto &dhdx2 = coords.GetConnX2(vg, b, k, j, i);
+        const auto &dhdx3 = coords.GetConnX3(vg, b, k, j, i);
 
-        const auto &xv = coords.GetCellCenter();
-        const auto &hx = coords.GetScaleFactors();
+        const auto &xv = coords.GetCellCenter(vg, b, k, j, i);
+        const auto &hx = coords.GetScaleFactors(vg, b, k, j, i);
 
-        const Real vol = coords.Volume();
+        const Real vol = coords.GetVolume(vg, b, k, j, i);
         const int nspecies = v0.GetSize(b, gas::cons::total_energy());
         for (int n = 0; n < nspecies; ++n) {
           const int imx1 = VI(n, 0);

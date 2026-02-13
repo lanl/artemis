@@ -58,21 +58,21 @@ struct ReconInfo {
   Real vol;
 
   ReconInfo() = default;
-  template <typename V1>
+  template <typename V1, typename V2>
   KOKKOS_INLINE_FUNCTION ReconInfo(const geometry::CoordParams &cpar, const V1 &v0,
-                                   const int b, const int n, const int k, const int j,
-                                   const int i) {
-    fill(cpar, v0, b, n, k, j, i);
+                                   const V2 &vg, const int b, const int n, const int k,
+                                   const int j, const int i) {
+    fill(cpar, v0, vg, b, n, k, j, i);
   }
 
-  template <typename V1>
+  template <typename V1, typename V2>
   KOKKOS_INLINE_FUNCTION void fill(const geometry::CoordParams &cpar, const V1 &v0,
-                                   const int b, const int n, const int k, const int j,
-                                   const int i) {
+                                   const V2 &vg, const int b, const int n, const int k,
+                                   const int j, const int i) {
     geometry::Coords<Coordinates::cartesian> coords(cpar, v0.GetCoordinates(b), k, j, i);
-    dx = coords.GetCellWidths();
-    xc = coords.GetCellCenter();
-    vol = coords.Volume();
+    dx = coords.GetCellWidths(vg, b, k, j, i);
+    xc = coords.GetCellCenter(vg, b, k, j, i);
+    vol = coords.GetVolume(vg, b, k, j, i);
     bnds = coords.bnds;
 
     q = v0(b, n, k, j, i);
@@ -161,9 +161,9 @@ RemapUpdate(const V1 &v0, const ReconInfo &rp, const ReconInfo &r, const Real vb
 //----------------------------------------------------------------------------------------
 //! \fn  RemapCons
 //! \brief
-template <Upwind UDIR, ReconstructionMethod R, typename V1>
+template <Upwind UDIR, ReconstructionMethod R, typename V1, typename V2>
 KOKKOS_INLINE_FUNCTION void RemapCons(const geometry::CoordParams &cpars, const V1 &v0,
-                                      const int multi_d, const int three_d,
+                                      const V2 &vg, const int multi_d, const int three_d,
                                       const Real dwdt, const int b, const int k,
                                       IndexRange jb, const int i) {
   // Extract coordinates
@@ -190,8 +190,8 @@ KOKKOS_INLINE_FUNCTION void RemapCons(const geometry::CoordParams &cpars, const 
   ArtemisUtils::ReconGradient<Coordinates::cartesian, R> recon;
   ReconInfo rd, rc, ru;
   for (int n = v0.GetLowerBound(b); n <= v0.GetUpperBound(b); ++n) {
-    ru.fill(cpars, v0, b, n, k, jstart + joff, i);
-    rc.fill(cpars, v0, b, n, k, jstart, i);
+    ru.fill(cpars, v0, vg, b, n, k, jstart + joff, i);
+    rc.fill(cpars, v0, vg, b, n, k, jstart, i);
     // Correct the centroid of the cell due to the motion
     ru.xc[1] += dwdt * ru.xc[0];
     rc.xc[1] += dwdt * rc.xc[0];
@@ -207,7 +207,7 @@ KOKKOS_INLINE_FUNCTION void RemapCons(const geometry::CoordParams &cpars, const 
     for (int j = jstart; compare(j, jend); j -= joff) {
       const int jd = j - joff;
       if (compare(jd, jend)) {
-        rd.fill(cpars, v0, b, n, k, jd, i);
+        rd.fill(cpars, v0, vg, b, n, k, jd, i);
         rd.xc[1] += dwdt * rd.xc[0];
         rd.grad = recon(cpars, v0, rd.dx, multi_d, three_d, b, n, k, jd, i);
         rd.grad[1] += dwdt * rd.grad[0];
@@ -222,8 +222,10 @@ KOKKOS_INLINE_FUNCTION void RemapCons(const geometry::CoordParams &cpars, const 
 //----------------------------------------------------------------------------------------
 //! \fn  LagrangeRemapImpl
 //! \brief
-template <ReconstructionMethod R, typename V1>
-TaskStatus LagrangeRemapImpl(MeshData<Real> *u0, const V1 &v0, const Real dwdt) {
+template <ReconstructionMethod R, typename V1, typename V2>
+TaskStatus LagrangeRemapImpl(MeshData<Real> *u0, const V1 &v0, const V2 &vg,
+                             const Real dwdt) {
+  PARTHENON_INSTRUMENT
   const int multi_d = u0->GetNDim() >= 2;
   PARTHENON_REQUIRE(multi_d, "Linear advection does not work in 1D");
   const int three_d = u0->GetNDim() == 3;
@@ -242,9 +244,9 @@ TaskStatus LagrangeRemapImpl(MeshData<Real> *u0, const V1 &v0, const Real dwdt) 
                                                         jb.s, i);
         const Real vb = dwdt * 0.5 * (coords.bnds.x1[0] + coords.bnds.x1[1]);
         if (vb < 0.0) {
-          RemapCons<Upwind::r, R>(cpars, v0, multi_d, three_d, dwdt, b, k, jb, i);
+          RemapCons<Upwind::r, R>(cpars, v0, vg, multi_d, three_d, dwdt, b, k, jb, i);
         } else if (vb > 0.0) {
-          RemapCons<Upwind::l, R>(cpars, v0, multi_d, three_d, dwdt, b, k, jb, i);
+          RemapCons<Upwind::l, R>(cpars, v0, vg, multi_d, three_d, dwdt, b, k, jb, i);
         }
       });
   return TaskStatus::complete;

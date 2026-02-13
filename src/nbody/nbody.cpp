@@ -261,6 +261,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
 //! \fn  Real NBody::EstimateTimestepMesh
 //! \brief Compute NBody timestep
 Real EstimateTimestepMesh(MeshData<Real> *md) {
+  PARTHENON_INSTRUMENT
   using parthenon::MakePackDescriptor;
   auto pm = md->GetParentPointer();
 
@@ -274,8 +275,10 @@ Real EstimateTimestepMesh(MeshData<Real> *md) {
 //! \brief Distance based refinement criterion
 template <Coordinates GEOM>
 AmrTag DistanceRefinement(MeshBlockData<Real> *md) {
+  PARTHENON_INSTRUMENT
   auto pmb = md->GetBlockPointer();
   auto pm = pmb->pmy_mesh;
+  auto &resolved_pkgs = pm->resolved_packages;
   auto &pco = pmb->coords;
 
   auto &nbody_pkg = pm->packages.Get("nbody");
@@ -289,6 +292,10 @@ AmrTag DistanceRefinement(MeshBlockData<Real> *md) {
   IndexRange jb = md->GetBoundsJ(IndexDomain::interior);
   IndexRange kb = md->GetBoundsK(IndexDomain::interior);
 
+  static auto desc_g =
+      MakePackDescriptor<geom::x1v, geom::x2v, geom::x3v>(resolved_pkgs.get());
+  auto vg = desc_g.GetPack(md);
+
   Real min_dist = Big<Real>();
   parthenon::par_reduce(
       parthenon::loop_pattern_mdrange_tag, PARTHENON_AUTO_LABEL, DevExecSpace(), kb.s,
@@ -296,13 +303,15 @@ AmrTag DistanceRefinement(MeshBlockData<Real> *md) {
       KOKKOS_LAMBDA(const int k, const int j, const int i, Real &ldist) {
         // Extract coordinates
         geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
-        const auto &x = coords.GetCellCenter();
+        const auto &x = coords.GetCellCenter(vg, 0, k, j, i);
 
         const auto &xcart = coords.ConvertToCart(x);
 
         // Each particle returns the distance normalized to it's target radius
         for (int n = 0; n < npart; n++) {
-          ldist = std::min(ldist, particles(n).refine_distance(xcart));
+          if (particles(n).alive) {
+            ldist = std::min(ldist, particles(n).refine_distance(xcart));
+          }
         }
       },
       Kokkos::Min<Real>(min_dist));
@@ -317,6 +326,7 @@ AmrTag DistanceRefinement(MeshBlockData<Real> *md) {
 //! \brief Create REBOUND restart file and store in Params to reuse as Parthenon restart
 void UserWorkBeforeRestartOutputMesh(Mesh *pmesh, ParameterInput *, SimTime &,
                                      OutputParameters *) {
+  PARTHENON_INSTRUMENT
   auto &artemis_pkg = pmesh->packages.Get("artemis");
   if (!(artemis_pkg->Param<bool>("do_nbody"))) return;
 

@@ -71,11 +71,13 @@ gas = true        # enable gas hydrodynamics
 radiation = true  # enable IMC radiation
 
 <gas>
-gamma = 1.666666    # adiabatic index
-mu = 1.008          # mean molecular weight
 cfl = 0.3           # CFL number
 reconstruct = plm   # reconstruction algorithm
-riemann = hllc      # Riemann solver
+riemann = hllc-general      # Riemann solver
+
+<gas/eos/ideal>
+mu = 1.008          # mean molecular weight
+gamma = 1.666666    # adiabatic index
 
 <gas/opacity/absorption>
 opacity_model = powerlaw  # absorption opacity model

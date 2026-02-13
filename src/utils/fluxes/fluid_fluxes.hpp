@@ -31,11 +31,11 @@ namespace ArtemisUtils {
 //----------------------------------------------------------------------------------------
 //! \fn  void ArtemisUtils::ScaleMomentumFlux
 //! \brief Scales the momentum fluxes by scale factors associated with relevant coord sys
-template <Coordinates G, Fluid F, int DIR, typename V3>
-KOKKOS_INLINE_FUNCTION void ScaleMomentumFlux(parthenon::team_mbr_t const &member,
-                                              const geometry::CoordParams &cpars,
-                                              const int b, const int k, const int j,
-                                              const int il, const int iu, const V3 &q) {
+template <Coordinates G, Fluid F, int DIR, typename V3, typename V4>
+KOKKOS_INLINE_FUNCTION void
+ScaleMomentumFlux(parthenon::team_mbr_t const &member, const geometry::CoordParams &cpars,
+                  const int b, const int k, const int j, const int il, const int iu,
+                  const V4 &vg, const V3 &q) {
   // Immediately return if Cartesian (i.e., do not scale momentum flux)
   if constexpr (G == Coordinates::cartesian) return;
   PARTHENON_REQUIRE(DIR > 0 && DIR <= 3, "Invalid flux direction!");
@@ -58,17 +58,10 @@ KOKKOS_INLINE_FUNCTION void ScaleMomentumFlux(parthenon::team_mbr_t const &membe
     parthenon::par_for_inner(
         DEFAULT_INNER_LOOP_PATTERN, member, il, iu, [&](const int i) {
           geometry::Coords<G> coords(cpars, q.GetCoordinates(b), k, j, i);
-          auto xf = NewArray<Real, 3>();
-          if constexpr (DIR == X1DIR) {
-            xf = coords.FaceCenX1(geometry::CellFace::lower);
-          } else if constexpr (DIR == X2DIR) {
-            xf = coords.FaceCenX2(geometry::CellFace::lower);
-          } else if constexpr (DIR == X3DIR) {
-            xf = coords.FaceCenX3(geometry::CellFace::lower);
-          }
-          q.flux(b, DIR, IVX, k, j, i) *= coords.hx1(xf[0], xf[1], xf[2]);
-          q.flux(b, DIR, IVY, k, j, i) *= coords.hx2(xf[0], xf[1], xf[2]);
-          q.flux(b, DIR, IVZ, k, j, i) *= coords.hx3(xf[0], xf[1], xf[2]);
+          const auto &hx = coords.template GetScaleFactorsFace<DIR>(vg, b, k, j, i);
+          q.flux(b, DIR, IVX, k, j, i) *= hx[0];
+          q.flux(b, DIR, IVY, k, j, i) *= hx[1];
+          q.flux(b, DIR, IVZ, k, j, i) *= hx[2];
         });
   }
   return;
@@ -79,9 +72,10 @@ KOKKOS_INLINE_FUNCTION void ScaleMomentumFlux(parthenon::team_mbr_t const &membe
 //! \brief Calculate hydrodynamic fluxes from reconstructed primitive variables.
 //! NOTE(PDM): flux kernel largely borrowed from AthenaPK/Parthenon-Hydro/AthenaK
 template <Coordinates G, Fluid F, Closure C, RSolver RIEMANN, ReconstructionMethod RECON,
-          typename PKG, typename PRIM, typename FLUX, typename FACE>
+          typename PKG, typename PRIM, typename FLUX, typename FACE, typename GEO>
 TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, FLUX vflx,
-                               FACE vface) {
+                               FACE vface, GEO vg) {
+  PARTHENON_INSTRUMENT
   auto pm = md->GetParentPointer();
 
   // Bounds and indexing
@@ -109,6 +103,17 @@ TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, FLUX vflx,
     c = pkg->template Param<Real>("c");
   }
 
+  Real dfloor = Null<Real>();
+  Real siefloor = Null<Real>();
+  if constexpr (F == Fluid::radiation) {
+    dfloor = pkg->template Param<Real>("efloor");
+  } else if constexpr (F == Fluid::gas) {
+    dfloor = pkg->template Param<Real>("dfloor");
+    siefloor = pkg->template Param<Real>("siefloor");
+  } else if constexpr (F == Fluid::dust) {
+    dfloor = pkg->template Param<Real>("dfloor");
+  }
+
   // Scratch properties
   // NOTE(PDM): Scratch here must be able to contain up to the total number of species,
   // even if some blocks don't contain all species
@@ -128,16 +133,11 @@ TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, FLUX vflx,
 
         // Reconstruct qR[i] and qL[i+1]
         Reconstruction<RECON, X1DIR, G> recon;
-        recon(mbr, cpars, b, k, j, il - 1, iu, vp, wl, wr);
+        recon(mbr, cpars, b, k, j, il - 1, iu, vp, vg, wl, wr);
         mbr.team_barrier();
 
-        // NOTE(@adempsey): Moments radiation currently requires zeroing of reconstructed
-        // fluxes when ~round-off.  Future work may invoke PCM fallbacks.  Such a utility
-        // could also be employed for e.g., dust, FOFC, etc...
-        if constexpr (F == Fluid::radiation) {
-          correct_recon(mbr, X1DIR, b, k, j, il - 1, iu, vp, wl, wr);
-          mbr.team_barrier();
-        }
+        post_recon<F>(eos, dfloor, siefloor, mbr, X1DIR, b, k, j, il - 1, iu, vp, wl, wr);
+        mbr.team_barrier();
 
         // Compute fluxes over[is, ie + 1]
         RiemannSolver<RIEMANN, F, C> riemann;
@@ -145,7 +145,7 @@ TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, FLUX vflx,
         mbr.team_barrier();
 
         // Scale X1-momentum flux by appropriate scale factor for coord system
-        ScaleMomentumFlux<G, F, X1DIR>(mbr, cpars, b, k, j, il, iu, vflx);
+        ScaleMomentumFlux<G, F, X1DIR>(mbr, cpars, b, k, j, il, iu, vg, vflx);
       });
 
   // X2-Flux
@@ -173,14 +173,12 @@ TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, FLUX vflx,
 
             // Reconstruct qR[j] and qL[j+1]
             Reconstruction<RECON, X2DIR, G> recon;
-            recon(mbr, cpars, b, k, j, il, iu, vp, wl_jp1, wr);
+            recon(mbr, cpars, b, k, j, il, iu, vp, vg, wl_jp1, wr);
             mbr.team_barrier();
 
-            // NOTE(@adempsey): See comments above
-            if constexpr (F == Fluid::radiation) {
-              correct_recon(mbr, X2DIR, b, k, j, il, iu, vp, wl_jp1, wr);
-              mbr.team_barrier();
-            }
+            post_recon<F>(eos, dfloor, siefloor, mbr, X2DIR, b, k, j, il, iu, vp, wl_jp1,
+                          wr);
+            mbr.team_barrier();
 
             if (j > jl) {
               // compute fluxes over [js,je+1]
@@ -189,7 +187,7 @@ TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, FLUX vflx,
               mbr.team_barrier();
 
               // Scale X2-momentum flux by appropriate scale factor for coord system
-              ScaleMomentumFlux<G, F, X2DIR>(mbr, cpars, b, k, j, il, iu, vflx);
+              ScaleMomentumFlux<G, F, X2DIR>(mbr, cpars, b, k, j, il, iu, vg, vflx);
             }
           }
         });
@@ -220,14 +218,12 @@ TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, FLUX vflx,
 
             // Reconstruct qR[k] and qL[k+1]
             Reconstruction<RECON, X3DIR, G> recon;
-            recon(mbr, cpars, b, k, j, il, iu, vp, wl_kp1, wr);
+            recon(mbr, cpars, b, k, j, il, iu, vp, vg, wl_kp1, wr);
             mbr.team_barrier();
 
-            // NOTE(@adempsey): See comments above
-            if constexpr (F == Fluid::radiation) {
-              correct_recon(mbr, X3DIR, b, k, j, il, iu, vp, wl_kp1, wr);
-              mbr.team_barrier();
-            }
+            post_recon<F>(eos, dfloor, siefloor, mbr, X3DIR, b, k, j, il, iu, vp, wl_kp1,
+                          wr);
+            mbr.team_barrier();
 
             // compute fluxes over [ks,ke+1]
             if (k > kl) {
@@ -236,7 +232,7 @@ TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, FLUX vflx,
               mbr.team_barrier();
 
               // Scale X3-momentum flux by appropriate scale factor for coord system
-              ScaleMomentumFlux<G, F, X3DIR>(mbr, cpars, b, k, j, il, iu, vflx);
+              ScaleMomentumFlux<G, F, X3DIR>(mbr, cpars, b, k, j, il, iu, vg, vflx);
             }
           }
         });
@@ -253,9 +249,10 @@ TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, FLUX vflx,
 //!         - the geometric source terms (be wary of rotating frame...)
 //!           <1/h_k * dh_k/dxi>  (rho*v_i^2 + P)
 template <Coordinates G, Fluid F, Closure C, typename PKG, typename PRIM, typename CONS,
-          typename FACE>
+          typename FACE, typename GEO>
 TaskStatus FluxSourceImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, CONS vcons, FACE vface,
-                          const Real omf, const Real dt) {
+                          GEO vg, const Real omf, const Real dt) {
+  PARTHENON_INSTRUMENT
   // Indexing and geometry
   const auto ib = md->GetBoundsI(IndexDomain::interior);
   const auto jb = md->GetBoundsJ(IndexDomain::interior);
@@ -283,18 +280,20 @@ TaskStatus FluxSourceImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, CONS vcons, FAC
       KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
         // Extract coordinates
         geometry::Coords<G> coords(cpars, vp.GetCoordinates(b), k, j, i);
-        const auto ax1 = coords.GetFaceAreaX1();
-        const auto ax2 = (multi_d) ? coords.GetFaceAreaX2() : NewArray<Real, 2>(0.0);
-        const auto ax3 = (three_d) ? coords.GetFaceAreaX3() : NewArray<Real, 2>(0.0);
-        const auto dh1 = (x1dep) ? coords.GetConnX1() : NewArray<Real, 3>(0.0);
-        const auto dh2 = (x2dep) ? coords.GetConnX2() : NewArray<Real, 3>(0.0);
-        const auto dh3 = (x3dep) ? coords.GetConnX3() : NewArray<Real, 3>(0.0);
+        const Real hdtv = 0.5 * dt / coords.GetVolume(vg, b, k, j, i);
 
+        std::array<Real, 3> dh1{0}, dh2{0}, dh3{0};
+        if constexpr (G != Coordinates::cartesian) {
+          dh1 = coords.GetConnX1(vg, b, k, j, i);
+          dh2 = coords.GetConnX2(vg, b, k, j, i);
+          dh3 = coords.GetConnX3(vg, b, k, j, i);
+        }
         // Get the rotational velocity
         std::array<Real, 3> rfv{0.0};
         [[maybe_unused]] Real omf_ = omf;
         if constexpr (F != Fluid::radiation) {
-          rfv = RotatingFrame::RotationVelocity<G>(coords.GetCellCenter(), omf_);
+          const auto &xv = coords.GetCellCenter(vg, b, k, j, i);
+          rfv = RotatingFrame::RotationVelocity<G>(xv, omf_);
         }
 
         // Timestep weighted by dx
@@ -304,7 +303,6 @@ TaskStatus FluxSourceImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, CONS vcons, FAC
                                           three_d * dt / (bnds.x3[1] - bnds.x3[0])};
 
         // Timestep weighted by (half) volume
-        const Real hdtv = 0.5 * dt / coords.Volume();
         const std::array<Real, 3> hdtvol = {hdtv, multi_d * hdtv, three_d * hdtv};
 
         // Face indexing
@@ -358,6 +356,9 @@ TaskStatus FluxSourceImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, CONS vcons, FAC
           // pdV source for gas internal energy equation
           if constexpr (F == Fluid::gas) {
             // pdV source term
+            const auto &ax1 = coords.GetFaceAreaX1(vg, b, k, j, i);
+            const auto &ax2 = coords.GetFaceAreaX2(vg, b, k, j, i);
+            const auto &ax3 = coords.GetFaceAreaX3(vg, b, k, j, i);
             // clang-format off
             vc_(b, IEG, k, j, i) += hdtvol[0] *
                                     (vp_.flux(b, d1, IPR, k, j, i) +
@@ -378,6 +379,9 @@ TaskStatus FluxSourceImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, CONS vcons, FAC
           }
 
           // Apply "coordinate source terms" (if not Cartesian)
+          [[maybe_unused]] const auto x1dep_ = x1dep;
+          [[maybe_unused]] const auto x2dep_ = x2dep;
+          [[maybe_unused]] const auto x3dep_ = x3dep;
           if constexpr (G != Coordinates::cartesian) {
             // Extract primitive weighted timestep
             Real wdt = vp_(b, n, k, j, i) * dt;
@@ -397,9 +401,9 @@ TaskStatus FluxSourceImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, CONS vcons, FAC
             const Real t1 = SQR(vp_(b, IVX, k, j, i) + rfv[0]);
             const Real t2 = SQR(vp_(b, IVY, k, j, i) + rfv[1]);
             const Real t3 = SQR(vp_(b, IVZ, k, j, i) + rfv[2]);
-            vc_(b, IMX, k, j, i) += x1dep * wdt * (dh1[0]*t1 + dh1[1]*t2 + dh1[2]*t3);
-            vc_(b, IMY, k, j, i) += x2dep * wdt * (dh2[0]*t1 + dh2[1]*t2 + dh2[2]*t3);
-            vc_(b, IMZ, k, j, i) += x3dep * wdt * (dh3[0]*t1 + dh3[1]*t2 + dh3[2]*t3);
+            vc_(b, IMX, k, j, i) += x1dep_ * wdt * (dh1[0]*t1 + dh1[1]*t2 + dh1[2]*t3);
+            vc_(b, IMY, k, j, i) += x2dep_ * wdt * (dh2[0]*t1 + dh2[1]*t2 + dh2[2]*t3);
+            vc_(b, IMZ, k, j, i) += x3dep_ * wdt * (dh3[0]*t1 + dh3[1]*t2 + dh3[2]*t3);
             // clang-format on
           }
         }
@@ -412,19 +416,19 @@ TaskStatus FluxSourceImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, CONS vcons, FAC
 //! \fn  TaskStatus ArtemisUtils::CalculateFluxesReconSelect
 //! \brief Dispatch templated function depending on runtime reconstruction option.
 template <Coordinates G, Fluid F, Closure C, RSolver R, typename PKG, typename PRIM,
-          typename FLUX, typename FACE>
+          typename FLUX, typename FACE, typename GEO>
 TaskStatus CalculateFluxesReconSelect(MeshData<Real> *md, PKG &pkg, PRIM vp, FLUX vflx,
-                                      FACE vface, const bool pcm) {
+                                      FACE vface, GEO vg, const bool pcm) {
   const auto recon_method = pkg->template Param<ReconstructionMethod>("recon");
 
   // Select CalculateFluxesImpl based on reconstruction method
   typedef ReconstructionMethod S;
   if ((recon_method == ReconstructionMethod::pcm) || (pcm)) {
-    return CalculateFluxesImpl<G, F, C, R, S::pcm>(md, pkg, vp, vflx, vface);
+    return CalculateFluxesImpl<G, F, C, R, S::pcm>(md, pkg, vp, vflx, vface, vg);
   } else if (recon_method == S::plm) {
-    return CalculateFluxesImpl<G, F, C, R, S::plm>(md, pkg, vp, vflx, vface);
+    return CalculateFluxesImpl<G, F, C, R, S::plm>(md, pkg, vp, vflx, vface, vg);
   } else if (recon_method == S::ppm) {
-    return CalculateFluxesImpl<G, F, C, R, S::ppm>(md, pkg, vp, vflx, vface);
+    return CalculateFluxesImpl<G, F, C, R, S::ppm>(md, pkg, vp, vflx, vface, vg);
   } else {
     PARTHENON_FAIL("Reconstruction method not recognized!");
   }
@@ -434,23 +438,32 @@ TaskStatus CalculateFluxesReconSelect(MeshData<Real> *md, PKG &pkg, PRIM vp, FLU
 //! \fn  TaskStatus ArtemisUtils::CalculateFluxesRiemannSelect
 //! \brief Dispatch templated function depending on runtime Riemann solver option.
 template <Coordinates G, Fluid F, Closure C, typename PKG, typename PRIM, typename FLUX,
-          typename FACE>
+          typename FACE, typename GEO>
 TaskStatus CalculateFluxesRiemannSelect(MeshData<Real> *md, PKG &pkg, PRIM vp, FLUX vflx,
-                                        FACE vface, const bool pcm) {
+                                        FACE vface, GEO vg, const bool pcm) {
   const auto riemann_method = pkg->template Param<RSolver>("rsolver");
 
   // Select CalculateFluxesReconSelect based on Riemann solver
   typedef RSolver R;
-  if (riemann_method == R::hllc) {
+  if (riemann_method == R::hllc_general) {
     if constexpr (F != Fluid::radiation && F != Fluid::dust) {
-      return CalculateFluxesReconSelect<G, F, C, R::hllc>(md, pkg, vp, vflx, vface, pcm);
+      return CalculateFluxesReconSelect<G, F, C, R::hllc_general>(md, pkg, vp, vflx,
+                                                                  vface, vg, pcm);
+    } else {
+      PARTHENON_FAIL("Radiation fluid does not support an HLLC solver")
+    }
+  } else if (riemann_method == R::hllc_gamma) {
+    if constexpr (F != Fluid::radiation && F != Fluid::dust) {
+      return CalculateFluxesReconSelect<G, F, C, R::hllc_gamma>(md, pkg, vp, vflx, vface,
+                                                                vg, pcm);
     } else {
       PARTHENON_FAIL("Radiation fluid does not support an HLLC solver")
     }
   } else if (riemann_method == R::hlle) {
-    return CalculateFluxesReconSelect<G, F, C, R::hlle>(md, pkg, vp, vflx, vface, pcm);
+    return CalculateFluxesReconSelect<G, F, C, R::hlle>(md, pkg, vp, vflx, vface, vg,
+                                                        pcm);
   } else if (riemann_method == R::llf) {
-    return CalculateFluxesReconSelect<G, F, C, R::llf>(md, pkg, vp, vflx, vface, pcm);
+    return CalculateFluxesReconSelect<G, F, C, R::llf>(md, pkg, vp, vflx, vface, vg, pcm);
   } else {
     PARTHENON_FAIL("Riemann solver not recognized!");
   }
@@ -460,25 +473,31 @@ TaskStatus CalculateFluxesRiemannSelect(MeshData<Real> *md, PKG &pkg, PRIM vp, F
 //! \fn  TaskStatus ArtemisUtils::CalculateFluxes
 //! \brief Hierarchically dispatch templated function depending on runtime coord system
 template <Fluid F, Closure C = Closure::null, typename PKG, typename PRIM, typename FLUX,
-          typename FACE>
+          typename FACE, typename GEO>
 TaskStatus CalculateFluxes(MeshData<Real> *md, PKG &pkg, PRIM vp, FLUX vflx, FACE vf,
-                           const bool dc) {
+                           GEO vg, const bool dc) {
   const auto sys = pkg->template Param<Coordinates>("coords");
 
   // Select CalculateFluxesRiemannSelect based on coordinate system
   typedef Coordinates G;
   if (sys == G::cartesian) {
-    return CalculateFluxesRiemannSelect<G::cartesian, F, C>(md, pkg, vp, vflx, vf, dc);
+    return CalculateFluxesRiemannSelect<G::cartesian, F, C>(md, pkg, vp, vflx, vf, vg,
+                                                            dc);
   } else if (sys == G::spherical3D) {
-    return CalculateFluxesRiemannSelect<G::spherical3D, F, C>(md, pkg, vp, vflx, vf, dc);
+    return CalculateFluxesRiemannSelect<G::spherical3D, F, C>(md, pkg, vp, vflx, vf, vg,
+                                                              dc);
   } else if (sys == G::spherical1D) {
-    return CalculateFluxesRiemannSelect<G::spherical1D, F, C>(md, pkg, vp, vflx, vf, dc);
+    return CalculateFluxesRiemannSelect<G::spherical1D, F, C>(md, pkg, vp, vflx, vf, vg,
+                                                              dc);
   } else if (sys == G::spherical2D) {
-    return CalculateFluxesRiemannSelect<G::spherical2D, F, C>(md, pkg, vp, vflx, vf, dc);
+    return CalculateFluxesRiemannSelect<G::spherical2D, F, C>(md, pkg, vp, vflx, vf, vg,
+                                                              dc);
   } else if (sys == G::cylindrical) {
-    return CalculateFluxesRiemannSelect<G::cylindrical, F, C>(md, pkg, vp, vflx, vf, dc);
+    return CalculateFluxesRiemannSelect<G::cylindrical, F, C>(md, pkg, vp, vflx, vf, vg,
+                                                              dc);
   } else if (sys == G::axisymmetric) {
-    return CalculateFluxesRiemannSelect<G::axisymmetric, F, C>(md, pkg, vp, vflx, vf, dc);
+    return CalculateFluxesRiemannSelect<G::axisymmetric, F, C>(md, pkg, vp, vflx, vf, vg,
+                                                               dc);
   } else {
     PARTHENON_FAIL("Coordinate type not recognized!");
   }
@@ -488,9 +507,9 @@ TaskStatus CalculateFluxes(MeshData<Real> *md, PKG &pkg, PRIM vp, FLUX vflx, FAC
 //! \fn  TaskStatus ArtemisUtils::FluxSourceGeomSelect
 //! \brief Dispatch templated function depending on runtime coordinate system.
 template <Fluid F, Closure C = Closure::null, typename PKG, typename PRIM, typename CONS,
-          typename FACE>
+          typename FACE, typename GEO>
 TaskStatus FluxSource(MeshData<Real> *md, PKG &pkg, PRIM vp, CONS vcons, FACE vface,
-                      const Real dt) {
+                      GEO vg, const Real dt) {
   auto pm = md->GetParentPointer();
 
   // Extract rotating frame omega
@@ -504,17 +523,17 @@ TaskStatus FluxSource(MeshData<Real> *md, PKG &pkg, PRIM vp, CONS vcons, FACE vf
   typedef Coordinates G;
   const auto sys = pkg->template Param<Coordinates>("coords");
   if (sys == G::cartesian) {
-    return FluxSourceImpl<G::cartesian, F, C>(md, pkg, vp, vcons, vface, omf, dt);
+    return FluxSourceImpl<G::cartesian, F, C>(md, pkg, vp, vcons, vface, vg, omf, dt);
   } else if (sys == G::spherical3D) {
-    return FluxSourceImpl<G::spherical3D, F, C>(md, pkg, vp, vcons, vface, omf, dt);
+    return FluxSourceImpl<G::spherical3D, F, C>(md, pkg, vp, vcons, vface, vg, omf, dt);
   } else if (sys == G::spherical1D) {
-    return FluxSourceImpl<G::spherical1D, F, C>(md, pkg, vp, vcons, vface, omf, dt);
+    return FluxSourceImpl<G::spherical1D, F, C>(md, pkg, vp, vcons, vface, vg, omf, dt);
   } else if (sys == G::spherical2D) {
-    return FluxSourceImpl<G::spherical2D, F, C>(md, pkg, vp, vcons, vface, omf, dt);
+    return FluxSourceImpl<G::spherical2D, F, C>(md, pkg, vp, vcons, vface, vg, omf, dt);
   } else if (sys == G::cylindrical) {
-    return FluxSourceImpl<G::cylindrical, F, C>(md, pkg, vp, vcons, vface, omf, dt);
+    return FluxSourceImpl<G::cylindrical, F, C>(md, pkg, vp, vcons, vface, vg, omf, dt);
   } else if (sys == G::axisymmetric) {
-    return FluxSourceImpl<G::axisymmetric, F, C>(md, pkg, vp, vcons, vface, omf, dt);
+    return FluxSourceImpl<G::axisymmetric, F, C>(md, pkg, vp, vcons, vface, vg, omf, dt);
   } else {
     PARTHENON_FAIL("Coordinate type not recognized!");
   }

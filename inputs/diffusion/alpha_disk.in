@@ -66,11 +66,13 @@ viscosity = true
 
 <gas>
 cfl = 0.3
-gamma = 1.0001
 reconstruct = plm
-riemann = hllc
+riemann = hllc-general
 dfloor = 1.0e-10
 siefloor = 1.0e-15
+
+<gas/eos/ideal>
+gamma = 1.0001
 
 <gas/viscosity>
 type = alpha

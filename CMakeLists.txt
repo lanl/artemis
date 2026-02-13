@@ -108,10 +108,15 @@ if(ARTEMIS_ENABLE_HDF5)
       "or HDF5 by rerunning CMake with -DARTEMIS_ENABLE_MPI=OFF or "
       "-DARTEMIS_ENABLE_HDF5=OFF")
   endif()
+  set(JAYBENNE_ENABLE_HDF5 ON CACHE BOOL "" FORCE)
   set(SINGULARITY_USE_HDF5 ON CACHE BOOL "" FORCE)
+  set(SINGULARITY_USE_SPINER ON CACHE BOOL "" FORCE)
   set(PARTHENON_DISABLE_HDF5 OFF CACHE BOOL "" FORCE)
 else()
+  set(JAYBENNE_ENABLE_HDF5 OFF CACHE BOOL "" FORCE)
   set(SINGULARITY_USE_HDF5 OFF CACHE BOOL "" FORCE)
+  set(SINGULARITY_USE_SPINER ON CACHE BOOL "" FORCE)
+  set(SINGULARITY_USE_SPINER_WITH_HDF5 OFF CACHE BOOL "" FORCE)
   set(PARTHENON_DISABLE_HDF5 ON CACHE BOOL "" FORCE)
 endif()
 
@@ -148,6 +153,7 @@ if (NOT TARGET parthenon)
   set(PARTHENON_ENABLE_INIT_PACKING ON CACHE BOOL "" FORCE)
   set(PARTHENON_LINT_DEFAULT OFF CACHE BOOL "" FORCE)
   set(PARTHENON_DISABLE_EXAMPLES ON CACHE BOOL "" FORCE)
+  set(PARTHENON_DISABLE_HDF5_COMPRESSION "Disable HDF5 compression" ON)
   set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
   add_subdirectory(external/parthenon parthenon)
 else()
@@ -238,3 +244,49 @@ add_subdirectory(external/jaybenne)
 # Add artemis
 message("\nConfiguring src")
 add_subdirectory(src)
+
+# Configure Catch2 for unit testing
+if (NOT TARGET Catch2::Catch2WithMain)
+  message("Configuring Catch2")
+  set(CATCH_BUILD_TESTING OFF CACHE BOOL "" FORCE)
+  set(CATCH_INSTALL_DOCS OFF CACHE BOOL "" FORCE)
+  set(CATCH_INSTALL_EXTRAS OFF CACHE BOOL "" FORCE)
+  add_subdirectory(external/Catch2 Catch2)
+else()
+  message(STATUS "Catch2 already configured in this build, skipping.")
+endif()
+
+# Enable testing
+enable_testing()
+
+# Add unit tests
+message("\nConfiguring unit tests")
+add_subdirectory(tst/unit)
+
+# Add regression tests
+message("\nConfiguring regression tests")
+find_package(Python3 COMPONENTS Interpreter)
+if(Python3_FOUND)
+  # Determine which test suite to run based on GPU support
+  if(ARTEMIS_ENABLE_CUDA OR ARTEMIS_ENABLE_HIP)
+    set(REGRESSION_SUITE "gpu.suite")
+  else()
+    set(REGRESSION_SUITE "regression.suite")
+  endif()
+  
+  # Add the regression test
+  add_test(
+    NAME regression
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tst/run_tests.py
+            ${REGRESSION_SUITE} --cwd
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+  )
+  
+  # Set label for regression test
+  set_tests_properties(regression PROPERTIES LABELS "regression")
+  
+  message(STATUS "Regression test suite: ${REGRESSION_SUITE}")
+  message(STATUS "Regression test command: ${Python3_EXECUTABLE} run_tests.py ${REGRESSION_SUITE} --cwd")
+else()
+  message(WARNING "Python3 not found. Regression tests will not be available via CTest.")
+endif()

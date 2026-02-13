@@ -38,6 +38,7 @@ void PrintArtemisConfiguration(Packages_t &packages) {
     std::string hfill(21, ' ');
     std::string msg = "";
     if (params.Get<bool>("do_gas")) msg += "Gas\n";
+    if (!params.Get<bool>("update_fluxes")) msg += "(without flux updates)\n";
     if (params.Get<bool>("do_dust")) msg += hfill + "Dust\n";
     if (params.Get<bool>("do_gravity")) msg += hfill + "Gravity\n";
     if (params.Get<bool>("do_rotating_frame")) msg += hfill + "Rotating frame\n";
@@ -198,6 +199,18 @@ ReconstructionMethod ChooseReconMethod(std::string recon) {
   }
   PARTHENON_FAIL("Reconstruction method not recognized.");
   return ReconstructionMethod::pcm;
+}
+
+bool CoarseNeighbor(MeshBlock *pmb) {
+  bool has_coarser = false;
+  const int mylevel = pmb->loc.level();
+  for (const auto &nb : pmb->neighbors) {
+    if (nb.origin_loc.level() < mylevel) {
+      has_coarser = true;
+      break;
+    }
+  }
+  return has_coarser;
 }
 
 } // namespace ArtemisUtils

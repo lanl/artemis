@@ -69,6 +69,7 @@ inline void InitShockParams(MeshBlock *pmb, ParameterInput *pin) {
 //! \brief Sets initial conditions for shock problem
 template <Coordinates GEOM>
 inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
+  PARTHENON_INSTRUMENT
   using parthenon::MakePackDescriptor;
 
   // Extract parameters from packages
@@ -96,6 +97,8 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
                          rad::prim::energy, rad::prim::flux>(
           (pmb->resolved_packages).get());
   auto v = desc.GetPack(md.get());
+  static auto desc_g = MakePackDescriptor<geom::x1v>((pmb->resolved_packages).get());
+  auto vg = desc_g.GetPack(md.get());
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
@@ -110,8 +113,8 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       "shock", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
         geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
-        const auto &xi = coords.GetCellCenter();
-        const bool upwind = (xi[0] <= shkp.xdisc);
+        const auto xi = coords.x1v();
+        const bool upwind = (xi <= shkp.xdisc);
         const Real rho = upwind ? shkp.rhol : shkp.rhor;
         const Real vx = upwind ? shkp.vxl : shkp.vxr;
         const Real T = upwind ? shkp.tl : shkp.tr;
@@ -136,9 +139,11 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 //! \fn void ProblemGenerator::ShockInnerX1()
 template <Coordinates GEOM>
 inline void ShockInnerX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) {
+  PARTHENON_INSTRUMENT
   using parthenon::MakePackDescriptor;
   using TE = parthenon::TopologicalElement;
   auto pmb = mbd->GetBlockPointer();
+  if (coarse && !ArtemisUtils::CoarseNeighbor(pmb)) return;
 
   auto artemis_pkg = pmb->packages.Get("artemis");
   const bool do_moment = artemis_pkg->Param<bool>("do_moment");
@@ -186,9 +191,11 @@ inline void ShockInnerX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse)
 //! \fn void ProblemGenerator::ShockOuterX1()
 template <Coordinates GEOM>
 inline void ShockOuterX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) {
+  PARTHENON_INSTRUMENT
   using parthenon::MakePackDescriptor;
   using TE = parthenon::TopologicalElement;
   auto pmb = mbd->GetBlockPointer();
+  if (coarse && !ArtemisUtils::CoarseNeighbor(pmb)) return;
 
   auto artemis_pkg = pmb->packages.Get("artemis");
   const bool do_moment = artemis_pkg->Param<bool>("do_moment");

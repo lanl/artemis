@@ -80,7 +80,9 @@ self_gravity = true
 <gas>
 cfl = 0.9
 reconstruct = plm
-riemann = hllc
+riemann = hllc-gamma
+
+<gas/eos/ideal>
 gamma = 2.0
 
 <self_gravity>

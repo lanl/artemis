@@ -26,6 +26,8 @@ set (SRC_LIST
 
   dust/dust.cpp
   dust/dust.hpp
+  dust/coagulation/coagulation.cpp
+  dust/coagulation/coagulation.hpp
 
   gas/gas.cpp
   gas/gas.hpp
@@ -33,6 +35,7 @@ set (SRC_LIST
   gas/cooling/cooling.cpp
   gas/cooling/cooling.hpp
 
+  geometry/geometry.cpp
   geometry/geometry.hpp
   geometry/spherical.hpp
   geometry/cylindrical.hpp
@@ -57,6 +60,7 @@ set (SRC_LIST
   pgen/advection.hpp
   pgen/beam.hpp
   pgen/blast.hpp
+  pgen/coag.hpp
   pgen/conduction.hpp
   pgen/constant.hpp
   pgen/disk.hpp
@@ -80,6 +84,8 @@ set (SRC_LIST
   radiation/moments/moments.hpp
   radiation/moments/moments_driver.cpp
   radiation/moments/matter_coupling.hpp
+  radiation/raytrace/raytrace.cpp
+  radiation/raytrace/raytrace.hpp
 
   rotating_frame/advection_driver.cpp
   rotating_frame/rotating_frame.cpp
@@ -126,6 +132,10 @@ set (SRC_LIST
 
 if (ARTEMIS_PORTABLE_RESTART)
   add_compile_definitions(PORTABLE_RESTART)
+endif()
+
+if (ARTEMIS_ENABLE_SESAME_EOS)
+  add_compile_definitions(WITH_SESAME)
 endif()
 
 # Generate library

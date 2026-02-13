@@ -29,6 +29,7 @@ namespace ArtemisDerived {
 //! NOTE(PDM): Note that this function is not called during remeshing.
 template <Coordinates GEOM>
 TaskStatus SetAuxillaryFields(MeshData<Real> *md) {
+  PARTHENON_INSTRUMENT
   using parthenon::MakePackDescriptor;
   auto pm = md->GetParentPointer();
   auto &resolved_pkgs = pm->resolved_packages;
@@ -48,6 +49,9 @@ TaskStatus SetAuxillaryFields(MeshData<Real> *md) {
       MakePackDescriptor<gas::cons::density, gas::cons::momentum, gas::cons::total_energy,
                          gas::cons::internal_energy>(resolved_pkgs.get());
   auto vmesh = desc.GetPack(md);
+  static auto desc_g =
+      MakePackDescriptor<geom::hx1v, geom::hx2v, geom::hx3v>(resolved_pkgs.get());
+  auto vg = desc_g.GetPack(md);
   IndexRange ib = md->GetBoundsI(IndexDomain::interior);
   IndexRange jb = md->GetBoundsJ(IndexDomain::interior);
   IndexRange kb = md->GetBoundsK(IndexDomain::interior);
@@ -62,7 +66,7 @@ TaskStatus SetAuxillaryFields(MeshData<Real> *md) {
         // Extract geometry
         geometry::Coords<GEOM> coords(cpars, vmesh.GetCoordinates(b), k, j, i);
 
-        const auto &hx = coords.GetScaleFactors();
+        const auto &hx = coords.GetScaleFactors(vg, b, k, j, i);
 
         for (int n = 0; n < vmesh.GetSize(b, gas::cons::density()); ++n) {
           // Extract state vector
@@ -91,6 +95,7 @@ TaskStatus SetAuxillaryFields(MeshData<Real> *md) {
 //! or remeshing event in preparation for FillGhost
 template <Coordinates GEOM>
 void ConsToPrim(MeshData<Real> *md) {
+  PARTHENON_INSTRUMENT
   using parthenon::MakePackDescriptor;
   auto pm = md->GetParentPointer();
   auto &resolved_pkgs = pm->resolved_packages;
@@ -131,6 +136,9 @@ void ConsToPrim(MeshData<Real> *md) {
       dust::cons::momentum, dust::prim::density, dust::prim::velocity, rad::cons::energy,
       rad::cons::flux, rad::prim::energy, rad::prim::flux>(resolved_pkgs.get());
   auto vmesh = desc.GetPack(md);
+  static auto desc_g = MakePackDescriptor<geom::x1v, geom::x2v, geom::x3v, geom::hx1v,
+                                          geom::hx2v, geom::hx3v>(resolved_pkgs.get());
+  auto vg = desc_g.GetPack(md);
   const int nblocks = md->NumBlocks();
   IndexRange ib = md->GetBoundsI(IndexDomain::interior);
   IndexRange jb = md->GetBoundsJ(IndexDomain::interior);
@@ -142,8 +150,8 @@ void ConsToPrim(MeshData<Real> *md) {
       KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
         // Extract coordinates
         geometry::Coords<GEOM> coords(cpars, vmesh.GetCoordinates(b), k, j, i);
-        const auto &xv = coords.GetCellCenter();
-        const auto &hx = coords.GetScaleFactors();
+        const auto &xv = coords.GetCellCenter(vg, b, k, j, i);
+        const auto &hx = coords.GetScaleFactors(vg, b, k, j, i);
 
         if (do_gas) {
           for (int n = 0; n < vmesh.GetSize(b, gas::prim::density()); ++n) {
@@ -218,6 +226,7 @@ void ConsToPrim(MeshData<Real> *md) {
 //! \brief Executes P2C following integrator updates and/or remeshing events
 template <typename T, Coordinates GEOM>
 void PrimToCons(T *md) {
+  PARTHENON_INSTRUMENT
   using parthenon::MakePackDescriptor;
   auto pm = md->GetParentPointer();
   auto &resolved_pkgs = pm->resolved_packages;
@@ -260,11 +269,14 @@ void PrimToCons(T *md) {
       MakePackDescriptor<gas::cons::density, gas::cons::momentum, gas::cons::total_energy,
                          gas::cons::internal_energy, gas::prim::density,
                          gas::prim::velocity, gas::prim::pressure, gas::prim::sie,
-                         dust::cons::density, dust::cons::momentum, dust::prim::density,
-                         dust::prim::velocity, rad::cons::energy, rad::cons::flux,
-                         rad::prim::energy, rad::prim::flux, rad::prim::pressure>(
-          resolved_pkgs.get());
+                         gas::prim::bmod, gas::prim::temperature, dust::cons::density,
+                         dust::cons::momentum, dust::prim::density, dust::prim::velocity,
+                         rad::cons::energy, rad::cons::flux, rad::prim::energy,
+                         rad::prim::flux, rad::prim::pressure>(resolved_pkgs.get());
   auto vmesh = desc.GetPack(md);
+  static auto desc_g = MakePackDescriptor<geom::x1v, geom::x2v, geom::x3v, geom::hx1v,
+                                          geom::hx2v, geom::hx3v>(resolved_pkgs.get());
+  auto vg = desc_g.GetPack(md);
   IndexRange ibe = md->GetBoundsI(IndexDomain::entire);
   IndexRange jbe = md->GetBoundsJ(IndexDomain::entire);
   IndexRange kbe = md->GetBoundsK(IndexDomain::entire);
@@ -275,8 +287,8 @@ void PrimToCons(T *md) {
       KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
         // Extract coordinates
         geometry::Coords<GEOM> coords(cpars, vmesh.GetCoordinates(b), k, j, i);
-        const auto &xv = coords.GetCellCenter();
-        const auto &hx = coords.GetScaleFactors();
+        const auto &xv = coords.GetCellCenter(vg, b, k, j, i);
+        const auto &hx = coords.GetScaleFactors(vg, b, k, j, i);
 
         if (do_gas) {
           Real lambda[ArtemisUtils::lambda_max_vals] = {Null<Real>()};
@@ -302,11 +314,15 @@ void PrimToCons(T *md) {
             // Sync primtive sie, pressure, and conserved internal energy
             Real &w_s = vmesh(b, gas::prim::sie(n), k, j, i);
             Real &w_p = vmesh(b, gas::prim::pressure(n), k, j, i);
+            Real &w_b = vmesh(b, gas::prim::bmod(n), k, j, i);
+            Real &w_t = vmesh(b, gas::prim::temperature(n), k, j, i);
             Real &u_u = vmesh(b, gas::cons::internal_energy(n), k, j, i);
             const bool siefloor = (w_s > sieflr_gas);
             w_s = (siefloor)*w_s + (!siefloor) * sieflr_gas;
             u_u = w_s * u_d;
             w_p = eos_d.PressureFromDensityInternalEnergy(w_d, w_s, lambda);
+            w_b = eos_d.BulkModulusFromDensityInternalEnergy(w_d, w_s, lambda);
+            w_t = eos_d.TemperatureFromDensityInternalEnergy(w_d, w_s, lambda);
 
             // Sync conserved total energy
             const Real ke = 0.5 * w_d * (SQR(vel1) + SQR(vel2) + SQR(vel3));
@@ -374,6 +390,7 @@ void PrimToCons(T *md) {
 //! but before PreCommFillDerived
 template <Coordinates GEOM>
 void PostInitialization(MeshBlock *pmb, ParameterInput *pin) {
+  PARTHENON_INSTRUMENT
   auto &md = pmb->meshblock_data.Get();
   PrimToCons<MeshBlockData<Real>, GEOM>(md.get());
 }
@@ -383,6 +400,7 @@ void PostInitialization(MeshBlock *pmb, ParameterInput *pin) {
 //! \brief Syncs unsplit fields following an operator split update
 template <Coordinates GEOM>
 TaskCollection SyncFields(Mesh *pmesh, const Real time, const Real dt) {
+  PARTHENON_INSTRUMENT
   using namespace ::parthenon::Update;
   TaskCollection tc;
   TaskID none(0);

@@ -47,6 +47,7 @@ static BumpParams bump_params;
 //! \brief
 template <Coordinates GEOM>
 inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
+  PARTHENON_INSTRUMENT
   using parthenon::MakePackDescriptor;
 
   auto pm = pmb->pmy_mesh;
@@ -64,6 +65,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   bump_params.vfac = pin->GetOrAddReal("problem", "vx2_bump", 0.0);
   bump_params.wfac = pin->GetOrAddReal("problem", "vx3_bump", 0.0);
 
+  ArtemisUtils::EOS eos;
   if (do_gas) {
     auto gas_pkg = pmb->packages.Get("gas");
     PARTHENON_REQUIRE((gas_pkg->Param<int>("nspecies") == 1),
@@ -73,6 +75,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
     bump_params.g_vx2 = pin->GetOrAddReal("problem", "gas_vx2", 0.0);
     bump_params.g_vx3 = pin->GetOrAddReal("problem", "gas_vx3", 0.0);
     bump_params.g_pres = pin->GetOrAddReal("problem", "gas_pres", 1.0);
+    eos = gas_pkg->Param<ArtemisUtils::EOS>("eos_d");
   }
   if (do_dust) {
     auto dust_pkg = pmb->packages.Get("dust");
@@ -94,6 +97,9 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
                          dust::prim::density, dust::prim::velocity>(
           (pmb->resolved_packages).get());
   auto v = desc.GetPack(md.get());
+  static auto desc_g =
+      MakePackDescriptor<geom::x1v, geom::x2v, geom::x3v>((pmb->resolved_packages).get());
+  auto vg = desc_g.GetPack(md.get());
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
@@ -109,8 +115,6 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   const bool multi_d = (pm->ndim >= 2);
   const bool three_d = (pm->ndim == 3);
-  const Real gamma = pin->GetReal("gas", "gamma");
-  const Real cv = 1.0 / (gamma - 1.);
 
   const auto &cpars =
       pm->packages.Get("artemis")->template Param<geometry::CoordParams>("coord_params");
@@ -118,7 +122,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       "constant", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
         geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
-        const auto &xi = coords.GetCellCenter();
+        const auto &xi = coords.GetCellCenter(vg, 0, k, j, i);
 
         auto xo = NewArray<Real, 3>();
         auto ex1 = NewArray<Real, 3>();
@@ -167,16 +171,24 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           v(0, gas::prim::velocity(0), k, j, i) = vx1 + pars.ufac * bump;
           v(0, gas::prim::velocity(1), k, j, i) = vx2 + pars.vfac * bump;
           v(0, gas::prim::velocity(2), k, j, i) = vx3 + pars.wfac * bump;
+          Real tmp = Null<Real>();
+          Real dens = pars.g_rho;
+          Real temp = Null<Real>();
+          Real sie = Null<Real>();
+          Real pres = pars.g_pres;
           if (pars.tfac > 0.0) {
-            // P = const = rho e (gamma-1);  T0*(1 + f)
-            const Real sie0 = pars.g_pres / (pars.g_rho * (gamma - 1.0));
-            const Real sie = sie0 * (1. + pars.tfac * bump);
-            v(0, gas::prim::density(0), k, j, i) = pars.g_pres / (sie * (gamma - 1.0));
-            v(0, gas::prim::sie(0), k, j, i) = sie;
+            // P = const, T = T0*(1 + f)
+            // Input pressure and density to get background T
+            temp = ArtemisUtils::TofPR(eos, pres, dens);
+            temp *= (1. + pars.tfac * bump);
+            // Input pressure and temperature
+            v(0, gas::prim::density(0), k, j, i) = ArtemisUtils::RofPT(eos, pres, temp);
+            v(0, gas::prim::sie(0), k, j, i) = ArtemisUtils::EofPT(eos, pres, temp);
           } else {
-            const Real dens = pars.g_rho * (1. + pars.dfac * bump);
+            dens = pars.g_rho * (1. + pars.dfac * bump);
             v(0, gas::prim::density(0), k, j, i) = dens;
-            v(0, gas::prim::sie(0), k, j, i) = pars.g_pres / ((gamma - 1.0) * dens);
+            // input density and pressure
+            v(0, gas::prim::sie(0), k, j, i) = ArtemisUtils::EofPR(eos, pres, dens);
           }
         }
         if (do_dust) {

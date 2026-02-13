@@ -93,11 +93,13 @@ viscosity = true
 
 <gas>
 cfl = 0.9
-gamma = 1.4
 reconstruct = plm
-riemann = hllc
+riemann = hllc-general
 dfloor = 1.0e-10
-siefloor = 1.0e-15
+siefloor = 1.0e-10
+
+<gas/eos/ideal>
+gamma = 1.4
 
 <gas/viscosity>
 type = alpha
@@ -110,7 +112,6 @@ nspecies = 2
 reconstruct = ppm
 riemann = hlle
 dfloor = 1.0e-10
-pfloor = 1.0e-15
 
 <gravity/point>
 mass = 1.0
@@ -121,8 +122,6 @@ rho0 = 1.0
 dslope = -2.25
 flare = 0.25
 h0 = 0.05
-dens_min = 1.0e-10
-pres_min = 1.0e-15
 polytropic_index = 1
 rcav = 0.8
 rexp = 2.8

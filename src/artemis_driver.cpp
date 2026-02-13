@@ -22,6 +22,7 @@
 #include "artemis.hpp"
 #include "artemis_driver.hpp"
 #include "drag/drag.hpp"
+#include "dust/coagulation/coagulation.hpp"
 #include "dust/dust.hpp"
 #include "gas/cooling/cooling.hpp"
 #include "gas/gas.hpp"
@@ -29,6 +30,7 @@
 #include "nbody/nbody.hpp"
 #include "radiation/imc/imc.hpp"
 #include "radiation/moments/moments.hpp"
+#include "radiation/raytrace/raytrace.hpp"
 #include "rotating_frame/rotating_frame.hpp"
 #include "self_gravity/self_gravity.hpp"
 #include "utils/integrators/artemis_integrator.hpp"
@@ -71,6 +73,12 @@ ArtemisDriver<GEOM>::ArtemisDriver(ParameterInput *pin, ApplicationInput *app_in
   do_diffusion = do_viscosity || do_conduction;
   do_imc = artemis_pkg->template Param<bool>("do_imc");
   do_moment = artemis_pkg->template Param<bool>("do_moment");
+  do_coagulation = artemis_pkg->template Param<bool>("do_coagulation");
+  do_raytrace = artemis_pkg->template Param<bool>("do_raytrace");
+
+  // Update fluxes option--gas fields are needed for radiation temperature updates but for
+  // rad-only test problems turn off advection
+  update_fluxes = artemis_pkg->template Param<bool>("update_fluxes");
 
   // Moments integrator
   if (do_moment) {
@@ -114,23 +122,39 @@ ArtemisDriver<GEOM>::ArtemisDriver(ParameterInput *pin, ApplicationInput *app_in
 //! \brief Assembles the tasks associated with a step for the ArtemisDriver
 template <Coordinates GEOM>
 TaskListStatus ArtemisDriver<GEOM>::Step() {
+  PARTHENON_INSTRUMENT
   // Prepare registers
   PreStepTasks();
-
+  TaskListStatus status = TaskListStatus::complete;
   // Execute explicit, unsplit physics
-  auto status = StepTasks().Execute();
+  if (do_raytrace) {
+    status = RT::RaytraceDriver(pmesh);
+    if (status != TaskListStatus::complete) return status;
+  }
+
+  status = StepTasks().Execute();
   if (status != TaskListStatus::complete) return status;
 
   // Operator split, background linear advection (for shearing box)
-  if (do_shear) status = RotatingFrame::Advect(pmesh, tm);
-  if (status != TaskListStatus::complete) return status;
+  if (do_shear) {
+    status = RotatingFrame::Advect(pmesh, tm);
+    if (status != TaskListStatus::complete) return status;
+  }
 
   // Operator split, IMC/DDMC radiation with Jaybenne
-  if (do_imc) status = IMC::JaybenneIMC<GEOM>(pmesh, tm.time, tm.dt);
-  if (status != TaskListStatus::complete) return status;
+  if (do_imc) {
+    status = IMC::JaybenneIMC<GEOM>(pmesh, tm, tm.dt);
+    if (status != TaskListStatus::complete) return status;
+  }
 
   // Operator split, moments subcyling (M1 or P1)
-  if (do_moment) status = Moments::MomentsDriver<GEOM>(pmesh, tm, rad_integrator.get());
+  if (do_moment) {
+    status = Moments::MomentsDriver<GEOM>(pmesh, tm, rad_integrator.get());
+    if (status != TaskListStatus::complete) return status;
+  }
+
+  // Operator split, dust coagulation
+  if (do_coagulation) status = Dust::Coagulation::CoagulationDriver<GEOM>(pmesh, tm);
   if (status != TaskListStatus::complete) return status;
 
   // Compute new dt, (de)refine, and handle sparse (if enabled)
@@ -147,6 +171,7 @@ TaskListStatus ArtemisDriver<GEOM>::Step() {
 //! \brief Defines the tasks executed prior to the main integrator in the ArtemisDriver
 template <Coordinates GEOM>
 void ArtemisDriver<GEOM>::PreStepTasks() {
+  PARTHENON_INSTRUMENT
   // set the integration timestep
   integrator->dt = tm.dt;
   if (do_nbody) nbody_integrator->dt = tm.dt;
@@ -164,11 +189,14 @@ void ArtemisDriver<GEOM>::PreStepTasks() {
 
   // Assign registers with fields required for moments
   if (do_moment) {
-    parthenon::Metadata::FlagCollection moments_flags;
+    parthenon::Metadata::FlagCollection moments_flags, geom_flags;
     moments_flags.TakeUnion(pmesh->packages.Get("moments")->GetMetadataFlag());
+    geom_flags.TakeUnion(pmesh->packages.Get("geometry")->GetMetadataFlag());
     auto moment_names = pmesh->GetVariableNames(moments_flags);
+    auto geom_names = pmesh->GetVariableNames(geom_flags);
     auto coupling_names = unsplit_names;
     coupling_names.insert(coupling_names.end(), moment_names.begin(), moment_names.end());
+    moment_names.insert(moment_names.end(), geom_names.begin(), geom_names.end());
     auto &u0c = pmesh->mesh_data.AddShallow("u0c", base, coupling_names);
     auto &u0m = pmesh->mesh_data.AddShallow("u0m", base, moment_names);
     auto &u1m = pmesh->mesh_data.Add("u1m", u0m);
@@ -180,6 +208,7 @@ void ArtemisDriver<GEOM>::PreStepTasks() {
 //! \brief Defines the main integrator's TaskCollection for the ArtemisDriver
 template <Coordinates GEOM>
 TaskCollection ArtemisDriver<GEOM>::StepTasks() {
+  PARTHENON_INSTRUMENT
   using TQ = TaskQualifier;
   using namespace ::parthenon::Update;
   TaskCollection tc;
@@ -225,7 +254,8 @@ TaskCollection ArtemisDriver<GEOM>::StepTasks() {
       // NOTE(@adempsey): 1st stage of VL2 uses piecewise constant reconstruction
       const bool do_pcm = ((stage == 1) && (integrator->GetName() == "vl2"));
       TaskID gas_flx = none, dust_flx = none;
-      if (do_gas) gas_flx = tl.AddTask(none, Gas::CalculateFluxes, u0.get(), do_pcm);
+      if (do_gas && update_fluxes)
+        gas_flx = tl.AddTask(none, Gas::CalculateFluxes, u0.get(), do_pcm);
       if (do_dust) dust_flx = tl.AddTask(none, Dust::CalculateFluxes, u0.get(), do_pcm);
 
       // Compute (gas) diffusive fluxes
@@ -270,18 +300,23 @@ TaskCollection ArtemisDriver<GEOM>::StepTasks() {
       }
 
       // Apply self-gravity source term
-      TaskID self_gravity_src = gas_coord_src | dust_coord_src | gas_diff_src;
+      TaskID self_gravity_src = gravity_src;
       if (do_self_gravity) {
         self_gravity_src =
-            tl.AddTask(gas_coord_src | dust_coord_src | gas_diff_src,
-                       SelfGravity::SelfGravity<GEOM>, u0.get(), time, bdt);
+            tl.AddTask(gravity_src, SelfGravity::SelfGravity<GEOM>, u0.get(), time, bdt);
+      }
+
+      TaskID rt_src = self_gravity_src;
+      // Note that radiation moments will handle this source term if active
+      if (do_raytrace && !do_moment) {
+        rt_src = tl.AddTask(self_gravity_src, Gas::DepositEnergy, u0.get(), bdt);
       }
 
       // Apply rotating frame source term
-      TaskID rframe_src = gravity_src | self_gravity_src;
+      TaskID rframe_src = rt_src;
       if (do_rotating_frame) {
-        rframe_src = tl.AddTask(gravity_src | self_gravity_src,
-                                RotatingFrame::RotatingFrameForce, u0.get(), time, bdt);
+        rframe_src =
+            tl.AddTask(rt_src, RotatingFrame::RotatingFrameForce, u0.get(), time, bdt);
       }
 
       // Apply drag source term
@@ -329,6 +364,7 @@ TaskCollection ArtemisDriver<GEOM>::StepTasks() {
 //! \brief Defines the TaskCollection for post step tasks in the ArtemisDriver
 template <Coordinates GEOM>
 TaskCollection ArtemisDriver<GEOM>::PostStepTasks() {
+  PARTHENON_INSTRUMENT
   using namespace ::parthenon::Update;
   TaskCollection tc;
   TaskID none(0);

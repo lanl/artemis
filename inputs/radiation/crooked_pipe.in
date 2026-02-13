@@ -1,0 +1,116 @@
+
+//========================================================================================
+// (C) (or copyright) 2026. Triad National Security, LLC. All rights reserved.
+//
+// This program was produced under U.S. Government contract 89233218CNA000001 for Los
+// Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
+// for the U.S. Department of Energy/National Nuclear Security Administration. All rights
+// in the program are reserved by Triad National Security, LLC, and the U.S. Department
+// of Energy/National Nuclear Security Administration. The Government is granted for
+// itself and others acting on its behalf a nonexclusive, paid-up, irrevocable worldwide
+// license in this material to reproduce, prepare derivative works, distribute copies to
+// the public, perform publicly and display publicly, and to permit others to do so.
+//========================================================================================
+<artemis>
+problem = crooked_pipe  # name of the pgen
+coordinates = cartesian
+physical_units = cgs     # not scale-free
+unit_conversion = base   # [L/T/M/Temp] = 1
+
+<parthenon/job>
+problem_id = crooked_pipe  # problem ID: basename of output filenames
+<parthenon/output1>
+variables = gas.prim.density,   &
+            gas.prim.velocity,  &
+            gas.prim.pressure, &
+            gas.prim.sie,      &
+            field.jaybenne.energy_tally
+file_type = hdf5  # HDF5 data dump
+dt        = 5.0e-8 # time increment between outputs
+#ghost_zones = true # output ghost zones
+use_final_label  = false
+
+<parthenon/time>
+nlim       = 1500   # cycle limit
+tlim       = 2.5e-6 # time limit
+integrator = rk2    # time integration algorithm
+ncycle_out = 1      # interval for stdout summary info
+dt_init = 1.0e-11
+dt_factor = 1.1
+dt_ceil = 1.0e-8
+
+<parthenon/mesh>
+#refinement = static # Enable static mesh refinement
+nx1 = 180
+x1min  = -2.0      # minimum value of X1
+x1max  = 7.0    # maximum value of X1
+ix1_bc = reflecting  # Inner-X1 boundary condition flag
+ox1_bc = outflow    # Outer-X1 boundary condition flag
+nx2    = 80        # Number of zones in X2-direction
+x2min  = -2.0       # minimum value of X2
+x2max  = 2.0       # maximum value of X2
+ix2_bc = reflecting   # Inner-X2 boundary condition flag
+ox2_bc = outflow   # Outer-X2 boundary condition flag
+nx3    = 1        # Number of zones in X3-direction
+x3min  = -0.5      # minimum value of X3
+x3max  = 0.5   # maximum value of X3
+ix3_bc = reflecting  # Inner-X3 boundary condition flag
+ox3_bc = reflecting  # Outer-X3 boundary condition flag
+nghost = 2
+#refinement = adaptive
+#numlevel = 2
+
+<parthenon/meshblock>
+nx1 = 20  # Number of cells in each MeshBlock, X1-dir
+nx2 = 20  # Number of cells in each MeshBlock, X2-dir
+nx3 = 1   # Number of cells in each MeshBlock, X3-dir
+
+<physics>
+gas = true
+gravity = false
+rotating_frame = false
+radiation = true
+
+# from thermalization
+<gas>
+cfl = 0.8
+reconstruct = plm
+riemann = hllc-general
+dfloor = 1.0e-10
+siefloor = 1.0e-10
+update_fluxes= false # radiation only problem
+
+# from thermalization
+<gas/eos/ideal>
+gamma = 1.4  # adiabatic index
+mu = 28.96   # mean molecular weight
+<gas/opacity/absorption>
+opacity_model = constant
+kappa_a = 0.2
+
+# from thermalization
+<problem>
+rho0 = 1.0
+h  = 0.1
+t_init = 1.1e4
+t_source = 5.8e6
+rho_thin = 0.01
+rho_thick = 10.0
+
+<parthenon/swarm>
+ix1_bc = jaybenne_reflecting # inner-X1 boundary flag for swarms
+ox1_bc = outflow  # outer-X1 boundary flag for swarms
+ix2_bc = jaybenne_reflecting  # inner-X2 boundary flag for swarms
+ox2_bc = outflow  # outer-X2 boundary flag for swarms
+ix3_bc = jaybenne_reflecting # inner-X3 boundary flag for swarms
+ox3_bc = jaybenne_reflecting # outer-X3 boundary flag for swarms
+
+<crooked_pipe>
+
+<radiation/imc>
+do_emission = true
+num_particles = 8000000 # particle resolution
+use_ddmc = false          # use DDMC?
+cutoff = 1.0e-6           # default is 1.0e-6
+emit_temp_threshold = 1.2e4 # from ryan, 1.1e4 is background
+#min_swarm_occupancy = 0.5

@@ -23,18 +23,19 @@ namespace Gravity {
 //----------------------------------------------------------------------------------------
 //! \fn  void Gravity::NBodyGravityImpl
 //! \brief Process fluids, applying effects of gravitational accelerations and accretion
-template <Coordinates GEOM, typename V1>
+template <Coordinates GEOM, typename V1, typename V2>
 KOKKOS_INLINE_FUNCTION void
-NBodyGravityImpl(V1 vmesh, const geometry::Coords<GEOM> &coords,
+NBodyGravityImpl(V1 &vmesh, V2 &vg, const geometry::Coords<GEOM> &coords,
                  const NBody::Particle &pl, ArtemisUtils::array_type<Real, 7> &lforce,
                  const int b, const int k, const int j, const int i, const bool do_gas,
                  const bool do_dust, const Real qshear, const Real omb, const Real omf,
                  const Real time, const Real dt) {
   // Extract coordinates
-  const auto &x = coords.GetCellCenter();
+
+  const auto &x = coords.GetCellCenter(vg, b, k, j, i);
   const auto &[xcart, ex1, ex2, ex3] = coords.ConvertToCartWithVec(x);
-  const auto &hx = coords.GetScaleFactors();
-  const Real vol = coords.Volume();
+  const auto &hx = coords.GetScaleFactors(vg, b, k, j, i);
+  const Real vol = coords.GetVolume(vg, b, k, j, i);
 
   // Compute gravitational acceleration
   Real g[3] = {0.0};
@@ -68,10 +69,9 @@ NBodyGravityImpl(V1 vmesh, const geometry::Coords<GEOM> &coords,
                          vmesh(b, gas::prim::velocity(VI(n, 1)), k, j, i),
                          vmesh(b, gas::prim::velocity(VI(n, 2)), k, j, i)};
       // Transform velocity to Cartesian
-      auto vcart = NewArray<Real, 3>();
-      vcart[0] = ex1[0] * v[0] + ex2[0] * v[1] + ex3[0] * v[2];
-      vcart[1] = ex1[1] * v[0] + ex2[1] * v[1] + ex3[1] * v[2];
-      vcart[2] = ex1[2] * v[0] + ex2[2] * v[1] + ex3[2] * v[2];
+      std::array<Real, 3> vcart{ex1[0] * v[0] + ex2[0] * v[1] + ex3[0] * v[2],
+                                ex1[1] * v[0] + ex2[1] * v[1] + ex3[1] * v[2],
+                                ex1[2] * v[0] + ex2[2] * v[1] + ex3[2] * v[2]};
 
       // Mass accretion
       Real dm = 0.0;
@@ -162,6 +162,7 @@ NBodyGravityImpl(V1 vmesh, const geometry::Coords<GEOM> &coords,
 //! \brief Applies accelerations due to collection of point masses
 template <Coordinates GEOM>
 TaskStatus NBodyGravity(MeshData<Real> *md, const Real time, const Real dt) {
+  PARTHENON_INSTRUMENT
   using parthenon::MakePackDescriptor;
   using TE = parthenon::TopologicalElement;
   auto pm = md->GetParentPointer();
@@ -204,6 +205,10 @@ TaskStatus NBodyGravity(MeshData<Real> *md, const Real time, const Real dt) {
                          gas::prim::sie, dust::prim::density, dust::prim::velocity>(
           resolved_pkgs.get());
   auto vmesh = desc.GetPack(md);
+  static auto desc_g =
+      MakePackDescriptor<geom::x1v, geom::x2v, geom::x3v, geom::hx1v, geom::hx2v,
+                         geom::hx3v, geom::vol>(resolved_pkgs.get());
+  auto vg = desc_g.GetPack(md);
   const auto ib = md->GetBoundsI(IndexDomain::interior);
   const auto jb = md->GetBoundsJ(IndexDomain::interior);
   const auto kb = md->GetBoundsK(IndexDomain::interior);
@@ -217,8 +222,8 @@ TaskStatus NBodyGravity(MeshData<Real> *md, const Real time, const Real dt) {
                       ArtemisUtils::array_type<Real, 7> &lsum) {
           if (particles(n).couple) {
             const geometry::Coords<GEOM> coords(cpars, vmesh.GetCoordinates(b), k, j, i);
-            NBodyGravityImpl<GEOM>(vmesh, coords, particles(n), lsum, b, k, j, i, do_gas,
-                                   do_dust, qshear, omb, omf, time, dt);
+            NBodyGravityImpl<GEOM>(vmesh, vg, coords, particles(n), lsum, b, k, j, i,
+                                   do_gas, do_dust, qshear, omb, omf, time, dt);
           }
         },
         ArtemisUtils::SumMyArray<Real, Kokkos::HostSpace, 7>(lforce));
@@ -237,9 +242,9 @@ TaskStatus NBodyGravity(MeshData<Real> *md, const Real time, const Real dt) {
 //! \fn  Real Gravity::NBodyPotential
 //! \brief
 template <Coordinates GEOM>
-KOKKOS_INLINE_FUNCTION Real NBodyPotential(geometry::Coords<GEOM> &coords,
+KOKKOS_INLINE_FUNCTION Real NBodyPotential(const geometry::Coords<GEOM> &coords,
                                            const std::array<Real, 3> &xv,
-                                           ParArray1D<NBody::Particle> particles,
+                                           const ParArray1D<NBody::Particle> particles,
                                            const int npart) {
   const auto &xcart = coords.ConvertToCart(xv);
   Real pot = 0.0;

@@ -1,0 +1,760 @@
+//========================================================================================
+// (C) (or copyright) 2025. Triad National Security, LLC. All rights reserved.
+//
+// This program was produced under U.S. Government contract 89233218CNA000001 for Los
+// Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
+// for the U.S. Department of Energy/National Nuclear Security Administration. All rights
+// in the program are reserved by Triad National Security, LLC, and the U.S. Department
+// of Energy/National Nuclear Security Administration. The Government is granted for
+// itself and others acting on its behalf a nonexclusive, paid-up, irrevocable worldwide
+// license in this material to reproduce, prepare derivative works, distribute copies to
+// the public, perform publicly and display publicly, and to permit others to do so.
+//========================================================================================
+#ifndef UTILS_EOS_IDEAL_H_HE_HPP_
+#define UTILS_EOS_IDEAL_H_HE_HPP_
+
+#include <cstdio>
+#ifdef SPINER_USE_HDF
+#include <hdf5.h>
+#include <hdf5_hl.h>
+#endif
+#include <singularity-eos/base/robust_utils.hpp>
+#include <singularity-eos/base/root-finding-1d/root_finding.hpp>
+#include <singularity-eos/base/spiner_table_utils.hpp>
+#include <singularity-eos/eos/eos.hpp>
+
+namespace ArtemisEOS {
+
+struct Mixture {
+  Real x, y, z1, z2;
+  Real dxdt, dydt, dz1dt, dz2dt;
+  Real dxdr, dydr, dz1dr, dz2dr;
+};
+struct H2Partition {
+  Real Z, dZ, d2Z;
+};
+
+// NOTE(@adempsey)
+// This implements the ideal gas H-He mixture EOS defined in
+// D'Angelo & Bodenheimer, 2013, ApJ 778.
+class IdealHHe : public singularity::eos_base::EosBase<IdealHHe> {
+  friend class singularity::table_utils::SpinerTricks<IdealHHe>;
+
+ public:
+  using DataBox = Spiner::DataBox<Real>;
+  IdealHHe() = default;
+  IdealHHe(Real X, Real Y, Real ltmin, Real ltmax, int nt, Real ldmin, Real ldmax, int nd,
+           const std::string &save_to_file, bool use_table = true, Real dlnT = 1e-6,
+           Real Eoffset = 0, int max_iters = 100,
+           const singularity::MeanAtomicProperties &AZbar =
+               singularity::MeanAtomicProperties())
+      : _X(X), _Y(Y), lTmin(ltmin), lTmax(ltmax), nt(nt), lDmin(ldmin), lDmax(ldmax),
+        nd(nd), use_table(use_table), _dlnT(dlnT), Eoffset(Eoffset), ITER_MAX(max_iters),
+        _AZbar(AZbar) {
+    _fp = 0.25;
+    _fo = 1. - _fp;
+    CheckParams();
+    FillTable(save_to_file);
+  }
+  IdealHHe(Real X, Real Y, Real dlnT = 1e-6, int max_iters = 100,
+           const singularity::MeanAtomicProperties &AZbar =
+               singularity::MeanAtomicProperties())
+      : _X(X), _Y(Y), lTmin(0.0), lTmax(0.0), nt(0), lDmin(0.0), lDmax(0.0), nd(0),
+        Eoffset(0), use_table(false), _dlnT(dlnT), ITER_MAX(max_iters), _AZbar(AZbar) {
+    _fp = 0.25;
+    _fo = 1. - _fp;
+    CheckParams();
+  }
+  IdealHHe(const std::string &filename) {
+    // Load from file
+    Load(filename);
+  }
+  void SetFloors(const Real sie_floor_, const Real t_floor_, const Real rho_floor_,
+                 const Real p_floor_) {
+    rho_floor = rho_floor_;
+    t_floor = t_floor_;
+    sie_floor = sie_floor_;
+    p_floor = p_floor_;
+  }
+  inline void FillTable(const std::string &filename);
+  inline void Save(const std::string &filename);
+  inline void Load(const std::string &filename);
+  IdealHHe GetOnDevice();
+
+  PORTABLE_INLINE_FUNCTION void CheckParams() const {
+    PORTABLE_ALWAYS_REQUIRE(_X >= 0, "X must be positive");
+    PORTABLE_ALWAYS_REQUIRE(_Y >= 0, "Y must be positive");
+    _AZbar.CheckParams();
+  }
+
+  template <typename Indexer_t = Real *>
+  PORTABLE_INLINE_FUNCTION Real
+  EofRT(const Real rho, const Real temperature,
+        Indexer_t &&lambda = static_cast<Real *>(nullptr)) const {
+    const auto &r = GetMassFractions(rho, temperature);
+    const Real kT = _eV * temperature;
+    const Real henorm = 1. + r.z2 * (r.z1 - 1.0);
+    Real EH = 1.5 * _X * (1. + r.x) * r.y;                        // H
+    Real EHe = 0.375 * _Y * (1. + (r.z1 + r.z1 * r.z2) / henorm); // He
+    Real EHpH = _ye * _X * r.y * 0.5;
+    Real EHp = _xe * _X * r.x * r.y;
+    Real EHep = _z1e * 0.25 * _Y * r.z1 / henorm;
+    Real EHepp = _z2e * 0.25 * _Y * (r.z1 * r.z2 / henorm);
+
+    // molecular hydrogen
+    // NOTE: yes, the coefficients are in K
+    const auto &[xp, xo] = H2PartitionFunctions(temperature);
+    const Real dlno = singularity::robust::ratio(xo.dZ, xo.Z);
+    const Real dlnp = singularity::robust::ratio(xp.dZ, xp.Z);
+    const Real lnx = 6140. / temperature;
+    const Real efac = singularity::robust::safe_arg_exp(-lnx);
+    const Real EH2 = 0.5 * _X * (1. - r.y) *
+                     (1.5 + lnx * singularity::robust::ratio(efac, 1. - efac) +
+                      (_fp * xp.dZ + _fo * xo.dZ) / (_fp * xp.Z + _fo * xo.Z));
+
+    Real sie = EH2 + EH + EHe + (EHpH + EHp + EHep + EHepp) / temperature;
+    sie = std::max(_small, sie * temperature * _kb / _mp);
+    return sie;
+  }
+  template <typename Indexer_t = Real *>
+  PORTABLE_INLINE_FUNCTION Real
+  PofRT(const Real rho, const Real temperature,
+        Indexer_t &&lambda = static_cast<Real *>(nullptr)) const {
+    const auto &[mu, dlmut, dlmur] = MeanMass(rho, temperature);
+    const Real P = _kb / (mu * _mp) * rho * temperature;
+    return std::max(_small, P);
+  }
+  template <typename Indexer_t = Real *>
+  PORTABLE_INLINE_FUNCTION Real
+  CvofRT(const Real rho, const Real temperature,
+         Indexer_t &&lambda = static_cast<Real *>(nullptr)) const {
+
+    Real tp = temperature * (1.0 + _dlnT);
+    Real tm = temperature * (1.0 - _dlnT);
+
+    Real ep = EofRT(rho, tp);
+    Real em = EofRT(rho, tm);
+    Real cv = singularity::robust::ratio(ep - em, 2 * _dlnT * temperature);
+    return std::max(_small, cv);
+  }
+  template <typename Indexer_t = Real *>
+  PORTABLE_INLINE_FUNCTION Real
+  G1ofRT(const Real rho, const Real temperature,
+         Indexer_t &&lambda = static_cast<Real *>(nullptr)) const {
+    // Gamma*rho  = (dP/dT) / Cv
+    const Real Cv = CvofRT(rho, temperature);
+    const Real P = PofRT(rho, temperature);
+
+    const auto &[mu, dlmudt, dlmudr] = MeanMass(rho, temperature);
+    // dln(P)/dln(T)
+    // dln(P)/dln(rho)
+    const Real xt = std::max(0.0, 1. - dlmudt);
+    const Real xd = std::max(0.0, 1. - dlmudr);
+    const Real denom = Cv * rho * temperature;
+    const Real fac1 = singularity::robust::ratio(P, Cv * rho * temperature);
+    const Real G1 = fac1 * xt * xt + xd;
+    return singularity::robust::ratio(P, Cv * rho * temperature) * xt * xt + xd;
+  }
+  template <typename Indexer_t = Real *>
+  PORTABLE_INLINE_FUNCTION Real
+  BofRT(const Real rho, const Real temperature,
+        Indexer_t &&lambda = static_cast<Real *>(nullptr)) const {
+    const Real P = PofRT(rho, temperature);
+    const Real G1 = G1ofRT(rho, temperature);
+    return std::max(_small, G1 * P);
+  }
+  PORTABLE_INLINE_FUNCTION std::tuple<Real, Real, Real, Real> FillEosofRT(const Real rho,
+                                                                          const Real T) {
+    const Real P = PofRT(rho, T);
+    const Real G1 = G1ofRT(rho, T);
+    const Real B = std::max(_small, G1 * P);
+    const Real Cv = CvofRT(rho, T);
+    return {P, B, Cv, G1};
+  }
+
+  template <typename Indexer_t = Real *>
+  PORTABLE_INLINE_FUNCTION Real TemperatureFromDensityInternalEnergy(
+      const Real rho, const Real sie,
+      Indexer_t &&lambda = static_cast<Real *>(nullptr)) const {
+
+    const Real ld = std::log10(rho);
+    const Real lE = std::log10(sie + Eoffset);
+    if ((lE <= lEmin) || (rho <= rho_floor)) return std::pow(10., lTmin);
+
+    if (use_table && ((ld >= lDmin) && (ld <= lDmax) && (lE >= lEmin) && (lE <= lEmax))) {
+      return std::pow(10., lT_.interpToReal(ld, lE));
+    }
+
+    // fall back to inline
+    const Real T = TofRE(rho, sie);
+    return T;
+  }
+  template <typename Indexer_t = Real *>
+  PORTABLE_INLINE_FUNCTION Real InternalEnergyFromDensityTemperature(
+      const Real rho, const Real temperature,
+      Indexer_t &&lambda = static_cast<Real *>(nullptr)) const {
+
+    if ((temperature <= t_floor) || (rho <= rho_floor)) return sie_floor;
+
+    const Real ld = std::log10(rho);
+    const Real lT = std::log10(temperature);
+
+    if (use_table && ((ld >= lDmin) && (ld <= lDmax) && (lT >= lTmin) && (lT <= lTmax))) {
+      Real sie = std::pow(10., lE_.interpToReal(ld, lT));
+      return sie - Eoffset;
+    }
+
+    Real sie = EofRT(rho, temperature);
+    return sie;
+  }
+  template <typename Indexer_t = Real *>
+  PORTABLE_INLINE_FUNCTION Real PressureFromDensityTemperature(
+      const Real rho, const Real temperature,
+      Indexer_t &&lambda = static_cast<Real *>(nullptr)) const {
+    const Real sie = InternalEnergyFromDensityTemperature(rho, temperature);
+    return PressureFromDensityInternalEnergy(rho, sie);
+  }
+  template <typename Indexer_t = Real *>
+  PORTABLE_INLINE_FUNCTION Real PressureFromDensityInternalEnergy(
+      const Real rho, const Real sie,
+      Indexer_t &&lambda = static_cast<Real *>(nullptr)) const {
+    if ((sie <= sie_floor) || (rho <= rho_floor)) return p_floor;
+
+    const Real ld = std::log10(rho);
+    const Real lE = std::log10(sie + Eoffset);
+
+    if (use_table && ((ld >= lDmin) && (ld <= lDmax) && (lE >= lEmin) && (lE <= lEmax))) {
+      return std::pow(10., lP_.interpToReal(ld, lE));
+    }
+
+    // fall back to inline
+    const Real T = TofRE(rho, sie);
+    return PofRT(rho, T);
+  }
+
+  template <typename Indexer_t = Real *>
+  PORTABLE_INLINE_FUNCTION Real
+  EntropyFromDensityTemperature(const Real rho, const Real temperature,
+                                Indexer_t &&lambda = static_cast<Real *>(nullptr)) const {
+    return 0.0;
+  }
+  template <typename Indexer_t = Real *>
+  PORTABLE_INLINE_FUNCTION Real EntropyFromDensityInternalEnergy(
+      const Real rho, const Real sie,
+      Indexer_t &&lambda = static_cast<Real *>(nullptr)) const {
+    return 0.0;
+  }
+  template <typename Indexer_t = Real *>
+  PORTABLE_INLINE_FUNCTION Real SpecificHeatFromDensityTemperature(
+      const Real rho, const Real temperature,
+      Indexer_t &&lambda = static_cast<Real *>(nullptr)) const {
+
+    const Real sie = InternalEnergyFromDensityTemperature(rho, temperature);
+    return SpecificHeatFromDensityInternalEnergy(rho, sie);
+  }
+
+  template <typename Indexer_t = Real *>
+  PORTABLE_INLINE_FUNCTION Real SpecificHeatFromDensityInternalEnergy(
+      const Real rho, const Real sie,
+      Indexer_t &&lambda = static_cast<Real *>(nullptr)) const {
+    if ((sie <= sie_floor) || (rho <= rho_floor)) return sie_floor / t_floor;
+
+    const Real ld = std::log10(rho);
+    const Real lE = std::log10(sie + Eoffset);
+
+    if (use_table && ((ld >= lDmin) && (ld <= lDmax) && (lE >= lEmin) && (lE <= lEmax))) {
+      return Cv_.interpToReal(ld, lE);
+    }
+    // fall back to inline
+    const Real T = TofRE(rho, sie);
+    return CvofRT(rho, T);
+  }
+
+  template <typename Indexer_t = Real *>
+  PORTABLE_INLINE_FUNCTION Real BulkModulusFromDensityTemperature(
+      const Real rho, const Real temperature,
+      Indexer_t &&lambda = static_cast<Real *>(nullptr)) const {
+    const Real sie = InternalEnergyFromDensityTemperature(rho, temperature);
+    return BulkModulusFromDensityInternalEnergy(rho, sie);
+  }
+  template <typename Indexer_t = Real *>
+  PORTABLE_INLINE_FUNCTION Real BulkModulusFromDensityInternalEnergy(
+      const Real rho, const Real sie,
+      Indexer_t &&lambda = static_cast<Real *>(nullptr)) const {
+    if ((sie <= sie_floor) || (rho <= rho_floor)) return p_floor;
+
+    const Real ld = std::log10(rho);
+    const Real lE = std::log10(sie + Eoffset);
+
+    if (use_table && ((ld >= lDmin) && (ld <= lDmax) && (lE >= lEmin) && (lE <= lEmax))) {
+      return std::pow(10., lB_.interpToReal(ld, lE));
+    }
+
+    // fall back to inline
+    const Real T = TofRE(rho, sie);
+    return BofRT(rho, T);
+  }
+
+  template <typename Indexer_t = Real *>
+  PORTABLE_INLINE_FUNCTION Real GruneisenParamFromDensityTemperature(
+      const Real rho, const Real temperature,
+      Indexer_t &&lambda = static_cast<Real *>(nullptr)) const {
+    const Real sie = GruneisenParamFromDensityTemperature(rho, temperature);
+    return GruneisenParamFromDensityInternalEnergy(rho, sie);
+  }
+  template <typename Indexer_t = Real *>
+  PORTABLE_INLINE_FUNCTION Real GruneisenParamFromDensityInternalEnergy(
+      const Real rho, const Real sie,
+      Indexer_t &&lambda = static_cast<Real *>(nullptr)) const {
+    if ((sie <= sie_floor) || (rho <= rho_floor)) return 0.0;
+
+    const Real ld = std::log10(rho);
+    const Real lE = std::log10(sie + Eoffset);
+
+    if (use_table && ((ld >= lDmin) && (ld <= lDmax) && (lE >= lEmin) && (lE <= lEmax))) {
+      return Gm_.interpToReal(ld, lE);
+    }
+
+    // fall back to inline
+    const Real T = TofRE(rho, sie);
+    return G1ofRT(rho, T);
+  }
+  template <typename Indexer_t = Real *>
+  PORTABLE_INLINE_FUNCTION void
+  FillEos(Real &rho, Real &temp, Real &energy, Real &press, Real &cv, Real &bmod,
+          const unsigned long output,
+          Indexer_t &&lambda = static_cast<Real *>(nullptr)) const;
+  template <typename Indexer_t = Real *>
+  PORTABLE_INLINE_FUNCTION void
+  ValuesAtReferenceState(Real &rho, Real &temp, Real &sie, Real &press, Real &cv,
+                         Real &bmod, Real &dpde, Real &dvdt,
+                         Indexer_t &&lambda = static_cast<Real *>(nullptr)) const {
+    // TODO
+  }
+  // Generic functions provided by the base class. These contain e.g. the vector
+  // overloads that use the scalar versions declared here
+  SG_ADD_BASE_CLASS_USINGS(IdealHHe)
+  SG_ADD_DEFAULT_MEAN_ATOMIC_FUNCTIONS(_AZbar)
+
+  static constexpr unsigned long PreferredInput() { return _preferred_input; }
+  PORTABLE_INLINE_FUNCTION void PrintParams() const { _AZbar.PrintParams(); }
+  inline void Finalize();
+  static std::string EosType() { return std::string("IdealHHe"); }
+  static std::string EosPyType() { return EosType(); }
+  std::size_t DynamicMemorySizeInBytes() const;
+  std::size_t DumpDynamicMemory(char *dst);
+  std::size_t SetDynamicMemory(char *src, const singularity::SharedMemSettings &stngs =
+                                              singularity::DEFAULT_SHMEM_STNGS);
+
+ private:
+  bool use_table = true;
+  Real _X, _Y, _fp, _fo;
+  Real lTmin, lTmax, lDmin, lDmax, _dlnT, lEmin, lEmax;
+  Real Eoffset = 0.0;
+  Real sie_floor = 1e-10;
+  Real t_floor = 1e-10;
+  Real rho_floor = 1e-20;
+  Real p_floor = 1e-20;
+  int nd, nt;
+  DataBox lP_, lB_, lT_, lE_, Cv_, Gm_;
+  Real _small = 1e-15;
+  Real _na = 6.02214129e23;
+  Real _hbar = 1.0546e-27; // cm^2 g/s
+  Real _kb = 1.3807e-16;   // cm^2 g/(s^2 K)
+  Real _eV = 8.6173e-5;    // eV/K
+  Real _me = 9.1094e-28;   // g
+  Real _mp = 1.6726e-24;   // g
+  Real _Tp = 4.0 * M_PI * _hbar * _hbar / (_mp * _kb);
+  Real _Te = 2.0 * M_PI * _hbar * _hbar / (_me * _kb);
+  Real _ye = 4.478069 / _eV;
+  Real _xe = 13.598433 / _eV;
+  Real _z1e = 24.587387 / _eV;
+  Real _z2e = 54.417760 / _eV;
+  int ITER_MAX = 100;
+
+  singularity::MeanAtomicProperties _AZbar;
+  static constexpr const unsigned long _preferred_input =
+      singularity::thermalqs::density | singularity::thermalqs::temperature;
+#define DBLIST &lP_, &lB_, &lT_, &lE_, &Cv_, &Gm_
+  auto GetDataBoxPointers_() const { return std::vector<const DataBox *>{DBLIST}; }
+  auto GetDataBoxPointers_() { return std::vector<DataBox *>{DBLIST}; }
+#undef DBLIST
+
+  singularity::DataStatus memoryStatus_ = singularity::DataStatus::Deallocated;
+  // Internal functions
+
+  PORTABLE_INLINE_FUNCTION
+  Real root_solve(const Real x, const Real a, const Real b, const Real c) const {
+    // Newton-Raphson on the polynomial (b + c*y)*y - a*(1-y)
+    constexpr Real tol = 1e-15;
+    // return x;
+    Real f = (a + b + c * x) * x - a;
+    if (std::abs(f) <= tol) return x;
+
+    int iter = 0;
+    Real xk = x;
+    do {
+      Real df = b + a + 2. * c * xk;
+      xk -= f / df;
+      f = (a + b + c * xk) * xk - a;
+      iter++;
+    } while ((std::abs(f) > tol) && (iter < ITER_MAX));
+    return xk;
+  }
+  PORTABLE_INLINE_FUNCTION
+  Real quadratic_root(const Real a, const Real b, const Real c) const {
+    // Solving quadratic equations of the form
+    //   (b + c*y)*y = (1 - y) * a == 0
+    // solution is  (-(a+b) + sqrt( (a+b)^2 + 4*a*c)) /(2*c)
+    // = c*y^2 + (b + a)*y - a == 0
+    // = c/a y^2 + (b/a + 1) * y - 1 == 0
+
+    const Real a_ = std::abs(a);
+    if (a_ <= _small) {
+      // Treat as 0 and pick the zero root
+      // Usually this means T is so low that nothing is ionized
+      return 0.0;
+    }
+    // a is large
+    if (a_ > 1e8) {
+      // use the small y^2 coefficient formula
+      const Real disc = 1.0 + (2 * (b + 2.0 * c) / a + (b / a) * (b / a));
+      return root_solve(singularity::robust::ratio(2.0, 1.0 + (b / a + std::sqrt(disc))),
+                        a, b, c);
+    }
+    // a is small, use the normal formula
+    const Real bp = b + a;
+    return root_solve(
+        singularity::robust::ratio((-bp + std::sqrt(bp * bp + 4. * a * c)), 2 * c), a, b,
+        c);
+  }
+  PORTABLE_INLINE_FUNCTION Mixture GetMassFractions(const Real rho, const Real T) const {
+    Mixture res{0.0};
+    // y
+    Real f1 = _mp / rho;
+    const Real ppfac = _mp * std::pow(_Tp, -1.5);
+    Real f2p = std::pow(T / _Tp, 1.5);
+    Real f2e = std::pow(T / _Te, 1.5);
+    const Real kT = _eV * T;
+    // x^2 = (1-x)*a
+    // x
+    Real a = f1 / _X * f2e * singularity::robust::safe_arg_exp(-_xe / (T));
+    Real dlat = _xe / (T) + 1.5;
+    res.x = (_X == 0.0) ? 0.0 : quadratic_root(a, 0., 1.0);
+    if ((std::abs(a) > _small) && (res.x > 0.0) && (res.x < 1.0)) {
+      res.dxdt = singularity::robust::ratio(dlat * a * (1. - res.x), 2 * res.x + a);
+      res.dxdr = singularity::robust::ratio(-a * (1. - res.x), (2 * res.x + a));
+    }
+
+    // y^2 = (1- y)*
+    Real efac_ = singularity::robust::safe_arg_exp(-_ye / (T));
+    Real fac1_ = f1 * f2p;
+    a = 0.5 * f1 / _X * f2p * singularity::robust::safe_arg_exp(-_ye / (T));
+    res.y = (_X == 0.0) ? 0.0 : quadratic_root(a, 0.0, 1.0);
+    dlat = _ye / (T) + 1.5;
+    if ((std::abs(a) > _small) || (res.y > 0.0) && (res.y < 1.0)) {
+      res.dydt = singularity::robust::ratio(dlat * a * (1. - res.y), 2 * res.y + a);
+      res.dydr = singularity::robust::ratio(-a * (1. - res.y), (2 * res.y + a));
+    }
+
+    // (X + 0.25*Y * z)*z = (1-z)*a
+    a = 4.0 * f1 * f2e * singularity::robust::safe_arg_exp(-_z1e / (T));
+    dlat = _z1e / (T) + 1.5;
+    res.z1 = quadratic_root(a, _X, 0.25 * _Y);
+    if ((std::abs(a) > _small) && (res.z1 > 0.0) && (res.z1 < 1.0)) {
+      res.dz1dt = singularity::robust::ratio(dlat * a * (1. - res.z1),
+                                             a + 0.5 * _Y * res.z1 + _X);
+      res.dz1dr =
+          singularity::robust::ratio(-a * (1. - res.z1), (a + 0.5 * _Y * res.z1 + _X));
+    }
+
+    // (X + 0.25*Y  + 0.25*Y * z)*z = (1-z)*a
+    a = f1 * f2e * singularity::robust::safe_arg_exp(-_z2e / (T));
+    dlat = _z2e / (T) + 1.5;
+    res.z2 = quadratic_root(a, _X + 0.25 * _Y, 0.25 * _Y);
+    if ((std::abs(a) > _small) && (res.z2 > 0.0) && (res.z2 < 1.0)) {
+      res.dz2dt = singularity::robust::ratio(dlat * a * (1. - res.z2),
+                                             a + 0.5 * _Y * res.z2 + _X + 0.25 * _Y);
+      res.dz2dr = singularity::robust::ratio(-a * (1. - res.z2),
+                                             (a + 0.5 * _Y * res.z2 + _X + 0.25 * _Y));
+    }
+
+    return res;
+  }
+
+  PORTABLE_INLINE_FUNCTION H2Partition
+  H2PartitionFunction_(const Real T, std::array<Real, 3> jstart) const {
+    const int max_iters = ITER_MAX * 200;
+    const Real x = 85.5 / T;
+
+    H2Partition part{0.0};
+
+    Real j = jstart[0];
+    Real dr = 0.0;
+    Real dr_p = 0.0;
+    do {
+      part.Z += dr;
+      dr_p = dr;
+      const Real jj = j * (j + 1.);
+      dr = (2. * j + 1.) * singularity::robust::safe_arg_exp(-jj * x);
+      j += 2.0;
+    } while ((dr > dr_p || dr > 3e-16 * part.Z) && (j < max_iters));
+
+    j = jstart[1];
+    dr = 0.0;
+    dr_p = 0.0;
+    do {
+      part.dZ += dr;
+      dr_p = dr;
+      const Real jj = j * (j + 1.);
+      dr = jj * (2. * j + 1.) * singularity::robust::safe_arg_exp(-jj * x);
+      j += 2.0;
+    } while ((dr > dr_p || dr > 3e-16 * part.dZ) && (j < max_iters));
+
+    j = jstart[2];
+    dr = 0.0;
+    dr_p = 0.0;
+    while (j < max_iters) {
+      part.d2Z += dr;
+      dr_p = dr;
+      const Real jj = j * (j + 1.);
+      dr = (2. * j + 1.) * jj * (jj * x - 2.0) *
+           singularity::robust::safe_arg_exp(-jj * x);
+      j += 2.0;
+      if (dr < 0.0 || dr > dr_p || dr > 3e-16 * std::abs(part.d2Z)) continue;
+      break;
+    }
+    part.dZ *= x;
+    part.d2Z *= x;
+    return part;
+  }
+
+  PORTABLE_INLINE_FUNCTION std::tuple<H2Partition, H2Partition>
+  H2PartitionFunctions(const Real T) const {
+    auto para = H2PartitionFunction_(T, {0.0, 2.0, 2.0});
+    auto ortho = H2PartitionFunction_(T, {1.0, 1.0, 1.0});
+    return {para, ortho};
+  }
+  PORTABLE_INLINE_FUNCTION std::tuple<Real, Real, Real> MeanMass(const Real rho,
+                                                                 const Real T) const {
+    auto get_mu = [](Real X, Real Y, Mixture r) {
+      return singularity::robust::ratio(
+          1.0,
+          0.25 * (2. * X * (1. + r.y * (1. + 2. * r.x)) + Y * (1. + r.z1 * (1. + r.z2))));
+    };
+    const auto &r = GetMassFractions(rho, T);
+    Real mu = get_mu(_X, _Y, r);
+
+    const auto &rtp = GetMassFractions(rho, T * (1. + _dlnT));
+    const auto &rtm = GetMassFractions(rho, T * (1. - _dlnT));
+    const auto &rdp = GetMassFractions(rho * (1. + _dlnT), T);
+    const auto &rdm = GetMassFractions(rho * (1. - _dlnT), T);
+    Real dlmut = (get_mu(_X, _Y, rtp) - get_mu(_X, _Y, rtm)) / (2. * _dlnT * mu);
+    Real dlmur = (get_mu(_X, _Y, rdp) - get_mu(_X, _Y, rdm)) / (2. * _dlnT * mu);
+
+    return {mu, dlmut, dlmur};
+  }
+  template <typename Indexer_t = Real *>
+  PORTABLE_INLINE_FUNCTION Real
+  TofRE(const Real rho, const Real sie,
+        Indexer_t &&lambda = static_cast<Real *>(nullptr)) const {
+
+    using RootFinding1D::findRoot;
+    using RootFinding1D::Status;
+
+    const Real tmin = 1e-10;
+    const Real tmax = 1e10;
+    Real temp;
+    const Real t_guess = 1e3;
+    if (findRoot([&](const Real t) { return EofRT(rho, t); }, sie, t_guess, tmin, tmax,
+                 1e-12 * t_guess, 1e-12, temp) != Status::SUCCESS) {
+      PARTHENON_DEBUG_WARN("TofRE did not converge");
+      return Tiny<Real>();
+    }
+    return std::max(_small, temp);
+  }
+};
+
+template <typename Indexer_t>
+PORTABLE_INLINE_FUNCTION void
+IdealHHe::FillEos(Real &rho, Real &temp, Real &sie, Real &press, Real &cv, Real &bmod,
+                  const unsigned long output, Indexer_t &&lambda) const {
+  if (output & singularity::thermalqs::density &&
+      output & singularity::thermalqs::specific_internal_energy) {
+    if (output & singularity::thermalqs::pressure ||
+        output & singularity::thermalqs::temperature) {
+      UNDEFINED_ERROR;
+    }
+    DensityEnergyFromPressureTemperature(press, temp, lambda, rho, sie);
+  }
+  if (output & singularity::thermalqs::pressure &&
+      output & singularity::thermalqs::specific_internal_energy) {
+    if (output & singularity::thermalqs::density ||
+        output & singularity::thermalqs::temperature) {
+      UNDEFINED_ERROR;
+    }
+    sie = InternalEnergyFromDensityTemperature(rho, temp, lambda);
+  }
+  if (output & singularity::thermalqs::temperature &&
+      output & singularity::thermalqs::specific_internal_energy) {
+    sie = InternalEnergyFromDensityTemperature(rho, temp, lambda);
+  }
+  if (output & singularity::thermalqs::pressure)
+    press = PressureFromDensityInternalEnergy(rho, sie);
+  if (output & singularity::thermalqs::temperature)
+    temp = TemperatureFromDensityInternalEnergy(rho, sie);
+  if (output & singularity::thermalqs::bulk_modulus)
+    bmod = BulkModulusFromDensityInternalEnergy(rho, sie);
+  if (output & singularity::thermalqs::specific_heat)
+    cv = SpecificHeatFromDensityInternalEnergy(rho, sie);
+}
+
+inline void IdealHHe::FillTable(const std::string &filename) {
+  lT_.resize(nd, nt);
+  lT_.setRange(0, lTmin, lTmax, nt);
+  lT_.setRange(1, lDmin, lDmax, nd);
+  lE_.copyMetadata(lT_);
+  // Determine the energy grid
+  lEmin = std::numeric_limits<Real>::max();
+  lEmax = std::numeric_limits<Real>::min();
+
+  for (int j = 0; j < nd; j++) {
+    const Real d = std::pow(10., lT_.range(1).x(j));
+    for (int i = 0; i < nt; i++) {
+      const Real T = std::pow(10., lT_.range(0).x(i));
+      const auto &[mu, dlmut, dlmur] = MeanMass(d, T);
+      const auto &r = GetMassFractions(d, T);
+      const Real E = EofRT(d, T);
+      const Real lE = std::log10(E + Eoffset);
+      lE_(j, i) = lE;
+      lEmin = std::min(lEmin, lE);
+      lEmax = std::max(lEmax, lE);
+    }
+  }
+  if (lEmin <= 0.0 || (lEmax <= 0.0) || std::isnan(lEmin) || std::isnan(lEmax)) {
+    PORTABLE_THROW_OR_ABORT("Failed to find positive or real energy values from given "
+                            "temperature and density grid.");
+  }
+  lT_.setRange(0, lEmin, lEmax, nt);
+  lP_.copyMetadata(lT_);
+  lB_.copyMetadata(lT_);
+  Cv_.copyMetadata(lT_);
+  Gm_.copyMetadata(lT_);
+  // Fill table
+
+  for (int j = 0; j < nd; j++) {
+    const Real d = std::pow(10., lT_.range(1).x(j));
+    for (int i = 0; i < nt; i++) {
+      const Real e = std::pow(10., lT_.range(0).x(i)) - Eoffset;
+      const Real T = TofRE(d, e);
+      lT_(j, i) = std::log10(T);
+      const auto &[P, B, Cv, G1] = FillEosofRT(d, T);
+      lP_(j, i) = std::log10(P);
+      lB_(j, i) = std::log10(B);
+      Cv_(j, i) = Cv;
+      Gm_(j, i) = G1;
+    }
+  }
+
+  // Checking table inversion
+  for (int j = 0; j < nd; j++) {
+    const Real ld = lT_.range(1).x(j);
+    const Real d = std::pow(10., lT_.range(1).x(j));
+    for (int i = 0; i < nt; i++) {
+      const Real lE = lT_.range(0).x(i);
+      const Real e = std::pow(10., lT_.range(0).x(i)) - Eoffset;
+      const Real T = TofRE(d, e);
+      assert(std::abs(std::pow(10., lT_.interpToReal(ld, lE)) / T - 1) <= 1e-4);
+    }
+  }
+
+  //   // Save table
+
+  if (filename != "") {
+    if (Globals::my_rank == 0) {
+      Save(filename);
+    }
+  }
+}
+
+constexpr char METADATA_NAME[] = "Params";
+inline void IdealHHe::Save(const std::string &filename) {
+#ifdef SPINER_USE_HDF
+  herr_t status = H5_SUCCESS;
+  hid_t file = H5Fcreate(filename.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+
+  hid_t metadata = H5Gcreate(file, METADATA_NAME, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+  status += H5LTset_attribute_double(file, METADATA_NAME, "x", &_X, 1);
+  status += H5LTset_attribute_double(file, METADATA_NAME, "y", &_Y, 1);
+  status += H5LTset_attribute_double(file, METADATA_NAME, "ltmin", &lTmin, 1);
+  status += H5LTset_attribute_double(file, METADATA_NAME, "ltmax", &lTmax, 1);
+  status += H5LTset_attribute_double(file, METADATA_NAME, "ldmin", &lDmin, 1);
+  status += H5LTset_attribute_double(file, METADATA_NAME, "ldmax", &lDmax, 1);
+  status += H5LTset_attribute_double(file, METADATA_NAME, "lemin", &lEmin, 1);
+  status += H5LTset_attribute_double(file, METADATA_NAME, "lemax", &lEmax, 1);
+  status += H5LTset_attribute_double(file, METADATA_NAME, "eoffset", &Eoffset, 1);
+  status += H5LTset_attribute_double(file, METADATA_NAME, "dlnT", &_dlnT, 1);
+  status += H5LTset_attribute_double(file, METADATA_NAME, "fp", &_fp, 1);
+  status += H5LTset_attribute_double(file, METADATA_NAME, "fm", &_fo, 1);
+  status += H5LTset_attribute_int(file, METADATA_NAME, "nt", &nt, 1);
+  status += H5LTset_attribute_int(file, METADATA_NAME, "nd", &nd, 1);
+  H5Gclose(metadata);
+
+  status += lP_.saveHDF(file, "logpress");
+  status += lT_.saveHDF(file, "logtemp");
+  status += Cv_.saveHDF(file, "cv");
+  status += lB_.saveHDF(file, "logbulkmodulus");
+  status += Gm_.saveHDF(file, "grun");
+  status += lE_.saveHDF(file, "logsie");
+
+  status += H5Fclose(file);
+  if (status != H5_SUCCESS) {
+    EOS_ERROR("[IdealHHe::Save]: There was a problem with HDF5\n");
+  }
+#endif
+}
+inline void IdealHHe::Load(const std::string &filename) {
+#ifdef SPINER_USE_HDF
+  herr_t status = H5_SUCCESS;
+  hid_t file = H5Fopen(filename.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
+
+  hid_t metadata = H5Gopen(file, METADATA_NAME, H5P_DEFAULT);
+  status += H5LTget_attribute_double(file, METADATA_NAME, "x", &_X);
+  status += H5LTget_attribute_double(file, METADATA_NAME, "y", &_Y);
+  status += H5LTget_attribute_double(file, METADATA_NAME, "ltmin", &lTmin);
+  status += H5LTget_attribute_double(file, METADATA_NAME, "ltmax", &lTmax);
+  status += H5LTget_attribute_double(file, METADATA_NAME, "ldmin", &lDmin);
+  status += H5LTget_attribute_double(file, METADATA_NAME, "ldmax", &lDmax);
+  status += H5LTget_attribute_double(file, METADATA_NAME, "lemin", &lEmin);
+  status += H5LTget_attribute_double(file, METADATA_NAME, "lemax", &lEmax);
+  status += H5LTget_attribute_double(file, METADATA_NAME, "eoffset", &Eoffset);
+  status += H5LTget_attribute_double(file, METADATA_NAME, "dlnT", &_dlnT);
+  status += H5LTget_attribute_double(file, METADATA_NAME, "fp", &_fp);
+  status += H5LTget_attribute_double(file, METADATA_NAME, "fm", &_fo);
+  status += H5LTget_attribute_int(file, METADATA_NAME, "nt", &nt);
+  status += H5LTget_attribute_int(file, METADATA_NAME, "nd", &nd);
+  H5Gclose(metadata);
+
+  status += lP_.loadHDF(file, "logpress");
+  status += lT_.loadHDF(file, "logtemp");
+  status += Cv_.loadHDF(file, "cv");
+  status += lB_.loadHDF(file, "logbulkmodulus");
+  status += Gm_.loadHDF(file, "grun");
+  status += lE_.loadHDF(file, "logsie");
+  status += H5Fclose(file);
+  if (status != H5_SUCCESS) {
+    EOS_ERROR("[IdealHHe::Save]: There was a problem with HDF5\n");
+  }
+#endif
+}
+
+inline IdealHHe IdealHHe::GetOnDevice() {
+  return singularity::table_utils::SpinerTricks<IdealHHe>::GetOnDevice(this);
+}
+inline void IdealHHe::Finalize() {
+  return singularity::table_utils::SpinerTricks<IdealHHe>::Finalize(this);
+}
+
+} // namespace ArtemisEOS
+
+#endif // UTILS_EOS_IDEAL_H_HE_HPP_

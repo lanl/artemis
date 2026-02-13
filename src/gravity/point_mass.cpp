@@ -25,6 +25,7 @@ namespace Gravity {
 //! \brief Applies accelerations due to a point mass gravitational potential
 template <Coordinates GEOM>
 TaskStatus PointMassGravity(MeshData<Real> *md, const Real time, const Real dt) {
+  PARTHENON_INSTRUMENT
   using parthenon::MakePackDescriptor;
   using TE = parthenon::TopologicalElement;
   auto pm = md->GetParentPointer();
@@ -54,6 +55,9 @@ TaskStatus PointMassGravity(MeshData<Real> *md, const Real time, const Real dt) 
                          gas::prim::velocity, gas::prim::sie, dust::prim::density,
                          dust::prim::velocity>(resolved_pkgs.get());
   auto vmesh = desc.GetPack(md);
+  static auto desc_g = MakePackDescriptor<geom::x1v, geom::x2v, geom::x3v, geom::hx1v,
+                                          geom::hx2v, geom::hx3v>(resolved_pkgs.get());
+  auto vg = desc_g.GetPack(md);
   const auto ib = md->GetBoundsI(IndexDomain::interior);
   const auto jb = md->GetBoundsJ(IndexDomain::interior);
   const auto kb = md->GetBoundsK(IndexDomain::interior);
@@ -67,8 +71,8 @@ TaskStatus PointMassGravity(MeshData<Real> *md, const Real time, const Real dt) 
       KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
         // Extract coordinates
         geometry::Coords<GEOM> coords(cpars, vmesh.GetCoordinates(b), k, j, i);
-        const auto &dx = coords.GetCellCenter();
-        const auto &hx = coords.GetScaleFactors();
+        const auto &dx = coords.GetCellCenter(vg, b, k, j, i);
+        const auto &hx = coords.GetScaleFactors(vg, b, k, j, i);
 
         // Capture outside constexpr if
         const Real &gm = gm_;

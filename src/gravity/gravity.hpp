@@ -113,7 +113,8 @@ TaskStatus NBodyGravityFixed(MeshData<Real> *md, const Real time, const Real dt)
 template <Coordinates GEOM>
 TaskStatus ExternalGravity(MeshData<Real> *md, const Real time, const Real dt);
 
-KOKKOS_INLINE_FUNCTION Real quad_ramp(const Real x) { return SQR(x); }
+KOKKOS_INLINE_FUNCTION
+Real quad_ramp(const Real x) { return SQR(x); }
 
 } // namespace Gravity
 

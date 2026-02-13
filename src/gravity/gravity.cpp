@@ -120,6 +120,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   }
 
   PARTHENON_REQUIRE((count > 0) && (gtype != GravityType::null), "Unknown gravity node!");
+
   PARTHENON_REQUIRE(count == 1, "artemis only supports 1 gravity type at this time");
 
   params.Add("type", gtype);

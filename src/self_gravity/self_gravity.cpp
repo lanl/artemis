@@ -124,7 +124,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   self_gravity->AddField<grav::rhs>(mrhs);
 
   // Solvers
-  using PoissEq = PoissonEquation<grav::phi>;
+  using PoissEq = PoissonEquation<Coordinates::cartesian, grav::phi>;
   PoissEq eq(pin, "poisson");
   params.Add("poisson_equation", eq, parthenon::Params::Mutability::Mutable);
   std::shared_ptr<parthenon::solvers::SolverBase> psolver;

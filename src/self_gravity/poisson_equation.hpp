@@ -16,6 +16,9 @@
 #ifndef SELF_GRAVITY_POISSON_EQUATION_HPP_
 #define SELF_GRAVITY_POISSON_EQUATION_HPP_
 
+// Artemis includes
+#include "geometry/geometry.hpp"
+
 // Parthenon includes
 #include <bvals/boundary_conditions_generic.hpp>
 #include <coordinates/coordinates.hpp>
@@ -34,7 +37,7 @@ constexpr parthenon::TopologicalElement te = parthenon::TopologicalElement::CC;
 
 // This class implement methods for calculating A.x = y and returning the diagonal of A,
 // where A is the the matrix representing the discretized Poisson equation on the grid.
-template <class var_t>
+template <Coordinates GEOM, class var_t>
 class PoissonEquation {
  public:
   using IndependentVars = parthenon::TypeList<var_t>;
@@ -61,24 +64,32 @@ class PoissonEquation {
   }
 
   template <parthenon::CoordinateDirection dir, class coords_t>
-  KOKKOS_INLINE_FUNCTION auto GetEffectiveInverseDx2(const coords_t &coords, const int k,
-                                                     const int j, const int i) {
-    using TE = parthenon::TopologicalElement;
-    constexpr TE te = dir == X1DIR ? TE::F1 : (dir == X2DIR ? TE::F2 : TE::F3);
-    constexpr int ioff = (dir == X1DIR);
-    constexpr int joff = (dir == X2DIR);
-    constexpr int koff = (dir == X3DIR);
-
-    const Real xp = coords.template Xc<dir>(k + koff, j + joff, i + ioff);
-    const Real xc = coords.template Xc<dir>(k, j, i);
-    const Real xm = coords.template Xc<dir>(k - koff, j - joff, i - ioff);
-
+  KOKKOS_INLINE_FUNCTION auto
+  GetEffectiveInverseDx2(const coords_t &coords, const coords_t &coords_p,
+                         const coords_t &coords_m, const int k, const int j,
+                         const int i) {
+    Real xc = Null<Real>(), xp = Null<Real>(), xm = Null<Real>();
+    auto AA = NewArray<Real, 2>();
+    const Real Vol = coords.Volume();
+    if constexpr (dir == X1DIR) {
+      xc = coords.x1v();
+      xp = coords_p.x1v();
+      xm = coords_m.x1v();
+      AA = coords.GetFaceAreaX1();
+    } else if constexpr (dir == X2DIR) {
+      xc = coords.x2v();
+      xp = coords_p.x2v();
+      xm = coords_m.x2v();
+      AA = coords.GetFaceAreaX2();
+    } else {
+      xc = coords.x3v();
+      xp = coords_p.x3v();
+      xm = coords_m.x3v();
+      AA = coords.GetFaceAreaX3();
+    }
     const Real dxp = xp - xc;
     const Real dxm = xc - xm;
-    const Real Ap = coords.template Volume<te>(k + koff, j + joff, i + ioff);
-    const Real Am = coords.template Volume<te>(k, j, i);
-    const Real Vol = coords.template Volume<TE::CC>(k, j, i);
-    return std::make_pair(Ap / (dxp * Vol), Am / (dxm * Vol));
+    return std::make_pair(AA[1] / (dxp * Vol), AA[0] / (dxm * Vol));
   }
 
   // Calculate an approximation to the diagonal of the matrix A and store it in diag_t.
@@ -94,28 +105,42 @@ class PoissonEquation {
     IndexRange kb = md_mat->GetBoundsK(IndexDomain::interior, te);
     int nblocks = md_mat->NumBlocks();
 
+    auto pm = md_mat->GetParentPointer();
+    const auto &cpars =
+        pm->packages.Get("artemis")->template Param<geometry::CoordParams>(
+            "coord_params");
+
     auto desc_diag = parthenon::MakePackDescriptor<var_t>(md_diag.get());
-    auto pack_diag = desc_diag.GetPack(md_diag.get());
+    auto pack = desc_diag.GetPack(md_diag.get());
     using TE = parthenon::TopologicalElement;
     parthenon::par_for(
-        "StoreDiagonal", 0, pack_diag.GetNBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s,
-        ib.e, KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
-          const auto &coords = pack_diag.GetCoordinates(b);
+        "StoreDiagonal", 0, pack.GetNBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+        KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+          geometry::Coords<GEOM> coords(cpars, pack.GetCoordinates(b), k, j, i);
           // Build the unigrid diagonal of the matrix
           Real diag_elem = 0.0;
           {
-            auto [idx2p, idx2m] = GetEffectiveInverseDx2<X1DIR>(coords, k, j, i);
+            geometry::Coords<GEOM> coords_p(cpars, pack.GetCoordinates(b), k, j, i + 1);
+            geometry::Coords<GEOM> coords_m(cpars, pack.GetCoordinates(b), k, j, i - 1);
+            auto [idx2p, idx2m] =
+                GetEffectiveInverseDx2<X1DIR>(coords, coords_p, coords_m, k, j, i);
             diag_elem -= (idx2m + idx2p);
           }
           if (ndim > 1) {
-            auto [idx2p, idx2m] = GetEffectiveInverseDx2<X2DIR>(coords, k, j, i);
+            geometry::Coords<GEOM> coords_p(cpars, pack.GetCoordinates(b), k, j + 1, i);
+            geometry::Coords<GEOM> coords_m(cpars, pack.GetCoordinates(b), k, j - 1, i);
+            auto [idx2p, idx2m] =
+                GetEffectiveInverseDx2<X2DIR>(coords, coords_p, coords_m, k, j, i);
             diag_elem -= (idx2m + idx2p);
           }
           if (ndim > 2) {
-            auto [idx2p, idx2m] = GetEffectiveInverseDx2<X3DIR>(coords, k, j, i);
+            geometry::Coords<GEOM> coords_p(cpars, pack.GetCoordinates(b), k + 1, j, i);
+            geometry::Coords<GEOM> coords_m(cpars, pack.GetCoordinates(b), k - 1, j, i);
+            auto [idx2p, idx2m] =
+                GetEffectiveInverseDx2<X3DIR>(coords, coords_p, coords_m, k, j, i);
             diag_elem -= (idx2m + idx2p);
           }
-          pack_diag(b, te, var_t(), k, j, i) = diag_elem;
+          pack(b, te, var_t(), k, j, i) = diag_elem;
         });
     return TaskStatus::complete;
   }
@@ -132,38 +157,49 @@ class PoissonEquation {
     IndexRange kb = md->GetBoundsK(IndexDomain::interior, te);
     int nblocks = md->NumBlocks();
 
+    auto pm = md_mat->GetParentPointer();
+    const auto &cpars =
+        pm->packages.Get("artemis")->template Param<geometry::CoordParams>(
+            "coord_params");
+
     auto desc = parthenon::MakePackDescriptor<var_t>(md.get(), {}, {PDOpt::WithFluxes});
     auto pack = desc.GetPack(md.get());
     parthenon::par_for(
         "CaclulateFluxes", 0, pack.GetNBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
         KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
-          const auto &coords = pack.GetCoordinates(b);
+          geometry::Coords<GEOM> coords(cpars, pack.GetCoordinates(b), k, j, i);
           pack.flux(b, X1DIR, var_t(), k, j, i) =
               (pack(b, te, var_t(), k, j, i - 1) - pack(b, te, var_t(), k, j, i)) /
-              coords.template Dxc<X1DIR>(k, j, i);
-          if (i == ib.e)
+              coords.GetCellWidthX1();
+          if (i == ib.e) {
+            geometry::Coords<GEOM> coords_p(cpars, pack.GetCoordinates(b), k, j, i + 1);
             pack.flux(b, X1DIR, var_t(), k, j, i + 1) =
                 (pack(b, te, var_t(), k, j, i) - pack(b, te, var_t(), k, j, i + 1)) /
-                coords.template Dxc<X1DIR>(k, j, i + 1);
+                coords_p.GetCellWidthX1();
+          }
 
           if (ndim > 1) {
             pack.flux(b, X2DIR, var_t(), k, j, i) =
                 (pack(b, te, var_t(), k, j - 1, i) - pack(b, te, var_t(), k, j, i)) /
-                coords.template Dxc<X2DIR>(k, j, i);
-            if (j == jb.e)
+                coords.GetCellWidthX2();
+            if (j == jb.e) {
+              geometry::Coords<GEOM> coords_p(cpars, pack.GetCoordinates(b), k, j + 1, i);
               pack.flux(b, X2DIR, var_t(), k, j + 1, i) =
                   (pack(b, te, var_t(), k, j, i) - pack(b, te, var_t(), k, j + 1, i)) /
-                  coords.template Dxc<X2DIR>(k, j + 1, i);
+                  coords_p.GetCellWidthX2();
+            }
           }
 
           if (ndim > 2) {
             pack.flux(b, X3DIR, var_t(), k, j, i) =
                 (pack(b, te, var_t(), k - 1, j, i) - pack(b, te, var_t(), k, j, i)) /
-                coords.template Dxc<X3DIR>(k, j, i);
-            if (k == kb.e)
+                coords.GetCellWidthX3();
+            if (k == kb.e) {
+              geometry::Coords<GEOM> coords_p(cpars, pack.GetCoordinates(b), k + 1, j, i);
               pack.flux(b, X3DIR, var_t(), k + 1, j, i) =
                   (pack(b, te, var_t(), k, j, i) - pack(b, te, var_t(), k + 1, j, i)) /
-                  coords.template Dxc<X3DIR>(k + 1, j, i);
+                  coords_p.GetCellWidthX3();
+            }
           }
         });
     return TaskStatus::complete;
@@ -183,6 +219,11 @@ class PoissonEquation {
     IndexRange kb = md->GetBoundsK(IndexDomain::interior, te);
     int nblocks = md->NumBlocks();
 
+    auto pm = md->GetParentPointer();
+    const auto &cpars =
+        pm->packages.Get("artemis")->template Param<geometry::CoordParams>(
+            "coord_params");
+
     static auto desc =
         parthenon::MakePackDescriptor<var_t>(md.get(), {}, {PDOpt::WithFluxes});
     static auto desc_out = parthenon::MakePackDescriptor<var_t>(md_out.get());
@@ -191,32 +232,29 @@ class PoissonEquation {
     parthenon::par_for(
         "FluxMultiplyMatrix", 0, pack.GetNBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s,
         ib.e, KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
-          const auto &coords = pack.GetCoordinates(b);
-          Real dx1 = coords.template Dxc<X1DIR>(k, j, i);
+          geometry::Coords<GEOM> coords(cpars, pack.GetCoordinates(b), k, j, i);
+          const Real VV = coords.Volume();
+          const auto A1 = coords.GetFaceAreaX1();
           pack_out(b, te, var_t(), k, j, i) = 0.0;
           pack_out(b, te, var_t(), k, j, i) +=
-              (pack.flux(b, X1DIR, var_t(), k, j, i) *
-                   coords.template Volume<TE::F1>(k, j, i) -
-               pack.flux(b, X1DIR, var_t(), k, j, i + 1) *
-                   coords.template Volume<TE::F1>(k, j, i + 1)) /
-              coords.template Volume<TE::CC>(k, j, i);
+              (pack.flux(b, X1DIR, var_t(), k, j, i) * A1[0] -
+               pack.flux(b, X1DIR, var_t(), k, j, i + 1) * A1[1]) /
+              VV;
 
           if (ndim > 1) {
+            const auto A2 = coords.GetFaceAreaX2();
             pack_out(b, te, var_t(), k, j, i) +=
-                (pack.flux(b, X2DIR, var_t(), k, j, i) *
-                     coords.template Volume<TE::F2>(k, j, i) -
-                 pack.flux(b, X2DIR, var_t(), k, j + 1, i) *
-                     coords.template Volume<TE::F2>(k, j + 1, i)) /
-                coords.template Volume<TE::CC>(k, j, i);
+                (pack.flux(b, X2DIR, var_t(), k, j, i) * A2[0] -
+                 pack.flux(b, X2DIR, var_t(), k, j + 1, i) * A2[1]) /
+                VV;
           }
 
           if (ndim > 2) {
+            const auto A3 = coords.GetFaceAreaX3();
             pack_out(b, te, var_t(), k, j, i) +=
-                (pack.flux(b, X3DIR, var_t(), k, j, i) *
-                     coords.template Volume<TE::F3>(k, j, i) -
-                 pack.flux(b, X3DIR, var_t(), k + 1, j, i) *
-                     coords.template Volume<TE::F3>(k + 1, j, i)) /
-                coords.template Volume<TE::CC>(k, j, i);
+                (pack.flux(b, X3DIR, var_t(), k, j, i) * A3[0] -
+                 pack.flux(b, X3DIR, var_t(), k + 1, j, i) * A3[1]) /
+                VV;
           }
         });
     return TaskStatus::complete;

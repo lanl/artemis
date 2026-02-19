@@ -115,12 +115,13 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
                                   Metadata::FillGhost,   Metadata::WithFluxes,
                                   Metadata::GMGRestrict, Metadata::GMGProlongate};
   Metadata m = Metadata(flags);
-  m.RegisterRefinementOps<ProlongateSharedLinear, RestrictAverage>();
+  ArtemisUtils::EnrollArtemisRefinementOps(m, coords, false, false);
   self_gravity->AddField<grav::phi>(m);
 
   // 4piG * \Sum rho
   auto mrhs = Metadata(
       {Metadata::Cell, Metadata::Derived, Metadata::OneCopy, Metadata::FillGhost});
+  ArtemisUtils::EnrollArtemisRefinementOps(mrhs, coords, false, false);
   self_gravity->AddField<grav::rhs>(mrhs);
 
   // Solvers

@@ -86,12 +86,9 @@ riemann = hllc-gamma
 gamma = 2.0
 
 <self_gravity>
-precondition = true
 print_per_step = true
 max_iterations = 100
 residual_tolerance = 1.0e-6
-smoother = SRJ2
-do_FAS = true
 units_override = true
 use_swindle = false
 ix1_bc = zero

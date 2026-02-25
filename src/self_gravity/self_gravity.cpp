@@ -40,11 +40,20 @@ struct any_poisson : public parthenon::variable_names::base_t<true> {
 };
 
 template <CoordinateDirection DIR, BCSide SIDE>
-auto Zero() {
+auto DirZ() {
   return [](std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) -> void {
     using namespace parthenon;
     using namespace parthenon::BoundaryFunction;
     GenericBC<DIR, SIDE, BCType::FixedFace, any_poisson>(rc, coarse, 0.0);
+  };
+}
+
+template <CoordinateDirection DIR, BCSide SIDE>
+auto NeuZ() {
+  return [](std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) -> void {
+    using namespace parthenon;
+    using namespace parthenon::BoundaryFunction;
+    GenericBC<DIR, SIDE, BCType::Outflow, any_poisson>(rc, coarse, 0.0);
   };
 }
 
@@ -92,22 +101,55 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   // self_gravity Package FillDerived function
   self_gravity->FillDerivedMesh = FillPoissonRHS<Coordinates::cartesian>;
 
-  // Enroll ZeroBC
+  // Enroll DirZ or NeuZ BCs if specified
   using BF = parthenon::BoundaryFace;
   constexpr auto LL = BCSide::Inner;
   constexpr auto RR = BCSide::Outer;
-  const bool zi1 = (pin->GetOrAddString(block_name, "ix1_bc", "default") == "zero");
-  const bool zo1 = (pin->GetOrAddString(block_name, "ox1_bc", "default") == "zero");
-  const bool zi2 = (pin->GetOrAddString(block_name, "ix2_bc", "default") == "zero");
-  const bool zo2 = (pin->GetOrAddString(block_name, "ox2_bc", "default") == "zero");
-  const bool zi3 = (pin->GetOrAddString(block_name, "ix3_bc", "default") == "zero");
-  const bool zo3 = (pin->GetOrAddString(block_name, "ox3_bc", "default") == "zero");
-  if (zi1) self_gravity->UserBoundaryFunctions[BF::inner_x1].push_back(Zero<X1DIR, LL>());
-  if (zo1) self_gravity->UserBoundaryFunctions[BF::inner_x2].push_back(Zero<X2DIR, LL>());
-  if (zi2) self_gravity->UserBoundaryFunctions[BF::inner_x3].push_back(Zero<X3DIR, LL>());
-  if (zo2) self_gravity->UserBoundaryFunctions[BF::outer_x1].push_back(Zero<X1DIR, RR>());
-  if (zi3) self_gravity->UserBoundaryFunctions[BF::outer_x2].push_back(Zero<X2DIR, RR>());
-  if (zo3) self_gravity->UserBoundaryFunctions[BF::outer_x3].push_back(Zero<X3DIR, RR>());
+  const std::string grav_bci1 = pin->GetOrAddString(block_name, "ix1_bc", "default");
+  const std::string grav_bco1 = pin->GetOrAddString(block_name, "ox1_bc", "default");
+  const std::string grav_bci2 = pin->GetOrAddString(block_name, "ix2_bc", "default");
+  const std::string grav_bco2 = pin->GetOrAddString(block_name, "ox2_bc", "default");
+  const std::string grav_bci3 = pin->GetOrAddString(block_name, "ix3_bc", "default");
+  const std::string grav_bco3 = pin->GetOrAddString(block_name, "ox3_bc", "default");
+
+  // Check validity
+  auto valid_grav_bc = [](const std::string &s) {
+    return s == "default" || s == "zero" || s == "neumann";
+  };
+  PARTHENON_REQUIRE(valid_grav_bc(grav_bci1), "Unsupported IX1 Poisson BC: " + grav_bci1);
+  PARTHENON_REQUIRE(valid_grav_bc(grav_bco1), "Unsupported OX1 Poisson BC: " + grav_bco1);
+  PARTHENON_REQUIRE(valid_grav_bc(grav_bci2), "Unsupported IX2 Poisson BC: " + grav_bci2);
+  PARTHENON_REQUIRE(valid_grav_bc(grav_bco2), "Unsupported OX2 Poisson BC: " + grav_bco2);
+  PARTHENON_REQUIRE(valid_grav_bc(grav_bci3), "Unsupported IX3 Poisson BC: " + grav_bci3);
+  PARTHENON_REQUIRE(valid_grav_bc(grav_bco3), "Unsupported OX3 Poisson BC: " + grav_bco3);
+
+  // Dirchlet (phi = 0) BC enrollment
+  const bool di1 = (grav_bci1 == "zero");
+  const bool do1 = (grav_bco1 == "zero");
+  const bool di2 = (grav_bci2 == "zero");
+  const bool do2 = (grav_bco2 == "zero");
+  const bool di3 = (grav_bci3 == "zero");
+  const bool do3 = (grav_bco3 == "zero");
+  if (di1) self_gravity->UserBoundaryFunctions[BF::inner_x1].push_back(DirZ<X1DIR, LL>());
+  if (do1) self_gravity->UserBoundaryFunctions[BF::inner_x2].push_back(DirZ<X2DIR, LL>());
+  if (di2) self_gravity->UserBoundaryFunctions[BF::inner_x3].push_back(DirZ<X3DIR, LL>());
+  if (do2) self_gravity->UserBoundaryFunctions[BF::outer_x1].push_back(DirZ<X1DIR, RR>());
+  if (di3) self_gravity->UserBoundaryFunctions[BF::outer_x2].push_back(DirZ<X2DIR, RR>());
+  if (do3) self_gravity->UserBoundaryFunctions[BF::outer_x3].push_back(DirZ<X3DIR, RR>());
+
+  // Neumann (dphi/dn = 0) BC enrollment
+  const bool ni1 = (grav_bci1 == "neumann");
+  const bool no1 = (grav_bco1 == "neumann");
+  const bool ni2 = (grav_bci2 == "neumann");
+  const bool no2 = (grav_bco2 == "neumann");
+  const bool ni3 = (grav_bci3 == "neumann");
+  const bool no3 = (grav_bco3 == "neumann");
+  if (ni1) self_gravity->UserBoundaryFunctions[BF::inner_x1].push_back(NeuZ<X1DIR, LL>());
+  if (no1) self_gravity->UserBoundaryFunctions[BF::inner_x2].push_back(NeuZ<X2DIR, LL>());
+  if (ni2) self_gravity->UserBoundaryFunctions[BF::inner_x3].push_back(NeuZ<X3DIR, LL>());
+  if (no2) self_gravity->UserBoundaryFunctions[BF::outer_x1].push_back(NeuZ<X1DIR, RR>());
+  if (ni3) self_gravity->UserBoundaryFunctions[BF::outer_x2].push_back(NeuZ<X2DIR, RR>());
+  if (no3) self_gravity->UserBoundaryFunctions[BF::outer_x3].push_back(NeuZ<X3DIR, RR>());
 
   // Gravitational potential
   using namespace parthenon::refinement_ops;

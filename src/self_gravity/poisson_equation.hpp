@@ -122,21 +122,21 @@ class PoissonEquation {
           {
             geometry::Coords<GEOM> coords_p(cpars, pack.GetCoordinates(b), k, j, i + 1);
             geometry::Coords<GEOM> coords_m(cpars, pack.GetCoordinates(b), k, j, i - 1);
-            auto [idx2p, idx2m] =
+            const auto &[idx2p, idx2m] =
                 GetEffectiveInverseDx2<X1DIR>(coords, coords_p, coords_m, k, j, i);
             diag_elem -= (idx2m + idx2p);
           }
           if (ndim > 1) {
             geometry::Coords<GEOM> coords_p(cpars, pack.GetCoordinates(b), k, j + 1, i);
             geometry::Coords<GEOM> coords_m(cpars, pack.GetCoordinates(b), k, j - 1, i);
-            auto [idx2p, idx2m] =
+            const auto &[idx2p, idx2m] =
                 GetEffectiveInverseDx2<X2DIR>(coords, coords_p, coords_m, k, j, i);
             diag_elem -= (idx2m + idx2p);
           }
           if (ndim > 2) {
             geometry::Coords<GEOM> coords_p(cpars, pack.GetCoordinates(b), k + 1, j, i);
             geometry::Coords<GEOM> coords_m(cpars, pack.GetCoordinates(b), k - 1, j, i);
-            auto [idx2p, idx2m] =
+            const auto &[idx2p, idx2m] =
                 GetEffectiveInverseDx2<X3DIR>(coords, coords_p, coords_m, k, j, i);
             diag_elem -= (idx2m + idx2p);
           }
@@ -233,29 +233,24 @@ class PoissonEquation {
         "FluxMultiplyMatrix", 0, pack.GetNBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s,
         ib.e, KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
           geometry::Coords<GEOM> coords(cpars, pack.GetCoordinates(b), k, j, i);
-          const Real VV = coords.Volume();
-          const auto A1 = coords.GetFaceAreaX1();
-          pack_out(b, te, var_t(), k, j, i) = 0.0;
-          pack_out(b, te, var_t(), k, j, i) +=
-              (pack.flux(b, X1DIR, var_t(), k, j, i) * A1[0] -
-               pack.flux(b, X1DIR, var_t(), k, j, i + 1) * A1[1]) /
-              VV;
 
+          Real div = 0.0;
+          {
+            const auto AA = coords.GetFaceAreaX1();
+            div += (pack.flux(b, X1DIR, var_t(), k, j, i) * AA[0] -
+                    pack.flux(b, X1DIR, var_t(), k, j, i + 1) * AA[1]);
+          }
           if (ndim > 1) {
-            const auto A2 = coords.GetFaceAreaX2();
-            pack_out(b, te, var_t(), k, j, i) +=
-                (pack.flux(b, X2DIR, var_t(), k, j, i) * A2[0] -
-                 pack.flux(b, X2DIR, var_t(), k, j + 1, i) * A2[1]) /
-                VV;
+            const auto AA = coords.GetFaceAreaX2();
+            div += (pack.flux(b, X2DIR, var_t(), k, j, i) * AA[0] -
+                    pack.flux(b, X2DIR, var_t(), k, j + 1, i) * AA[1]);
           }
-
           if (ndim > 2) {
-            const auto A3 = coords.GetFaceAreaX3();
-            pack_out(b, te, var_t(), k, j, i) +=
-                (pack.flux(b, X3DIR, var_t(), k, j, i) * A3[0] -
-                 pack.flux(b, X3DIR, var_t(), k + 1, j, i) * A3[1]) /
-                VV;
+            const auto AA = coords.GetFaceAreaX3();
+            div += (pack.flux(b, X3DIR, var_t(), k, j, i) * AA[0] -
+                    pack.flux(b, X3DIR, var_t(), k + 1, j, i) * AA[1]);
           }
+          pack_out(b, te, var_t(), k, j, i) = div / coords.Volume();
         });
     return TaskStatus::complete;
   }

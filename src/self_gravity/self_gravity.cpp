@@ -84,10 +84,10 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
 
   // Jeans swindle
   bool pi1 = (pin->GetOrAddString("parthenon/mesh", "ix1_bc", "outflow") == "periodic");
-  bool po1 = (pin->GetOrAddString("parthenon/mesh", "ox1_bc", "outflow") == "periodic");
   bool pi2 = (pin->GetOrAddString("parthenon/mesh", "ix2_bc", "outflow") == "periodic");
-  bool po2 = (pin->GetOrAddString("parthenon/mesh", "ox2_bc", "outflow") == "periodic");
   bool pi3 = (pin->GetOrAddString("parthenon/mesh", "ix3_bc", "outflow") == "periodic");
+  bool po1 = (pin->GetOrAddString("parthenon/mesh", "ox1_bc", "outflow") == "periodic");
+  bool po2 = (pin->GetOrAddString("parthenon/mesh", "ox2_bc", "outflow") == "periodic");
   bool po3 = (pin->GetOrAddString("parthenon/mesh", "ox3_bc", "outflow") == "periodic");
   const bool needs_swindle = (pi1 && pi2 && pi3 && po1 && po2 && po3);
   const bool swindle = pin->GetOrAddBoolean(block_name, "use_swindle", needs_swindle);
@@ -106,10 +106,10 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   constexpr auto LL = BCSide::Inner;
   constexpr auto RR = BCSide::Outer;
   const std::string grav_bci1 = pin->GetOrAddString(block_name, "ix1_bc", "default");
-  const std::string grav_bco1 = pin->GetOrAddString(block_name, "ox1_bc", "default");
   const std::string grav_bci2 = pin->GetOrAddString(block_name, "ix2_bc", "default");
-  const std::string grav_bco2 = pin->GetOrAddString(block_name, "ox2_bc", "default");
   const std::string grav_bci3 = pin->GetOrAddString(block_name, "ix3_bc", "default");
+  const std::string grav_bco1 = pin->GetOrAddString(block_name, "ox1_bc", "default");
+  const std::string grav_bco2 = pin->GetOrAddString(block_name, "ox2_bc", "default");
   const std::string grav_bco3 = pin->GetOrAddString(block_name, "ox3_bc", "default");
 
   // Check validity
@@ -117,10 +117,10 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
     return s == "default" || s == "zero" || s == "neumann";
   };
   PARTHENON_REQUIRE(valid_grav_bc(grav_bci1), "Unsupported IX1 Poisson BC: " + grav_bci1);
-  PARTHENON_REQUIRE(valid_grav_bc(grav_bco1), "Unsupported OX1 Poisson BC: " + grav_bco1);
   PARTHENON_REQUIRE(valid_grav_bc(grav_bci2), "Unsupported IX2 Poisson BC: " + grav_bci2);
-  PARTHENON_REQUIRE(valid_grav_bc(grav_bco2), "Unsupported OX2 Poisson BC: " + grav_bco2);
   PARTHENON_REQUIRE(valid_grav_bc(grav_bci3), "Unsupported IX3 Poisson BC: " + grav_bci3);
+  PARTHENON_REQUIRE(valid_grav_bc(grav_bco1), "Unsupported OX1 Poisson BC: " + grav_bco1);
+  PARTHENON_REQUIRE(valid_grav_bc(grav_bco2), "Unsupported OX2 Poisson BC: " + grav_bco2);
   PARTHENON_REQUIRE(valid_grav_bc(grav_bco3), "Unsupported OX3 Poisson BC: " + grav_bco3);
 
   // Dirchlet (phi = 0) BC enrollment
@@ -131,10 +131,10 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   const bool di3 = (grav_bci3 == "zero");
   const bool do3 = (grav_bco3 == "zero");
   if (di1) self_gravity->UserBoundaryFunctions[BF::inner_x1].push_back(DirZ<X1DIR, LL>());
-  if (do1) self_gravity->UserBoundaryFunctions[BF::inner_x2].push_back(DirZ<X2DIR, LL>());
-  if (di2) self_gravity->UserBoundaryFunctions[BF::inner_x3].push_back(DirZ<X3DIR, LL>());
-  if (do2) self_gravity->UserBoundaryFunctions[BF::outer_x1].push_back(DirZ<X1DIR, RR>());
-  if (di3) self_gravity->UserBoundaryFunctions[BF::outer_x2].push_back(DirZ<X2DIR, RR>());
+  if (di2) self_gravity->UserBoundaryFunctions[BF::inner_x2].push_back(DirZ<X2DIR, LL>());
+  if (di3) self_gravity->UserBoundaryFunctions[BF::inner_x3].push_back(DirZ<X3DIR, LL>());
+  if (do1) self_gravity->UserBoundaryFunctions[BF::outer_x1].push_back(DirZ<X1DIR, RR>());
+  if (do2) self_gravity->UserBoundaryFunctions[BF::outer_x2].push_back(DirZ<X2DIR, RR>());
   if (do3) self_gravity->UserBoundaryFunctions[BF::outer_x3].push_back(DirZ<X3DIR, RR>());
 
   // Neumann (dphi/dn = 0) BC enrollment
@@ -145,10 +145,10 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   const bool ni3 = (grav_bci3 == "neumann");
   const bool no3 = (grav_bco3 == "neumann");
   if (ni1) self_gravity->UserBoundaryFunctions[BF::inner_x1].push_back(NeuZ<X1DIR, LL>());
-  if (no1) self_gravity->UserBoundaryFunctions[BF::inner_x2].push_back(NeuZ<X2DIR, LL>());
-  if (ni2) self_gravity->UserBoundaryFunctions[BF::inner_x3].push_back(NeuZ<X3DIR, LL>());
-  if (no2) self_gravity->UserBoundaryFunctions[BF::outer_x1].push_back(NeuZ<X1DIR, RR>());
-  if (ni3) self_gravity->UserBoundaryFunctions[BF::outer_x2].push_back(NeuZ<X2DIR, RR>());
+  if (ni2) self_gravity->UserBoundaryFunctions[BF::inner_x2].push_back(NeuZ<X2DIR, LL>());
+  if (ni3) self_gravity->UserBoundaryFunctions[BF::inner_x3].push_back(NeuZ<X3DIR, LL>());
+  if (no1) self_gravity->UserBoundaryFunctions[BF::outer_x1].push_back(NeuZ<X1DIR, RR>());
+  if (no2) self_gravity->UserBoundaryFunctions[BF::outer_x2].push_back(NeuZ<X2DIR, RR>());
   if (no3) self_gravity->UserBoundaryFunctions[BF::outer_x3].push_back(NeuZ<X3DIR, RR>());
 
   // Gravitational potential

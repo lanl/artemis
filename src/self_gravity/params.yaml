@@ -12,3 +12,15 @@ self_gravity:
   use_swindle:
     _type: bool
     _description: "Invoke Jeans swindle.  Required when fully periodic."
+  print_per_step:
+    _type: bool
+    _description: "Reports (when true) the iteration residual history for Poisson solver"
+    _default: "false"
+  max_iterations:
+    _type: int
+    _description: "Maximum number of iterations for Poisson solver"
+    _default: 1000
+  residual_tolerance:
+    _type: Real
+    _description: "Residual tolerance for Poisson solver"
+    _default: 1.0e-12

@@ -216,29 +216,33 @@ void FillPoissonRHS(MeshData<Real> *md) {
   const bool use_swindle = grav_pkg->template Param<bool>("use_swindle");
   if (use_swindle) {
     Real total_mass = 0.0;
-    Real total_volume = artemis_pkg->template Param<Real>("domain_volume");
+    Real total_volume = 0.0;
     parthenon::par_reduce(
         parthenon::loop_pattern_mdrange_tag, "Gravity::TotalMass",
         parthenon::DevExecSpace(), 0, nblocks - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
-        KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i,
-                      Real &mtot) {
+        KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i, Real &lmtot,
+                      Real &lvtot) {
           geometry::Coords<GEOM> coords(cpars, vmesh.GetCoordinates(b), k, j, i);
           const Real vv = coords.Volume();
+          lvtot += vv;
           for (int n = 0; n < do_gas * vmesh.GetSize(b, gas::prim::density()); ++n) {
-            mtot += vmesh(b, gas::prim::density(n), k, j, i) * vv;
+            lmtot += vmesh(b, gas::prim::density(n), k, j, i) * vv;
           }
           for (int n = 0; n < do_dust * vmesh.GetSize(b, dust::prim::density()); ++n) {
-            mtot += vmesh(b, dust::prim::density(n), k, j, i) * vv;
+            lmtot += vmesh(b, dust::prim::density(n), k, j, i) * vv;
           }
         },
-        Kokkos::Sum<Real>(total_mass));
+        Kokkos::Sum<Real>(total_mass), Kokkos::Sum<Real>(total_volume));
     Kokkos::fence();
 
 #ifdef MPI_PARALLEL
     // NOTE(@pdmullen): This reduction only works because we require pack_size==-1...
-    MPI_Allreduce(MPI_IN_PLACE, &total_mass, 1, MPI_PARTHENON_REAL, MPI_SUM,
-                  MPI_COMM_WORLD);
+    Real values[2] = {total_mass, total_volume};
+    MPI_Allreduce(MPI_IN_PLACE, values, 2, MPI_PARTHENON_REAL, MPI_SUM, MPI_COMM_WORLD);
+    total_mass = values[0];
+    total_volume = values[1];
 #endif
+
     grav_mean_rho = total_mass / total_volume;
   }
 

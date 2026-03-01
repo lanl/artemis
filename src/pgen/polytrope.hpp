@@ -58,6 +58,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   // Polytrope params
   const int iprob = pin->GetOrAddInteger("problem", "iprob", 1);
+  PARTHENON_REQUIRE((iprob == 1) || (iprob == 2), "iprob not recognized!");
   const Real x10a = pin->GetOrAddReal("problem", "x10a", (iprob == 2) * 4.0);
   const Real x20a = pin->GetOrAddReal("problem", "x20a", (iprob == 2) * 2.5);
   const Real x30a = pin->GetOrAddReal("problem", "x30a", (iprob == 2) * 0.0);
@@ -97,8 +98,6 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         } else if (iprob == 2) {
           trho = inside1 ? lane_emden1 : (inside2 ? lane_emden2 : rho_amb);
           tsie = inside1 ? lane_emden1 : (inside2 ? lane_emden2 : sie_amb);
-        } else {
-          PARTHENON_FAIL("iprob not recognized!");
         }
         v(0, gas::prim::density(), k, j, i) = trho;
         v(0, gas::prim::sie(), k, j, i) = tsie;

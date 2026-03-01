@@ -1,5 +1,5 @@
 //========================================================================================
-// (C) (or copyright) 2023-2025. Triad National Security, LLC. All rights reserved.
+// (C) (or copyright) 2023-2026. Triad National Security, LLC. All rights reserved.
 //
 // This program was produced under U.S. Government contract 89233218CNA000001 for Los
 // Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -32,6 +32,7 @@
 #include "radiation/moments/moments.hpp"
 #include "radiation/raytrace/raytrace.hpp"
 #include "rotating_frame/rotating_frame.hpp"
+#include "self_gravity/self_gravity.hpp"
 #include "utils/integrators/artemis_integrator.hpp"
 
 using namespace parthenon::driver::prelude;
@@ -61,6 +62,7 @@ ArtemisDriver<GEOM>::ArtemisDriver(ParameterInput *pin, ApplicationInput *app_in
   do_gas = artemis_pkg->template Param<bool>("do_gas");
   do_dust = artemis_pkg->template Param<bool>("do_dust");
   do_gravity = artemis_pkg->template Param<bool>("do_gravity");
+  do_self_gravity = artemis_pkg->template Param<bool>("do_self_gravity");
   do_rotating_frame = artemis_pkg->template Param<bool>("do_rotating_frame");
   do_shear = artemis_pkg->template Param<bool>("do_shear");
   do_cooling = artemis_pkg->template Param<bool>("do_cooling");
@@ -235,6 +237,9 @@ TaskCollection ArtemisDriver<GEOM>::StepTasks() {
     const Real g1 = integrator->gam1[stage - 1];
     const Real bdt = integrator->beta[stage - 1] * integrator->dt;
 
+    // Compute gravitational potential
+    if (do_self_gravity) SelfGravity::SolvePoisson(tc, pmesh);
+
     TaskRegion &tr = tc.AddRegion(num_partitions);
     for (int i = 0; i < num_partitions; i++) {
       auto &tl = tr[i];
@@ -294,10 +299,17 @@ TaskCollection ArtemisDriver<GEOM>::StepTasks() {
                                  Gravity::ExternalGravity<GEOM>, u0.get(), time, bdt);
       }
 
-      TaskID rt_src = gravity_src;
+      // Apply self-gravity source term
+      TaskID self_gravity_src = gravity_src;
+      if (do_self_gravity) {
+        self_gravity_src =
+            tl.AddTask(gravity_src, SelfGravity::SelfGravity<GEOM>, u0.get(), time, bdt);
+      }
+
+      TaskID rt_src = self_gravity_src;
       // Note that radiation moments will handle this source term if active
       if (do_raytrace && !do_moment) {
-        rt_src = tl.AddTask(gravity_src, Gas::DepositEnergy, u0.get(), bdt);
+        rt_src = tl.AddTask(self_gravity_src, Gas::DepositEnergy, u0.get(), bdt);
       }
 
       // Apply rotating frame source term

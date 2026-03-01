@@ -1,5 +1,5 @@
 # ========================================================================================
-#  (C) (or copyright) 2023-2025. Triad National Security, LLC. All rights reserved.
+#  (C) (or copyright) 2023-2026. Triad National Security, LLC. All rights reserved.
 #
 #  This program was produced under U.S. Government contract 89233218CNA000001 for Los
 #  Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -43,10 +43,10 @@ set (SRC_LIST
 
   gravity/binary_mass.cpp
   gravity/gravity.cpp
+  gravity/gravity.hpp
   gravity/nbody_gravity.hpp
   gravity/point_mass.cpp
   gravity/uniform.cpp
-  gravity/gravity.hpp
 
   nbody/nbody.cpp
   nbody/nbody.hpp
@@ -68,6 +68,7 @@ set (SRC_LIST
   pgen/kh.hpp
   pgen/linear_wave.hpp
   pgen/lw.hpp
+  pgen/polytrope.hpp
   pgen/pgen.hpp
   pgen/problem_modifier.hpp
   pgen/rt.hpp
@@ -90,6 +91,12 @@ set (SRC_LIST
   rotating_frame/rotating_frame.cpp
   rotating_frame/rotating_frame_impl.hpp
   rotating_frame/rotating_frame.hpp
+
+  self_gravity/self_gravity.cpp
+  self_gravity/self_gravity.hpp
+  self_gravity/poisson_driver.cpp
+  self_gravity/poisson_equation.hpp
+  self_gravity/self_gravity.cpp
 
   utils/artemis_utils.cpp
   utils/artemis_utils.hpp

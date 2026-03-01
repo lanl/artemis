@@ -1,5 +1,5 @@
 //========================================================================================
-// (C) (or copyright) 2023-2025. Triad National Security, LLC. All rights reserved.
+// (C) (or copyright) 2023-2026. Triad National Security, LLC. All rights reserved.
 //
 // This program was produced under U.S. Government contract 89233218CNA000001 for Los
 // Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -26,6 +26,7 @@
 #include "radiation/radiation.hpp"
 #include "radiation/raytrace/raytrace.hpp"
 #include "rotating_frame/rotating_frame.hpp"
+#include "self_gravity/self_gravity.hpp"
 #include "utils/artemis_utils.hpp"
 #include "utils/history.hpp"
 #include "utils/units.hpp"
@@ -91,6 +92,7 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   const bool do_gas = pin->GetOrAddBoolean("physics", "gas", true);
   const bool do_dust = pin->GetOrAddBoolean("physics", "dust", false);
   const bool do_gravity = pin->GetOrAddBoolean("physics", "gravity", false);
+  const bool do_self_gravity = pin->GetOrAddBoolean("physics", "self_gravity", false);
   const bool do_nbody = pin->GetOrAddBoolean("physics", "nbody", false);
   const bool do_rotating_frame = pin->GetOrAddBoolean("physics", "rotating_frame", false);
   const bool do_cooling = pin->GetOrAddBoolean("physics", "cooling", false);
@@ -128,6 +130,7 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   artemis->AddParam("do_gas", do_gas);
   artemis->AddParam("do_dust", do_dust);
   artemis->AddParam("do_gravity", do_gravity);
+  artemis->AddParam("do_self_gravity", do_self_gravity);
   artemis->AddParam("do_nbody", do_nbody);
   artemis->AddParam("do_rotating_frame", do_rotating_frame);
   artemis->AddParam("do_cooling", do_cooling);
@@ -162,6 +165,8 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   packages.Add(geometry::Initialize(pin.get()));
   if (do_nbody) packages.Add(NBody::Initialize(pin.get(), constants));
   if (do_gravity) packages.Add(Gravity::Initialize(pin.get(), constants, packages));
+  if (do_self_gravity)
+    packages.Add(SelfGravity::Initialize(pin.get(), constants, packages));
   if (do_gas) packages.Add(Gas::Initialize(pin.get(), units, constants, packages));
   if (do_dust) packages.Add(Dust::Initialize(pin.get(), units));
   if (do_rotating_frame) packages.Add(RotatingFrame::Initialize(pin.get()));

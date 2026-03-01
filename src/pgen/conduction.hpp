@@ -133,7 +133,6 @@ template <Coordinates GEOM, IndexDomain BDY, Diffusion::DiffType DTYP>
 void CondBoundaryImpl(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) {
   PARTHENON_INSTRUMENT
   auto pmb = mbd->GetBlockPointer();
-  if (coarse && !ArtemisUtils::CoarseNeighbor(pmb)) return;
 
   // Artemis package and params
   auto artemis_pkg = pmb->packages.Get("artemis");
@@ -267,7 +266,6 @@ template <Coordinates GEOM, IndexDomain BDY>
 inline void CondBoundary(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) {
   PARTHENON_INSTRUMENT
   auto pmb = mbd->GetBlockPointer();
-  if (coarse && !ArtemisUtils::CoarseNeighbor(pmb)) return;
 
   auto artemis_pkg = pmb->packages.Get("artemis");
   auto &pkg = pmb->packages.Get("gas");

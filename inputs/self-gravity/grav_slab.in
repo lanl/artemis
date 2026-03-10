@@ -43,13 +43,13 @@ x1max  = 18.84955592153876  # maximum value of X1
 ix1_bc = periodic  # Inner-X1 boundary condition flag
 ox1_bc = periodic  # Outer-X1 boundary condition flag
 
-nx2    = 64         # Number of zones in X2-direction
+nx2    = 64        # Number of zones in X2-direction
 x2min  = 0.0       # minimum value of X2
 x2max  = 9.424777960769380  # maximum value of X2
 ix2_bc = periodic  # Inner-X2 boundary condition flag
 ox2_bc = periodic  # Outer-X2 boundary condition flag
 
-nx3    = 64         # Number of zones in X3-direction
+nx3    = 64        # Number of zones in X3-direction
 x3min  = 0.0       # minimum value of X3
 x3max  = 9.424777960769380  # maximum value of X3
 ix3_bc = periodic  # Inner-X3 boundary condition flag

@@ -28,6 +28,7 @@
 #include "disk.hpp"
 #include "gaussian_bump.hpp"
 #include "geometry/geometry.hpp"
+#include "grav_slab.hpp"
 #include "kh.hpp"
 #include "linear_wave.hpp"
 #include "lw.hpp"
@@ -63,6 +64,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
     disk::ProblemGenerator<T>(pmb, pin);
   } else if (name == "gaussian_bump") {
     gaussian_bump::ProblemGenerator<T>(pmb, pin);
+  } else if (name == "grav_slab") {
+    grav_slab::ProblemGenerator<T>(pmb, pin);
   } else if (name == "linear_wave") {
     linear_wave::ProblemGenerator<T>(pmb, pin);
   } else if (name == "lw") {

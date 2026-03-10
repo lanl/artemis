@@ -1,5 +1,5 @@
 # ========================================================================================
-#  (C) (or copyright) 2023-2024. Triad National Security, LLC. All rights reserved.
+#  (C) (or copyright) 2026. Triad National Security, LLC. All rights reserved.
 #
 #  This program was produced under U.S. Government contract 89233218CNA000001 for Los
 #  Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -11,18 +11,25 @@
 #  the public, perform publicly and display publicly, and to permit others to do so.
 # ========================================================================================
 
-# parallel suite
+# Regression test based on the self-gravitating slab advection problem
 
-advection/advection_mpi
-binary/binary_mpi
-binary_aid/binary_adi_mpi
-coords/blast_mpi
-disk/disk_mpi
-nbody/nbody_mpi
-hydro/linwave_mpi
-self_gravity/grav_slab_mpi
-ssheet/ssheet_mpi
-diffusion/viscous_diffusion_mpi
-diffusion/alpha_disk_mpi
-diffusion/thermal_diffusion_mpi
-drag/drag_mpi
+# Modules
+import importlib
+import logging
+import scripts.self_gravity.grav_slab as grav_slab
+
+logger = logging.getLogger("artemis" + __name__[7:])  # set logger name
+
+importlib.reload(grav_slab)
+grav_slab._nranks = 2
+grav_slab._file_id = "grav_slab_mpi"
+
+
+# Run Artemis
+def run(**kwargs):
+    return grav_slab.run(**kwargs)
+
+
+# Analyze outputs
+def analyze():
+    return grav_slab.analyze()

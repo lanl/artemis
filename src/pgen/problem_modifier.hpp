@@ -100,6 +100,8 @@ void ProblemModifier(parthenon::ParthenonManager *pman) {
       pman->app_input->RegisterBoundaryCondition(BF::outer_x1, "viscous",
                                                  disk::DiskBoundaryVisc<G, ID::outer_x1>);
     }
+  } else if (artemis_problem == "grav_slab") {
+    pman->app_input->UserWorkAfterLoop = grav_slab::UserWorkAfterLoop<G>;
   } else if (artemis_problem == "linear_wave") {
     pman->app_input->UserWorkAfterLoop = linear_wave::UserWorkAfterLoop<G>;
   } else if (artemis_problem == "shock") {

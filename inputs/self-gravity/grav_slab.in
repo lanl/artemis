@@ -1,0 +1,84 @@
+# ========================================================================================
+#  (C) (or copyright) 2026. Triad National Security, LLC. All rights reserved.
+#
+#  This program was produced under U.S. Government contract 89233218CNA000001 for Los
+#  Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
+#  for the U.S. Department of Energy/National Nuclear Security Administration. All rights
+#  in the program are reserved by Triad National Security, LLC, and the U.S. Department
+#  of Energy/National Nuclear Security Administration. The Government is granted for
+#  itself and others acting on its behalf a nonexclusive, paid-up, irrevocable worldwide
+#  license in this material to reproduce, prepare derivative works, distribute copies to
+#  the public, perform publicly and display publicly, and to permit others to do so.
+# ========================================================================================
+
+<artemis>
+problem = grav_slab    # name of the pgen
+coordinates = cartesian  # coordinate system
+
+<parthenon/job>
+problem_id = grav_slab  # problem ID: basename of output filenames
+
+<parthenon/output1>
+variables = gas.prim.density,  &
+            gas.prim.velocity, &
+            gas.prim.pressure
+file_type = hdf5  # HDF5 data dump
+dt        = -1.0   # time increment between outputs
+
+<parthenon/time>
+nlim       = -1    # cycle limit
+tlim       = 1.0   # time limit (to be reset by problem generator)
+integrator = rk2   # time integration algorithm
+ncycle_out = 1     # interval for stdout summary info
+
+<parthenon/mesh>
+nghost = 2
+refinement = none
+numlevel = 1
+multigrid = true
+
+nx1    = 128       # Number of zones in X1-direction
+x1min  = 0.0       # minimum value of X1
+x1max  = 18.84955592153876  # maximum value of X1 
+ix1_bc = periodic  # Inner-X1 boundary condition flag
+ox1_bc = periodic  # Outer-X1 boundary condition flag
+
+nx2    = 64        # Number of zones in X2-direction
+x2min  = 0.0       # minimum value of X2
+x2max  = 9.424777960769380  # maximum value of X2
+ix2_bc = periodic  # Inner-X2 boundary condition flag
+ox2_bc = periodic  # Outer-X2 boundary condition flag
+
+nx3    = 64        # Number of zones in X3-direction
+x3min  = 0.0       # minimum value of X3
+x3max  = 9.424777960769380  # maximum value of X3
+ix3_bc = periodic  # Inner-X3 boundary condition flag
+ox3_bc = periodic  # Outer-X3 boundary condition flag
+
+<parthenon/meshblock>
+nx1 = 32  # Number of cells in each MeshBlock, X1-dir
+nx2 = 32  # Number of cells in each MeshBlock, X2-dir
+nx3 = 32  # Number of cells in each MeshBlock, X3-dir
+
+<physics>
+gas = true
+dust = false
+self_gravity = true
+
+<gas>
+cfl = 0.9
+reconstruct = plm
+riemann = hllc-general
+
+<gas/eos/ideal>
+gamma = 1.66666666667
+
+<self_gravity>
+print_per_step = true
+max_iterations = 100
+residual_tolerance = 1.0e-8
+units_override = true
+use_swindle = true
+
+<problem>
+nperiod   = 1       # Number of wave crossing periods to evolve simulation

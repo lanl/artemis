@@ -38,6 +38,7 @@ void PrintArtemisConfiguration(Packages_t &packages) {
     std::string hfill(21, ' ');
     std::string msg = "";
     if (params.Get<bool>("do_gas")) msg += "Gas\n";
+    if (!params.Get<bool>("update_fluxes")) msg += "(without flux updates)\n";
     if (params.Get<bool>("do_dust")) msg += hfill + "Dust\n";
     if (params.Get<bool>("do_gravity")) msg += hfill + "Gravity\n";
     if (params.Get<bool>("do_rotating_frame")) msg += hfill + "Rotating frame\n";
@@ -95,53 +96,126 @@ void PrintArtemisConfiguration(Packages_t &packages) {
 //! \fn void ArtemisUtils::EnrollArtemisRefinementOps
 //! \brief Registers custom prolongation and restriction operators on provided Metadata
 void EnrollArtemisRefinementOps(parthenon::Metadata &m, Coordinates coords,
-                                const bool log) {
+                                const bool log, const bool use_minmod_slope) {
   typedef Coordinates G;
 
-  // log space
   if (coords == G::cartesian) {
-    m.RegisterRefinementOps<ArtemisUtils::ProlongateSharedMinMod<G::cartesian, false>,
-                            ArtemisUtils::RestrictAverage<G::cartesian, false>>();
+    if (use_minmod_slope) {
+      m.RegisterRefinementOps<ArtemisUtils::ProlongateShared<G::cartesian, false, true>,
+                              ArtemisUtils::RestrictAverage<G::cartesian, false>>();
+    } else {
+      m.RegisterRefinementOps<ArtemisUtils::ProlongateShared<G::cartesian, false, false>,
+                              ArtemisUtils::RestrictAverage<G::cartesian, false>>();
+    }
   } else if (coords == G::spherical1D) {
     if (log) {
-      m.RegisterRefinementOps<ArtemisUtils::ProlongateSharedMinMod<G::spherical1D, true>,
-                              ArtemisUtils::RestrictAverage<G::spherical1D, true>>();
+      if (use_minmod_slope) {
+        m.RegisterRefinementOps<
+            ArtemisUtils::ProlongateShared<G::spherical1D, true, true>,
+            ArtemisUtils::RestrictAverage<G::spherical1D, true>>();
+      } else {
+        m.RegisterRefinementOps<
+            ArtemisUtils::ProlongateShared<G::spherical1D, true, false>,
+            ArtemisUtils::RestrictAverage<G::spherical1D, true>>();
+      }
     } else {
-      m.RegisterRefinementOps<ArtemisUtils::ProlongateSharedMinMod<G::spherical1D, false>,
-                              ArtemisUtils::RestrictAverage<G::spherical1D, false>>();
+      if (use_minmod_slope) {
+        m.RegisterRefinementOps<
+            ArtemisUtils::ProlongateShared<G::spherical1D, false, true>,
+            ArtemisUtils::RestrictAverage<G::spherical1D, false>>();
+      } else {
+        m.RegisterRefinementOps<
+            ArtemisUtils::ProlongateShared<G::spherical1D, false, false>,
+            ArtemisUtils::RestrictAverage<G::spherical1D, false>>();
+      }
     }
   } else if (coords == G::spherical2D) {
     if (log) {
-      m.RegisterRefinementOps<ArtemisUtils::ProlongateSharedMinMod<G::spherical2D, true>,
-                              ArtemisUtils::RestrictAverage<G::spherical2D, true>>();
+      if (use_minmod_slope) {
+        m.RegisterRefinementOps<
+            ArtemisUtils::ProlongateShared<G::spherical2D, true, true>,
+            ArtemisUtils::RestrictAverage<G::spherical2D, true>>();
+      } else {
+        m.RegisterRefinementOps<
+            ArtemisUtils::ProlongateShared<G::spherical2D, true, false>,
+            ArtemisUtils::RestrictAverage<G::spherical2D, true>>();
+      }
     } else {
-      m.RegisterRefinementOps<ArtemisUtils::ProlongateSharedMinMod<G::spherical2D, false>,
-                              ArtemisUtils::RestrictAverage<G::spherical2D, false>>();
+      if (use_minmod_slope) {
+        m.RegisterRefinementOps<
+            ArtemisUtils::ProlongateShared<G::spherical2D, false, true>,
+            ArtemisUtils::RestrictAverage<G::spherical2D, false>>();
+      } else {
+        m.RegisterRefinementOps<
+            ArtemisUtils::ProlongateShared<G::spherical2D, false, false>,
+            ArtemisUtils::RestrictAverage<G::spherical2D, false>>();
+      }
     }
   } else if (coords == G::spherical3D) {
     if (log) {
-      m.RegisterRefinementOps<ArtemisUtils::ProlongateSharedMinMod<G::spherical3D, true>,
-                              ArtemisUtils::RestrictAverage<G::spherical3D, true>>();
+      if (use_minmod_slope) {
+        m.RegisterRefinementOps<
+            ArtemisUtils::ProlongateShared<G::spherical3D, true, true>,
+            ArtemisUtils::RestrictAverage<G::spherical3D, true>>();
+      } else {
+        m.RegisterRefinementOps<
+            ArtemisUtils::ProlongateShared<G::spherical3D, true, false>,
+            ArtemisUtils::RestrictAverage<G::spherical3D, true>>();
+      }
     } else {
-      m.RegisterRefinementOps<ArtemisUtils::ProlongateSharedMinMod<G::spherical3D, false>,
-                              ArtemisUtils::RestrictAverage<G::spherical3D, false>>();
+      if (use_minmod_slope) {
+        m.RegisterRefinementOps<
+            ArtemisUtils::ProlongateShared<G::spherical3D, false, true>,
+            ArtemisUtils::RestrictAverage<G::spherical3D, false>>();
+      } else {
+        m.RegisterRefinementOps<
+            ArtemisUtils::ProlongateShared<G::spherical3D, false, false>,
+            ArtemisUtils::RestrictAverage<G::spherical3D, false>>();
+      }
     }
   } else if (coords == G::cylindrical) {
     if (log) {
-      m.RegisterRefinementOps<ArtemisUtils::ProlongateSharedMinMod<G::cylindrical, true>,
-                              ArtemisUtils::RestrictAverage<G::cylindrical, true>>();
+      if (use_minmod_slope) {
+        m.RegisterRefinementOps<
+            ArtemisUtils::ProlongateShared<G::cylindrical, true, true>,
+            ArtemisUtils::RestrictAverage<G::cylindrical, true>>();
+      } else {
+        m.RegisterRefinementOps<
+            ArtemisUtils::ProlongateShared<G::cylindrical, true, false>,
+            ArtemisUtils::RestrictAverage<G::cylindrical, true>>();
+      }
     } else {
-      m.RegisterRefinementOps<ArtemisUtils::ProlongateSharedMinMod<G::cylindrical, false>,
-                              ArtemisUtils::RestrictAverage<G::cylindrical, false>>();
+      if (use_minmod_slope) {
+        m.RegisterRefinementOps<
+            ArtemisUtils::ProlongateShared<G::cylindrical, false, true>,
+            ArtemisUtils::RestrictAverage<G::cylindrical, false>>();
+      } else {
+        m.RegisterRefinementOps<
+            ArtemisUtils::ProlongateShared<G::cylindrical, false, false>,
+            ArtemisUtils::RestrictAverage<G::cylindrical, false>>();
+      }
     }
   } else if (coords == G::axisymmetric) {
     if (log) {
-      m.RegisterRefinementOps<ArtemisUtils::ProlongateSharedMinMod<G::axisymmetric, true>,
-                              ArtemisUtils::RestrictAverage<G::axisymmetric, true>>();
+      if (use_minmod_slope) {
+        m.RegisterRefinementOps<
+            ArtemisUtils::ProlongateShared<G::axisymmetric, true, true>,
+            ArtemisUtils::RestrictAverage<G::axisymmetric, true>>();
+      } else {
+        m.RegisterRefinementOps<
+            ArtemisUtils::ProlongateShared<G::axisymmetric, true, false>,
+            ArtemisUtils::RestrictAverage<G::axisymmetric, true>>();
+      }
     } else {
-      m.RegisterRefinementOps<
-          ArtemisUtils::ProlongateSharedMinMod<G::axisymmetric, false>,
-          ArtemisUtils::RestrictAverage<G::axisymmetric, false>>();
+      if (use_minmod_slope) {
+        m.RegisterRefinementOps<
+            ArtemisUtils::ProlongateShared<G::axisymmetric, false, true>,
+            ArtemisUtils::RestrictAverage<G::axisymmetric, false>>();
+      } else {
+        m.RegisterRefinementOps<
+            ArtemisUtils::ProlongateShared<G::axisymmetric, false, false>,
+            ArtemisUtils::RestrictAverage<G::axisymmetric, false>>();
+      }
     }
   } else {
     PARTHENON_FAIL("Invalid artemis/coordinate system!");

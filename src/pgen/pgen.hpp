@@ -1,5 +1,5 @@
 //========================================================================================
-// (C) (or copyright) 2023-2024. Triad National Security, LLC. All rights reserved.
+// (C) (or copyright) 2023-2026. Triad National Security, LLC. All rights reserved.
 //
 // This program was produced under U.S. Government contract 89233218CNA000001 for Los
 // Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -24,12 +24,14 @@
 #include "coag.hpp"
 #include "conduction.hpp"
 #include "constant.hpp"
+#include "crooked_pipe.hpp"
 #include "disk.hpp"
 #include "gaussian_bump.hpp"
 #include "geometry/geometry.hpp"
 #include "kh.hpp"
 #include "linear_wave.hpp"
 #include "lw.hpp"
+#include "polytrope.hpp"
 #include "rt.hpp"
 #include "shock.hpp"
 #include "strat.hpp"
@@ -65,6 +67,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
     linear_wave::ProblemGenerator<T>(pmb, pin);
   } else if (name == "lw") {
     lw::ProblemGenerator<T>(pmb, pin);
+  } else if (name == "polytrope") {
+    polytrope::ProblemGenerator<T>(pmb, pin);
   } else if (name == "kh") {
     kh::ProblemGenerator<T>(pmb, pin);
   } else if (name == "rt") {
@@ -75,6 +79,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
     strat::ProblemGenerator<T>(pmb, pin);
   } else if (name == "thermalization") {
     thermalization::ProblemGenerator<T>(pmb, pin);
+  } else if (name == "crooked_pipe") {
+    crooked_pipe::ProblemGenerator<T>(pmb, pin);
   } else {
     PARTHENON_FAIL("Invalid problem name!");
   }

@@ -1,5 +1,5 @@
 //========================================================================================
-// (C) (or copyright) 2023-2025. Triad National Security, LLC. All rights reserved.
+// (C) (or copyright) 2023-2026. Triad National Security, LLC. All rights reserved.
 //
 // This program was produced under U.S. Government contract 89233218CNA000001 for Los
 // Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -96,6 +96,11 @@ SWARM_VARIABLE(Real, rad.star, x);
 SWARM_VARIABLE(int, rad.star, ijk);
 } // namespace star
 } // namespace rad
+
+namespace grav {
+ARTEMIS_VARIABLE(grav, phi);
+ARTEMIS_VARIABLE(grav, rhs);
+} // namespace grav
 
 namespace geom {
 ARTEMIS_VARIABLE(geom, x1v);

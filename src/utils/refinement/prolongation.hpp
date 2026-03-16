@@ -77,10 +77,10 @@ Real GradMinMod(const Real fc, const Real fm, const Real fp, const Real dxm,
 }
 
 //----------------------------------------------------------------------------------------
-//! \struct  ArtemisUtils::ProlongateSharedMinMod
+//! \struct  ArtemisUtils::ProlongateShared
 //! \brief
-template <Coordinates GEOM, bool log>
-struct ProlongateSharedMinMod {
+template <Coordinates GEOM, bool log, bool use_minmod_slope>
+struct ProlongateShared {
   static constexpr bool OperationRequired(TopologicalElement fel,
                                           TopologicalElement cel) {
     return fel == cel;
@@ -123,8 +123,10 @@ struct ProlongateSharedMinMod {
       Real gx1c = ArtemisUtils::GradMinMod(fc, coarse(element_idx, l, m, n, k, j, i - 1),
                                            coarse(element_idx, l, m, n, k, j, i + 1),
                                            dx1m, dx1p, gx1m, gx1p);
-      gx1m = gx1c;
-      gx1p = gx1c;
+      if constexpr (use_minmod_slope) {
+        gx1m = gx1c;
+        gx1p = gx1c;
+      }
     }
 
     Real dx2fm = 0;
@@ -137,8 +139,10 @@ struct ProlongateSharedMinMod {
       Real gx2c = ArtemisUtils::GradMinMod(fc, coarse(element_idx, l, m, n, k, j - 1, i),
                                            coarse(element_idx, l, m, n, k, j + 1, i),
                                            dx2m, dx2p, gx2m, gx2p);
-      gx2m = gx2c;
-      gx2p = gx2c;
+      if constexpr (use_minmod_slope) {
+        gx2m = gx2c;
+        gx2p = gx2c;
+      }
     }
 
     Real dx3fm = 0;
@@ -151,8 +155,10 @@ struct ProlongateSharedMinMod {
       Real gx3c = ArtemisUtils::GradMinMod(fc, coarse(element_idx, l, m, n, k - 1, j, i),
                                            coarse(element_idx, l, m, n, k + 1, j, i),
                                            dx3m, dx3p, gx3m, gx3p);
-      gx3m = gx3c;
-      gx3p = gx3c;
+      if constexpr (use_minmod_slope) {
+        gx3m = gx3c;
+        gx3p = gx3c;
+      }
     }
 
     // KGF: add the off-centered quantities first to preserve FP symmetry

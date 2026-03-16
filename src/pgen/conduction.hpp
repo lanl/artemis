@@ -266,6 +266,7 @@ template <Coordinates GEOM, IndexDomain BDY>
 inline void CondBoundary(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) {
   PARTHENON_INSTRUMENT
   auto pmb = mbd->GetBlockPointer();
+
   auto artemis_pkg = pmb->packages.Get("artemis");
   auto &pkg = pmb->packages.Get("gas");
 

@@ -677,10 +677,10 @@ void DiskBoundaryIC(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) {
 template <Coordinates GEOM, IndexDomain BDY>
 void DiskBoundaryExtrap(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) {
   PARTHENON_INSTRUMENT
-  const bool lnx = (GEOM != Coordinates::cartesian);
 
   auto pmb = mbd->GetBlockPointer();
 
+  const bool lnx = (GEOM != Coordinates::cartesian);
   // Extract artemis parameters
   auto artemis_pkg = pmb->packages.Get("artemis");
   const bool do_gas = artemis_pkg->Param<bool>("do_gas");

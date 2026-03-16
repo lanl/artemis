@@ -166,7 +166,7 @@ struct SumMyArray {
 //! NOTE(@pdmullen): We should likely move everything above to implementation file too...
 void PrintArtemisConfiguration(Packages_t &packages);
 void EnrollArtemisRefinementOps(parthenon::Metadata &m, Coordinates coords,
-                                const bool log);
+                                const bool log, const bool use_minmod_slope = true);
 std::vector<std::vector<Real>> loadtxt(std::string fname);
 
 // 4D  outer parallel loop using Kokkos Teams

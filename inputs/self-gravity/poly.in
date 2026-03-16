@@ -1,0 +1,102 @@
+# ========================================================================================
+#  (C) (or copyright) 2026. Triad National Security, LLC. All rights reserved.
+#
+#  This program was produced under U.S. Government contract 89233218CNA000001 for Los
+#  Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
+#  for the U.S. Department of Energy/National Nuclear Security Administration. All rights
+#  in the program are reserved by Triad National Security, LLC, and the U.S. Department
+#  of Energy/National Nuclear Security Administration. The Government is granted for
+#  itself and others acting on its behalf a nonexclusive, paid-up, irrevocable worldwide
+#  license in this material to reproduce, prepare derivative works, distribute copies to
+#  the public, perform publicly and display publicly, and to permit others to do so.
+# ========================================================================================
+
+<artemis>
+problem = polytrope      # name of the pgen
+coordinates = cartesian  # coordinate system
+
+<parthenon/job>
+problem_id = polytrope  # problem ID: basename of output filenames
+
+<parthenon/output1>
+file_type = hdf5  # HDF5 data dump
+variables = gas.prim.density, &
+            gas.prim.velocity, &
+            gas.prim.pressure, &
+            grav.phi, &
+            grav.rhs
+dt        = 1.0   # time increment between outputs
+
+<parthenon/output2>
+file_type = hst   # HDF5 data dump
+dt        = 1.0   # time increment between outputs
+
+<parthenon/time>
+nlim       = -1     # cycle limit
+tlim       = 100.0  # time limit (to be reset by problem generator)
+integrator = rk2    # time integration algorithm
+ncycle_out = 1      # interval for stdout summary info
+
+<parthenon/mesh>
+# do_coalesced_comms = true
+refinement = adaptive
+numlevel = 3
+multigrid = true
+
+nx1 = 64
+x1min = -32.0
+x1max = 32.0
+ix1_bc = outflow
+ox1_bc = outflow
+
+nx2 = 64
+x2min = -32.0
+x2max = 32.0
+ix2_bc = outflow
+ox2_bc = outflow
+
+nx3 = 64
+x3min = -32.0
+x3max = 32.0
+ix3_bc = outflow
+ox3_bc = outflow
+
+<parthenon/meshblock>
+nx1 = 16
+nx2 = 16
+nx3 = 16
+
+<parthenon/refinement0>
+method = magnitude
+comparator = greater_than
+field = gas.prim.density_0
+refine_tol = 0.1
+derefine_tol = 0.1
+
+<physics>
+gas = true
+self_gravity = true
+
+<gas>
+cfl = 0.9
+reconstruct = plm
+riemann = hllc-gamma
+
+<gas/eos/ideal>
+gamma = 2.0
+
+<self_gravity>
+print_per_step = true
+max_iterations = 100
+residual_tolerance = 1.0e-6
+units_override = true
+use_swindle = false
+ix1_bc = zero
+ox1_bc = zero
+ix2_bc = zero
+ox2_bc = zero
+ix3_bc = zero
+ox3_bc = zero
+
+<problem>
+iprob = 2

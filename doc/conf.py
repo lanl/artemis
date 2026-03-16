@@ -27,9 +27,7 @@ def open_close_div(count, title, css="art_node", disp="art_hide"):
     {}
    </div>
   <div id=\"menu.{:d}\" class=\"{}\">
-""".format(
-        css, count, title, count, disp
-    )
+""".format(css, count, title, count, disp)
 
 
 def add_card(title, card, count, tabs=0, debug=False):

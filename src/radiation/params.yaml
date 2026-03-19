@@ -25,6 +25,12 @@ radiation:
       ppm:
         _type: opt
         _description: "Piecewise Parabolic"
+      wenoz:
+        _type: opt
+        _description: "Weighted Essentially Non Oscillatory (Z)"
+      wenomz:
+        _type: opt
+        _description: "Weighted Essentially Non Oscillatory (MZ)"
     riemann:
       _type: string
       _description: "Riemann solver"

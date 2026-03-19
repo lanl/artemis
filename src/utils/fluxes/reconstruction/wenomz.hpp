@@ -47,11 +47,11 @@ void WENOMZ5(const Real &q_im2, const Real &q_im1, const Real &q_i, const Real &
             weno_beta_coeff_1 * SQR(3 * q_i - 4 * q_ip1 + q_ip2), 
             weno_beta_coeff_4 * SQR(q_im1 - 2 * q_i + q_ip1)};
 
-  Real tau_5 = fabs(beta[0] - beta[2]);
-  Real r = (fabs(beta[2] - beta[1]) + Fuzz<Real>()) / (fabs(beta[0] - beta[1]) + Fuzz<Real>());
+  Real tau_5 = std::abs(beta[0] - beta[2]);
+  Real r = (std::abs(beta[2] - beta[1]) + Fuzz<Real>()) / (std::abs(beta[0] - beta[1]) + Fuzz<Real>());
   Real t0 = 1.0 + r;
   Real t2 = 1.0 + 1.0 / r;
-  Real eta = tau_5 * SQR(SQR(tau_5 / (fmax(beta[0], beta[2]) + Fuzz<Real>()) ));
+  Real eta = tau_5 * SQR(SQR(tau_5 / (std::max(beta[0], beta[2]) + Fuzz<Real>()) ));
 
 
   const std::array<Real,3> indicator{

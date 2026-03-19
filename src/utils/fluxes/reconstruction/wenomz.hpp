@@ -89,7 +89,7 @@ void WENOMZ5(const Real &q_im2, const Real &q_im1, const Real &q_i, const Real &
 }
 //----------------------------------------------------------------------------------------
 //! \class ArtemisUtils::Reconstruction<RSolver::wenomz, X1DIR, ...>
-//! \brief The piecewise parabolic reconstruction method in the X1 direction
+//! \brief The WENO-MZ method in the X1 direction
 template <Coordinates GEOM>
 struct Reconstruction<ReconstructionMethod::wenomz, X1DIR, GEOM> {
   template <typename V1, typename V2>

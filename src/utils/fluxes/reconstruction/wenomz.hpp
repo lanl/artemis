@@ -30,44 +30,41 @@ namespace ArtemisUtils {
 //! reconstruction in any dimension by passing in the appropriate q_im2,...,q _ip2.
 KOKKOS_INLINE_FUNCTION
 void WENOMZ5(const Real &q_im2, const Real &q_im1, const Real &q_i, const Real &q_ip1,
-            const Real &q_ip2, Real &ql_ip1, Real &qr_i) {
+             const Real &q_ip2, Real &ql_ip1, Real &qr_i) {
 
   // Smooth WENO weights: See Jiang & Shu 1996
 
   constexpr Real weno_beta_coeff_0 = 13. / 12.;
-  constexpr Real weno_beta_coeff_1  = 0.25;
-  constexpr Real weno_beta_coeff_4  = 1. / 12.;
+  constexpr Real weno_beta_coeff_1 = 0.25;
+  constexpr Real weno_beta_coeff_4 = 1. / 12.;
 
-  const std::array<Real,4> beta{
-            weno_beta_coeff_0 * SQR(q_im2 - 2 * q_im1 + q_i) +
-            weno_beta_coeff_1 * SQR(q_im2 - 4 * q_im1 + 3 * q_i),
-            weno_beta_coeff_0 * SQR(q_im1 - 2 * q_i + q_ip1) +
-            weno_beta_coeff_1 * SQR(q_im1 + q_ip1),
-            weno_beta_coeff_0 * SQR(q_i - 2 * q_ip1 + q_ip2) +
-            weno_beta_coeff_1 * SQR(3 * q_i - 4 * q_ip1 + q_ip2), 
-            weno_beta_coeff_4 * SQR(q_im1 - 2 * q_i + q_ip1)};
+  const std::array<Real, 4> beta{weno_beta_coeff_0 * SQR(q_im2 - 2 * q_im1 + q_i) +
+                                     weno_beta_coeff_1 * SQR(q_im2 - 4 * q_im1 + 3 * q_i),
+                                 weno_beta_coeff_0 * SQR(q_im1 - 2 * q_i + q_ip1) +
+                                     weno_beta_coeff_1 * SQR(q_im1 + q_ip1),
+                                 weno_beta_coeff_0 * SQR(q_i - 2 * q_ip1 + q_ip2) +
+                                     weno_beta_coeff_1 * SQR(3 * q_i - 4 * q_ip1 + q_ip2),
+                                 weno_beta_coeff_4 * SQR(q_im1 - 2 * q_i + q_ip1)};
 
   Real tau_5 = std::abs(beta[0] - beta[2]);
-  Real r = (std::abs(beta[2] - beta[1]) + Fuzz<Real>()) / (std::abs(beta[0] - beta[1]) + Fuzz<Real>());
+  Real r = (std::abs(beta[2] - beta[1]) + Fuzz<Real>()) /
+           (std::abs(beta[0] - beta[1]) + Fuzz<Real>());
   Real t0 = 1.0 + r;
   Real t2 = 1.0 + 1.0 / r;
-  Real eta = tau_5 * SQR(SQR(tau_5 / (std::max(beta[0], beta[2]) + Fuzz<Real>()) ));
+  Real eta = tau_5 * SQR(SQR(tau_5 / (std::max(beta[0], beta[2]) + Fuzz<Real>())));
 
-
-  const std::array<Real,3> indicator{
-                         eta/(beta[0] + Fuzz<Real>()) + (tau_5 - eta)/(t0 * beta[3] + Fuzz<Real>()),
-                         eta/(beta[1] + Fuzz<Real>()) + (tau_5 - eta)/(2. * beta[3] + Fuzz<Real>()),
-                         eta/(beta[2] + Fuzz<Real>()) + (tau_5 - eta)/(t2 * beta[3] + Fuzz<Real>())};
+  const std::array<Real, 3> indicator{
+      eta / (beta[0] + Fuzz<Real>()) + (tau_5 - eta) / (t0 * beta[3] + Fuzz<Real>()),
+      eta / (beta[1] + Fuzz<Real>()) + (tau_5 - eta) / (2. * beta[3] + Fuzz<Real>()),
+      eta / (beta[2] + Fuzz<Real>()) + (tau_5 - eta) / (t2 * beta[3] + Fuzz<Real>())};
 
   // compute qL_ip1
-  std::array<Real,3> f{2.0 * q_im2 - 7.0 * q_im1 + 11.0 * q_i,
-                                  -1.0 * q_im1 + 5.0 * q_i + 2.0 * q_ip1,
-                                   2.0 * q_i + 5.0 * q_ip1 - q_ip2};
+  std::array<Real, 3> f{2.0 * q_im2 - 7.0 * q_im1 + 11.0 * q_i,
+                        -1.0 * q_im1 + 5.0 * q_i + 2.0 * q_ip1,
+                        2.0 * q_i + 5.0 * q_ip1 - q_ip2};
 
-  std::array<Real,3> alpha{
-   0.1 * (1.0 + indicator[0]),
-   0.6 * (1.0 + indicator[1]),
-   0.3 * (1.0 + indicator[2])};
+  std::array<Real, 3> alpha{0.1 * (1.0 + indicator[0]), 0.6 * (1.0 + indicator[1]),
+                            0.3 * (1.0 + indicator[2])};
   Real alpha_sum = 6.0 * (alpha[0] + alpha[1] + alpha[2]);
 
   ql_ip1 = (f[0] * alpha[0] + f[1] * alpha[1] + f[2] * alpha[2]) / alpha_sum;
@@ -75,11 +72,11 @@ void WENOMZ5(const Real &q_im2, const Real &q_im1, const Real &q_i, const Real &
   // compute qR_i
   // Factor of 1/6 in coefficients of f[] array applied to alpha_sum to reduce divisions
   f[0] = 2.0 * q_ip2 - 7.0 * q_ip1 + 11.0 * q_i;
-  f[1] = -1.0 * q_ip1 + 5.0 * q_i   + 2.0 * q_im1;
-  f[2] = 2.0 * q_i   + 5.0 * q_im1 -      q_im2;
+  f[1] = -1.0 * q_ip1 + 5.0 * q_i + 2.0 * q_im1;
+  f[2] = 2.0 * q_i + 5.0 * q_im1 - q_im2;
 
-  alpha[0] = 0.1 + 0.1*indicator[2];
-  alpha[2] = 0.3 + 0.3*indicator[0];
+  alpha[0] = 0.1 + 0.1 * indicator[2];
+  alpha[2] = 0.3 + 0.3 * indicator[0];
 
   alpha_sum = 6.0 * (alpha[0] + alpha[1] + alpha[2]);
 
@@ -102,7 +99,7 @@ struct Reconstruction<ReconstructionMethod::wenomz, X1DIR, GEOM> {
       parthenon::par_for_inner(
           DEFAULT_INNER_LOOP_PATTERN, member, il, iu, [&](const int i) {
             WENOMZ5(q(b, n, k, j, i - 2), q(b, n, k, j, i - 1), q(b, n, k, j, i),
-                 q(b, n, k, j, i + 1), q(b, n, k, j, i + 2), ql(n, i + 1), qr(n, i));
+                    q(b, n, k, j, i + 1), q(b, n, k, j, i + 2), ql(n, i + 1), qr(n, i));
           });
     }
   }
@@ -123,7 +120,7 @@ struct Reconstruction<ReconstructionMethod::wenomz, X2DIR, GEOM> {
       parthenon::par_for_inner(
           DEFAULT_INNER_LOOP_PATTERN, member, il, iu, [&](const int i) {
             WENOMZ5(q(b, n, k, j - 2, i), q(b, n, k, j - 1, i), q(b, n, k, j, i),
-                 q(b, n, k, j + 1, i), q(b, n, k, j + 2, i), ql_jp1(n, i), qr_j(n, i));
+                    q(b, n, k, j + 1, i), q(b, n, k, j + 2, i), ql_jp1(n, i), qr_j(n, i));
           });
     }
   }
@@ -144,7 +141,7 @@ struct Reconstruction<ReconstructionMethod::wenomz, X3DIR, GEOM> {
       parthenon::par_for_inner(
           DEFAULT_INNER_LOOP_PATTERN, member, il, iu, [&](const int i) {
             WENOMZ5(q(b, n, k - 2, j, i), q(b, n, k - 1, j, i), q(b, n, k, j, i),
-                 q(b, n, k + 1, j, i), q(b, n, k + 2, j, i), ql_kp1(n, i), qr_k(n, i));
+                    q(b, n, k + 1, j, i), q(b, n, k + 2, j, i), ql_kp1(n, i), qr_k(n, i));
           });
     }
   }
@@ -161,17 +158,17 @@ struct ReconGradient<GEOM, ReconstructionMethod::wenomz> {
     Real wl = Null<Real>(), wr = Null<Real>();
 
     WENOMZ5(q(b, n, k, j, i - 2), q(b, n, k, j, i - 1), q(b, n, k, j, i),
-         q(b, n, k, j, i + 1), q(b, n, k, j, i + 2), wl, wr);
+            q(b, n, k, j, i + 1), q(b, n, k, j, i + 2), wl, wr);
     dqdx[0] = (wr - wl) / (2.0 * dx[0]);
 
     wl = Null<Real>(), wr = Null<Real>();
     WENOMZ5(q(b, n, k, j - 2 * multi_d, i), q(b, n, k, j - multi_d, i), q(b, n, k, j, i),
-         q(b, n, k, j + multi_d, i), q(b, n, k, j + 2 * multi_d, i), wl, wr);
+            q(b, n, k, j + multi_d, i), q(b, n, k, j + 2 * multi_d, i), wl, wr);
     dqdx[1] = (wr - wl) / (2.0 * dx[1]);
 
     wl = Null<Real>(), wr = Null<Real>();
     WENOMZ5(q(b, n, k - three_d, j, i), q(b, n, k - 2 * three_d, j, i), q(b, n, k, j, i),
-         q(b, n, k + three_d, j, i), q(b, n, k + 2 * three_d, j, i), wl, wr);
+            q(b, n, k + three_d, j, i), q(b, n, k + 2 * three_d, j, i), wl, wr);
     dqdx[2] = (wr - wl) / (2.0 * dx[2]);
 
     return dqdx;

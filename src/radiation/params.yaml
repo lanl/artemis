@@ -98,6 +98,14 @@ radiation:
       _type: bool
       _description: "Crash the code if the matter-coupling step does not converge."
       _default: true
+    tstart:
+      _type: Real
+      _description: "Turn on moments at this time"
+      _default: "0.0"
+    tstop:
+      _type: Real
+      _description: "Turn off moments at this time"
+      _default: "1e99"
   imc:
     _description: "IMC radiation model from the Jaybenne library"
     _type: node
@@ -179,4 +187,12 @@ radiation:
         _type: Real
         _description: "Radiation enrgy density floor"
         _default: 1e-10
+      tstart:
+        _type: Real
+        _description: "Turn on raytrace at this time"
+        _default: "0.0"
+      tstop:
+        _type: Real
+        _description: "Turn off raytrace at this time"
+        _default: "1e99"
       

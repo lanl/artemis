@@ -128,7 +128,7 @@ TaskListStatus ArtemisDriver<GEOM>::Step() {
   TaskListStatus status = TaskListStatus::complete;
   // Execute explicit, unsplit physics
   if (do_raytrace) {
-    status = RT::RaytraceDriver(pmesh);
+    status = RT::RaytraceDriver(pmesh, tm.time);
     if (status != TaskListStatus::complete) return status;
   }
 
@@ -147,7 +147,7 @@ TaskListStatus ArtemisDriver<GEOM>::Step() {
     if (status != TaskListStatus::complete) return status;
   }
 
-  // Operator split, moments subcyling (M1 or P1)
+  // Operator split, moments subcycling (M1 or P1)
   if (do_moment) {
     status = Moments::MomentsDriver<GEOM>(pmesh, tm, rad_integrator.get());
     if (status != TaskListStatus::complete) return status;

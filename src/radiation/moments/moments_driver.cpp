@@ -28,6 +28,21 @@ TaskListStatus MomentsDriver(Mesh *pmesh, const SimTime &tm,
                              parthenon::LowStorageIntegrator *integrator) {
   PARTHENON_INSTRUMENT
   // Craft a series of **equal** substeps that sum to the unsplit step
+  auto &pkg = pmesh->packages.Get("moments");
+  const auto active = ArtemisUtils::CheckPackageStatus(pkg, tm.time);
+  if (active == ArtemisUtils::PackageControl::inactive) {
+    return TaskListStatus::complete;
+  } else if (active == ArtemisUtils::PackageControl::shutdown) {
+    if (Globals::my_rank == 0) {
+      printf("Turning off radiation moments at t=%.8e...\n", tm.time);
+    }
+    return TaskListStatus::complete;
+  } else if (active == ArtemisUtils::PackageControl::initial) {
+    if (Globals::my_rank == 0) {
+      printf("Turning on radiation moments at t=%.8e...\n", tm.time);
+    }
+    Moments::InitMesh(pmesh);
+  }
   const Real dtlimit = Moments::EstimateTimeStep<GEOM>(pmesh);
   const int nsteps = static_cast<int>(std::ceil(integrator->dt / dtlimit));
   integrator->dt = integrator->dt / nsteps;

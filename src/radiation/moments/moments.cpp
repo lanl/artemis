@@ -87,10 +87,12 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
              pin->GetOrAddBoolean("radiation/moment", "fatal_if_unconverged", true));
 
   // how to handle the matter coupling:
-  // full_coupling = false only does a loop over energy couopling
+  // full_coupling = false only does a loop over energy coupling
   // full_coupling = true also does an outer loop over momentum coupling
   params.Add("full_coupling",
              pin->GetOrAddBoolean("radiation/moment", "full_coupling", true));
+
+  ArtemisUtils::AddPackageTimeParams(params, "radiation/moment", pin);
 
   // Radiation constants (including chat for Moments)
   // NOTE(@pdmullen): These are also stored in top level radiation package...
@@ -376,6 +378,52 @@ TaskStatus MatterCoupling(MeshData<Real> *u0, const Real dt) {
     }
   }
   return TaskStatus::complete;
+}
+
+void InitMesh(parthenon::Mesh *pmesh) {
+  PARTHENON_INSTRUMENT
+  auto &moments_pkg = pmesh->packages.Get("moments");
+  auto &gas_pkg = pmesh->packages.Get("gas");
+
+  const Real arad = moments_pkg->Param<Real>("arad");
+  const auto &eos_d = gas_pkg->Param<EOS>("eos_d");
+
+  for (int partition = 0; partition < pmesh->DefaultNumPartitions(); partition++) {
+    auto md = pmesh->mesh_data.GetOrAdd("u0c", partition).get();
+
+    // Packing and Indexing
+    static auto desc =
+        MakePackDescriptor<gas::prim::density, gas::prim::sie, rad::cons::energy,
+                           rad::prim::energy, rad::cons::flux, rad::prim::flux>(
+            (pmesh->resolved_packages).get());
+    auto vmesh = desc.GetPack(md);
+
+    IndexRange ib = md->GetBoundsI(IndexDomain::interior);
+    IndexRange jb = md->GetBoundsJ(IndexDomain::interior);
+    IndexRange kb = md->GetBoundsK(IndexDomain::interior);
+    const auto ndim = pmesh->ndim;
+    const auto &cpars =
+        pmesh->packages.Get("artemis")->template Param<geometry::CoordParams>(
+            "coord_params");
+
+    // Compute minimum dx
+    parthenon::par_for(
+        DEFAULT_LOOP_PATTERN, "Moments::InitMesh", DevExecSpace(), 0, md->NumBlocks() - 1,
+        kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+        KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+          // Extract coordinates
+          const Real &rho = vmesh(b, gas::prim::density(0), k, j, i);
+          const Real &sie = vmesh(b, gas::prim::sie(0), k, j, i);
+          const Real T = eos_d.TemperatureFromDensityInternalEnergy(rho, sie);
+          const Real Erad = arad * SQR(SQR(T));
+          vmesh(b, rad::cons::energy(0), k, j, i) = Erad;
+          vmesh(b, rad::prim::energy(0), k, j, i) = Erad;
+          for (int d = 0; d < 3; d++) {
+            vmesh(b, rad::cons::flux(d), k, j, i) = 0.0;
+            vmesh(b, rad::prim::flux(d), k, j, i) = 0.0;
+          }
+        });
+  }
 }
 
 //----------------------------------------------------------------------------------------

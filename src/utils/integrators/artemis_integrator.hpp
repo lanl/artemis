@@ -63,12 +63,14 @@ TaskStatus ApplyUpdate(MeshData<Real> *u0, MeshData<Real> *u1, const Real g0,
   auto pm = u0->GetParentPointer();
 
   // Packing and indexing
-  std::vector<MetadataFlag> flags({Metadata::Conserved});
+  std::vector<MetadataFlag> flags({Metadata::Conserved, Metadata::Cell});
   static auto desc = MakePackDescriptor<any>(u0, flags, {parthenon::PDOpt::WithFluxes});
-  static auto desc_g = MakePackDescriptor<geom::vol, geom::ax1, geom::ax2, geom::ax3>(u0);
+  static auto desc_g = MakePackDescriptor<geom::vol, geom::ax1, geom::ax2, geom::ax3,
+                                          geom::dx1, geom::dx2, geom::dx3>(u0);
   const auto v0 = desc.GetPack(u0);
   const auto v1 = desc.GetPack(u1);
   const auto vg = desc_g.GetPack(u1);
+
   const auto ib = u0->GetBoundsI(IndexDomain::interior);
   const auto jb = u0->GetBoundsJ(IndexDomain::interior);
   const auto kb = u0->GetBoundsK(IndexDomain::interior);
@@ -108,6 +110,99 @@ TaskStatus ApplyUpdate(MeshData<Real> *u0, MeshData<Real> *u1, const Real g0,
           }
         }
       });
+  return TaskStatus::complete;
+}
+
+//----------------------------------------------------------------------------------------
+//! \fn  TaskStatus ArtemisUtils::ApplyFaceUpdate
+//! \brief
+template <Coordinates GEOM>
+TaskStatus ApplyFaceUpdate(MeshData<Real> *u0, MeshData<Real> *u1, const Real g0,
+                           const Real g1, const Real beta_dt) {
+  PARTHENON_INSTRUMENT
+  using parthenon::MakePackDescriptor;
+  using parthenon::variable_names::any;
+  auto pm = u0->GetParentPointer();
+
+  // Packing and indexing
+  static auto desc =
+      MakePackDescriptor<field::face::B>(u0, {}, {parthenon::PDOpt::WithFluxes});
+  static auto desc_g = MakePackDescriptor<geom::ax1, geom::ax2, geom::ax3, geom::dx1,
+                                          geom::dx2, geom::dx3>(u0);
+  const auto v0 = desc.GetPack(u0);
+  const auto v1 = desc.GetPack(u1);
+  const auto vg = desc_g.GetPack(u1);
+
+  const auto ib = u0->GetBoundsI(IndexDomain::interior);
+  const auto jb = u0->GetBoundsJ(IndexDomain::interior);
+  const auto kb = u0->GetBoundsK(IndexDomain::interior);
+
+  const bool multi_d = (pm->ndim > 1);
+  const bool three_d = (pm->ndim > 2);
+  const auto &cpars =
+      pm->packages.Get("artemis")->template Param<geometry::CoordParams>("coord_params");
+
+  parthenon::par_for(
+      DEFAULT_LOOP_PATTERN, "ApplyFaceUpdate::X1", parthenon::DevExecSpace(), 0,
+      u0->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e + 1,
+      KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
+        geometry::Coords<GEOM> coords(cpars, v0.GetCoordinates(b), k, j, i);
+        Real &v0n = v0(b, TE::F1, field::face::B(), k, j, i);
+        Real &v1n = v1(b, TE::F1, field::face::B(), k, j, i);
+        v0n = g0 * v0n + g1 * v1n;
+
+        const Real bdt = beta_dt / coords.GetFaceAreaX1(vg, b, k, j, i)[0];
+        const Real dl2m = coords.GetEdgeLengthX2(vg, b, k, j, i);
+        const Real dl2p = coords.GetEdgeLengthX2(vg, b, k + three_d, j, i);
+        const Real dl3m = coords.GetEdgeLengthX3(vg, b, k, j, i);
+        const Real dl3p = coords.GetEdgeLengthX3(vg, b, k, j + multi_d, i);
+
+        v0n -= bdt * ((dl3m * v0.flux(b, TE::E3, field::face::B(), k, j, i) -
+                       dl3p * v0.flux(b, TE::E3, field::face::B(), k, j + multi_d, i)) +
+                      (dl2p * v0.flux(b, TE::E2, field::face::B(), k + three_d, j, i) -
+                       dl2m * v0.flux(b, TE::E2, field::face::B(), k, j, i)));
+      });
+  parthenon::par_for(
+      DEFAULT_LOOP_PATTERN, "ApplyFaceUpdate::X2", parthenon::DevExecSpace(), 0,
+      u0->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e + multi_d, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
+        geometry::Coords<GEOM> coords(cpars, v0.GetCoordinates(b), k, j, i);
+        Real &v0n = v0(b, TE::F2, field::face::B(), k, j, i);
+        Real &v1n = v1(b, TE::F2, field::face::B(), k, j, i);
+        v0n = g0 * v0n + g1 * v1n;
+
+        const Real bdt = beta_dt / coords.GetFaceAreaX2(vg, b, k, j, i)[0];
+        const Real dl1m = coords.GetEdgeLengthX1(vg, b, k, j, i);
+        const Real dl1p = coords.GetEdgeLengthX1(vg, b, k + three_d, j, i);
+        const Real dl3m = coords.GetEdgeLengthX3(vg, b, k, j, i);
+        const Real dl3p = coords.GetEdgeLengthX3(vg, b, k, j, i + 1);
+
+        v0n -= bdt * ((dl3p * v0.flux(b, TE::E3, field::face::B(), k, j, i + 1) -
+                       dl3m * v0.flux(b, TE::E3, field::face::B(), k, j, i)) +
+                      (dl1m * v0.flux(b, TE::E1, field::face::B(), k, j, i) -
+                       dl1p * v0.flux(b, TE::E1, field::face::B(), k + three_d, j, i)));
+      });
+  parthenon::par_for(
+      DEFAULT_LOOP_PATTERN, "ApplyFaceUpdate::X3", parthenon::DevExecSpace(), 0,
+      u0->NumBlocks() - 1, kb.s, kb.e + three_d, jb.s, jb.e, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
+        geometry::Coords<GEOM> coords(cpars, v0.GetCoordinates(b), k, j, i);
+        Real &v0n = v0(b, TE::F3, field::face::B(), k, j, i);
+        Real &v1n = v1(b, TE::F3, field::face::B(), k, j, i);
+        v0n = g0 * v0n + g1 * v1n;
+
+        const Real bdt = beta_dt / coords.GetFaceAreaX3(vg, b, k, j, i)[0];
+        const Real dl1m = coords.GetEdgeLengthX1(vg, b, k, j, i);
+        const Real dl1p = coords.GetEdgeLengthX1(vg, b, k, j + multi_d, i);
+        const Real dl2m = coords.GetEdgeLengthX2(vg, b, k, j, i);
+        const Real dl2p = coords.GetEdgeLengthX2(vg, b, k, j, i + 1);
+
+        v0n -= bdt * ((dl2m * v0.flux(b, TE::E2, field::face::B(), k, j, i) -
+                       dl2p * v0.flux(b, TE::E2, field::face::B(), k, j, i + 1)) +
+                      (dl1p * v0.flux(b, TE::E1, field::face::B(), k, j + multi_d, i) -
+                       dl1m * v0.flux(b, TE::E1, field::face::B(), k, j, i)));
+      });
+
   return TaskStatus::complete;
 }
 

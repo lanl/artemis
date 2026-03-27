@@ -21,6 +21,7 @@
 #include "gas/gas.hpp"
 #include "geometry/geometry.hpp"
 #include "gravity/gravity.hpp"
+#include "mhd/mhd.hpp"
 #include "nbody/nbody.hpp"
 #include "radiation/moments/moments.hpp"
 #include "radiation/radiation.hpp"
@@ -102,6 +103,7 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   const bool do_radiation = pin->GetOrAddBoolean("physics", "radiation", false);
   const bool do_coagulation = pin->GetOrAddBoolean("physics", "coagulation", false);
   const bool do_raytrace = pin->GetOrAddBoolean("physics", "raytrace", false);
+  const bool do_mhd = pin->GetOrAddBoolean("physics", "mhd", false);
 
   // Determine input file specified algorithms
   const bool do_imc = do_radiation && pin->DoesBlockExist("radiation/imc");
@@ -144,6 +146,7 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   artemis->AddParam("do_moment", do_moment);
   artemis->AddParam("do_shear", do_shear);
   artemis->AddParam("do_raytrace", do_raytrace);
+  artemis->AddParam("do_mhd", do_mhd);
   artemis->AddParam("update_fluxes", update_fluxes);
 
   // Set coordinate system
@@ -152,6 +155,7 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   Coordinates coords = geometry::CoordSelect(sys, ndim);
   artemis->AddParam("coords", coords);
   artemis->AddParam("coord_sys", sys);
+  artemis->AddParam("ndim", ndim);
 
   geometry::CoordParams cpars(pin.get());
   artemis->AddParam("coord_params", cpars);
@@ -201,6 +205,7 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
     }
   }
   if (do_raytrace) packages.Add(RT::Initialize(pin.get(), units, constants));
+  if (do_mhd) packages.Add(MHD::Initialize(pin.get(), units, constants, packages));
 
   // Assign geometry-specific FillDerived functions
   if (do_gas || do_dust) {

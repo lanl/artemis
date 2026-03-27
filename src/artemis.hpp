@@ -102,6 +102,21 @@ ARTEMIS_VARIABLE(grav, phi);
 ARTEMIS_VARIABLE(grav, rhs);
 } // namespace grav
 
+namespace field {
+namespace face {
+ARTEMIS_VARIABLE(field.face, B);
+} // namespace face
+namespace edge {
+ARTEMIS_VARIABLE(field.edge, E);
+ARTEMIS_VARIABLE(field.edge, J);
+} // namespace edge
+namespace cell {
+ARTEMIS_VARIABLE(field.cell, B);
+ARTEMIS_VARIABLE(field.cell, E);
+ARTEMIS_VARIABLE(field.cell, J);
+} // namespace cell
+} // namespace field
+
 namespace geom {
 ARTEMIS_VARIABLE(geom, x1v);
 ARTEMIS_VARIABLE(geom, x2v);
@@ -121,6 +136,9 @@ ARTEMIS_VARIABLE(geom, hx3f3);
 ARTEMIS_VARIABLE(geom, dx1);
 ARTEMIS_VARIABLE(geom, dx2);
 ARTEMIS_VARIABLE(geom, dx3);
+ARTEMIS_VARIABLE(geom, dl1);
+ARTEMIS_VARIABLE(geom, dl2);
+ARTEMIS_VARIABLE(geom, dl3);
 ARTEMIS_VARIABLE(geom, vol);
 ARTEMIS_VARIABLE(geom, ax1);
 ARTEMIS_VARIABLE(geom, ax2);

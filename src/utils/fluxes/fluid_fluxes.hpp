@@ -92,8 +92,9 @@ TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, FLUX vflx,
     eos = pkg->template Param<EOS>("eos_d");
   }
 
-  const auto &cpars =
-      pm->packages.Get("artemis")->template Param<geometry::CoordParams>("coord_params");
+  const auto &artemis_pkg = pm->packages.Get("artemis");
+  const auto &cpars = artemis_pkg->template Param<geometry::CoordParams>("coord_params");
+  const auto do_mhd = artemis_pkg->template Param<bool>("do_mhd");
 
   // Speed of light (and reduced), if used
   Real chat = Null<Real>();
@@ -136,12 +137,14 @@ TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, FLUX vflx,
         recon(mbr, cpars, b, k, j, il - 1, iu, vp, vg, wl, wr);
         mbr.team_barrier();
 
-        post_recon<F>(eos, dfloor, siefloor, mbr, X1DIR, b, k, j, il - 1, iu, vp, wl, wr);
+        post_recon<F>(eos, dfloor, siefloor, do_mhd, mbr, X1DIR, b, k, j, il - 1, iu, vp,
+                      vflx, wl, wr);
         mbr.team_barrier();
 
         // Compute fluxes over[is, ie + 1]
         RiemannSolver<RIEMANN, F, C> riemann;
-        riemann(eos, c, chat, mbr, b, k, j, il, iu, X1DIR, wl, wr, vp, vflx, vface);
+        riemann(eos, c, chat, do_mhd, mbr, b, k, j, il, iu, X1DIR, wl, wr, vp, vflx,
+                vface);
         mbr.team_barrier();
 
         // Scale X1-momentum flux by appropriate scale factor for coord system
@@ -176,14 +179,15 @@ TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, FLUX vflx,
             recon(mbr, cpars, b, k, j, il, iu, vp, vg, wl_jp1, wr);
             mbr.team_barrier();
 
-            post_recon<F>(eos, dfloor, siefloor, mbr, X2DIR, b, k, j, il, iu, vp, wl_jp1,
-                          wr);
+            post_recon<F>(eos, dfloor, siefloor, do_mhd, mbr, X2DIR, b, k, j, il, iu, vp,
+                          vflx, wl_jp1, wr);
             mbr.team_barrier();
 
             if (j > jl) {
               // compute fluxes over [js,je+1]
               RiemannSolver<RIEMANN, F, C> riemann;
-              riemann(eos, c, chat, mbr, b, k, j, il, iu, X2DIR, wl, wr, vp, vflx, vface);
+              riemann(eos, c, chat, do_mhd, mbr, b, k, j, il, iu, X2DIR, wl, wr, vp, vflx,
+                      vface);
               mbr.team_barrier();
 
               // Scale X2-momentum flux by appropriate scale factor for coord system
@@ -221,14 +225,15 @@ TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, FLUX vflx,
             recon(mbr, cpars, b, k, j, il, iu, vp, vg, wl_kp1, wr);
             mbr.team_barrier();
 
-            post_recon<F>(eos, dfloor, siefloor, mbr, X3DIR, b, k, j, il, iu, vp, wl_kp1,
-                          wr);
+            post_recon<F>(eos, dfloor, siefloor, do_mhd, mbr, X3DIR, b, k, j, il, iu, vp,
+                          vflx, wl_kp1, wr);
             mbr.team_barrier();
 
             // compute fluxes over [ks,ke+1]
             if (k > kl) {
               RiemannSolver<RIEMANN, F, C> riemann;
-              riemann(eos, c, chat, mbr, b, k, j, il, iu, X3DIR, wl, wr, vp, vflx, vface);
+              riemann(eos, c, chat, do_mhd, mbr, b, k, j, il, iu, X3DIR, wl, wr, vp, vflx,
+                      vface);
               mbr.team_barrier();
 
               // Scale X3-momentum flux by appropriate scale factor for coord system

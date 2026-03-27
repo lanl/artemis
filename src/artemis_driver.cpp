@@ -75,6 +75,7 @@ ArtemisDriver<GEOM>::ArtemisDriver(ParameterInput *pin, ApplicationInput *app_in
   do_moment = artemis_pkg->template Param<bool>("do_moment");
   do_coagulation = artemis_pkg->template Param<bool>("do_coagulation");
   do_raytrace = artemis_pkg->template Param<bool>("do_raytrace");
+  do_mhd = artemis_pkg->template Param<bool>("do_mhd");
 
   // Update fluxes option--gas fields are needed for radiation temperature updates but for
   // rad-only test problems turn off advection
@@ -279,9 +280,14 @@ TaskCollection ArtemisDriver<GEOM>::StepTasks() {
       auto update =
           tl.AddTask(gas_flx | dust_flx | set_flx, ArtemisUtils::ApplyUpdate<GEOM>,
                      u0.get(), u1.get(), g0, g1, bdt);
+      auto update_mhd = gas_flx | set_flx;
+      if (do_mhd) {
+        update_mhd = tl.AddTask(gas_flx | set_flx, ArtemisUtils::ApplyFaceUpdate<GEOM>,
+                                u0.get(), u1.get(), g0, g1, bdt);
+      }
 
       // Apply "coordinate source terms"
-      TaskID gas_coord_src = update, dust_coord_src = update;
+      TaskID gas_coord_src = update | update_mhd, dust_coord_src = update;
       if (do_gas) gas_coord_src = tl.AddTask(update, Gas::FluxSource, u0.get(), bdt);
       if (do_dust) dust_coord_src = tl.AddTask(update, Dust::FluxSource, u0.get(), bdt);
 

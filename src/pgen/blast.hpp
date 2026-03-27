@@ -129,6 +129,7 @@ template <Coordinates GEOM>
 inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   PARTHENON_INSTRUMENT
   using parthenon::MakePackDescriptor;
+  using TE = parthenon::TopologicalElement;
 
   // Extract blast parameters
   blast_params.rinit = pin->GetOrAddReal("problem", "radius", 1.0);
@@ -139,6 +140,11 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   blast_params.x0[0] = pin->GetOrAddReal("problem", "x1", 0.0);
   blast_params.x0[1] = pin->GetOrAddReal("problem", "x2", 0.0);
   blast_params.x0[2] = pin->GetOrAddReal("problem", "x3", 0.0);
+
+  const Real bx1 = pin->GetOrAddReal("problem", "bx1", 0.0);
+  const Real bx2 = pin->GetOrAddReal("problem", "bx2", 0.0);
+  const Real bx3 = pin->GetOrAddReal("problem", "bx3", 0.0);
+
   blast_params.samples = pin->GetOrAddInteger("problem", "samples", -1);
   std::string sym = pin->GetOrAddString("problem", "symmetry", "spherical");
   if (sym == "spherical") {
@@ -152,6 +158,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   // Extract parameters from packages
   auto artemis_pkg = pmb->packages.Get("artemis");
   const bool do_dust = artemis_pkg->Param<bool>("do_dust");
+  const bool do_mhd = artemis_pkg->Param<bool>("do_mhd");
   // TODO(PDM): Replace the below with a call to singularity-eos
   auto gas_pkg = pmb->packages.Get("gas");
   const auto &eos = gas_pkg->Param<ArtemisUtils::EOS>("eos_d");
@@ -163,7 +170,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   }
   static auto desc =
       MakePackDescriptor<gas::prim::density, gas::prim::velocity, gas::prim::sie,
-                         dust::prim::density, dust::prim::velocity>(
+                         dust::prim::density, dust::prim::velocity, field::face::B>(
           (pmb->resolved_packages).get());
   auto v = desc.GetPack(md.get());
   static auto desc_g = MakePackDescriptor<geom::vol, geom::x1v, geom::x2v, geom::x3v>(
@@ -175,6 +182,10 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto &pco = pmb->coords;
   auto pars = blast_params;
   const auto &cpars = artemis_pkg->template Param<geometry::CoordParams>("coord_params");
+
+  const int ndim = pmb->pmy_mesh->ndim;
+  const int multid = ndim >= 2;
+  const int threed = ndim == 3;
 
   // setup uniform ambient medium with spherical over-pressured region
   pmb->par_for(
@@ -225,11 +236,19 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         const Real vx3 = 0.0;
 
         // compute cell-centered conserved variables
-        v(0, gas::prim::density(), k, j, i) = den;
-        v(0, gas::prim::velocity(0), k, j, i) = vx1;
-        v(0, gas::prim::velocity(1), k, j, i) = vx2;
-        v(0, gas::prim::velocity(2), k, j, i) = vx3;
-        v(0, gas::prim::sie(), k, j, i) = internal_energy / den;
+        v(0, TE::CC, gas::prim::density(), k, j, i) = den;
+        v(0, TE::CC, gas::prim::velocity(0), k, j, i) = vx1;
+        v(0, TE::CC, gas::prim::velocity(1), k, j, i) = vx2;
+        v(0, TE::CC, gas::prim::velocity(2), k, j, i) = vx3;
+        v(0, TE::CC, gas::prim::sie(), k, j, i) = internal_energy / den;
+        if (do_mhd) {
+          v(0, TE::F1, field::face::B(), k, j, i) = bx1;
+          if (i == ib.e) v(0, TE::F1, field::face::B(), k, j, ib.e + 1) = bx1;
+          v(0, TE::F2, field::face::B(), k, j, i) = bx2;
+          if (j == jb.e) v(0, TE::F2, field::face::B(), k, jb.e + multid, i) = bx2;
+          v(0, TE::F3, field::face::B(), k, j, i) = bx3;
+          if (k == kb.e) v(0, TE::F3, field::face::B(), kb.e + threed, j, i) = bx3;
+        }
       });
 }
 

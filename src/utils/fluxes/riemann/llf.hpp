@@ -44,13 +44,13 @@ template <Fluid FLUID_TYPE, Closure CTYPE>
 struct RiemannSolver<RSolver::llf, FLUID_TYPE, CTYPE,
                      std::enable_if_t<FLUID_TYPE != Fluid::radiation>> {
   template <typename V1, typename V2, typename V3>
-  KOKKOS_INLINE_FUNCTION void operator()(const EOS &eos, const Real c, const Real chat,
-                                         parthenon::team_mbr_t const &member, const int b,
-                                         const int k, const int j, const int il,
-                                         const int iu, const int dir,
-                                         const parthenon::ScratchPad2D<Real> &wl,
-                                         const parthenon::ScratchPad2D<Real> &wr,
-                                         const V1 &p, const V2 &q, const V3 &vf) const {
+  KOKKOS_INLINE_FUNCTION void
+  operator()(const EOS &eos, const Real c, const Real chat, const bool do_mhd,
+             parthenon::team_mbr_t const &member, const int b, const int k, const int j,
+             const int il, const int iu, const int dir,
+             const parthenon::ScratchPad2D<Real> &wl,
+             const parthenon::ScratchPad2D<Real> &wr, const V1 &p, const V2 &q,
+             const V3 &vf) const {
 
     using TE = parthenon::TopologicalElement;
     // Check sensibility of flux direction
@@ -65,6 +65,9 @@ struct RiemannSolver<RSolver::llf, FLUID_TYPE, CTYPE,
       nspecies = q.GetSize(b, dust::cons::density());
     }
 
+    [[maybe_unused]] const int IBX = nspecies * 7 + (dir - 1);
+    [[maybe_unused]] const int IBY = nspecies * 7 + ((dir - 1) + 1) % 3;
+    [[maybe_unused]] const int IBZ = nspecies * 7 + ((dir - 1) + 2) % 3;
     for (int n = 0; n < nspecies; ++n) {
       const int IDN = n;
       const int ivx = nspecies + (n * 3) + ((dir - 1));
@@ -96,6 +99,13 @@ struct RiemannSolver<RSolver::llf, FLUID_TYPE, CTYPE,
             [[maybe_unused]] Real wr_ise = Null<Real>();
             [[maybe_unused]] Real wl_ibl = Null<Real>();
             [[maybe_unused]] Real wr_ibl = Null<Real>();
+            // note these are intentionally 0 and not Null
+            [[maybe_unused]] Real wl_ibx = 0.0;
+            [[maybe_unused]] Real wl_iby = 0.0;
+            [[maybe_unused]] Real wl_ibz = 0.0;
+            [[maybe_unused]] Real wr_ibx = 0.0;
+            [[maybe_unused]] Real wr_iby = 0.0;
+            [[maybe_unused]] Real wr_ibz = 0.0;
             if constexpr (FLUID_TYPE == Fluid::gas) {
               wl_ipr = wl(IPR, i);
               wl_ise = wl(ISE, i);
@@ -103,6 +113,14 @@ struct RiemannSolver<RSolver::llf, FLUID_TYPE, CTYPE,
               wr_ipr = wr(IPR, i);
               wr_ise = wr(ISE, i);
               wr_ibl = wr(IBL, i);
+              if (do_mhd) {
+                wl_ibx = wl(IBX, i);
+                wl_iby = wl(IBY, i);
+                wl_ibz = wl(IBZ, i);
+                wr_ibx = wr(IBX, i);
+                wr_iby = wr(IBY, i);
+                wr_ibz = wr(IBZ, i);
+              }
             }
 
             // Compute sum of L/R fluxes
@@ -116,19 +134,46 @@ struct RiemannSolver<RSolver::llf, FLUID_TYPE, CTYPE,
             [[maybe_unused]] Real el = Null<Real>();
             [[maybe_unused]] Real er = Null<Real>();
             [[maybe_unused]] Real fsum_e = Null<Real>();
+            [[maybe_unused]] Real pbl = 0.0;
+            [[maybe_unused]] Real pbr = 0.0;
+            [[maybe_unused]] Real vdBl = 0.0;
+            [[maybe_unused]] Real vdBr = 0.0;
+            [[maybe_unused]] Real fsum_by = 0.0;
+            [[maybe_unused]] Real fsum_bz = 0.0;
+
             if constexpr (FLUID_TYPE == Fluid::gas) {
               el = wl_ise * wl_idn +
                    0.5 * wl_idn * (SQR(wl_ivx) + SQR(wl_ivy) + SQR(wl_ivz));
               er = wr_ise * wr_idn +
                    0.5 * wr_idn * (SQR(wr_ivx) + SQR(wr_ivy) + SQR(wr_ivz));
               fsum_e = (el + wl_ipr) * wl_ivx + (er + wr_ipr) * wr_ivx;
+              if (do_mhd) {
+                fsum_mx -= SQR(wl_ibx);
+                fsum_my -= wl_ibx * (wl_iby + wr_iby);
+                fsum_mz -= wl_ibx * (wl_ibz + wr_ibz);
+                pbl = 0.5 * (SQR(wl_ibx) + SQR(wl_iby) + SQR(wl_ibz));
+                pbr = 0.5 * (SQR(wr_ibx) + SQR(wr_iby) + SQR(wr_ibz));
+                el += pbl;
+                er += pbr;
+                fsum_by = (wl_ivx * wl_iby - wl_ivy * wl_ibx) +
+                          (wr_ivx * wr_iby - wr_ivy * wr_ibx);
+                fsum_bz = (wl_ivy * wl_ibz - wl_ivz * wl_iby) +
+                          (wr_ivy * wr_ibz - wr_ivz * wr_iby);
+              }
             }
 
             // Compute max wave speed in L/R states (see Toro eq. 10.43)
             Real a = Null<Real>();
             if constexpr (FLUID_TYPE == Fluid::gas) {
-              qa = std::sqrt(wl_ibl / wl_idn);
-              qb = std::sqrt(wr_ibl / wr_idn);
+              qa = (wl_ibl + 2. * pbl) / wl_idn;
+              qb = (wr_ibl + 2. * pbr) / wr_idn;
+              if (do_mhd) {
+                // cf^2 = 0.5*( c_A^2 + sqrt( c_A^4 - 4*c_s^2 B_x^2/rho))
+                qa += std::sqrt(SQR(qa) - 4. * wl_ibl * SQR(wl_ibx / wl_idn));
+                qa = std::sqrt(0.5 * qa);
+                qb += std::sqrt(SQR(qb) - 4. * wr_ibl * SQR(wr_ibx / wr_idn));
+                qb = std::sqrt(0.5 * qb);
+              }
               a = std::max((std::abs(wl_ivx) + qa), (std::abs(wr_ivx) + qb));
             } else if constexpr (FLUID_TYPE == Fluid::dust) {
               a = std::max(std::abs(wl_ivx), std::abs(wr_ivx));
@@ -175,13 +220,13 @@ template <Fluid FLUID_TYPE, Closure CTYPE>
 struct RiemannSolver<RSolver::llf, FLUID_TYPE, CTYPE,
                      std::enable_if_t<FLUID_TYPE == Fluid::radiation>> {
   template <typename V1, typename V2, typename V3>
-  KOKKOS_INLINE_FUNCTION void operator()(const EOS &eos, const Real c, const Real chat,
-                                         parthenon::team_mbr_t const &member, const int b,
-                                         const int k, const int j, const int il,
-                                         const int iu, const int dir,
-                                         const parthenon::ScratchPad2D<Real> &wl,
-                                         const parthenon::ScratchPad2D<Real> &wr,
-                                         const V1 &p, const V2 &q, const V3 &vf) const {
+  KOKKOS_INLINE_FUNCTION void
+  operator()(const EOS &eos, const Real c, const Real chat, const bool do_mhd,
+             parthenon::team_mbr_t const &member, const int b, const int k, const int j,
+             const int il, const int iu, const int dir,
+             const parthenon::ScratchPad2D<Real> &wl,
+             const parthenon::ScratchPad2D<Real> &wr, const V1 &p, const V2 &q,
+             const V3 &vf) const {
     using TE = parthenon::TopologicalElement;
     // Check sensibility of flux direction
     PARTHENON_REQUIRE(dir > 0 && dir <= 3, "Invalid flux direction!");

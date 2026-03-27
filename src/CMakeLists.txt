@@ -48,6 +48,9 @@ set (SRC_LIST
   gravity/point_mass.cpp
   gravity/uniform.cpp
 
+  mhd/mhd.cpp
+  mhd/mhd.hpp
+
   nbody/nbody.cpp
   nbody/nbody.hpp
   nbody/nbody_advance.cpp

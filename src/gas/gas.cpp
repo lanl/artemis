@@ -542,9 +542,12 @@ Real EstimateTimestepMesh(MeshData<Real> *md) {
   auto &params = gas_pkg->AllParams();
   auto eos_d = params.template Get<EOS>("eos_d");
 
+  auto &artemis_pkg = pm->packages.Get("artemis");
+  const bool do_mhd = artemis_pkg->template Param<bool>("do_mhd");
+
   static auto desc =
       MakePackDescriptor<gas::prim::density, gas::prim::velocity, gas::prim::sie,
-                         gas::prim::bmod>(resolved_pkgs.get());
+                         gas::prim::bmod, field::cell::B>(resolved_pkgs.get());
   auto vmesh = desc.GetPack(md);
   static auto desc_g =
       MakePackDescriptor<geom::dx1, geom::dx2, geom::dx3>(resolved_pkgs.get());
@@ -568,11 +571,18 @@ Real EstimateTimestepMesh(MeshData<Real> *md) {
         for (int n = 0; n < vmesh.GetSize(b, gas::prim::density()); ++n) {
           const Real &dens = vmesh(b, gas::prim::density(n), k, j, i);
           const Real &bulk = vmesh(b, gas::prim::bmod(n), k, j, i);
-          const Real cs = std::sqrt(bulk / dens);
+          Real b2 = 0.0;
+          if (do_mhd) {
+            b2 += SQR(vmesh(b, TE::CC, field::cell::B(0), k, j, i)) +
+                  SQR(vmesh(b, TE::CC, field::cell::B(1), k, j, i)) +
+                  SQR(vmesh(b, TE::CC, field::cell::B(2), k, j, i));
+          }
+          const Real ss = std::sqrt((bulk + b2) / dens);
+
           Real denom = 0.0;
           for (int d = 0; d < ndim; d++) {
             denom +=
-                (std::abs(vmesh(b, gas::prim::velocity(VI(n, d)), k, j, i)) + cs) / dx[d];
+                (std::abs(vmesh(b, gas::prim::velocity(VI(n, d)), k, j, i)) + ss) / dx[d];
           }
           ldt = std::min(ldt, 1.0 / denom);
         }
@@ -628,12 +638,14 @@ TaskStatus CalculateFluxes(MeshData<Real> *md, const bool pcm) {
 
   static auto desc_prim =
       parthenon::MakePackDescriptor<gas::prim::density, gas::prim::velocity,
-                                    gas::prim::pressure, gas::prim::sie, gas::prim::bmod>(
-          resolved_pkgs.get(), {}, {parthenon::PDOpt::WithFluxes});
+                                    gas::prim::pressure, gas::prim::sie, gas::prim::bmod,
+                                    field::cell::B>(resolved_pkgs.get(), {},
+                                                    {parthenon::PDOpt::WithFluxes});
   static auto desc_flux =
       parthenon::MakePackDescriptor<gas::cons::density, gas::cons::momentum,
-                                    gas::cons::total_energy, gas::cons::internal_energy>(
-          resolved_pkgs.get(), {}, {parthenon::PDOpt::WithFluxes});
+                                    gas::cons::total_energy, gas::cons::internal_energy,
+                                    field::face::B>(resolved_pkgs.get(), {},
+                                                    {parthenon::PDOpt::WithFluxes});
   static auto desc_face =
       parthenon::MakePackDescriptor<gas::face::velocity>(resolved_pkgs.get());
   static auto desc_g =

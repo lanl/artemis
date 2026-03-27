@@ -519,6 +519,34 @@ class CoordsBase {
             vg(b, geom::dx3())(index<geom::dx3>(k, j, i))};
   }
 
+  template <typename V1>
+  KOKKOS_INLINE_FUNCTION Real GetEdgeLengthX1(const V1 &vg, const int b, const int k,
+                                              const int j, const int i) const {
+    // Return all cell widths
+    if constexpr (CoordsTrait<T>::value == Coordinates::cartesian) {
+      return GetCellWidthX1();
+    }
+    return vg(b, geom::dx1())(index<geom::dx1>(k, j, i));
+  }
+  template <typename V1>
+  KOKKOS_INLINE_FUNCTION Real GetEdgeLengthX2(const V1 &vg, const int b, const int k,
+                                              const int j, const int i) const {
+    // Return all cell widths
+    if constexpr (CoordsTrait<T>::value == Coordinates::cartesian) {
+      return GetCellWidthX2();
+    }
+    return vg(b, geom::dx2())(index<geom::dx2>(k, j, i));
+  }
+  template <typename V1>
+  KOKKOS_INLINE_FUNCTION Real GetEdgeLengthX3(const V1 &vg, const int b, const int k,
+                                              const int j, const int i) const {
+    // Return all cell widths
+    if constexpr (CoordsTrait<T>::value == Coordinates::cartesian) {
+      return GetCellWidthX3();
+    }
+    return vg(b, geom::dx3())(index<geom::dx3>(k, j, i));
+  }
+
   KOKKOS_INLINE_FUNCTION std::array<Real, 3> GetCellCenter() const {
     // Get the cell centroid
     return {static_cast<const T *>(this)->x1v(), static_cast<const T *>(this)->x2v(),

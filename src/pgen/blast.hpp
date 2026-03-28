@@ -219,7 +219,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           Real vol =
               (pars.samples > 0)
                   ? compute_overlap_cyl<GEOM>(coords.bnds, pars.rinit, pars.samples)
-                  : ((SQR(xcart[0]) + SQR(xcart[1]) + SQR(xcart[2]) <
+              : ((SQR(xcart[0]) + SQR(xcart[1]) <
                       pars.rinit * pars.rinit)
                          ? total_vol
                          : 0.0);
@@ -244,10 +244,14 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         if (do_mhd) {
           v(0, TE::F1, field::face::B(), k, j, i) = bx1;
           if (i == ib.e) v(0, TE::F1, field::face::B(), k, j, ib.e + 1) = bx1;
-          v(0, TE::F2, field::face::B(), k, j, i) = bx2;
-          if (j == jb.e) v(0, TE::F2, field::face::B(), k, jb.e + multid, i) = bx2;
-          v(0, TE::F3, field::face::B(), k, j, i) = bx3;
-          if (k == kb.e) v(0, TE::F3, field::face::B(), kb.e + threed, j, i) = bx3;
+          if (multid) {
+            v(0, TE::F2, field::face::B(), k, j, i) = bx2;
+            if (j == jb.e) v(0, TE::F2, field::face::B(), k, jb.e + multid, i) = bx2;
+          }
+          if (threed) {
+            v(0, TE::F3, field::face::B(), k, j, i) = bx3;
+            if (k == kb.e) v(0, TE::F3, field::face::B(), kb.e + threed, j, i) = bx3;
+          }
         }
       });
 }

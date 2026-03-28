@@ -32,13 +32,17 @@ inline TaskStatus DeepCopyConservedData(MeshData<Real> *to, MeshData<Real> *from
   using parthenon::MakePackDescriptor;
   using parthenon::variable_names::any;
 
-  std::vector<MetadataFlag> flags({Metadata::Conserved});
+  std::vector<MetadataFlag> flags({Metadata::Cell, Metadata::Conserved});
   static auto desc = MakePackDescriptor<any>(to, flags);
+  std::vector<MetadataFlag> flags_f({Metadata::Face, Metadata::Conserved});
+  static auto desc_b = MakePackDescriptor<any>(to, flags_f);
   const auto vt = desc.GetPack(to);
   const auto vf = desc.GetPack(from);
-  const auto ibe = to->GetBoundsI(IndexDomain::entire);
-  const auto jbe = to->GetBoundsJ(IndexDomain::entire);
-  const auto kbe = to->GetBoundsK(IndexDomain::entire);
+  const auto vtf = desc_b.GetPack(to);
+  const auto vff = desc_b.GetPack(from);
+  auto ibe = to->GetBoundsI(IndexDomain::entire);
+  auto jbe = to->GetBoundsJ(IndexDomain::entire);
+  auto kbe = to->GetBoundsK(IndexDomain::entire);
 
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "DeepCopyConservedData", parthenon::DevExecSpace(), 0,
@@ -46,6 +50,40 @@ inline TaskStatus DeepCopyConservedData(MeshData<Real> *to, MeshData<Real> *from
       KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
         for (int n = vt.GetLowerBound(b); n <= vt.GetUpperBound(b); ++n) {
           vt(b, n, k, j, i) = vf(b, n, k, j, i);
+        }
+      });
+
+  ibe = to->GetBoundsI(IndexDomain::entire, TE::F1);
+  jbe = to->GetBoundsJ(IndexDomain::entire, TE::F1);
+  kbe = to->GetBoundsK(IndexDomain::entire, TE::F1);
+  parthenon::par_for(
+      DEFAULT_LOOP_PATTERN, "DeepCopyConservedData::F1", parthenon::DevExecSpace(), 0,
+      to->NumBlocks() - 1, kbe.s, kbe.e, jbe.s, jbe.e, ibe.s, ibe.e,
+      KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
+        for (int n = vtf.GetLowerBound(b); n <= vtf.GetUpperBound(b); ++n) {
+          vtf(b, TE::F1, n, k, j, i) = vff(b, TE::F1, n, k, j, i);
+        }
+      });
+  ibe = to->GetBoundsI(IndexDomain::entire, TE::F2);
+  jbe = to->GetBoundsJ(IndexDomain::entire, TE::F2);
+  kbe = to->GetBoundsK(IndexDomain::entire, TE::F2);
+  parthenon::par_for(
+      DEFAULT_LOOP_PATTERN, "DeepCopyConservedData::F2", parthenon::DevExecSpace(), 0,
+      to->NumBlocks() - 1, kbe.s, kbe.e, jbe.s, jbe.e, ibe.s, ibe.e,
+      KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
+        for (int n = vtf.GetLowerBound(b); n <= vtf.GetUpperBound(b); ++n) {
+          vtf(b, TE::F2, n, k, j, i) = vff(b, TE::F2, n, k, j, i);
+        }
+      });
+  ibe = to->GetBoundsI(IndexDomain::entire, TE::F3);
+  jbe = to->GetBoundsJ(IndexDomain::entire, TE::F3);
+  kbe = to->GetBoundsK(IndexDomain::entire, TE::F3);
+  parthenon::par_for(
+      DEFAULT_LOOP_PATTERN, "DeepCopyConservedData::F3", parthenon::DevExecSpace(), 0,
+      to->NumBlocks() - 1, kbe.s, kbe.e, jbe.s, jbe.e, ibe.s, ibe.e,
+      KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
+        for (int n = vtf.GetLowerBound(b); n <= vtf.GetUpperBound(b); ++n) {
+          vtf(b, TE::F3, n, k, j, i) = vff(b, TE::F3, n, k, j, i);
         }
       });
   return TaskStatus::complete;
@@ -141,7 +179,6 @@ TaskStatus ApplyFaceUpdate(MeshData<Real> *u0, MeshData<Real> *u1, const Real g0
   const bool three_d = (pm->ndim > 2);
   const auto &cpars =
       pm->packages.Get("artemis")->template Param<geometry::CoordParams>("coord_params");
-
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "ApplyFaceUpdate::X1", parthenon::DevExecSpace(), 0,
       u0->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e + 1,
@@ -157,10 +194,10 @@ TaskStatus ApplyFaceUpdate(MeshData<Real> *u0, MeshData<Real> *u1, const Real g0
         const Real dl3m = coords.GetEdgeLengthX3(vg, b, k, j, i);
         const Real dl3p = coords.GetEdgeLengthX3(vg, b, k, j + multi_d, i);
 
-        v0n -= bdt * ((dl3m * v0.flux(b, TE::E3, field::face::B(), k, j, i) -
-                       dl3p * v0.flux(b, TE::E3, field::face::B(), k, j + multi_d, i)) +
-                      (dl2p * v0.flux(b, TE::E2, field::face::B(), k + three_d, j, i) -
-                       dl2m * v0.flux(b, TE::E2, field::face::B(), k, j, i)));
+        v0n -= bdt * ((dl3p * v0.flux(b, TE::E3, field::face::B(), k, j + multi_d, i) -
+                       dl3m * v0.flux(b, TE::E3, field::face::B(), k, j, i)) +
+                      (dl2m * v0.flux(b, TE::E2, field::face::B(), k, j, i) -
+                       dl2p * v0.flux(b, TE::E2, field::face::B(), k + three_d, j, i)));
       });
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "ApplyFaceUpdate::X2", parthenon::DevExecSpace(), 0,
@@ -177,10 +214,10 @@ TaskStatus ApplyFaceUpdate(MeshData<Real> *u0, MeshData<Real> *u1, const Real g0
         const Real dl3m = coords.GetEdgeLengthX3(vg, b, k, j, i);
         const Real dl3p = coords.GetEdgeLengthX3(vg, b, k, j, i + 1);
 
-        v0n -= bdt * ((dl3p * v0.flux(b, TE::E3, field::face::B(), k, j, i + 1) -
-                       dl3m * v0.flux(b, TE::E3, field::face::B(), k, j, i)) +
-                      (dl1m * v0.flux(b, TE::E1, field::face::B(), k, j, i) -
-                       dl1p * v0.flux(b, TE::E1, field::face::B(), k + three_d, j, i)));
+        v0n -= bdt * ((dl3m * v0.flux(b, TE::E3, field::face::B(), k, j, i) -
+                       dl3p * v0.flux(b, TE::E3, field::face::B(), k, j, i + 1)) +
+                      (dl1p * v0.flux(b, TE::E1, field::face::B(), k + three_d, j, i) -
+                       dl1m * v0.flux(b, TE::E1, field::face::B(), k, j, i)));
       });
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "ApplyFaceUpdate::X3", parthenon::DevExecSpace(), 0,
@@ -197,10 +234,10 @@ TaskStatus ApplyFaceUpdate(MeshData<Real> *u0, MeshData<Real> *u1, const Real g0
         const Real dl2m = coords.GetEdgeLengthX2(vg, b, k, j, i);
         const Real dl2p = coords.GetEdgeLengthX2(vg, b, k, j, i + 1);
 
-        v0n -= bdt * ((dl2m * v0.flux(b, TE::E2, field::face::B(), k, j, i) -
-                       dl2p * v0.flux(b, TE::E2, field::face::B(), k, j, i + 1)) +
-                      (dl1p * v0.flux(b, TE::E1, field::face::B(), k, j + multi_d, i) -
-                       dl1m * v0.flux(b, TE::E1, field::face::B(), k, j, i)));
+        v0n -= bdt * ((dl2p * v0.flux(b, TE::E2, field::face::B(), k, j, i + 1) -
+                       dl2m * v0.flux(b, TE::E2, field::face::B(), k, j, i)) +
+                      (dl1m * v0.flux(b, TE::E1, field::face::B(), k, j, i) -
+                       dl1p * v0.flux(b, TE::E1, field::face::B(), k, j + multi_d, i)));
       });
 
   return TaskStatus::complete;

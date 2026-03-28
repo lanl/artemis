@@ -45,7 +45,7 @@ struct RiemannSolver<RSolver::llf, FLUID_TYPE, CTYPE,
                      std::enable_if_t<FLUID_TYPE != Fluid::radiation>> {
   template <typename V1, typename V2, typename V3>
   KOKKOS_INLINE_FUNCTION void
-  operator()(const EOS &eos, const Real c, const Real chat, const bool do_mhd,
+  operator()(const EOS &eos, const Real c, const Real chat, bool do_mhd,
              parthenon::team_mbr_t const &member, const int b, const int k, const int j,
              const int il, const int iu, const int dir,
              const parthenon::ScratchPad2D<Real> &wl,
@@ -68,7 +68,12 @@ struct RiemannSolver<RSolver::llf, FLUID_TYPE, CTYPE,
     [[maybe_unused]] const int IBX = nspecies * 7 + (dir - 1);
     [[maybe_unused]] const int IBY = nspecies * 7 + ((dir - 1) + 1) % 3;
     [[maybe_unused]] const int IBZ = nspecies * 7 + ((dir - 1) + 2) % 3;
+    [[maybe_unused]] const int IBM = nspecies * 7 + 3;
+    [[maybe_unused]] const int IBXG = dir - 1;
+    [[maybe_unused]] const int IBYG = dir % 3;
+    [[maybe_unused]] const int IBZG = (dir + 1) % 3;
     for (int n = 0; n < nspecies; ++n) {
+      do_mhd &= (n == 0);
       const int IDN = n;
       const int ivx = nspecies + (n * 3) + ((dir - 1));
       const int ivy = nspecies + (n * 3) + ((dir - 1) + 1) % 3;
@@ -109,7 +114,7 @@ struct RiemannSolver<RSolver::llf, FLUID_TYPE, CTYPE,
             if constexpr (FLUID_TYPE == Fluid::gas) {
               wl_ipr = wl(IPR, i);
               wl_ise = wl(ISE, i);
-              wl_ibl = wr(IBL, i);
+              wl_ibl = wl(IBL, i);
               wr_ipr = wr(IPR, i);
               wr_ise = wr(ISE, i);
               wr_ibl = wr(IBL, i);
@@ -148,31 +153,40 @@ struct RiemannSolver<RSolver::llf, FLUID_TYPE, CTYPE,
                    0.5 * wr_idn * (SQR(wr_ivx) + SQR(wr_ivy) + SQR(wr_ivz));
               fsum_e = (el + wl_ipr) * wl_ivx + (er + wr_ipr) * wr_ivx;
               if (do_mhd) {
-                fsum_mx -= SQR(wl_ibx);
-                fsum_my -= wl_ibx * (wl_iby + wr_iby);
-                fsum_mz -= wl_ibx * (wl_ibz + wr_ibz);
                 pbl = 0.5 * (SQR(wl_ibx) + SQR(wl_iby) + SQR(wl_ibz));
                 pbr = 0.5 * (SQR(wr_ibx) + SQR(wr_iby) + SQR(wr_ibz));
+                p.flux(b, dir, IBM, k, j, i) = 0.5 * (pbl + pbr);
+                fsum_mx -= SQR(wl_ibx) + SQR(wr_ibx);
+                fsum_my -= wl_ibx * wl_iby + wr_ibx * wr_iby;
+                fsum_mz -= wl_ibx * wl_ibz + wr_ibx * wr_ibz;
+                vdBl = wl_ivx * wl_ibx + wl_ivy * wl_iby + wl_ivz * wl_ibz;
+                vdBr = wr_ivx * wr_ibx + wr_ivy * wr_iby + wr_ivz * wr_ibz;
                 el += pbl;
                 er += pbr;
+                fsum_e -= wl_ibx * vdBl + wr_ibx * vdBr;
                 fsum_by = (wl_ivx * wl_iby - wl_ivy * wl_ibx) +
                           (wr_ivx * wr_iby - wr_ivy * wr_ibx);
-                fsum_bz = (wl_ivy * wl_ibz - wl_ivz * wl_iby) +
-                          (wr_ivy * wr_ibz - wr_ivz * wr_iby);
+                fsum_bz = (wl_ivx * wl_ibz - wl_ivz * wl_ibx) +
+                          (wr_ivx * wr_ibz - wr_ivz * wr_ibx);
               }
             }
 
             // Compute max wave speed in L/R states (see Toro eq. 10.43)
             Real a = Null<Real>();
             if constexpr (FLUID_TYPE == Fluid::gas) {
-              qa = (wl_ibl + 2. * pbl) / wl_idn;
-              qb = (wr_ibl + 2. * pbr) / wr_idn;
               if (do_mhd) {
                 // cf^2 = 0.5*( c_A^2 + sqrt( c_A^4 - 4*c_s^2 B_x^2/rho))
-                qa += std::sqrt(SQR(qa) - 4. * wl_ibl * SQR(wl_ibx / wl_idn));
-                qa = std::sqrt(0.5 * qa);
-                qb += std::sqrt(SQR(qb) - 4. * wr_ibl * SQR(wr_ibx / wr_idn));
-                qb = std::sqrt(0.5 * qb);
+                qa = (wl_ibl + 2. * pbl) / wl_idn;
+                qb = (wr_ibl + 2. * pbr) / wr_idn;
+                qa = std::sqrt(0.5 * (qa + std::sqrt(std::max(
+                                              0.0, SQR(qa) - 4. * wl_ibl *
+                                                        SQR(wl_ibx / wl_idn)))));
+                qb = std::sqrt(0.5 * (qb + std::sqrt(std::max(
+                                              0.0, SQR(qb) - 4. * wr_ibl *
+                                                        SQR(wr_ibx / wr_idn)))));
+              } else {
+                qa = std::sqrt(wl_ibl / wl_idn);
+                qb = std::sqrt(wr_ibl / wr_idn);
               }
               a = std::max((std::abs(wl_ivx) + qa), (std::abs(wr_ivx) + qb));
             } else if constexpr (FLUID_TYPE == Fluid::dust) {
@@ -186,8 +200,14 @@ struct RiemannSolver<RSolver::llf, FLUID_TYPE, CTYPE,
             Real du_mz = a * (wr_idn * wr_ivz - wl_idn * wl_ivz);
 
             [[maybe_unused]] Real du_e = Null<Real>();
+            [[maybe_unused]] Real du_by = 0.0;
+            [[maybe_unused]] Real du_bz = 0.0;
             if constexpr (FLUID_TYPE == Fluid::gas) {
               du_e = a * (er - el);
+              if (do_mhd) {
+                du_by = a * (wr_iby - wl_iby);
+                du_bz = a * (wr_ibz - wl_ibz);
+              }
             }
 
             // Set an approximate interface pressure for coordinate source terms
@@ -202,6 +222,13 @@ struct RiemannSolver<RSolver::llf, FLUID_TYPE, CTYPE,
             q.flux(b, dir, ivy, k, j, i) = 0.5 * (fsum_my - du_my);
             q.flux(b, dir, ivz, k, j, i) = 0.5 * (fsum_mz - du_mz);
             if constexpr (FLUID_TYPE == Fluid::gas) {
+              if (do_mhd) {
+                const Real fby = 0.5 * (fsum_by - du_by);
+                const Real fbz = 0.5 * (fsum_bz - du_bz);
+                p.flux(b, dir, field::cell::B(IBXG), k, j, i) = 0.0;
+                p.flux(b, dir, field::cell::B(IBYG), k, j, i) = fby;
+                p.flux(b, dir, field::cell::B(IBZG), k, j, i) = fbz;
+              }
               q.flux(b, dir, IEN, k, j, i) = 0.5 * (fsum_e - du_e);
 
               // Li, 2008, https://ui.adsabs.harvard.edu/abs/2008ASPC..385..273L/abstract

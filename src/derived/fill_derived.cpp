@@ -131,17 +131,17 @@ void ConsToPrim(MeshData<Real> *md) {
   const auto &cpars = artemis_pkg->template Param<geometry::CoordParams>("coord_params");
 
   // Packing and indexing
-  static auto desc =
-      MakePackDescriptor<gas::cons::density, gas::cons::momentum,
-                         gas::cons::internal_energy, gas::prim::density,
-                         gas::prim::velocity, gas::prim::sie, dust::cons::density,
-                         dust::cons::momentum, dust::prim::density, dust::prim::velocity,
-                         rad::cons::energy, rad::cons::flux, rad::prim::energy,
-                         rad::prim::flux, field::face::B, field::cell::B>(
-          resolved_pkgs.get());
+  static auto desc = MakePackDescriptor<
+      gas::cons::density, gas::cons::momentum, gas::cons::internal_energy,
+      gas::prim::density, gas::prim::velocity, gas::prim::sie, dust::cons::density,
+      dust::cons::momentum, dust::prim::density, dust::prim::velocity, rad::cons::energy,
+      rad::cons::flux, rad::prim::energy, rad::prim::flux, field::face::B, field::cell::B,
+      field::cell::energy, field::cell::divB>(resolved_pkgs.get());
   auto vmesh = desc.GetPack(md);
-  static auto desc_g = MakePackDescriptor<geom::x1v, geom::x2v, geom::x3v, geom::hx1v,
-                                          geom::hx2v, geom::hx3v>(resolved_pkgs.get());
+  static auto desc_g =
+      MakePackDescriptor<geom::x1v, geom::x2v, geom::x3v, geom::hx1v, geom::hx2v,
+                         geom::hx3v, geom::vol, geom::ax1, geom::ax2, geom::ax3>(
+          resolved_pkgs.get());
   auto vg = desc_g.GetPack(md);
   const int nblocks = md->NumBlocks();
   IndexRange ib = md->GetBoundsI(IndexDomain::interior);
@@ -237,6 +237,18 @@ void ConsToPrim(MeshData<Real> *md) {
           }
         }
         if (do_mhd) {
+          const Real vol = coords.GetVolume(vg, b, k, j, i);
+          const auto ax1 = coords.GetFaceAreaX1(vg, b, k, j, i);
+          const auto ax2 = coords.GetFaceAreaX2(vg, b, k, j, i);
+          const auto ax3 = coords.GetFaceAreaX3(vg, b, k, j, i);
+          vmesh(b, TE::CC, field::cell::divB(), k, j, i) =
+              ((ax1[1] * vmesh(b, TE::F1, field::face::B(), k, j, i + 1) -
+                ax1[0] * vmesh(b, TE::F1, field::face::B(), k, j, i)) +
+               (ax2[1] * vmesh(b, TE::F2, field::face::B(), k, j + multid, i) -
+                ax2[0] * vmesh(b, TE::F2, field::face::B(), k, j, i)) +
+               (ax3[1] * vmesh(b, TE::F3, field::face::B(), k + threed, j, i) -
+                ax3[0] * vmesh(b, TE::F3, field::face::B(), k, j, i))) /
+              vol;
           vmesh(b, TE::CC, field::cell::B(0), k, j, i) =
               0.5 * (vmesh(b, TE::F1, field::face::B(), k, j, i) +
                      vmesh(b, TE::F1, field::face::B(), k, j, i + 1));
@@ -246,6 +258,10 @@ void ConsToPrim(MeshData<Real> *md) {
           vmesh(b, TE::CC, field::cell::B(2), k, j, i) =
               0.5 * (vmesh(b, TE::F3, field::face::B(), k, j, i) +
                      vmesh(b, TE::F3, field::face::B(), k + threed, j, i));
+          vmesh(b, TE::CC, field::cell::energy(), k, j, i) =
+              0.5 * (SQR(vmesh(b, TE::CC, field::cell::B(0), k, j, i)) +
+                     SQR(vmesh(b, TE::CC, field::cell::B(1), k, j, i)) +
+                     SQR(vmesh(b, TE::CC, field::cell::B(2), k, j, i)));
         }
       });
 }

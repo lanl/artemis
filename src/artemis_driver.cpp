@@ -282,8 +282,10 @@ TaskCollection ArtemisDriver<GEOM>::StepTasks() {
                      u0.get(), u1.get(), g0, g1, bdt);
       auto update_mhd = gas_flx | set_flx;
       if (do_mhd) {
-        update_mhd = tl.AddTask(gas_flx | set_flx, ArtemisUtils::ApplyFaceUpdate<GEOM>,
-                                u0.get(), u1.get(), g0, g1, bdt);
+        auto edge_emf =
+            tl.AddTask(gas_flx | set_flx, ArtemisUtils::AssembleEdgeEMF, u0.get());
+        update_mhd = tl.AddTask(edge_emf, ArtemisUtils::ApplyFaceUpdate<GEOM>, u0.get(),
+                                u1.get(), g0, g1, bdt);
       }
 
       // Apply "coordinate source terms"

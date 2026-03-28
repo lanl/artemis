@@ -45,11 +45,23 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   //   mhd->AddField<field::edge::E>(m);
   //   mhd->AddField<field::edge::J>(m);
   m = Metadata({Metadata::Cell, Metadata::Derived, Metadata::Intensive, Metadata::OneCopy,
-                Metadata::FillGhost},
+                Metadata::FillGhost, Metadata::WithFluxes},
                std::vector<int>({3}));
   mhd->AddField<field::cell::B>(m);
-  mhd->AddField<field::cell::E>(m);
-  mhd->AddField<field::cell::J>(m);
+
+  m = Metadata({Metadata::Cell, Metadata::Derived, Metadata::Intensive, Metadata::OneCopy,
+                Metadata::FillGhost, Metadata::WithFluxes});
+  mhd->AddField<field::cell::energy>(m);
+
+  m = Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy});
+  mhd->AddField<field::cell::divB>(m);
+
+  //   m = Metadata({Metadata::Cell, Metadata::Derived, Metadata::Intensive,
+  //   Metadata::OneCopy,
+  //                 Metadata::FillGhost},
+  //                std::vector<int>({3}));
+  //   mhd->AddField<field::cell::E>(m);
+  //   mhd->AddField<field::cell::J>(m);
   return mhd;
 }
 } // namespace MHD

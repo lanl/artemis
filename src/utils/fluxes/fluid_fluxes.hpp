@@ -247,6 +247,95 @@ TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, FLUX vflx,
 }
 
 //----------------------------------------------------------------------------------------
+//! \fn  TaskStatus ArtemisUtils::AssembleEdgeEMF
+//! \brief Assemble unique edge EMFs from raw face induction fluxes on field::cell::B.
+inline TaskStatus AssembleEdgeEMF(MeshData<Real> *md) {
+  PARTHENON_INSTRUMENT
+  auto pm = md->GetParentPointer();
+  auto &resolved_pkgs = pm->resolved_packages;
+  const auto do_mhd = pm->packages.Get("artemis")->template Param<bool>("do_mhd");
+  if (!do_mhd) return TaskStatus::complete;
+
+  static auto desc = MakePackDescriptor<field::cell::B, field::face::B>(
+      resolved_pkgs.get(), {}, {parthenon::PDOpt::WithFluxes});
+  const auto v = desc.GetPack(md);
+
+  const auto ib = md->GetBoundsI(IndexDomain::interior);
+  const auto jb = md->GetBoundsJ(IndexDomain::interior);
+  const auto kb = md->GetBoundsK(IndexDomain::interior);
+  const bool multi_d = (pm->ndim > 1);
+  const bool three_d = (pm->ndim > 2);
+
+  //
+  //     Fx(By) = -Ez and Fy(Bx) = Ez
+  //
+  //     E_i-1j--Fy_i-1j+1--E_ij+1---Fy_ij+1--E_i+1j+1
+  //        |                 |                 |
+  //        |                 |                 |
+  //      Fx_i-1j           Fx_ij             Fx_i+1j
+  //        |                 |                 |
+  //        |                 |                 |
+  //      E_i-1j---Fy_i-1j---E_ij------Fy_ij---E_i+1j
+  //        |                 |                 |
+  //        |                 |                 |
+  //      Fx_i-1j-1         Fx_ij-1           Fx_i+1j-1
+  //        |                 |                 |
+  //        |                 |                 |
+  //     E_i-1j-1--Fy_i-1j--E_ij-1-----Fy_ij---E_i+1j-1
+  //
+  if (multi_d) {
+    parthenon::par_for(
+        DEFAULT_LOOP_PATTERN, "AssembleEdgeEMF::E3", parthenon::DevExecSpace(), 0,
+        md->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e + 1, ib.s, ib.e + 1,
+        KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
+          const int j0 = j - (j > jb.e);
+          const int jm = j - (j > jb.s);
+          const int i0 = i - (i > ib.e);
+          const int im = i - (i > ib.s);
+          v.flux(b, TE::E3, field::face::B(), k, j, i) =
+              0.25 * (-v.flux(b, X1DIR, field::cell::B(1), k, j0, i) -
+                      v.flux(b, X1DIR, field::cell::B(1), k, jm, i) +
+                      v.flux(b, X2DIR, field::cell::B(0), k, j, i0) +
+                      v.flux(b, X2DIR, field::cell::B(0), k, j, im));
+        });
+  }
+
+  if (three_d) {
+    parthenon::par_for(
+        DEFAULT_LOOP_PATTERN, "AssembleEdgeEMF::E2", parthenon::DevExecSpace(), 0,
+        md->NumBlocks() - 1, kb.s, kb.e + 1, jb.s, jb.e, ib.s, ib.e + 1,
+        KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
+          const int k0 = k - (k > kb.e);
+          const int km = k - (k > kb.s);
+          const int i0 = i - (i > ib.e);
+          const int im = i - (i > ib.s);
+          v.flux(b, TE::E2, field::face::B(), k, j, i) =
+              0.25 * (v.flux(b, X1DIR, field::cell::B(2), k0, j, i) +
+                      v.flux(b, X1DIR, field::cell::B(2), km, j, i) -
+                      v.flux(b, X3DIR, field::cell::B(0), k, j, i0) -
+                      v.flux(b, X3DIR, field::cell::B(0), k, j, im));
+        });
+
+    parthenon::par_for(
+        DEFAULT_LOOP_PATTERN, "AssembleEdgeEMF::E1", parthenon::DevExecSpace(), 0,
+        md->NumBlocks() - 1, kb.s, kb.e + 1, jb.s, jb.e + 1, ib.s, ib.e,
+        KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
+          const int k0 = k - (k > kb.e);
+          const int km = k - (k > kb.s);
+          const int j0 = j - (j > jb.e);
+          const int jm = j - (j > jb.s);
+          v.flux(b, TE::E1, field::face::B(), k, j, i) =
+              0.25 * (-v.flux(b, X2DIR, field::cell::B(2), k0, j, i) -
+                      v.flux(b, X2DIR, field::cell::B(2), km, j, i) +
+                      v.flux(b, X3DIR, field::cell::B(1), k, j0, i) +
+                      v.flux(b, X3DIR, field::cell::B(1), k, jm, i));
+        });
+  }
+
+  return TaskStatus::complete;
+}
+
+//----------------------------------------------------------------------------------------
 //! \fn  TaskStatus ArtemisUtils::FluxSourceImpl
 //!  \brief Adds source terms "affiliated with the flux", e.g.,
 //!         - the pressure gradient force (including for radiation moments)
@@ -274,10 +363,10 @@ TaskStatus FluxSourceImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, CONS vcons, FAC
   if constexpr (F == Fluid::radiation) {
     hcchat = 0.5 * pkg->template Param<Real>("c") * pkg->template Param<Real>("chat");
   }
-  const auto &cpars = md->GetParentPointer()
-                          ->packages.Get("artemis")
-                          ->template Param<geometry::CoordParams>("coord_params");
 
+  const auto &artemis_pkg = md->GetParentPointer()->packages.Get("artemis");
+  const auto &cpars = artemis_pkg->template Param<geometry::CoordParams>("coord_params");
+  const auto do_mhd = artemis_pkg->template Param<bool>("do_mhd");
   // Apply flux sources
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "FluxSourceTerms", parthenon::DevExecSpace(), 0,
@@ -356,6 +445,20 @@ TaskStatus FluxSourceImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, CONS vcons, FAC
                                                vp_.flux(b, d2, IPR, k, j + multi_d, i));
             vc_(b, IMZ, k, j, i) += dtdx[2] * (vp_.flux(b, d3, IPR, k, j, i) -
                                                vp_.flux(b, d3, IPR, k + three_d, j, i));
+          }
+
+          if constexpr (F == Fluid::gas) {
+            if (do_mhd) {
+              vc_(b, IMX, k, j, i) +=
+                  dtdx[0] * (vp_.flux(b, d1, field::cell::energy(), k, j, i) -
+                             vp_.flux(b, d1, field::cell::energy(), k, j, i + 1));
+              vc_(b, IMY, k, j, i) +=
+                  dtdx[1] * (vp_.flux(b, d2, field::cell::energy(), k, j, i) -
+                             vp_.flux(b, d2, field::cell::energy(), k, j + multi_d, i));
+              vc_(b, IMZ, k, j, i) +=
+                  dtdx[2] * (vp_.flux(b, d3, field::cell::energy(), k, j, i) -
+                             vp_.flux(b, d3, field::cell::energy(), k + three_d, j, i));
+            }
           }
 
           // pdV source for gas internal energy equation

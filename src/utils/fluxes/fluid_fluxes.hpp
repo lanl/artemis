@@ -298,6 +298,14 @@ inline TaskStatus AssembleEdgeEMF(MeshData<Real> *md) {
                       v.flux(b, X2DIR, field::cell::B(0), k, j, i0) +
                       v.flux(b, X2DIR, field::cell::B(0), k, j, im));
         });
+  } else {
+    parthenon::par_for(
+        DEFAULT_LOOP_PATTERN, "AssembleEdgeEMF::E3", parthenon::DevExecSpace(), 0,
+        md->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e + 1,
+        KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
+          v.flux(b, TE::E3, field::face::B(), k, j, i) =
+              -v.flux(b, X1DIR, field::cell::B(1), k, j, i);
+        });
   }
 
   if (three_d) {
@@ -316,20 +324,40 @@ inline TaskStatus AssembleEdgeEMF(MeshData<Real> *md) {
                       v.flux(b, X3DIR, field::cell::B(0), k, j, im));
         });
 
+    if (multi_d) {
+      parthenon::par_for(
+          DEFAULT_LOOP_PATTERN, "AssembleEdgeEMF::E1", parthenon::DevExecSpace(), 0,
+          md->NumBlocks() - 1, kb.s, kb.e + 1, jb.s, jb.e + 1, ib.s, ib.e,
+          KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
+            const int k0 = k - (k > kb.e);
+            const int km = k - (k > kb.s);
+            const int j0 = j - (j > jb.e);
+            const int jm = j - (j > jb.s);
+            v.flux(b, TE::E1, field::face::B(), k, j, i) =
+                0.25 * (-v.flux(b, X2DIR, field::cell::B(2), k0, j, i) -
+                        v.flux(b, X2DIR, field::cell::B(2), km, j, i) +
+                        v.flux(b, X3DIR, field::cell::B(1), k, j0, i) +
+                        v.flux(b, X3DIR, field::cell::B(1), k, jm, i));
+          });
+    }
+  } else {
     parthenon::par_for(
-        DEFAULT_LOOP_PATTERN, "AssembleEdgeEMF::E1", parthenon::DevExecSpace(), 0,
-        md->NumBlocks() - 1, kb.s, kb.e + 1, jb.s, jb.e + 1, ib.s, ib.e,
+        DEFAULT_LOOP_PATTERN, "AssembleEdgeEMF::E2", parthenon::DevExecSpace(), 0,
+        md->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e + 1,
         KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
-          const int k0 = k - (k > kb.e);
-          const int km = k - (k > kb.s);
-          const int j0 = j - (j > jb.e);
-          const int jm = j - (j > jb.s);
-          v.flux(b, TE::E1, field::face::B(), k, j, i) =
-              0.25 * (-v.flux(b, X2DIR, field::cell::B(2), k0, j, i) -
-                      v.flux(b, X2DIR, field::cell::B(2), km, j, i) +
-                      v.flux(b, X3DIR, field::cell::B(1), k, j0, i) +
-                      v.flux(b, X3DIR, field::cell::B(1), k, jm, i));
+          v.flux(b, TE::E2, field::face::B(), k, j, i) =
+              v.flux(b, X1DIR, field::cell::B(2), k, j, i);
         });
+
+    if (multi_d) {
+      parthenon::par_for(
+          DEFAULT_LOOP_PATTERN, "AssembleEdgeEMF::E1", parthenon::DevExecSpace(), 0,
+          md->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e + 1, ib.s, ib.e,
+          KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
+            v.flux(b, TE::E1, field::face::B(), k, j, i) =
+                -v.flux(b, X2DIR, field::cell::B(2), k, j, i);
+          });
+    }
   }
 
   return TaskStatus::complete;

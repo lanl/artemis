@@ -31,6 +31,7 @@
 #include "kh.hpp"
 #include "linear_wave.hpp"
 #include "lw.hpp"
+#include "orszag_tang.hpp"
 #include "polytrope.hpp"
 #include "rt.hpp"
 #include "shock.hpp"
@@ -67,6 +68,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
     linear_wave::ProblemGenerator<T>(pmb, pin);
   } else if (name == "lw") {
     lw::ProblemGenerator<T>(pmb, pin);
+  } else if (name == "orszag_tang") {
+    orszag_tang::ProblemGenerator<T>(pmb, pin);
   } else if (name == "polytrope") {
     polytrope::ProblemGenerator<T>(pmb, pin);
   } else if (name == "kh") {

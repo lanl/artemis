@@ -85,7 +85,7 @@ post_recon(const EOS &eos, const Real dfloor, const Real siefloor, const bool do
                                  Real &dL = ql(IDN, ipl);
                                  Real &pL = ql(IPR, ipl);
                                  Real &eL = ql(ISE, ipl);
-                                 Real &bL = qr(IBL, ipl);
+                                 Real &bL = ql(IBL, ipl);
                                  Real &dR = qr(IDN, i);
                                  Real &pR = qr(IPR, i);
                                  Real &eR = qr(ISE, i);
@@ -116,7 +116,9 @@ post_recon(const EOS &eos, const Real dfloor, const Real siefloor, const bool do
       parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, member, il, iu,
                                [&](const int i) {
                                  const int ipl = i + (dir == 1);
-                                 ql(n, ipl) = qc(b, fd, field::face::B(), k, j, ipl);
+                                 ql(n, ipl) =
+                                     qc(b, fd, field::face::B(), k + (dir == 3),
+                                        j + (dir == 2), ipl);
                                  qr(n, i) = qc(b, fd, field::face::B(), k, j, i);
                                });
     }

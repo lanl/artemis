@@ -38,14 +38,17 @@ KOKKOS_FORCEINLINE_FUNCTION Real VDot(const V1 &a, const V2 &b) {
 //----------------------------------------------------------------------------------------
 //! \fn Real ArtemisUtils::DualEnergySIE(vmesh, const int b, const int n, const int k,
 //!                                      const int j, const int i, const Real de_switch,
-//!                                      const Real hx[3])
+//!                                      const Real hx[3], const Real emag)
 //! \brief Returns appropriate specific internal energy variable based on de_switch
+//! If `de_switch <= 0`, the dual-energy switch is disabled and the auxiliary internal
+//! energy is used.
 //! NOTE(@pdmullen): Floors should be handled outside this function call
 template <typename T>
 KOKKOS_FORCEINLINE_FUNCTION Real DualEnergySIE(T &vmesh, const int b, const int n,
                                                const int k, const int j, const int i,
                                                const Real de_switch,
-                                               const std::array<Real, 3> &hx) {
+                                               const std::array<Real, 3> &hx,
+                                               const Real emag = 0.0) {
   // Extract state vector
   const Real invd = 1.0 / vmesh(b, gas::cons::density(n), k, j, i);
   const Real &rv1 = vmesh(b, gas::cons::momentum(VI(n, 0)), k, j, i) / hx[0];
@@ -56,9 +59,10 @@ KOKKOS_FORCEINLINE_FUNCTION Real DualEnergySIE(T &vmesh, const int b, const int 
   const Real ke = 0.5 * invd * (SQR(rv1) + SQR(rv2) + SQR(rv3));
 
   // Calculate conserved representation of internal energy
-  const Real ut_sie = invd * (u_e - ke);
-  const bool dual_switch = (ut_sie > invd * de_switch * u_e);
-  return (dual_switch)*ut_sie + (!dual_switch) * invd * u_u;
+  const Real ut_sie = invd * (u_e - ke - emag);
+  const Real u_hyd = u_e - emag;
+  const bool use_total = (de_switch > 0.0) && (ut_sie > invd * de_switch * u_hyd);
+  return (use_total)*ut_sie + (!use_total) * invd * u_u;
 }
 
 //----------------------------------------------------------------------------------------

@@ -36,8 +36,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   auto mhd = std::make_shared<StateDescriptor>("mhd");
   Params &params = mhd->AllParams();
 
-  Metadata m = Metadata(
-      {Metadata::Face, Metadata::Conserved, Metadata::Independent, Metadata::WithFluxes});
+  Metadata m = Metadata({Metadata::Face, Metadata::Conserved, Metadata::Independent,
+                         Metadata::WithFluxes, Metadata::FillGhost});
   mhd->AddField<field::face::B>(m);
   //   m = Metadata(
   //       {Metadata::Edge, Metadata::Conserved, Metadata::Independent,

@@ -178,6 +178,7 @@ TaskStatus SelfDragSourceImpl(MeshData<Real> *md, const Real time, const Real dt
   auto &artemis_pkg = pm->packages.Get("artemis");
   const bool do_gas = artemis_pkg->template Param<bool>("do_gas");
   const bool do_dust = artemis_pkg->template Param<bool>("do_dust");
+  const bool do_mhd = artemis_pkg->template Param<bool>("do_mhd");
 
   // Extract gas parameters
   Real de_switch = Null<Real>();
@@ -208,8 +209,8 @@ TaskStatus SelfDragSourceImpl(MeshData<Real> *md, const Real time, const Real dt
   // Packing and indexing
   static auto desc =
       MakePackDescriptor<gas::cons::total_energy, gas::cons::momentum, gas::cons::density,
-                         gas::cons::internal_energy, dust::cons::momentum,
-                         dust::cons::density>(resolved_pkgs.get());
+                         gas::cons::internal_energy, field::cell::energy,
+                         dust::cons::momentum, dust::cons::density>(resolved_pkgs.get());
   auto vmesh = desc.GetPack(md);
   static auto desc_g = MakePackDescriptor<geom::x1v, geom::x2v, geom::x3v, geom::hx1v,
                                           geom::hx2v, geom::hx3v>(resolved_pkgs.get());
@@ -263,7 +264,10 @@ TaskStatus SelfDragSourceImpl(MeshData<Real> *md, const Real time, const Real dt
             dens = (dfloor)*dens + (!dfloor) * dflr_gas;
 
             // Compute SIE via dual energy formalism and apply floor
-            Real sieg = ArtemisUtils::DualEnergySIE(vmesh, b, n, k, j, i, de_switch, hx);
+            const Real emag =
+                (do_mhd && (n == 0)) ? vmesh(b, field::cell::energy(), k, j, i) : 0.0;
+            Real sieg =
+                ArtemisUtils::DualEnergySIE(vmesh, b, n, k, j, i, de_switch, hx, emag);
             const Real efloor = (sieg > sieflr_gas);
             sieg = (efloor)*sieg + (!efloor) * sieflr_gas;
 
@@ -355,6 +359,7 @@ TaskStatus SimpleDragSourceImpl(MeshData<Real> *md, const Real time, const Real 
   const int multi_d = (ndim >= 2);
   const int three_d = (ndim == 3);
   auto &artemis_pkg = pm->packages.Get("artemis");
+  const bool do_mhd = artemis_pkg->template Param<bool>("do_mhd");
 
   // Extract gas package and params
   auto &gas_pkg = pm->packages.Get("gas");
@@ -380,8 +385,8 @@ TaskStatus SimpleDragSourceImpl(MeshData<Real> *md, const Real time, const Real 
   // Packing and indexing
   static auto desc =
       MakePackDescriptor<gas::cons::total_energy, gas::cons::momentum, gas::cons::density,
-                         gas::cons::internal_energy, dust::cons::momentum,
-                         dust::cons::density>(resolved_pkgs.get());
+                         gas::cons::internal_energy, field::cell::energy,
+                         dust::cons::momentum, dust::cons::density>(resolved_pkgs.get());
   auto vmesh = desc.GetPack(md);
   static auto desc_g = MakePackDescriptor<geom::x1v, geom::x2v, geom::x3v, geom::hx1v,
                                           geom::hx2v, geom::hx3v>(resolved_pkgs.get());
@@ -446,7 +451,9 @@ TaskStatus SimpleDragSourceImpl(MeshData<Real> *md, const Real time, const Real 
         dg = (dfloor)*dg + (!dfloor) * dflr_gas;
 
         // Compute SIE via dual energy formalism and apply floor
-        Real sieg = ArtemisUtils::DualEnergySIE(vmesh, b, 0, k, j, i, de_switch, hx);
+        const Real emag = do_mhd ? vmesh(b, field::cell::energy(), k, j, i) : 0.0;
+        Real sieg =
+            ArtemisUtils::DualEnergySIE(vmesh, b, 0, k, j, i, de_switch, hx, emag);
         const Real efloor = (sieg > sieflr_gas);
         sieg = (efloor)*sieg + (!efloor) * sieflr_gas;
 

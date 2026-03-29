@@ -200,6 +200,12 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
     riemann_solver = RSolver::hlle;
   } else if (riemann.compare("llf") == 0) {
     riemann_solver = RSolver::llf;
+  } else if (riemann.compare("hlld") == 0) {
+    PARTHENON_REQUIRE(eos_type == "ideal",
+                      "The hlld Riemann solver requires the ideal eos.");
+    PARTHENON_REQUIRE(pin->GetOrAddBoolean("physics", "mhd", false),
+                      "The hlld Riemann solver requires MHD to be enabled.");
+    riemann_solver = RSolver::hlld;
   } else {
     PARTHENON_FAIL("Riemann solver (gas) not recognized.");
   }
@@ -639,8 +645,8 @@ TaskStatus CalculateFluxes(MeshData<Real> *md, const bool pcm) {
   static auto desc_prim =
       parthenon::MakePackDescriptor<gas::prim::density, gas::prim::velocity,
                                     gas::prim::pressure, gas::prim::sie, gas::prim::bmod,
-                    field::cell::B, field::cell::energy>(
-        resolved_pkgs.get(), {}, {parthenon::PDOpt::WithFluxes});
+                                    field::cell::B, field::cell::energy>(
+          resolved_pkgs.get(), {}, {parthenon::PDOpt::WithFluxes});
   static auto desc_flux =
       parthenon::MakePackDescriptor<gas::cons::density, gas::cons::momentum,
                                     gas::cons::total_energy, gas::cons::internal_energy,
@@ -673,8 +679,8 @@ TaskStatus FluxSource(MeshData<Real> *md, const Real dt) {
 
   static auto desc_prim =
       parthenon::MakePackDescriptor<gas::prim::density, gas::prim::velocity,
-                    gas::prim::pressure, field::cell::energy>(
-        resolved_pkgs.get(), {}, {parthenon::PDOpt::WithFluxes});
+                                    gas::prim::pressure, field::cell::energy>(
+          resolved_pkgs.get(), {}, {parthenon::PDOpt::WithFluxes});
   static auto desc_cons =
       parthenon::MakePackDescriptor<gas::cons::momentum, gas::cons::internal_energy>(
           resolved_pkgs.get());

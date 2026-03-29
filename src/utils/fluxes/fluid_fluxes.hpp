@@ -612,6 +612,13 @@ TaskStatus CalculateFluxesRiemannSelect(MeshData<Real> *md, PKG &pkg, PRIM vp, F
                                                         pcm);
   } else if (riemann_method == R::llf) {
     return CalculateFluxesReconSelect<G, F, C, R::llf>(md, pkg, vp, vflx, vface, vg, pcm);
+  } else if (riemann_method == R::hlld) {
+    if constexpr (F == Fluid::gas) {
+      return CalculateFluxesReconSelect<G, F, C, R::hlld>(md, pkg, vp, vflx, vface, vg,
+                                                          pcm);
+    } else {
+      PARTHENON_FAIL("HLLD solver only supports ideal MHD");
+    }
   } else {
     PARTHENON_FAIL("Riemann solver not recognized!");
   }

@@ -39,6 +39,7 @@ struct RiemannSolver {
 
 // Partial specializations
 #include "hllc.hpp"
+#include "hlld.hpp"
 #include "hlle.hpp"
 #include "llf.hpp"
 

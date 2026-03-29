@@ -64,6 +64,29 @@ ScaleMomentumFlux(parthenon::team_mbr_t const &member, const geometry::CoordPara
           q.flux(b, DIR, IVZ, k, j, i) *= hx[2];
         });
   }
+
+  return;
+}
+
+//----------------------------------------------------------------------------------------
+//! \fn  void ArtemisUtils::ScaleMHDFlux
+//! \brief Scales raw induction fluxes by scale factors associated with relevant coord sys
+template <Coordinates G, int DIR, typename V3, typename V4>
+KOKKOS_INLINE_FUNCTION void ScaleMHDFlux(parthenon::team_mbr_t const &member,
+                                         const geometry::CoordParams &cpars, const int b,
+                                         const int k, const int j, const int il,
+                                         const int iu, const V4 &vg, const V3 &p) {
+  if constexpr (G == Coordinates::cartesian) return;
+  PARTHENON_REQUIRE(DIR > 0 && DIR <= 3, "Invalid flux direction!");
+
+  parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, member, il, iu, [&](const int i) {
+    geometry::Coords<G> coords(cpars, p.GetCoordinates(b), k, j, i);
+    const auto &hx = coords.template GetScaleFactorsFace<DIR>(vg, b, k, j, i);
+    p.flux(b, DIR, field::cell::B(0), k, j, i) *= hx[0];
+    p.flux(b, DIR, field::cell::B(1), k, j, i) *= hx[1];
+    p.flux(b, DIR, field::cell::B(2), k, j, i) *= hx[2];
+  });
+
   return;
 }
 
@@ -157,6 +180,9 @@ TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, FLUX vflx,
 
         // Scale X1-momentum flux by appropriate scale factor for coord system
         ScaleMomentumFlux<G, F, X1DIR>(mbr, cpars, b, k, j, il, iu, vg, vflx);
+        if constexpr (F == Fluid::gas) {
+          if (do_mhd) ScaleMHDFlux<G, X1DIR>(mbr, cpars, b, k, j, il, iu, vg, vp);
+        }
       });
 
   // X2-Flux
@@ -208,6 +234,9 @@ TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, FLUX vflx,
 
               // Scale X2-momentum flux by appropriate scale factor for coord system
               ScaleMomentumFlux<G, F, X2DIR>(mbr, cpars, b, k, j, il, iu, vg, vflx);
+              if constexpr (F == Fluid::gas) {
+                if (do_mhd) ScaleMHDFlux<G, X2DIR>(mbr, cpars, b, k, j, il, iu, vg, vp);
+              }
             }
           }
         });
@@ -262,6 +291,9 @@ TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, FLUX vflx,
 
               // Scale X3-momentum flux by appropriate scale factor for coord system
               ScaleMomentumFlux<G, F, X3DIR>(mbr, cpars, b, k, j, il, iu, vg, vflx);
+              if constexpr (F == Fluid::gas) {
+                if (do_mhd) ScaleMHDFlux<G, X3DIR>(mbr, cpars, b, k, j, il, iu, vg, vp);
+              }
             }
           }
         });
@@ -271,18 +303,13 @@ TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, FLUX vflx,
 }
 
 //----------------------------------------------------------------------------------------
-//! \fn  TaskStatus ArtemisUtils::AssembleEdgeEMF
+//! \fn  TaskStatus ArtemisUtils::AssembleEdgeEMFImpl
 //! \brief Assemble unique edge EMFs from raw face induction fluxes on field::cell::B.
-inline TaskStatus AssembleEdgeEMF(MeshData<Real> *md) {
+template <Coordinates G, typename PACK, typename GEO>
+inline TaskStatus AssembleEdgeEMFImpl(MeshData<Real> *md, PACK v, GEO vg,
+                                      const geometry::CoordParams &cpars) {
   PARTHENON_INSTRUMENT
   auto pm = md->GetParentPointer();
-  auto &resolved_pkgs = pm->resolved_packages;
-  const auto do_mhd = pm->packages.Get("artemis")->template Param<bool>("do_mhd");
-  if (!do_mhd) return TaskStatus::complete;
-
-  static auto desc = MakePackDescriptor<field::cell::B, field::face::B>(
-      resolved_pkgs.get(), {}, {parthenon::PDOpt::WithFluxes});
-  const auto v = desc.GetPack(md);
 
   const auto ib = md->GetBoundsI(IndexDomain::interior);
   const auto jb = md->GetBoundsJ(IndexDomain::interior);
@@ -312,19 +339,28 @@ inline TaskStatus AssembleEdgeEMF(MeshData<Real> *md) {
         DEFAULT_LOOP_PATTERN, "AssembleEdgeEMF::E3", parthenon::DevExecSpace(), 0,
         md->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e + 1, ib.s, ib.e + 1,
         KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
+          geometry::Coords<G> coords(cpars, vg.GetCoordinates(b), k, j, i);
+          const auto hx1 = coords.template GetScaleFactorsFace<X1DIR>(vg, b, k, j, i);
+          const auto hx1_jm =
+              coords.template GetScaleFactorsFace<X1DIR>(vg, b, k, j - 1, i);
+          const auto hx2 = coords.template GetScaleFactorsFace<X2DIR>(vg, b, k, j, i);
+          const auto hx2_im =
+              coords.template GetScaleFactorsFace<X2DIR>(vg, b, k, j, i - 1);
           v.flux(b, TE::E3, field::face::B(), k, j, i) =
-              0.25 * (-v.flux(b, X1DIR, field::cell::B(1), k, j, i) -
-                      v.flux(b, X1DIR, field::cell::B(1), k, j - 1, i) +
-                      v.flux(b, X2DIR, field::cell::B(0), k, j, i) +
-                      v.flux(b, X2DIR, field::cell::B(0), k, j, i - 1));
+              0.25 * (-v.flux(b, X1DIR, field::cell::B(1), k, j, i) / hx1[1] -
+                      v.flux(b, X1DIR, field::cell::B(1), k, j - 1, i) / hx1_jm[1] +
+                      v.flux(b, X2DIR, field::cell::B(0), k, j, i) / hx2[0] +
+                      v.flux(b, X2DIR, field::cell::B(0), k, j, i - 1) / hx2_im[0]);
         });
   } else {
     parthenon::par_for(
         DEFAULT_LOOP_PATTERN, "AssembleEdgeEMF::E3", parthenon::DevExecSpace(), 0,
         md->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e + 1,
         KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
+          geometry::Coords<G> coords(cpars, vg.GetCoordinates(b), k, j, i);
+          const auto hx1 = coords.template GetScaleFactorsFace<X1DIR>(vg, b, k, j, i);
           v.flux(b, TE::E3, field::face::B(), k, j, i) =
-              -v.flux(b, X1DIR, field::cell::B(1), k, j, i);
+              -v.flux(b, X1DIR, field::cell::B(1), k, j, i) / hx1[1];
         });
   }
 
@@ -333,11 +369,18 @@ inline TaskStatus AssembleEdgeEMF(MeshData<Real> *md) {
         DEFAULT_LOOP_PATTERN, "AssembleEdgeEMF::E2", parthenon::DevExecSpace(), 0,
         md->NumBlocks() - 1, kb.s, kb.e + 1, jb.s, jb.e, ib.s, ib.e + 1,
         KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
+          geometry::Coords<G> coords(cpars, vg.GetCoordinates(b), k, j, i);
+          const auto hx1 = coords.template GetScaleFactorsFace<X1DIR>(vg, b, k, j, i);
+          const auto hx1_km =
+              coords.template GetScaleFactorsFace<X1DIR>(vg, b, k - 1, j, i);
+          const auto hx3 = coords.template GetScaleFactorsFace<X3DIR>(vg, b, k, j, i);
+          const auto hx3_im =
+              coords.template GetScaleFactorsFace<X3DIR>(vg, b, k, j, i - 1);
           v.flux(b, TE::E2, field::face::B(), k, j, i) =
-              0.25 * (v.flux(b, X1DIR, field::cell::B(2), k, j, i) +
-                      v.flux(b, X1DIR, field::cell::B(2), k - 1, j, i) -
-                      v.flux(b, X3DIR, field::cell::B(0), k, j, i) -
-                      v.flux(b, X3DIR, field::cell::B(0), k, j, i - 1));
+              0.25 * (v.flux(b, X1DIR, field::cell::B(2), k, j, i) / hx1[2] +
+                      v.flux(b, X1DIR, field::cell::B(2), k - 1, j, i) / hx1_km[2] -
+                      v.flux(b, X3DIR, field::cell::B(0), k, j, i) / hx3[0] -
+                      v.flux(b, X3DIR, field::cell::B(0), k, j, i - 1) / hx3_im[0]);
         });
 
     if (multi_d) {
@@ -345,11 +388,18 @@ inline TaskStatus AssembleEdgeEMF(MeshData<Real> *md) {
           DEFAULT_LOOP_PATTERN, "AssembleEdgeEMF::E1", parthenon::DevExecSpace(), 0,
           md->NumBlocks() - 1, kb.s, kb.e + 1, jb.s, jb.e + 1, ib.s, ib.e,
           KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
+            geometry::Coords<G> coords(cpars, vg.GetCoordinates(b), k, j, i);
+            const auto hx2 = coords.template GetScaleFactorsFace<X2DIR>(vg, b, k, j, i);
+            const auto hx2_km =
+                coords.template GetScaleFactorsFace<X2DIR>(vg, b, k - 1, j, i);
+            const auto hx3 = coords.template GetScaleFactorsFace<X3DIR>(vg, b, k, j, i);
+            const auto hx3_jm =
+                coords.template GetScaleFactorsFace<X3DIR>(vg, b, k, j - 1, i);
             v.flux(b, TE::E1, field::face::B(), k, j, i) =
-                0.25 * (-v.flux(b, X2DIR, field::cell::B(2), k, j, i) -
-                        v.flux(b, X2DIR, field::cell::B(2), k - 1, j, i) +
-                        v.flux(b, X3DIR, field::cell::B(1), k, j, i) +
-                        v.flux(b, X3DIR, field::cell::B(1), k, j - 1, i));
+                0.25 * (-v.flux(b, X2DIR, field::cell::B(2), k, j, i) / hx2[2] -
+                        v.flux(b, X2DIR, field::cell::B(2), k - 1, j, i) / hx2_km[2] +
+                        v.flux(b, X3DIR, field::cell::B(1), k, j, i) / hx3[1] +
+                        v.flux(b, X3DIR, field::cell::B(1), k, j - 1, i) / hx3_jm[1]);
           });
     }
   } else {
@@ -357,8 +407,10 @@ inline TaskStatus AssembleEdgeEMF(MeshData<Real> *md) {
         DEFAULT_LOOP_PATTERN, "AssembleEdgeEMF::E2", parthenon::DevExecSpace(), 0,
         md->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e + 1,
         KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
+          geometry::Coords<G> coords(cpars, vg.GetCoordinates(b), k, j, i);
+          const auto hx1 = coords.template GetScaleFactorsFace<X1DIR>(vg, b, k, j, i);
           v.flux(b, TE::E2, field::face::B(), k, j, i) =
-              v.flux(b, X1DIR, field::cell::B(2), k, j, i);
+              v.flux(b, X1DIR, field::cell::B(2), k, j, i) / hx1[2];
         });
 
     if (multi_d) {
@@ -366,13 +418,56 @@ inline TaskStatus AssembleEdgeEMF(MeshData<Real> *md) {
           DEFAULT_LOOP_PATTERN, "AssembleEdgeEMF::E1", parthenon::DevExecSpace(), 0,
           md->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e + 1, ib.s, ib.e,
           KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
+            geometry::Coords<G> coords(cpars, vg.GetCoordinates(b), k, j, i);
+            const auto hx2 = coords.template GetScaleFactorsFace<X2DIR>(vg, b, k, j, i);
             v.flux(b, TE::E1, field::face::B(), k, j, i) =
-                -v.flux(b, X2DIR, field::cell::B(2), k, j, i);
+                -v.flux(b, X2DIR, field::cell::B(2), k, j, i) / hx2[2];
           });
     }
   }
 
   return TaskStatus::complete;
+}
+
+//----------------------------------------------------------------------------------------
+//! \fn  TaskStatus ArtemisUtils::AssembleEdgeEMF
+//! \brief Runtime dispatch for geometry-aware edge EMF assembly.
+inline TaskStatus AssembleEdgeEMF(MeshData<Real> *md) {
+  PARTHENON_INSTRUMENT
+  auto pm = md->GetParentPointer();
+  auto &resolved_pkgs = pm->resolved_packages;
+  const auto &artemis_pkg = pm->packages.Get("artemis");
+  const auto do_mhd = artemis_pkg->template Param<bool>("do_mhd");
+  if (!do_mhd) return TaskStatus::complete;
+
+  static auto desc = MakePackDescriptor<field::cell::B, field::face::B>(
+      resolved_pkgs.get(), {}, {parthenon::PDOpt::WithFluxes});
+  static auto desc_g =
+      MakePackDescriptor<geom::x1v, geom::x2v, geom::x3v, geom::dx1, geom::dx2, geom::dx3,
+                         geom::hx1f1, geom::hx2f1, geom::hx3f1, geom::hx1f2, geom::hx2f2,
+                         geom::hx3f2, geom::hx1f3, geom::hx2f3, geom::hx3f3>(
+          resolved_pkgs.get());
+  const auto v = desc.GetPack(md);
+  const auto vg = desc_g.GetPack(md);
+
+  const auto sys = artemis_pkg->template Param<Coordinates>("coords");
+  const auto &cpars = artemis_pkg->template Param<geometry::CoordParams>("coord_params");
+  typedef Coordinates G;
+  if (sys == G::cartesian) {
+    return AssembleEdgeEMFImpl<G::cartesian>(md, v, vg, cpars);
+  } else if (sys == G::spherical3D) {
+    return AssembleEdgeEMFImpl<G::spherical3D>(md, v, vg, cpars);
+  } else if (sys == G::spherical1D) {
+    return AssembleEdgeEMFImpl<G::spherical1D>(md, v, vg, cpars);
+  } else if (sys == G::spherical2D) {
+    return AssembleEdgeEMFImpl<G::spherical2D>(md, v, vg, cpars);
+  } else if (sys == G::cylindrical) {
+    return AssembleEdgeEMFImpl<G::cylindrical>(md, v, vg, cpars);
+  } else if (sys == G::axisymmetric) {
+    return AssembleEdgeEMFImpl<G::axisymmetric>(md, v, vg, cpars);
+  } else {
+    PARTHENON_FAIL("Coordinate type not recognized!");
+  }
 }
 
 //----------------------------------------------------------------------------------------
@@ -467,6 +562,7 @@ TaskStatus FluxSourceImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, CONS vcons, FAC
 
         // Add the "flux source terms"
         for (int n = 0; n < nspecies; ++n) {
+          const bool mhd = (F == Fluid::gas) && do_mhd && (n == 0);
           const int IMX = VI(n, 0);
           const int IMY = VI(n, 1);
           const int IMZ = VI(n, 2);
@@ -477,7 +573,7 @@ TaskStatus FluxSourceImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, CONS vcons, FAC
           const int IEG = nspecies * 3 + n; // may not be used
 
           // Pressure gradient force for gas and radiation
-          if constexpr (F == Fluid::gas || F == Fluid::radiation) {
+          if constexpr (F == Fluid::radiation) {
             // Pressure gradient force
             vc_(b, IMX, k, j, i) += dtdx[0] * (vp_.flux(b, d1, IPR, k, j, i) -
                                                vp_.flux(b, d1, IPR, k, j, i + 1));
@@ -485,24 +581,26 @@ TaskStatus FluxSourceImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, CONS vcons, FAC
                                                vp_.flux(b, d2, IPR, k, j + multi_d, i));
             vc_(b, IMZ, k, j, i) += dtdx[2] * (vp_.flux(b, d3, IPR, k, j, i) -
                                                vp_.flux(b, d3, IPR, k + three_d, j, i));
-          }
+          } else if constexpr (F == Fluid::gas) {
+            // Pressure gradient force
+            Real Pl = vp_.flux(b, d1, IPR, k, j, i) +
+                      (mhd)*vp_.flux(b, d1, field::cell::energy(), k, j, i);
+            Real Pr = vp_.flux(b, d1, IPR, k, j, i + 1) +
+                      (mhd)*vp_.flux(b, d1, field::cell::energy(), k, j, i + 1);
+            vc_(b, IMX, k, j, i) += dtdx[0] * (Pl - Pr);
 
-          if constexpr (F == Fluid::gas) {
-            if (do_mhd) {
-              vc_(b, IMX, k, j, i) +=
-                  dtdx[0] * (vp_.flux(b, d1, field::cell::energy(), k, j, i) -
-                             vp_.flux(b, d1, field::cell::energy(), k, j, i + 1));
-              vc_(b, IMY, k, j, i) +=
-                  dtdx[1] * (vp_.flux(b, d2, field::cell::energy(), k, j, i) -
-                             vp_.flux(b, d2, field::cell::energy(), k, j + multi_d, i));
-              vc_(b, IMZ, k, j, i) +=
-                  dtdx[2] * (vp_.flux(b, d3, field::cell::energy(), k, j, i) -
-                             vp_.flux(b, d3, field::cell::energy(), k + three_d, j, i));
-            }
-          }
+            Pl = vp_.flux(b, d2, IPR, k, j, i) +
+                 (mhd)*vp_.flux(b, d2, field::cell::energy(), k, j, i);
+            Pr = vp_.flux(b, d2, IPR, k, j + multi_d, i) +
+                 (mhd)*vp_.flux(b, d2, field::cell::energy(), k, j + multi_d, i);
+            vc_(b, IMY, k, j, i) += dtdx[1] * (Pl - Pr);
 
-          // pdV source for gas internal energy equation
-          if constexpr (F == Fluid::gas) {
+            Pl = vp_.flux(b, d3, IPR, k, j, i) +
+                 (mhd)*vp_.flux(b, d3, field::cell::energy(), k, j, i);
+            Pr = vp_.flux(b, d3, IPR, k + three_d, j, i) +
+                 (mhd)*vp_.flux(b, d3, field::cell::energy(), k + three_d, j, i);
+            vc_(b, IMZ, k, j, i) += dtdx[2] * (Pl - Pr);
+
             // pdV source term
             const auto &ax1 = coords.GetFaceAreaX1(vg, b, k, j, i);
             const auto &ax2 = coords.GetFaceAreaX2(vg, b, k, j, i);
@@ -542,17 +640,32 @@ TaskStatus FluxSourceImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, CONS vcons, FAC
               const Real ff = std::sqrt(SQR(fx) + SQR(fy) + SQR(fz));
               const Real chi = Moments::ThriceEddingtonFactor<C>(ff);
               wdt *= ((chi - 1.) / (ff + Fuzz<Real>())) * hcchat_;
+            } else if constexpr (F == Fluid::gas) {
+              // Update momenta with mhd
+              const Real t1 = SQR(vp_(b, IVX, k, j, i) + rfv[0]) -
+                              (mhd)*SQR(vp_(b, field::cell::B(0), k, j, i));
+              const Real t2 = SQR(vp_(b, IVY, k, j, i) + rfv[1]) -
+                              (mhd)*SQR(vp_(b, field::cell::B(1), k, j, i));
+              const Real t3 = SQR(vp_(b, IVZ, k, j, i) + rfv[2]) -
+                              (mhd)*SQR(vp_(b, field::cell::B(2), k, j, i));
+              vc_(b, IMX, k, j, i) +=
+                  x1dep_ * wdt * (dh1[0] * t1 + dh1[1] * t2 + dh1[2] * t3);
+              vc_(b, IMY, k, j, i) +=
+                  x2dep_ * wdt * (dh2[0] * t1 + dh2[1] * t2 + dh2[2] * t3);
+              vc_(b, IMZ, k, j, i) +=
+                  x3dep_ * wdt * (dh3[0] * t1 + dh3[1] * t2 + dh3[2] * t3);
+            } else {
+              // Update momenta
+              const Real t1 = SQR(vp_(b, IVX, k, j, i) + rfv[0]);
+              const Real t2 = SQR(vp_(b, IVY, k, j, i) + rfv[1]);
+              const Real t3 = SQR(vp_(b, IVZ, k, j, i) + rfv[2]);
+              vc_(b, IMX, k, j, i) +=
+                  x1dep_ * wdt * (dh1[0] * t1 + dh1[1] * t2 + dh1[2] * t3);
+              vc_(b, IMY, k, j, i) +=
+                  x2dep_ * wdt * (dh2[0] * t1 + dh2[1] * t2 + dh2[2] * t3);
+              vc_(b, IMZ, k, j, i) +=
+                  x3dep_ * wdt * (dh3[0] * t1 + dh3[1] * t2 + dh3[2] * t3);
             }
-
-            // Update momenta
-            // clang-format off
-            const Real t1 = SQR(vp_(b, IVX, k, j, i) + rfv[0]);
-            const Real t2 = SQR(vp_(b, IVY, k, j, i) + rfv[1]);
-            const Real t3 = SQR(vp_(b, IVZ, k, j, i) + rfv[2]);
-            vc_(b, IMX, k, j, i) += x1dep_ * wdt * (dh1[0]*t1 + dh1[1]*t2 + dh1[2]*t3);
-            vc_(b, IMY, k, j, i) += x2dep_ * wdt * (dh2[0]*t1 + dh2[1]*t2 + dh2[2]*t3);
-            vc_(b, IMZ, k, j, i) += x3dep_ * wdt * (dh3[0]*t1 + dh3[1]*t2 + dh3[2]*t3);
-            // clang-format on
           }
         }
       });

@@ -125,6 +125,14 @@ TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, FLUX vflx,
   // X1-Flux
   int il = ib.s, iu = ib.e + 1;
   int jl = jb.s, ju = jb.e, kl = kb.s, ku = kb.e;
+  if constexpr (F == Fluid::gas) {
+    if (do_mhd) {
+      jl -= multi_d;
+      ju += multi_d;
+      kl -= three_d;
+      ku += three_d;
+    }
+  }
   parthenon::par_for_outer(
       DEFAULT_OUTER_LOOP_PATTERN, "CalculateFluxes::X1-Flux", DevExecSpace(), scr_size,
       scr_level, 0, md->NumBlocks() - 1, kl, ku, jl, ju,
@@ -155,6 +163,14 @@ TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, FLUX vflx,
   if (multi_d) {
     jl = jb.s - 1, ju = jb.e + 1;
     il = ib.s, iu = ib.e, kl = kb.s, ku = kb.e;
+    if constexpr (F == Fluid::gas) {
+      if (do_mhd) {
+        il -= 1;
+        iu += 1;
+        kl -= three_d;
+        ku += three_d;
+      }
+    }
     scr_size = ScratchPad2D<Real>::shmem_size(nvars, ncells1) * 3;
     parthenon::par_for_outer(
         DEFAULT_OUTER_LOOP_PATTERN, "CalculateFluxes::X2-Flux", DevExecSpace(), scr_size,
@@ -201,6 +217,14 @@ TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, FLUX vflx,
   if (three_d) {
     kl = kb.s - 1, ku = kb.e + 1;
     il = ib.s, iu = ib.e, jl = jb.s, ju = jb.e;
+    if constexpr (F == Fluid::gas) {
+      if (do_mhd) {
+        il -= 1;
+        iu += 1;
+        jl -= 1;
+        ju += 1;
+      }
+    }
     scr_size = ScratchPad2D<Real>::shmem_size(nvars, ncells1) * 3;
     parthenon::par_for_outer(
         DEFAULT_OUTER_LOOP_PATTERN, "Hydro::X3-Flux", DevExecSpace(), scr_size, scr_level,
@@ -288,15 +312,11 @@ inline TaskStatus AssembleEdgeEMF(MeshData<Real> *md) {
         DEFAULT_LOOP_PATTERN, "AssembleEdgeEMF::E3", parthenon::DevExecSpace(), 0,
         md->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e + 1, ib.s, ib.e + 1,
         KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
-          const int j0 = j - (j > jb.e);
-          const int jm = j - (j > jb.s);
-          const int i0 = i - (i > ib.e);
-          const int im = i - (i > ib.s);
           v.flux(b, TE::E3, field::face::B(), k, j, i) =
-              0.25 * (-v.flux(b, X1DIR, field::cell::B(1), k, j0, i) -
-                      v.flux(b, X1DIR, field::cell::B(1), k, jm, i) +
-                      v.flux(b, X2DIR, field::cell::B(0), k, j, i0) +
-                      v.flux(b, X2DIR, field::cell::B(0), k, j, im));
+              0.25 * (-v.flux(b, X1DIR, field::cell::B(1), k, j, i) -
+                      v.flux(b, X1DIR, field::cell::B(1), k, j - 1, i) +
+                      v.flux(b, X2DIR, field::cell::B(0), k, j, i) +
+                      v.flux(b, X2DIR, field::cell::B(0), k, j, i - 1));
         });
   } else {
     parthenon::par_for(
@@ -313,15 +333,11 @@ inline TaskStatus AssembleEdgeEMF(MeshData<Real> *md) {
         DEFAULT_LOOP_PATTERN, "AssembleEdgeEMF::E2", parthenon::DevExecSpace(), 0,
         md->NumBlocks() - 1, kb.s, kb.e + 1, jb.s, jb.e, ib.s, ib.e + 1,
         KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
-          const int k0 = k - (k > kb.e);
-          const int km = k - (k > kb.s);
-          const int i0 = i - (i > ib.e);
-          const int im = i - (i > ib.s);
           v.flux(b, TE::E2, field::face::B(), k, j, i) =
-              0.25 * (v.flux(b, X1DIR, field::cell::B(2), k0, j, i) +
-                      v.flux(b, X1DIR, field::cell::B(2), km, j, i) -
-                      v.flux(b, X3DIR, field::cell::B(0), k, j, i0) -
-                      v.flux(b, X3DIR, field::cell::B(0), k, j, im));
+              0.25 * (v.flux(b, X1DIR, field::cell::B(2), k, j, i) +
+                      v.flux(b, X1DIR, field::cell::B(2), k - 1, j, i) -
+                      v.flux(b, X3DIR, field::cell::B(0), k, j, i) -
+                      v.flux(b, X3DIR, field::cell::B(0), k, j, i - 1));
         });
 
     if (multi_d) {
@@ -329,15 +345,11 @@ inline TaskStatus AssembleEdgeEMF(MeshData<Real> *md) {
           DEFAULT_LOOP_PATTERN, "AssembleEdgeEMF::E1", parthenon::DevExecSpace(), 0,
           md->NumBlocks() - 1, kb.s, kb.e + 1, jb.s, jb.e + 1, ib.s, ib.e,
           KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
-            const int k0 = k - (k > kb.e);
-            const int km = k - (k > kb.s);
-            const int j0 = j - (j > jb.e);
-            const int jm = j - (j > jb.s);
             v.flux(b, TE::E1, field::face::B(), k, j, i) =
-                0.25 * (-v.flux(b, X2DIR, field::cell::B(2), k0, j, i) -
-                        v.flux(b, X2DIR, field::cell::B(2), km, j, i) +
-                        v.flux(b, X3DIR, field::cell::B(1), k, j0, i) +
-                        v.flux(b, X3DIR, field::cell::B(1), k, jm, i));
+                0.25 * (-v.flux(b, X2DIR, field::cell::B(2), k, j, i) -
+                        v.flux(b, X2DIR, field::cell::B(2), k - 1, j, i) +
+                        v.flux(b, X3DIR, field::cell::B(1), k, j, i) +
+                        v.flux(b, X3DIR, field::cell::B(1), k, j - 1, i));
           });
     }
   } else {

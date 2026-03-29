@@ -207,7 +207,7 @@ inline void ShockInnerX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse)
   static auto descriptors =
       ArtemisUtils::GetBoundaryPackDescriptorMap<gas::prim::density, gas::prim::velocity,
                                                  gas::prim::sie, rad::prim::energy,
-                                                 rad::prim::flux>(mbd);
+                                                 rad::prim::flux, field::cell::B>(mbd);
   auto v = descriptors[coarse].GetPack(mbd.get());
   if (v.GetMaxNumberOfVars() == 0) return;
   static auto descriptors_b =
@@ -229,6 +229,11 @@ inline void ShockInnerX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse)
           v(0, gas::prim::velocity(VI(n, 1)), k, j, i) = 0.0;
           v(0, gas::prim::velocity(VI(n, 2)), k, j, i) = 0.0;
           v(0, gas::prim::sie(n), k, j, i) = sie;
+        }
+        if (do_mhd) {
+          v(0, TE::CC, field::cell::B(0), k, j, i) = shkp.bx;
+          v(0, TE::CC, field::cell::B(1), k, j, i) = shkp.byl;
+          v(0, TE::CC, field::cell::B(2), k, j, i) = shkp.bzl;
         }
         if (do_moment) {
           for (int n = 0; n < v.GetSize(0, rad::prim::energy()); ++n) {
@@ -284,7 +289,7 @@ inline void ShockOuterX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse)
   static auto descriptors =
       ArtemisUtils::GetBoundaryPackDescriptorMap<gas::prim::density, gas::prim::velocity,
                                                  gas::prim::sie, rad::prim::energy,
-                                                 rad::prim::flux>(mbd);
+                                                 rad::prim::flux, field::cell::B>(mbd);
   auto v = descriptors[coarse].GetPack(mbd.get());
   if (v.GetMaxNumberOfVars() == 0) return;
   static auto descriptors_b =
@@ -305,6 +310,11 @@ inline void ShockOuterX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse)
           v(0, gas::prim::velocity(VI(n, 1)), k, j, i) = 0.0;
           v(0, gas::prim::velocity(VI(n, 2)), k, j, i) = 0.0;
           v(0, gas::prim::sie(n), k, j, i) = sie;
+        }
+        if (do_mhd) {
+          v(0, TE::CC, field::cell::B(0), k, j, i) = shkp.bx;
+          v(0, TE::CC, field::cell::B(1), k, j, i) = shkp.byr;
+          v(0, TE::CC, field::cell::B(2), k, j, i) = shkp.bzr;
         }
         if (do_moment) {
           for (int n = 0; n < v.GetSize(0, rad::prim::energy()); ++n) {

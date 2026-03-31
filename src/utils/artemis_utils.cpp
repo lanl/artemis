@@ -223,6 +223,160 @@ void EnrollArtemisRefinementOps(parthenon::Metadata &m, Coordinates coords,
 }
 
 //----------------------------------------------------------------------------------------
+//! \fn void ArtemisUtils::EnrollArtemisFaceRefinementOps
+//! \brief Registers custom face-centered prolongation and restriction operators.
+void EnrollArtemisFaceRefinementOps(parthenon::Metadata &m, Coordinates coords,
+                                    const bool log, const bool use_minmod_slope) {
+  typedef Coordinates G;
+
+  if (coords == G::cartesian) {
+    if (use_minmod_slope) {
+      m.RegisterRefinementOps<
+          ArtemisUtils::ProlongateShared<G::cartesian, false, true>,
+          ArtemisUtils::RestrictAverage<G::cartesian, false>,
+          ArtemisUtils::ProlongateInternalTothAndRoe<G::cartesian, false>>();
+    } else {
+      m.RegisterRefinementOps<
+          ArtemisUtils::ProlongateShared<G::cartesian, false, false>,
+          ArtemisUtils::RestrictAverage<G::cartesian, false>,
+          ArtemisUtils::ProlongateInternalTothAndRoe<G::cartesian, false>>();
+    }
+  } else if (coords == G::spherical1D) {
+    if (log) {
+      if (use_minmod_slope) {
+        m.RegisterRefinementOps<
+            ArtemisUtils::ProlongateShared<G::spherical1D, true, true>,
+            ArtemisUtils::RestrictAverage<G::spherical1D, true>,
+            ArtemisUtils::ProlongateInternalTothAndRoe<G::spherical1D, true>>();
+      } else {
+        m.RegisterRefinementOps<
+            ArtemisUtils::ProlongateShared<G::spherical1D, true, false>,
+            ArtemisUtils::RestrictAverage<G::spherical1D, true>,
+            ArtemisUtils::ProlongateInternalTothAndRoe<G::spherical1D, true>>();
+      }
+    } else {
+      if (use_minmod_slope) {
+        m.RegisterRefinementOps<
+            ArtemisUtils::ProlongateShared<G::spherical1D, false, true>,
+            ArtemisUtils::RestrictAverage<G::spherical1D, false>,
+            ArtemisUtils::ProlongateInternalTothAndRoe<G::spherical1D, false>>();
+      } else {
+        m.RegisterRefinementOps<
+            ArtemisUtils::ProlongateShared<G::spherical1D, false, false>,
+            ArtemisUtils::RestrictAverage<G::spherical1D, false>,
+            ArtemisUtils::ProlongateInternalTothAndRoe<G::spherical1D, false>>();
+      }
+    }
+  } else if (coords == G::spherical2D) {
+    if (log) {
+      if (use_minmod_slope) {
+        m.RegisterRefinementOps<
+            ArtemisUtils::ProlongateShared<G::spherical2D, true, true>,
+            ArtemisUtils::RestrictAverage<G::spherical2D, true>,
+            ArtemisUtils::ProlongateInternalTothAndRoe<G::spherical2D, true>>();
+      } else {
+        m.RegisterRefinementOps<
+            ArtemisUtils::ProlongateShared<G::spherical2D, true, false>,
+            ArtemisUtils::RestrictAverage<G::spherical2D, true>,
+            ArtemisUtils::ProlongateInternalTothAndRoe<G::spherical2D, true>>();
+      }
+    } else {
+      if (use_minmod_slope) {
+        m.RegisterRefinementOps<
+            ArtemisUtils::ProlongateShared<G::spherical2D, false, true>,
+            ArtemisUtils::RestrictAverage<G::spherical2D, false>,
+            ArtemisUtils::ProlongateInternalTothAndRoe<G::spherical2D, false>>();
+      } else {
+        m.RegisterRefinementOps<
+            ArtemisUtils::ProlongateShared<G::spherical2D, false, false>,
+            ArtemisUtils::RestrictAverage<G::spherical2D, false>,
+            ArtemisUtils::ProlongateInternalTothAndRoe<G::spherical2D, false>>();
+      }
+    }
+  } else if (coords == G::spherical3D) {
+    if (log) {
+      if (use_minmod_slope) {
+        m.RegisterRefinementOps<
+            ArtemisUtils::ProlongateShared<G::spherical3D, true, true>,
+            ArtemisUtils::RestrictAverage<G::spherical3D, true>,
+            ArtemisUtils::ProlongateInternalTothAndRoe<G::spherical3D, true>>();
+      } else {
+        m.RegisterRefinementOps<
+            ArtemisUtils::ProlongateShared<G::spherical3D, true, false>,
+            ArtemisUtils::RestrictAverage<G::spherical3D, true>,
+            ArtemisUtils::ProlongateInternalTothAndRoe<G::spherical3D, true>>();
+      }
+    } else {
+      if (use_minmod_slope) {
+        m.RegisterRefinementOps<
+            ArtemisUtils::ProlongateShared<G::spherical3D, false, true>,
+            ArtemisUtils::RestrictAverage<G::spherical3D, false>,
+            ArtemisUtils::ProlongateInternalTothAndRoe<G::spherical3D, false>>();
+      } else {
+        m.RegisterRefinementOps<
+            ArtemisUtils::ProlongateShared<G::spherical3D, false, false>,
+            ArtemisUtils::RestrictAverage<G::spherical3D, false>,
+            ArtemisUtils::ProlongateInternalTothAndRoe<G::spherical3D, false>>();
+      }
+    }
+  } else if (coords == G::cylindrical) {
+    if (log) {
+      if (use_minmod_slope) {
+        m.RegisterRefinementOps<
+            ArtemisUtils::ProlongateShared<G::cylindrical, true, true>,
+            ArtemisUtils::RestrictAverage<G::cylindrical, true>,
+            ArtemisUtils::ProlongateInternalTothAndRoe<G::cylindrical, true>>();
+      } else {
+        m.RegisterRefinementOps<
+            ArtemisUtils::ProlongateShared<G::cylindrical, true, false>,
+            ArtemisUtils::RestrictAverage<G::cylindrical, true>,
+            ArtemisUtils::ProlongateInternalTothAndRoe<G::cylindrical, true>>();
+      }
+    } else {
+      if (use_minmod_slope) {
+        m.RegisterRefinementOps<
+            ArtemisUtils::ProlongateShared<G::cylindrical, false, true>,
+            ArtemisUtils::RestrictAverage<G::cylindrical, false>,
+            ArtemisUtils::ProlongateInternalTothAndRoe<G::cylindrical, false>>();
+      } else {
+        m.RegisterRefinementOps<
+            ArtemisUtils::ProlongateShared<G::cylindrical, false, false>,
+            ArtemisUtils::RestrictAverage<G::cylindrical, false>,
+            ArtemisUtils::ProlongateInternalTothAndRoe<G::cylindrical, false>>();
+      }
+    }
+  } else if (coords == G::axisymmetric) {
+    if (log) {
+      if (use_minmod_slope) {
+        m.RegisterRefinementOps<
+            ArtemisUtils::ProlongateShared<G::axisymmetric, true, true>,
+            ArtemisUtils::RestrictAverage<G::axisymmetric, true>,
+            ArtemisUtils::ProlongateInternalTothAndRoe<G::axisymmetric, true>>();
+      } else {
+        m.RegisterRefinementOps<
+            ArtemisUtils::ProlongateShared<G::axisymmetric, true, false>,
+            ArtemisUtils::RestrictAverage<G::axisymmetric, true>,
+            ArtemisUtils::ProlongateInternalTothAndRoe<G::axisymmetric, true>>();
+      }
+    } else {
+      if (use_minmod_slope) {
+        m.RegisterRefinementOps<
+            ArtemisUtils::ProlongateShared<G::axisymmetric, false, true>,
+            ArtemisUtils::RestrictAverage<G::axisymmetric, false>,
+            ArtemisUtils::ProlongateInternalTothAndRoe<G::axisymmetric, false>>();
+      } else {
+        m.RegisterRefinementOps<
+            ArtemisUtils::ProlongateShared<G::axisymmetric, false, false>,
+            ArtemisUtils::RestrictAverage<G::axisymmetric, false>,
+            ArtemisUtils::ProlongateInternalTothAndRoe<G::axisymmetric, false>>();
+      }
+    }
+  } else {
+    PARTHENON_FAIL("Invalid artemis/coordinate system!");
+  }
+}
+
+//----------------------------------------------------------------------------------------
 //! \fn  std::vector<std::vector<Real>> NBody::loadtxt
 //! \brief
 std::vector<std::vector<Real>> loadtxt(std::string fname) {

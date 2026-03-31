@@ -32,11 +32,36 @@
 #include "geometry/geometry.hpp"
 
 namespace ArtemisUtils {
+template <Coordinates C, int DIM, TopologicalElement EL>
+KOKKOS_FORCEINLINE_FUNCTION Real GetCoordinate(const geometry::Coords<C> &coords) {
+  static_assert(DIM >= 1 && DIM <= 3, "Invalid dimension!");
+  if constexpr (EL == TE::CC) {
+    if constexpr (DIM == 1) {
+      return coords.x1v();
+    } else if constexpr (DIM == 2) {
+      return coords.x2v();
+    }
+    return coords.x3v();
+  } else if constexpr (EL == TE::F1) {
+    const auto xf = coords.FaceCenX1(geometry::CellFace::lower);
+    return xf[DIM - 1];
+  } else if constexpr (EL == TE::F2) {
+    const auto xf = coords.FaceCenX2(geometry::CellFace::lower);
+    return xf[DIM - 1];
+  } else if constexpr (EL == TE::F3) {
+    const auto xf = coords.FaceCenX3(geometry::CellFace::lower);
+    return xf[DIM - 1];
+  }
+  PARTHENON_FAIL(
+      "Artemis prolongation only supports cell-centered and face-centered fields!");
+  return 0.0;
+}
+
 //----------------------------------------------------------------------------------------
 //! \fn  void ArtemisUtils::GetGridSpacings
 //! \brief compute distances from cell center to the nearest center in the + or -
 //!        coordinate direction. Do so for both coarse and fine grids.
-template <Coordinates C, int DIM>
+template <Coordinates C, int DIM, TopologicalElement EL>
 KOKKOS_FORCEINLINE_FUNCTION void
 GetGridSpacings(const Coordinates_t &coords, const Coordinates_t &coarse_coords,
                 const bool log, int k, int j, int i, int fk, int fj, int fi, Real *dxm,
@@ -49,16 +74,11 @@ GetGridSpacings(const Coordinates_t &coords, const Coordinates_t &coarse_coords,
   gg::Coords<C> cp(log, coarse_coords, k + (DIM == 3), j + (DIM == 2), i + (DIM == 1));
   gg::Coords<C> fm(log, coords, fk, fj, fi);
   gg::Coords<C> fp(log, coords, fk + (DIM == 3), fj + (DIM == 2), fi + (DIM == 1));
-  if constexpr (DIM == 1) {
-    xm = cm.x1v(), xc = cc.x1v(), xp = cp.x1v();
-    fxm = fm.x1v(), fxp = fp.x1v();
-  } else if constexpr (DIM == 2) {
-    xm = cm.x2v(), xc = cc.x2v(), xp = cp.x2v();
-    fxm = fm.x2v(), fxp = fp.x2v();
-  } else if constexpr (DIM == 3) {
-    xm = cm.x3v(), xc = cc.x3v(), xp = cp.x3v();
-    fxm = fm.x3v(), fxp = fp.x3v();
-  }
+  xm = ArtemisUtils::GetCoordinate<C, DIM, EL>(cm);
+  xc = ArtemisUtils::GetCoordinate<C, DIM, EL>(cc);
+  xp = ArtemisUtils::GetCoordinate<C, DIM, EL>(cp);
+  fxm = ArtemisUtils::GetCoordinate<C, DIM, EL>(fm);
+  fxp = ArtemisUtils::GetCoordinate<C, DIM, EL>(fp);
   *dxm = xc - xm;
   *dxp = xp - xc;
   *dxfm = xc - fxm;
@@ -95,7 +115,9 @@ struct ProlongateShared {
      const Coordinates_t &coords, const Coordinates_t &coarse_coords,
      const ParArrayND<Real, VariableState> *pcoarse,
      const ParArrayND<Real, VariableState> *pfine) {
-    PARTHENON_REQUIRE((el == TE::CC), "Artemis AMR only supports cell-centered fields!");
+    PARTHENON_REQUIRE(
+        el == TE::CC || el == TE::F1 || el == TE::F2 || el == TE::F3,
+        "Artemis AMR only supports cell-centered and face-centered fields!");
 
     auto &coarse = *pcoarse;
     auto &fine = *pfine;
@@ -106,9 +128,12 @@ struct ProlongateShared {
     const int fj = (DIM > 1) ? (j - cjb.s) * 2 + jb.s : jb.s;
     const int fk = (DIM > 2) ? (k - ckb.s) * 2 + kb.s : kb.s;
 
-    constexpr bool INCLUDE_X1 = (DIM > 0);
-    constexpr bool INCLUDE_X2 = (DIM > 1);
-    constexpr bool INCLUDE_X3 = (DIM > 2);
+    constexpr bool INCLUDE_X1 =
+        (DIM > 0) && (el == TE::CC || el == TE::F2 || el == TE::F3);
+    constexpr bool INCLUDE_X2 =
+        (DIM > 1) && (el == TE::CC || el == TE::F3 || el == TE::F1);
+    constexpr bool INCLUDE_X3 =
+        (DIM > 2) && (el == TE::CC || el == TE::F1 || el == TE::F2);
 
     const Real fc = coarse(element_idx, l, m, n, k, j, i);
 
@@ -117,8 +142,8 @@ struct ProlongateShared {
     [[maybe_unused]] Real gx1m = 0, gx1p = 0;
     if constexpr (INCLUDE_X1) {
       Real dx1m, dx1p;
-      ArtemisUtils::GetGridSpacings<GEOM, 1>(coords, coarse_coords, log, k, j, i, fk, fj,
-                                             fi, &dx1m, &dx1p, &dx1fm, &dx1fp);
+      ArtemisUtils::GetGridSpacings<GEOM, 1, el>(coords, coarse_coords, log, k, j, i, fk,
+                                                 fj, fi, &dx1m, &dx1p, &dx1fm, &dx1fp);
 
       Real gx1c = ArtemisUtils::GradMinMod(fc, coarse(element_idx, l, m, n, k, j, i - 1),
                                            coarse(element_idx, l, m, n, k, j, i + 1),
@@ -134,8 +159,8 @@ struct ProlongateShared {
     [[maybe_unused]] Real gx2m = 0, gx2p = 0;
     if constexpr (INCLUDE_X2) {
       Real dx2m, dx2p;
-      ArtemisUtils::GetGridSpacings<GEOM, 2>(coords, coarse_coords, log, k, j, i, fk, fj,
-                                             fi, &dx2m, &dx2p, &dx2fm, &dx2fp);
+      ArtemisUtils::GetGridSpacings<GEOM, 2, el>(coords, coarse_coords, log, k, j, i, fk,
+                                                 fj, fi, &dx2m, &dx2p, &dx2fm, &dx2fp);
       Real gx2c = ArtemisUtils::GradMinMod(fc, coarse(element_idx, l, m, n, k, j - 1, i),
                                            coarse(element_idx, l, m, n, k, j + 1, i),
                                            dx2m, dx2p, gx2m, gx2p);
@@ -150,8 +175,8 @@ struct ProlongateShared {
     [[maybe_unused]] Real gx3m = 0, gx3p = 0;
     if constexpr (INCLUDE_X3) {
       Real dx3m, dx3p;
-      ArtemisUtils::GetGridSpacings<GEOM, 3>(coords, coarse_coords, log, k, j, i, fk, fj,
-                                             fi, &dx3m, &dx3p, &dx3fm, &dx3fp);
+      ArtemisUtils::GetGridSpacings<GEOM, 3, el>(coords, coarse_coords, log, k, j, i, fk,
+                                                 fj, fi, &dx3m, &dx3p, &dx3fm, &dx3fp);
       Real gx3c = ArtemisUtils::GradMinMod(fc, coarse(element_idx, l, m, n, k - 1, j, i),
                                            coarse(element_idx, l, m, n, k + 1, j, i),
                                            dx3m, dx3p, gx3m, gx3p);
@@ -186,6 +211,89 @@ struct ProlongateShared {
     if constexpr (INCLUDE_X3 && INCLUDE_X2 && INCLUDE_X1)
       fine(element_idx, l, m, n, fk + 1, fj + 1, fi + 1) =
           fc + (gx1p * dx1fp + gx2p * dx2fp + gx3p * dx3fp);
+  }
+};
+
+//----------------------------------------------------------------------------------------
+//! \struct  ArtemisUtils::ProlongateInternalTothAndRoe
+//! \brief Geometry-aware, divergence-preserving prolongation to internal faces.
+template <Coordinates GEOM, bool log>
+struct ProlongateInternalTothAndRoe {
+  static constexpr bool OperationRequired(TopologicalElement fel,
+                                          TopologicalElement cel) {
+    return (cel == TE::CC) && (fel == TE::F1 || fel == TE::F2 || fel == TE::F3);
+  }
+
+  template <int DIM, TopologicalElement fel = TopologicalElement::CC,
+            TopologicalElement cel = TopologicalElement::CC>
+  KOKKOS_FORCEINLINE_FUNCTION static void
+  Do(const int l, const int m, const int n, const int k, const int j, const int i,
+     const IndexRange &ckb, const IndexRange &cjb, const IndexRange &cib,
+     const IndexRange &kb, const IndexRange &jb, const IndexRange &ib,
+     const Coordinates_t &coords, const Coordinates_t &coarse_coords,
+     const ParArrayND<Real, VariableState> *,
+     const ParArrayND<Real, VariableState> *pfine) {
+    if constexpr (!(cel == TE::CC && (fel == TE::F1 || fel == TE::F2 || fel == TE::F3))) {
+      return;
+    } else {
+      const int fi = (DIM > 0) ? (i - cib.s) * 2 + ib.s : ib.s;
+      const int fj = (DIM > 1) ? (j - cjb.s) * 2 + jb.s : jb.s;
+      const int fk = (DIM > 2) ? (k - ckb.s) * 2 + kb.s : kb.s;
+
+      constexpr int element_idx = static_cast<int>(fel) % 3;
+      auto &fine = *pfine;
+
+      auto get_fine_permuted = [&](int eidx, int ok, int oj, int oi) -> Real & {
+        eidx = (element_idx + eidx) % 3;
+        constexpr int g3 = (DIM > 2);
+        constexpr int g2 = (DIM > 1);
+        if constexpr (fel == TE::F1) {
+          return fine(eidx, l, m, n, fk + ok * g3, fj + oj * g2, fi + oi);
+        } else if constexpr (fel == TE::F2) {
+          return fine(eidx, l, m, n, fk + oj * g3, fj + oi * g2, fi + ok);
+        }
+        return fine(eidx, l, m, n, fk + oi * g3, fj + ok * g2, fi + oj);
+      };
+
+      auto sg = [](const int offset) -> Real { return offset == 0 ? -1.0 : 1.0; };
+      Real Uxx{0.0};
+      Real Vxyz{0.0};
+      Real Wxyz{0.0};
+      for (int v = 0; v <= 1; v++) {
+        for (int u = 0; u <= 2; u += 2) {
+          for (int t = 0; t <= 1; t++) {
+            const auto fine2 = get_fine_permuted(1, v, u, t);
+            const auto fine3 = get_fine_permuted(2, u, v, t);
+            Uxx += sg(t) * sg(u) * (fine2 + fine3);
+            Vxyz += sg(t) * sg(u) * sg(v) * fine2;
+            Wxyz += sg(t) * sg(u) * sg(v) * fine3;
+          }
+        }
+      }
+      Uxx *= 0.125;
+
+      geometry::Coords<GEOM> cc(log, coarse_coords, k, j, i);
+      const Real dl1 = cc.Distance(cc.FaceCenX1(geometry::CellFace::lower),
+                                   cc.FaceCenX1(geometry::CellFace::upper));
+      const Real dl2 = cc.Distance(cc.FaceCenX2(geometry::CellFace::lower),
+                                   cc.FaceCenX2(geometry::CellFace::upper));
+      const Real dl3 = cc.Distance(cc.FaceCenX3(geometry::CellFace::lower),
+                                   cc.FaceCenX3(geometry::CellFace::upper));
+      const std::array<Real, 3> dl{dl1, dl2, dl3};
+      const Real dx2 = SQR(dl[element_idx]);
+      const Real dy2 = SQR(dl[(element_idx + 1) % 3]);
+      const Real dz2 = SQR(dl[(element_idx + 2) % 3]);
+      Vxyz *= 0.125 * dz2 / (dx2 + dz2 + Fuzz<Real>());
+      Wxyz *= 0.125 * dy2 / (dx2 + dy2 + Fuzz<Real>());
+
+      for (int ok = 0; ok <= 1; ok++) {
+        for (int oj = 0; oj <= 1; oj++) {
+          get_fine_permuted(0, ok, oj, 1) =
+              0.5 * (get_fine_permuted(0, ok, oj, 0) + get_fine_permuted(0, ok, oj, 2)) +
+              Uxx + sg(ok) * Vxyz + sg(oj) * Wxyz;
+        }
+      }
+    }
   }
 };
 

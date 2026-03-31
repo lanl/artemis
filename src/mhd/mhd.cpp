@@ -18,6 +18,7 @@
 #include "artemis.hpp"
 #include "geometry/geometry.hpp"
 #include "mhd.hpp"
+#include "utils/artemis_utils.hpp"
 #include "utils/history.hpp"
 #include "utils/refinement/amr_criteria.hpp"
 #include "utils/units.hpp"
@@ -36,8 +37,15 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   auto mhd = std::make_shared<StateDescriptor>("mhd");
   Params &params = mhd->AllParams();
 
+  const int ndim = ProblemDimension(pin);
+  std::string sys = pin->GetOrAddString("artemis", "coordinates", "cartesian");
+  Coordinates coords = geometry::CoordSelect(sys, ndim);
+  const bool log =
+      pin->GetOrAddString("artemis", "radial_spacing", "uniform") == "logarithmic";
+
   Metadata m = Metadata({Metadata::Face, Metadata::Conserved, Metadata::Independent,
                          Metadata::WithFluxes, Metadata::FillGhost});
+  ArtemisUtils::EnrollArtemisFaceRefinementOps(m, coords, log);
   mhd->AddField<field::face::B>(m);
   //   m = Metadata(
   //       {Metadata::Edge, Metadata::Conserved, Metadata::Independent,

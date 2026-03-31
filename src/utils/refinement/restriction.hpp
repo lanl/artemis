@@ -54,15 +54,16 @@ struct RestrictAverage {
      const Coordinates_t &pco, const Coordinates_t &coarse_pco,
      const ParArrayND<Real, VariableState> *pcoarse,
      const ParArrayND<Real, VariableState> *pfine) {
-    PARTHENON_REQUIRE(
-        el == TE::CC || el == TE::F1 || el == TE::F2 || el == TE::F3,
-        "Artemis restriction only supports cell-centered and face-centered fields!");
+    PARTHENON_REQUIRE(el == TE::CC || el == TE::F1 || el == TE::F2 || el == TE::F3 ||
+                          el == TE::E1 || el == TE::E2 || el == TE::E3,
+                      "Artemis restriction only supports cell-centered, face-centered, "
+                      "and edge-centered fields!");
     constexpr bool INCLUDE_X1 =
-        (DIM > 0) && (el == TE::CC || el == TE::F2 || el == TE::F3);
+        (DIM > 0) && (el == TE::CC || el == TE::F2 || el == TE::F3 || el == TE::E1);
     constexpr bool INCLUDE_X2 =
-        (DIM > 1) && (el == TE::CC || el == TE::F3 || el == TE::F1);
+        (DIM > 1) && (el == TE::CC || el == TE::F3 || el == TE::F1 || el == TE::E2);
     constexpr bool INCLUDE_X3 =
-        (DIM > 2) && (el == TE::CC || el == TE::F1 || el == TE::F2);
+        (DIM > 2) && (el == TE::CC || el == TE::F1 || el == TE::F2 || el == TE::E3);
     constexpr int element_idx = static_cast<int>(el) % 3;
 
     auto &coarse = *pcoarse;
@@ -95,6 +96,12 @@ struct RestrictAverage {
             vol[ok][oj][oi] = coords.template GetFaceArea<X2DIR>();
           } else if constexpr (el == TE::F3) {
             vol[ok][oj][oi] = coords.template GetFaceArea<X3DIR>();
+          } else if constexpr (el == TE::E1) {
+            vol[ok][oj][oi] = coords.GetEdgeLengthX1();
+          } else if constexpr (el == TE::E2) {
+            vol[ok][oj][oi] = coords.GetEdgeLengthX2();
+          } else if constexpr (el == TE::E3) {
+            vol[ok][oj][oi] = coords.GetEdgeLengthX3();
           }
           terms[ok][oj][oi] =
               vol[ok][oj][oi] * fine(element_idx, l, m, n, k + ok, j + oj, i + oi);
@@ -107,9 +114,11 @@ struct RestrictAverage {
     const Real tvol = ((vol[0][0][0] + vol[0][1][0]) + (vol[0][0][1] + vol[0][1][1])) +
                       ((vol[1][0][0] + vol[1][1][0]) + (vol[1][0][1] + vol[1][1][1]));
     coarse(element_idx, l, m, n, ck, cj, ci) =
-        (((terms[0][0][0] + terms[0][1][0]) + (terms[0][0][1] + terms[0][1][1])) +
-         ((terms[1][0][0] + terms[1][1][0]) + (terms[1][0][1] + terms[1][1][1]))) /
-        tvol;
+        tvol > 0.0
+            ? (((terms[0][0][0] + terms[0][1][0]) + (terms[0][0][1] + terms[0][1][1])) +
+               ((terms[1][0][0] + terms[1][1][0]) + (terms[1][0][1] + terms[1][1][1]))) /
+                  tvol
+            : 0.0;
   }
 };
 

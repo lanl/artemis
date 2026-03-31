@@ -173,14 +173,20 @@ constexpr bool staggered_field() {
          (std::is_same_v<VAR, geom::hx1f1> && DIR == 1) ||
          (std::is_same_v<VAR, geom::hx2f1> && DIR == 1) ||
          (std::is_same_v<VAR, geom::hx3f1> && DIR == 1) ||
+         (std::is_same_v<VAR, geom::hx2e2> && DIR == 1) ||
+         (std::is_same_v<VAR, geom::hx3e3> && DIR == 1) ||
          (std::is_same_v<VAR, geom::ax2> && DIR == 2) ||
          (std::is_same_v<VAR, geom::hx1f2> && DIR == 2) ||
          (std::is_same_v<VAR, geom::hx2f2> && DIR == 2) ||
          (std::is_same_v<VAR, geom::hx3f2> && DIR == 2) ||
+         (std::is_same_v<VAR, geom::hx1e1> && DIR == 2) ||
+         (std::is_same_v<VAR, geom::hx3e3> && DIR == 2) ||
          (std::is_same_v<VAR, geom::hx1f3> && DIR == 3) ||
          (std::is_same_v<VAR, geom::hx2f3> && DIR == 3) ||
          (std::is_same_v<VAR, geom::hx3f3> && DIR == 3) ||
-         (std::is_same_v<VAR, geom::ax3> && DIR == 3);
+         (std::is_same_v<VAR, geom::ax3> && DIR == 3) ||
+         (std::is_same_v<VAR, geom::hx1e1> && DIR == 3) ||
+         (std::is_same_v<VAR, geom::hx2e2> && DIR == 3);
 }
 
 // NOTE(@amd)
@@ -317,6 +323,22 @@ class CoordsBase {
     // The centroid value of the X3 face
     return {static_cast<const T *>(this)->x1v(), static_cast<const T *>(this)->x2v(),
             bnds.x3[static_cast<int>(f)]};
+  }
+
+  KOKKOS_INLINE_FUNCTION std::array<Real, 3> EdgeCenX1(const CellFace f2,
+                                                       const CellFace f3) const {
+    return {static_cast<const T *>(this)->x1v(), bnds.x2[static_cast<int>(f2)],
+            bnds.x3[static_cast<int>(f3)]};
+  }
+  KOKKOS_INLINE_FUNCTION std::array<Real, 3> EdgeCenX2(const CellFace f1,
+                                                       const CellFace f3) const {
+    return {bnds.x1[static_cast<int>(f1)], static_cast<const T *>(this)->x2v(),
+            bnds.x3[static_cast<int>(f3)]};
+  }
+  KOKKOS_INLINE_FUNCTION std::array<Real, 3> EdgeCenX3(const CellFace f1,
+                                                       const CellFace f2) const {
+    return {bnds.x1[static_cast<int>(f1)], bnds.x2[static_cast<int>(f2)],
+            static_cast<const T *>(this)->x3v()};
   }
 
   template <typename V1>
@@ -465,7 +487,9 @@ class CoordsBase {
     return static_cast<const T *>(this)->template shape_<VAR>();
   }
 
-  KOKKOS_INLINE_FUNCTION BBox &GetBounds() const {
+  KOKKOS_INLINE_FUNCTION BBox &GetBounds() { return static_cast<T *>(this)->bnds; }
+
+  KOKKOS_INLINE_FUNCTION const BBox &GetBounds() const {
     return static_cast<const T *>(this)->bnds;
   }
 
@@ -519,34 +543,58 @@ class CoordsBase {
             vg(b, geom::dx3())(index<geom::dx3>(k, j, i))};
   }
 
+  template <int DIR>
+  KOKKOS_INLINE_FUNCTION Real GetEdgeScaleFactor() const {
+    PARTHENON_REQUIRE(DIR > 0 && DIR <= 3, "Invalid edge direction!");
+    if constexpr (DIR == 1) {
+      const auto xe = EdgeCenX1(CellFace::lower, CellFace::lower);
+      return static_cast<const T *>(this)->hx1(xe[0], xe[1], xe[2]);
+    } else if constexpr (DIR == 2) {
+      const auto xe = EdgeCenX2(CellFace::lower, CellFace::lower);
+      return static_cast<const T *>(this)->hx2(xe[0], xe[1], xe[2]);
+    }
+    const auto xe = EdgeCenX3(CellFace::lower, CellFace::lower);
+    return static_cast<const T *>(this)->hx3(xe[0], xe[1], xe[2]);
+  }
+
+  template <int DIR, typename V1>
+  KOKKOS_INLINE_FUNCTION Real GetEdgeScaleFactor(const V1 &vg, const int b, const int k,
+                                                 const int j, const int i) const {
+    PARTHENON_REQUIRE(DIR > 0 && DIR <= 3, "Invalid edge direction!");
+    if constexpr (CoordsTrait<T>::value == Coordinates::cartesian) {
+      return 1.0;
+    }
+    if constexpr (DIR == 1) {
+      return vg(b, geom::hx1e1())(index<geom::hx1e1>(k, j, i));
+    } else if constexpr (DIR == 2) {
+      return vg(b, geom::hx2e2())(index<geom::hx2e2>(k, j, i));
+    }
+    return vg(b, geom::hx3e3())(index<geom::hx3e3>(k, j, i));
+  }
   template <typename V1>
   KOKKOS_INLINE_FUNCTION Real GetEdgeLengthX1(const V1 &vg, const int b, const int k,
                                               const int j, const int i) const {
-    // Return all cell widths
-    if constexpr (CoordsTrait<T>::value == Coordinates::cartesian) {
-      return GetCellWidthX1();
-    }
-    return vg(b, geom::dx1())(index<geom::dx1>(k, j, i));
+    return GetEdgeScaleFactor<X1DIR>(vg, b, k, j, i) * (bnds.x1[1] - bnds.x1[0]);
+  }
+  KOKKOS_INLINE_FUNCTION Real GetEdgeLengthX1() const {
+    return GetEdgeScaleFactor<X1DIR>() * (bnds.x1[1] - bnds.x1[0]);
   }
   template <typename V1>
   KOKKOS_INLINE_FUNCTION Real GetEdgeLengthX2(const V1 &vg, const int b, const int k,
                                               const int j, const int i) const {
-    // Return all cell widths
-    if constexpr (CoordsTrait<T>::value == Coordinates::cartesian) {
-      return GetCellWidthX2();
-    }
-    return vg(b, geom::dx2())(index<geom::dx2>(k, j, i));
+    return GetEdgeScaleFactor<X2DIR>(vg, b, k, j, i) * (bnds.x2[1] - bnds.x2[0]);
+  }
+  KOKKOS_INLINE_FUNCTION Real GetEdgeLengthX2() const {
+    return GetEdgeScaleFactor<X2DIR>() * (bnds.x2[1] - bnds.x2[0]);
   }
   template <typename V1>
   KOKKOS_INLINE_FUNCTION Real GetEdgeLengthX3(const V1 &vg, const int b, const int k,
                                               const int j, const int i) const {
-    // Return all cell widths
-    if constexpr (CoordsTrait<T>::value == Coordinates::cartesian) {
-      return GetCellWidthX3();
-    }
-    return vg(b, geom::dx3())(index<geom::dx3>(k, j, i));
+    return GetEdgeScaleFactor<X3DIR>(vg, b, k, j, i) * (bnds.x3[1] - bnds.x3[0]);
   }
-
+  KOKKOS_INLINE_FUNCTION Real GetEdgeLengthX3() const {
+    return GetEdgeScaleFactor<X3DIR>() * (bnds.x3[1] - bnds.x3[0]);
+  }
   KOKKOS_INLINE_FUNCTION std::array<Real, 3> GetCellCenter() const {
     // Get the cell centroid
     return {static_cast<const T *>(this)->x1v(), static_cast<const T *>(this)->x2v(),

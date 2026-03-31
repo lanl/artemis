@@ -170,9 +170,8 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   }
   static auto desc =
       MakePackDescriptor<gas::prim::density, gas::prim::velocity, gas::prim::sie,
-               dust::prim::density, dust::prim::velocity, field::cell::B,
-               field::face::B>(
-          (pmb->resolved_packages).get());
+                         dust::prim::density, dust::prim::velocity, field::cell::B,
+                         field::face::B>((pmb->resolved_packages).get());
   auto v = desc.GetPack(md.get());
   static auto desc_g = MakePackDescriptor<geom::vol, geom::x1v, geom::x2v, geom::x3v>(
       (pmb->resolved_packages).get());

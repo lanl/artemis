@@ -15,6 +15,7 @@
 #include "fill_derived.hpp"
 #include "artemis.hpp"
 #include "geometry/geometry.hpp"
+#include "mhd/mhd.hpp"
 #include "radiation/moments/moments.hpp"
 #include "utils/artemis_utils.hpp"
 #include "utils/eos/eos.hpp"
@@ -23,6 +24,7 @@ using ArtemisUtils::EOS;
 using ArtemisUtils::VI;
 
 namespace ArtemisDerived {
+
 //----------------------------------------------------------------------------------------
 //! \fn TaskStatus ArtemisDerived::SetAuxillaryFields(MeshData<Real> *md)
 //! \brief Sets auxillary fields over IndexDomain::interior after an integration stage
@@ -260,23 +262,23 @@ void ConsToPrim(MeshData<Real> *md) {
                 ax3[0] * vmesh(b, TE::F3, field::face::B(), k, j, i))) /
               vol;
           vmesh(b, TE::CC, field::cell::B(0), k, j, i) =
-            ((bnds.x1[1] - xv[0]) * vmesh(b, TE::F1, field::face::B(), k, j, i) +
-             (xv[0] - bnds.x1[0]) * vmesh(b, TE::F1, field::face::B(), k, j, i + 1)) /
-            (bnds.x1[1] - bnds.x1[0]);
+              ((bnds.x1[1] - xv[0]) * vmesh(b, TE::F1, field::face::B(), k, j, i) +
+               (xv[0] - bnds.x1[0]) * vmesh(b, TE::F1, field::face::B(), k, j, i + 1)) /
+              (bnds.x1[1] - bnds.x1[0]);
           vmesh(b, TE::CC, field::cell::B(1), k, j, i) =
-            multid
-              ? (((bnds.x2[1] - xv[1]) * vmesh(b, TE::F2, field::face::B(), k, j, i) +
-                (xv[1] - bnds.x2[0]) *
-                  vmesh(b, TE::F2, field::face::B(), k, j + multid, i)) /
-               (bnds.x2[1] - bnds.x2[0]))
-              : vmesh(b, TE::F2, field::face::B(), k, j, i);
+              multid
+                  ? (((bnds.x2[1] - xv[1]) * vmesh(b, TE::F2, field::face::B(), k, j, i) +
+                      (xv[1] - bnds.x2[0]) *
+                          vmesh(b, TE::F2, field::face::B(), k, j + multid, i)) /
+                     (bnds.x2[1] - bnds.x2[0]))
+                  : vmesh(b, TE::F2, field::face::B(), k, j, i);
           vmesh(b, TE::CC, field::cell::B(2), k, j, i) =
-            threed
-              ? (((bnds.x3[1] - xv[2]) * vmesh(b, TE::F3, field::face::B(), k, j, i) +
-                (xv[2] - bnds.x3[0]) *
-                  vmesh(b, TE::F3, field::face::B(), k + threed, j, i)) /
-               (bnds.x3[1] - bnds.x3[0]))
-              : vmesh(b, TE::F3, field::face::B(), k, j, i);
+              threed
+                  ? (((bnds.x3[1] - xv[2]) * vmesh(b, TE::F3, field::face::B(), k, j, i) +
+                      (xv[2] - bnds.x3[0]) *
+                          vmesh(b, TE::F3, field::face::B(), k + threed, j, i)) /
+                     (bnds.x3[1] - bnds.x3[0]))
+                  : vmesh(b, TE::F3, field::face::B(), k, j, i);
           vmesh(b, TE::CC, field::cell::energy(), k, j, i) =
               0.5 * (SQR(vmesh(b, TE::CC, field::cell::B(0), k, j, i)) +
                      SQR(vmesh(b, TE::CC, field::cell::B(1), k, j, i)) +
@@ -305,23 +307,23 @@ void ConsToPrim(MeshData<Real> *md) {
                 ax3[0] * vmesh(b, TE::F3, field::face::B(), k, j, i))) /
               vol;
           vmesh(b, TE::CC, field::cell::B(0), k, j, i) =
-            ((bnds.x1[1] - xv[0]) * vmesh(b, TE::F1, field::face::B(), k, j, i) +
-             (xv[0] - bnds.x1[0]) * vmesh(b, TE::F1, field::face::B(), k, j, i + 1)) /
-            (bnds.x1[1] - bnds.x1[0] + Fuzz<Real>());
+              ((bnds.x1[1] - xv[0]) * vmesh(b, TE::F1, field::face::B(), k, j, i) +
+               (xv[0] - bnds.x1[0]) * vmesh(b, TE::F1, field::face::B(), k, j, i + 1)) /
+              (bnds.x1[1] - bnds.x1[0] + Fuzz<Real>());
           vmesh(b, TE::CC, field::cell::B(1), k, j, i) =
-            multid
-              ? (((bnds.x2[1] - xv[1]) * vmesh(b, TE::F2, field::face::B(), k, j, i) +
-                (xv[1] - bnds.x2[0]) *
-                  vmesh(b, TE::F2, field::face::B(), k, j + multid, i)) /
-               (bnds.x2[1] - bnds.x2[0] + Fuzz<Real>()))
-              : vmesh(b, TE::F2, field::face::B(), k, j, i);
+              multid
+                  ? (((bnds.x2[1] - xv[1]) * vmesh(b, TE::F2, field::face::B(), k, j, i) +
+                      (xv[1] - bnds.x2[0]) *
+                          vmesh(b, TE::F2, field::face::B(), k, j + multid, i)) /
+                     (bnds.x2[1] - bnds.x2[0] + Fuzz<Real>()))
+                  : vmesh(b, TE::F2, field::face::B(), k, j, i);
           vmesh(b, TE::CC, field::cell::B(2), k, j, i) =
-            threed
-              ? (((bnds.x3[1] - xv[2]) * vmesh(b, TE::F3, field::face::B(), k, j, i) +
-                (xv[2] - bnds.x3[0]) *
-                  vmesh(b, TE::F3, field::face::B(), k + threed, j, i)) /
-               (bnds.x3[1] - bnds.x3[0] + Fuzz<Real>()))
-              : vmesh(b, TE::F3, field::face::B(), k, j, i);
+              threed
+                  ? (((bnds.x3[1] - xv[2]) * vmesh(b, TE::F3, field::face::B(), k, j, i) +
+                      (xv[2] - bnds.x3[0]) *
+                          vmesh(b, TE::F3, field::face::B(), k + threed, j, i)) /
+                     (bnds.x3[1] - bnds.x3[0] + Fuzz<Real>()))
+                  : vmesh(b, TE::F3, field::face::B(), k, j, i);
           vmesh(b, TE::CC, field::cell::energy(), k, j, i) =
               0.5 * (SQR(vmesh(b, TE::CC, field::cell::B(0), k, j, i)) +
                      SQR(vmesh(b, TE::CC, field::cell::B(1), k, j, i)) +
@@ -519,6 +521,7 @@ template <Coordinates GEOM>
 void PostInitialization(MeshBlock *pmb, ParameterInput *pin) {
   PARTHENON_INSTRUMENT
   auto &md = pmb->meshblock_data.Get();
+  MHD::SetCellCenteredMagneticFields<MeshBlockData<Real>, GEOM>(md.get());
   PrimToCons<MeshBlockData<Real>, GEOM>(md.get());
 }
 

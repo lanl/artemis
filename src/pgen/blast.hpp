@@ -170,8 +170,8 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   }
   static auto desc =
       MakePackDescriptor<gas::prim::density, gas::prim::velocity, gas::prim::sie,
-                         dust::prim::density, dust::prim::velocity, field::cell::B,
-                         field::face::B>((pmb->resolved_packages).get());
+                         dust::prim::density, dust::prim::velocity, field::face::B>(
+          (pmb->resolved_packages).get());
   auto v = desc.GetPack(md.get());
   static auto desc_g = MakePackDescriptor<geom::vol, geom::x1v, geom::x2v, geom::x3v>(
       (pmb->resolved_packages).get());
@@ -240,9 +240,6 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         v(0, TE::CC, gas::prim::velocity(2), k, j, i) = vx3;
         v(0, TE::CC, gas::prim::sie(), k, j, i) = internal_energy / den;
         if (do_mhd) {
-          v(0, TE::CC, field::cell::B(0), k, j, i) = bx1;
-          v(0, TE::CC, field::cell::B(1), k, j, i) = bx2;
-          v(0, TE::CC, field::cell::B(2), k, j, i) = bx3;
           v(0, TE::F1, field::face::B(), k, j, i) = bx1;
           if (i == ib.e) v(0, TE::F1, field::face::B(), k, j, ib.e + 1) = bx1;
           if (multid) {

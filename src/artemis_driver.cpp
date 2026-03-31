@@ -271,7 +271,7 @@ TaskCollection ArtemisDriver<GEOM>::StepTasks() {
 
       TaskID edge_emf = none;
       if (do_mhd) {
-        edge_emf = tl.AddTask(gas_flx, ArtemisUtils::AssembleEdgeEMF, u0.get());
+        edge_emf = tl.AddTask(gas_flx, MHD::AssembleEdgeEMF, u0.get());
       }
 
       // Communicate and set fluxes

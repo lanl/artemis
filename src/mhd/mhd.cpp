@@ -72,4 +72,46 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   //   mhd->AddField<field::cell::J>(m);
   return mhd;
 }
+
+//----------------------------------------------------------------------------------------
+//! \fn  TaskStatus ArtemisUtils::AssembleEdgeEMF
+//! \brief Runtime dispatch for geometry-aware edge EMF assembly.
+TaskStatus AssembleEdgeEMF(MeshData<Real> *md) {
+  PARTHENON_INSTRUMENT
+  auto pm = md->GetParentPointer();
+  auto &resolved_pkgs = pm->resolved_packages;
+  const auto &artemis_pkg = pm->packages.Get("artemis");
+  const auto do_mhd = artemis_pkg->template Param<bool>("do_mhd");
+  if (!do_mhd) return TaskStatus::complete;
+
+  static auto desc = MakePackDescriptor<field::cell::B, field::face::B>(
+      resolved_pkgs.get(), {}, {parthenon::PDOpt::WithFluxes});
+  static auto desc_g =
+      MakePackDescriptor<geom::x1v, geom::x2v, geom::x3v, geom::dx1, geom::dx2, geom::dx3,
+                         geom::hx1f1, geom::hx2f1, geom::hx3f1, geom::hx1f2, geom::hx2f2,
+                         geom::hx3f2, geom::hx1f3, geom::hx2f3, geom::hx3f3, geom::hx1e1,
+                         geom::hx2e2, geom::hx3e3>(resolved_pkgs.get());
+  const auto v = desc.GetPack(md);
+  const auto vg = desc_g.GetPack(md);
+
+  const auto sys = artemis_pkg->template Param<Coordinates>("coords");
+  const auto &cpars = artemis_pkg->template Param<geometry::CoordParams>("coord_params");
+  typedef Coordinates G;
+  if (sys == G::cartesian) {
+    return AssembleEdgeEMFImpl<G::cartesian>(md, v, vg, cpars);
+  } else if (sys == G::spherical3D) {
+    return AssembleEdgeEMFImpl<G::spherical3D>(md, v, vg, cpars);
+  } else if (sys == G::spherical1D) {
+    return AssembleEdgeEMFImpl<G::spherical1D>(md, v, vg, cpars);
+  } else if (sys == G::spherical2D) {
+    return AssembleEdgeEMFImpl<G::spherical2D>(md, v, vg, cpars);
+  } else if (sys == G::cylindrical) {
+    return AssembleEdgeEMFImpl<G::cylindrical>(md, v, vg, cpars);
+  } else if (sys == G::axisymmetric) {
+    return AssembleEdgeEMFImpl<G::axisymmetric>(md, v, vg, cpars);
+  } else {
+    PARTHENON_FAIL("Coordinate type not recognized!");
+  }
+}
+
 } // namespace MHD

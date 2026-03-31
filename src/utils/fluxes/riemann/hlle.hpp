@@ -54,9 +54,9 @@ struct RiemannSolver<RSolver::hlle, FLUID_TYPE, CTYPE,
                      std::enable_if_t<FLUID_TYPE != Fluid::radiation>> {
   template <typename V1, typename V2, typename V3>
   KOKKOS_INLINE_FUNCTION void
-  operator()(const EOS &eos, const Real c, const Real chat, const bool do_mhd,
-             parthenon::team_mbr_t const &member, const int b, const int k, const int j,
-             const int il, const int iu, const int dir,
+  operator()(const EOS &eos, const Real c, const Real chat, const Real mu0,
+             const bool do_mhd, parthenon::team_mbr_t const &member, const int b,
+             const int k, const int j, const int il, const int iu, const int dir,
              const parthenon::ScratchPad2D<Real> &wl,
              const parthenon::ScratchPad2D<Real> &wr, const V1 &p, const V2 &q,
              const V3 &vf) const {
@@ -161,8 +161,8 @@ struct RiemannSolver<RSolver::hlle, FLUID_TYPE, CTYPE,
               er = wr_idn * wr_ise +
                    0.5 * wr_idn * (SQR(wr_ivx) + SQR(wr_ivy) + SQR(wr_ivz));
               if (mhd) {
-                pbl = 0.5 * (SQR(wl_ibx) + SQR(wl_iby) + SQR(wl_ibz));
-                pbr = 0.5 * (SQR(wr_ibx) + SQR(wr_iby) + SQR(wr_ibz));
+                pbl = MHD::MagneticEnergyDensity(wl_ibx, wl_iby, wl_ibz, mu0);
+                pbr = MHD::MagneticEnergyDensity(wr_ibx, wr_iby, wr_ibz, mu0);
                 el += pbl;
                 er += pbr;
               }
@@ -173,14 +173,10 @@ struct RiemannSolver<RSolver::hlle, FLUID_TYPE, CTYPE,
             Real qa = Null<Real>(), qb = Null<Real>();
             if constexpr (FLUID_TYPE == Fluid::gas) {
               if (mhd) {
-                qa = (wl_ibl + 2. * pbl) / wl_idn;
-                qb = (wr_ibl + 2. * pbr) / wr_idn;
-                qa = std::sqrt(
-                    0.5 * (qa + std::sqrt(std::max(
-                                    0.0, SQR(qa) - 4. * wl_ibl * SQR(wl_ibx / wl_idn)))));
-                qb = std::sqrt(
-                    0.5 * (qb + std::sqrt(std::max(
-                                    0.0, SQR(qb) - 4. * wr_ibl * SQR(wr_ibx / wr_idn)))));
+                qa = MHD::FastMagnetosonicSpeed(wl_ibl, wl_idn, wl_ibx, wl_iby, wl_ibz,
+                                                mu0);
+                qb = MHD::FastMagnetosonicSpeed(wr_ibl, wr_idn, wr_ibx, wr_iby, wr_ibz,
+                                                mu0);
               } else {
                 qa = std::sqrt(wl_ibl / wl_idn);
                 qb = std::sqrt(wr_ibl / wr_idn);
@@ -240,16 +236,16 @@ struct RiemannSolver<RSolver::hlle, FLUID_TYPE, CTYPE,
             [[maybe_unused]] Real fr_bz = 0.0;
             if constexpr (FLUID_TYPE == Fluid::gas) {
               if (mhd) {
-                fl_mx -= SQR(wl_ibx);
-                fr_mx -= SQR(wr_ibx);
-                fl_my -= wl_ibx * wl_iby;
-                fr_my -= wr_ibx * wr_iby;
-                fl_mz -= wl_ibx * wl_ibz;
-                fr_mz -= wr_ibx * wr_ibz;
+                fl_mx -= SQR(wl_ibx) / mu0;
+                fr_mx -= SQR(wr_ibx) / mu0;
+                fl_my -= wl_ibx * wl_iby / mu0;
+                fr_my -= wr_ibx * wr_iby / mu0;
+                fl_mz -= wl_ibx * wl_ibz / mu0;
+                fr_mz -= wr_ibx * wr_ibz / mu0;
                 vdBl = wl_ivx * wl_ibx + wl_ivy * wl_iby + wl_ivz * wl_ibz;
                 vdBr = wr_ivx * wr_ibx + wr_ivy * wr_iby + wr_ivz * wr_ibz;
-                fl_e = el * qa + (wl_ipr + pbl) * wl_ivx - wl_ibx * vdBl;
-                fr_e = er * qb + (wr_ipr + pbr) * wr_ivx - wr_ibx * vdBr;
+                fl_e = el * qa + (wl_ipr + pbl) * wl_ivx - wl_ibx * vdBl / mu0;
+                fr_e = er * qb + (wr_ipr + pbr) * wr_ivx - wr_ibx * vdBr / mu0;
                 fl_by = (wl_ivx * wl_iby - wl_ivy * wl_ibx) - bm * wl_iby;
                 fr_by = (wr_ivx * wr_iby - wr_ivy * wr_ibx) - bp * wr_iby;
                 fl_bz = (wl_ivx * wl_ibz - wl_ivz * wl_ibx) - bm * wl_ibz;
@@ -306,9 +302,9 @@ struct RiemannSolver<RSolver::hlle, FLUID_TYPE, CTYPE,
                      std::enable_if_t<FLUID_TYPE == Fluid::radiation>> {
   template <typename V1, typename V2, typename V3>
   KOKKOS_INLINE_FUNCTION void
-  operator()(const EOS &eos, const Real c, const Real chat, const bool do_mhd,
-             parthenon::team_mbr_t const &member, const int b, const int k, const int j,
-             const int il, const int iu, const int dir,
+  operator()(const EOS &eos, const Real c, const Real chat, const Real mu0,
+             const bool do_mhd, parthenon::team_mbr_t const &member, const int b,
+             const int k, const int j, const int il, const int iu, const int dir,
              const parthenon::ScratchPad2D<Real> &wl,
              const parthenon::ScratchPad2D<Real> &wr, const V1 &p, const V2 &q,
              const V3 &vf) const {

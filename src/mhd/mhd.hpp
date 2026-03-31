@@ -18,6 +18,28 @@
 
 namespace MHD {
 
+KOKKOS_FORCEINLINE_FUNCTION Real MagneticEnergyDensity(const Real bx, const Real by,
+                                                       const Real bz, const Real mu0) {
+  return 0.5 * (SQR(bx) + SQR(by) + SQR(bz)) / mu0;
+}
+
+KOKKOS_FORCEINLINE_FUNCTION Real FastMagnetosonicSpeed(const Real bulk,
+                                                       const Real density, const Real b2,
+                                                       const Real bx, const Real mu0) {
+  const Real wave_sum = (bulk + b2 / mu0) / density;
+  const Real discriminant =
+      std::max(0.0, SQR(wave_sum) - 4.0 * bulk * SQR(bx) / (mu0 * SQR(density)));
+  return std::sqrt(0.5 * (wave_sum + std::sqrt(discriminant)));
+}
+
+KOKKOS_FORCEINLINE_FUNCTION Real FastMagnetosonicSpeed(const Real bulk,
+                                                       const Real density, const Real bx,
+                                                       const Real by, const Real bz,
+                                                       const Real mu0) {
+  // NOTE(AMD): bx is the component normal to the interface
+  return FastMagnetosonicSpeed(bulk, density, SQR(bx) + SQR(by) + SQR(bz), bx, mu0);
+}
+
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
                                             ArtemisUtils::Units &units,
                                             ArtemisUtils::Constants &constants,

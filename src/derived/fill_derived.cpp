@@ -113,6 +113,8 @@ void ConsToPrim(MeshData<Real> *md) {
   const bool do_dust = artemis_pkg->template Param<bool>("do_dust");
   const bool do_rad = artemis_pkg->template Param<bool>("do_moment");
   const bool do_mhd = artemis_pkg->template Param<bool>("do_mhd");
+  const Real mu0_code =
+      do_mhd ? pm->packages.Get("mhd")->template Param<Real>("mu0_code") : 1.0;
 
   // Extract gas parameters
   Real dflr_gas = Null<Real>(), sieflr_gas = Null<Real>();
@@ -279,10 +281,10 @@ void ConsToPrim(MeshData<Real> *md) {
                           vmesh(b, TE::F3, field::face::B(), k + threed, j, i)) /
                      (bnds.x3[1] - bnds.x3[0]))
                   : vmesh(b, TE::F3, field::face::B(), k, j, i);
-          vmesh(b, TE::CC, field::cell::energy(), k, j, i) =
-              0.5 * (SQR(vmesh(b, TE::CC, field::cell::B(0), k, j, i)) +
-                     SQR(vmesh(b, TE::CC, field::cell::B(1), k, j, i)) +
-                     SQR(vmesh(b, TE::CC, field::cell::B(2), k, j, i)));
+          vmesh(b, TE::CC, field::cell::energy(), k, j, i) = MHD::MagneticEnergyDensity(
+              vmesh(b, TE::CC, field::cell::B(0), k, j, i),
+              vmesh(b, TE::CC, field::cell::B(1), k, j, i),
+              vmesh(b, TE::CC, field::cell::B(2), k, j, i), mu0_code);
         }
       });
 
@@ -324,10 +326,10 @@ void ConsToPrim(MeshData<Real> *md) {
                           vmesh(b, TE::F3, field::face::B(), k + threed, j, i)) /
                      (bnds.x3[1] - bnds.x3[0] + Fuzz<Real>()))
                   : vmesh(b, TE::F3, field::face::B(), k, j, i);
-          vmesh(b, TE::CC, field::cell::energy(), k, j, i) =
-              0.5 * (SQR(vmesh(b, TE::CC, field::cell::B(0), k, j, i)) +
-                     SQR(vmesh(b, TE::CC, field::cell::B(1), k, j, i)) +
-                     SQR(vmesh(b, TE::CC, field::cell::B(2), k, j, i)));
+          vmesh(b, TE::CC, field::cell::energy(), k, j, i) = MHD::MagneticEnergyDensity(
+              vmesh(b, TE::CC, field::cell::B(0), k, j, i),
+              vmesh(b, TE::CC, field::cell::B(1), k, j, i),
+              vmesh(b, TE::CC, field::cell::B(2), k, j, i), mu0_code);
         });
   }
 }
@@ -349,6 +351,8 @@ void PrimToCons(T *md) {
   const bool do_dust = artemis_pkg->template Param<bool>("do_dust");
   const bool do_mhd = artemis_pkg->template Param<bool>("do_mhd");
   const bool do_rad = artemis_pkg->template Param<bool>("do_moment");
+  const Real mu0_code =
+      do_mhd ? pm->packages.Get("mhd")->template Param<Real>("mu0_code") : 1.0;
 
   // Extract gas parameters
   Real dflr_gas = Null<Real>();
@@ -453,7 +457,7 @@ void PrimToCons(T *md) {
               const Real bz =
                   0.5 * (vmesh(b, TE::F3, field::face::B(), k, j, i) +
                          vmesh(b, TE::F3, field::face::B(), k + threed, j, i));
-              me = 0.5 * (SQR(bx) + SQR(by) + SQR(bz));
+              me = MHD::MagneticEnergyDensity(bx, by, bz, mu0_code);
             }
             Real &u_e = vmesh(b, gas::cons::total_energy(n), k, j, i);
             u_e = u_u + ke + me;

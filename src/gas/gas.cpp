@@ -550,6 +550,8 @@ Real EstimateTimestepMesh(MeshData<Real> *md) {
 
   auto &artemis_pkg = pm->packages.Get("artemis");
   const bool do_mhd = artemis_pkg->template Param<bool>("do_mhd");
+  const Real mu0_code =
+      do_mhd ? pm->packages.Get("mhd")->template Param<Real>("mu0_code") : 1.0;
 
   static auto desc =
       MakePackDescriptor<gas::prim::density, gas::prim::velocity, gas::prim::sie,
@@ -577,13 +579,18 @@ Real EstimateTimestepMesh(MeshData<Real> *md) {
         for (int n = 0; n < vmesh.GetSize(b, gas::prim::density()); ++n) {
           const Real &dens = vmesh(b, gas::prim::density(n), k, j, i);
           const Real &bulk = vmesh(b, gas::prim::bmod(n), k, j, i);
+
+          // NOTE(AMD): This is an upper bound on the fast magnetosonic speed.
+          //            It is much cheaper to compute since we would need to compute
+          //            the fast magnetosonic speed at each face of the zone to do it more
+          //            accurately.
           Real b2 = 0.0;
           if (do_mhd) {
             b2 += SQR(vmesh(b, TE::CC, field::cell::B(0), k, j, i)) +
                   SQR(vmesh(b, TE::CC, field::cell::B(1), k, j, i)) +
                   SQR(vmesh(b, TE::CC, field::cell::B(2), k, j, i));
           }
-          const Real ss = std::sqrt((bulk + b2) / dens);
+          const Real ss = std::sqrt((bulk + b2 / mu0_code) / dens);
 
           Real denom = 0.0;
           for (int d = 0; d < ndim; d++) {

@@ -37,6 +37,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   auto mhd = std::make_shared<StateDescriptor>("mhd");
   Params &params = mhd->AllParams();
 
+  params.Add("mu0", constants.GetMu0Physical());
+  params.Add("mu0_code", constants.GetMu0Code());
+
   const int ndim = ProblemDimension(pin);
   std::string sys = pin->GetOrAddString("artemis", "coordinates", "cartesian");
   Coordinates coords = geometry::CoordSelect(sys, ndim);

@@ -45,7 +45,7 @@ struct RiemannSolver<RSolver::llf, FLUID_TYPE, CTYPE,
                      std::enable_if_t<FLUID_TYPE != Fluid::radiation>> {
   template <typename V1, typename V2, typename V3>
   KOKKOS_INLINE_FUNCTION void
-  operator()(const EOS &eos, const Real c, const Real chat, bool do_mhd,
+  operator()(const EOS &eos, const Real c, const Real chat, const Real mu0, bool do_mhd,
              parthenon::team_mbr_t const &member, const int b, const int k, const int j,
              const int il, const int iu, const int dir,
              const parthenon::ScratchPad2D<Real> &wl,
@@ -153,17 +153,17 @@ struct RiemannSolver<RSolver::llf, FLUID_TYPE, CTYPE,
                    0.5 * wr_idn * (SQR(wr_ivx) + SQR(wr_ivy) + SQR(wr_ivz));
               fsum_e = (el + wl_ipr) * wl_ivx + (er + wr_ipr) * wr_ivx;
               if (do_mhd) {
-                pbl = 0.5 * (SQR(wl_ibx) + SQR(wl_iby) + SQR(wl_ibz));
-                pbr = 0.5 * (SQR(wr_ibx) + SQR(wr_iby) + SQR(wr_ibz));
+                pbl = MHD::MagneticEnergyDensity(wl_ibx, wl_iby, wl_ibz, mu0);
+                pbr = MHD::MagneticEnergyDensity(wr_ibx, wr_iby, wr_ibz, mu0);
                 p.flux(b, dir, IBM, k, j, i) = 0.5 * (pbl + pbr);
-                fsum_mx -= SQR(wl_ibx) + SQR(wr_ibx);
-                fsum_my -= wl_ibx * wl_iby + wr_ibx * wr_iby;
-                fsum_mz -= wl_ibx * wl_ibz + wr_ibx * wr_ibz;
+                fsum_mx -= (SQR(wl_ibx) + SQR(wr_ibx)) / mu0;
+                fsum_my -= (wl_ibx * wl_iby + wr_ibx * wr_iby) / mu0;
+                fsum_mz -= (wl_ibx * wl_ibz + wr_ibx * wr_ibz) / mu0;
                 vdBl = wl_ivx * wl_ibx + wl_ivy * wl_iby + wl_ivz * wl_ibz;
                 vdBr = wr_ivx * wr_ibx + wr_ivy * wr_iby + wr_ivz * wr_ibz;
                 el += pbl;
                 er += pbr;
-                fsum_e -= wl_ibx * vdBl + wr_ibx * vdBr;
+                fsum_e -= (wl_ibx * vdBl + wr_ibx * vdBr) / mu0;
                 fsum_by = (wl_ivx * wl_iby - wl_ivy * wl_ibx) +
                           (wr_ivx * wr_iby - wr_ivy * wr_ibx);
                 fsum_bz = (wl_ivx * wl_ibz - wl_ivz * wl_ibx) +
@@ -175,15 +175,10 @@ struct RiemannSolver<RSolver::llf, FLUID_TYPE, CTYPE,
             Real a = Null<Real>();
             if constexpr (FLUID_TYPE == Fluid::gas) {
               if (do_mhd) {
-                // cf^2 = 0.5*( c_A^2 + sqrt( c_A^4 - 4*c_s^2 B_x^2/rho))
-                qa = (wl_ibl + 2. * pbl) / wl_idn;
-                qb = (wr_ibl + 2. * pbr) / wr_idn;
-                qa = std::sqrt(0.5 * (qa + std::sqrt(std::max(
-                                              0.0, SQR(qa) - 4. * wl_ibl *
-                                                        SQR(wl_ibx / wl_idn)))));
-                qb = std::sqrt(0.5 * (qb + std::sqrt(std::max(
-                                              0.0, SQR(qb) - 4. * wr_ibl *
-                                                        SQR(wr_ibx / wr_idn)))));
+                qa = MHD::FastMagnetosonicSpeed(wl_ibl, wl_idn, wl_ibx, wl_iby, wl_ibz,
+                                                mu0);
+                qb = MHD::FastMagnetosonicSpeed(wr_ibl, wr_idn, wr_ibx, wr_iby, wr_ibz,
+                                                mu0);
               } else {
                 qa = std::sqrt(wl_ibl / wl_idn);
                 qb = std::sqrt(wr_ibl / wr_idn);
@@ -248,9 +243,9 @@ struct RiemannSolver<RSolver::llf, FLUID_TYPE, CTYPE,
                      std::enable_if_t<FLUID_TYPE == Fluid::radiation>> {
   template <typename V1, typename V2, typename V3>
   KOKKOS_INLINE_FUNCTION void
-  operator()(const EOS &eos, const Real c, const Real chat, const bool do_mhd,
-             parthenon::team_mbr_t const &member, const int b, const int k, const int j,
-             const int il, const int iu, const int dir,
+  operator()(const EOS &eos, const Real c, const Real chat, const Real mu0,
+             const bool do_mhd, parthenon::team_mbr_t const &member, const int b,
+             const int k, const int j, const int il, const int iu, const int dir,
              const parthenon::ScratchPad2D<Real> &wl,
              const parthenon::ScratchPad2D<Real> &wr, const V1 &p, const V2 &q,
              const V3 &vf) const {

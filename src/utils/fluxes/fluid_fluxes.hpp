@@ -97,6 +97,8 @@ TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, FLUX vflx,
   const auto &artemis_pkg = pm->packages.Get("artemis");
   const auto &cpars = artemis_pkg->template Param<geometry::CoordParams>("coord_params");
   const auto do_mhd = artemis_pkg->template Param<bool>("do_mhd");
+  const Real mu0_code =
+      do_mhd ? pm->packages.Get("mhd")->template Param<Real>("mu0_code") : 1.0;
 
   // Speed of light (and reduced), if used
   Real chat = Null<Real>();
@@ -153,8 +155,8 @@ TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, FLUX vflx,
 
         // Compute fluxes over[is, ie + 1]
         RiemannSolver<RIEMANN, F, C> riemann;
-        riemann(eos, c, chat, do_mhd, mbr, b, k, j, il, iu, X1DIR, wl, wr, vp, vflx,
-                vface);
+        riemann(eos, c, chat, mu0_code, do_mhd, mbr, b, k, j, il, iu, X1DIR, wl, wr, vp,
+                vflx, vface);
         mbr.team_barrier();
 
         // Scale X1-momentum flux by appropriate scale factor for coord system
@@ -207,8 +209,8 @@ TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, FLUX vflx,
             if (j > jl) {
               // compute fluxes over [js,je+1]
               RiemannSolver<RIEMANN, F, C> riemann;
-              riemann(eos, c, chat, do_mhd, mbr, b, k, j, il, iu, X2DIR, wl, wr, vp, vflx,
-                      vface);
+              riemann(eos, c, chat, mu0_code, do_mhd, mbr, b, k, j, il, iu, X2DIR, wl, wr,
+                      vp, vflx, vface);
               mbr.team_barrier();
 
               // Scale X2-momentum flux by appropriate scale factor for coord system
@@ -265,8 +267,8 @@ TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, FLUX vflx,
             // compute fluxes over [ks,ke+1]
             if (k > kl) {
               RiemannSolver<RIEMANN, F, C> riemann;
-              riemann(eos, c, chat, do_mhd, mbr, b, k, j, il, iu, X3DIR, wl, wr, vp, vflx,
-                      vface);
+              riemann(eos, c, chat, mu0_code, do_mhd, mbr, b, k, j, il, iu, X3DIR, wl, wr,
+                      vp, vflx, vface);
               mbr.team_barrier();
 
               // Scale X3-momentum flux by appropriate scale factor for coord system
@@ -315,6 +317,10 @@ TaskStatus FluxSourceImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, CONS vcons, FAC
   const auto &artemis_pkg = md->GetParentPointer()->packages.Get("artemis");
   const auto &cpars = artemis_pkg->template Param<geometry::CoordParams>("coord_params");
   const auto do_mhd = artemis_pkg->template Param<bool>("do_mhd");
+  const Real mu0_code =
+      do_mhd
+          ? md->GetParentPointer()->packages.Get("mhd")->template Param<Real>("mu0_code")
+          : 1.0;
   // Apply flux sources
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "FluxSourceTerms", parthenon::DevExecSpace(), 0,
@@ -455,12 +461,15 @@ TaskStatus FluxSourceImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, CONS vcons, FAC
               wdt *= ((chi - 1.) / (ff + Fuzz<Real>())) * hcchat_;
             } else if constexpr (F == Fluid::gas) {
               // Update momenta with mhd
-              const Real t1 = SQR(vp_(b, IVX, k, j, i) + rfv[0]) -
-                              (mhd ? SQR(vp_(b, field::cell::B(0), k, j, i)) : 0.0);
-              const Real t2 = SQR(vp_(b, IVY, k, j, i) + rfv[1]) -
-                              (mhd ? SQR(vp_(b, field::cell::B(1), k, j, i)) : 0.0);
-              const Real t3 = SQR(vp_(b, IVZ, k, j, i) + rfv[2]) -
-                              (mhd ? SQR(vp_(b, field::cell::B(2), k, j, i)) : 0.0);
+              const Real t1 =
+                  SQR(vp_(b, IVX, k, j, i) + rfv[0]) -
+                  (mhd ? SQR(vp_(b, field::cell::B(0), k, j, i)) / mu0_code : 0.0);
+              const Real t2 =
+                  SQR(vp_(b, IVY, k, j, i) + rfv[1]) -
+                  (mhd ? SQR(vp_(b, field::cell::B(1), k, j, i)) / mu0_code : 0.0);
+              const Real t3 =
+                  SQR(vp_(b, IVZ, k, j, i) + rfv[2]) -
+                  (mhd ? SQR(vp_(b, field::cell::B(2), k, j, i)) / mu0_code : 0.0);
               vc_(b, IMX, k, j, i) +=
                   x1dep_ * wdt * (dh1[0] * t1 + dh1[1] * t2 + dh1[2] * t3);
               vc_(b, IMY, k, j, i) +=

@@ -249,6 +249,8 @@ void ConsToPrim(MeshData<Real> *md) {
           const auto ax1 = coords.GetFaceAreaX1(vg, b, k, j, i);
           const auto ax2 = coords.GetFaceAreaX2(vg, b, k, j, i);
           const auto ax3 = coords.GetFaceAreaX3(vg, b, k, j, i);
+          const auto xv = coords.GetCellCenter(vg, b, k, j, i);
+          const auto &bnds = coords.GetBounds();
           vmesh(b, TE::CC, field::cell::divB(), k, j, i) =
               ((ax1[1] * vmesh(b, TE::F1, field::face::B(), k, j, i + 1) -
                 ax1[0] * vmesh(b, TE::F1, field::face::B(), k, j, i)) +
@@ -258,14 +260,23 @@ void ConsToPrim(MeshData<Real> *md) {
                 ax3[0] * vmesh(b, TE::F3, field::face::B(), k, j, i))) /
               vol;
           vmesh(b, TE::CC, field::cell::B(0), k, j, i) =
-              0.5 * (vmesh(b, TE::F1, field::face::B(), k, j, i) +
-                     vmesh(b, TE::F1, field::face::B(), k, j, i + 1));
+            ((bnds.x1[1] - xv[0]) * vmesh(b, TE::F1, field::face::B(), k, j, i) +
+             (xv[0] - bnds.x1[0]) * vmesh(b, TE::F1, field::face::B(), k, j, i + 1)) /
+            (bnds.x1[1] - bnds.x1[0]);
           vmesh(b, TE::CC, field::cell::B(1), k, j, i) =
-              0.5 * (vmesh(b, TE::F2, field::face::B(), k, j, i) +
-                     vmesh(b, TE::F2, field::face::B(), k, j + multid, i));
+            multid
+              ? (((bnds.x2[1] - xv[1]) * vmesh(b, TE::F2, field::face::B(), k, j, i) +
+                (xv[1] - bnds.x2[0]) *
+                  vmesh(b, TE::F2, field::face::B(), k, j + multid, i)) /
+               (bnds.x2[1] - bnds.x2[0]))
+              : vmesh(b, TE::F2, field::face::B(), k, j, i);
           vmesh(b, TE::CC, field::cell::B(2), k, j, i) =
-              0.5 * (vmesh(b, TE::F3, field::face::B(), k, j, i) +
-                     vmesh(b, TE::F3, field::face::B(), k + threed, j, i));
+            threed
+              ? (((bnds.x3[1] - xv[2]) * vmesh(b, TE::F3, field::face::B(), k, j, i) +
+                (xv[2] - bnds.x3[0]) *
+                  vmesh(b, TE::F3, field::face::B(), k + threed, j, i)) /
+               (bnds.x3[1] - bnds.x3[0]))
+              : vmesh(b, TE::F3, field::face::B(), k, j, i);
           vmesh(b, TE::CC, field::cell::energy(), k, j, i) =
               0.5 * (SQR(vmesh(b, TE::CC, field::cell::B(0), k, j, i)) +
                      SQR(vmesh(b, TE::CC, field::cell::B(1), k, j, i)) +
@@ -283,6 +294,8 @@ void ConsToPrim(MeshData<Real> *md) {
           const auto ax1 = coords.GetFaceAreaX1(vg, b, k, j, i);
           const auto ax2 = coords.GetFaceAreaX2(vg, b, k, j, i);
           const auto ax3 = coords.GetFaceAreaX3(vg, b, k, j, i);
+          const auto xv = coords.GetCellCenter(vg, b, k, j, i);
+          const auto &bnds = coords.GetBounds();
           vmesh(b, TE::CC, field::cell::divB(), k, j, i) =
               ((ax1[1] * vmesh(b, TE::F1, field::face::B(), k, j, i + 1) -
                 ax1[0] * vmesh(b, TE::F1, field::face::B(), k, j, i)) +
@@ -292,14 +305,23 @@ void ConsToPrim(MeshData<Real> *md) {
                 ax3[0] * vmesh(b, TE::F3, field::face::B(), k, j, i))) /
               vol;
           vmesh(b, TE::CC, field::cell::B(0), k, j, i) =
-              0.5 * (vmesh(b, TE::F1, field::face::B(), k, j, i) +
-                     vmesh(b, TE::F1, field::face::B(), k, j, i + 1));
+            ((bnds.x1[1] - xv[0]) * vmesh(b, TE::F1, field::face::B(), k, j, i) +
+             (xv[0] - bnds.x1[0]) * vmesh(b, TE::F1, field::face::B(), k, j, i + 1)) /
+            (bnds.x1[1] - bnds.x1[0] + Fuzz<Real>());
           vmesh(b, TE::CC, field::cell::B(1), k, j, i) =
-              0.5 * (vmesh(b, TE::F2, field::face::B(), k, j, i) +
-                     vmesh(b, TE::F2, field::face::B(), k, j + multid, i));
+            multid
+              ? (((bnds.x2[1] - xv[1]) * vmesh(b, TE::F2, field::face::B(), k, j, i) +
+                (xv[1] - bnds.x2[0]) *
+                  vmesh(b, TE::F2, field::face::B(), k, j + multid, i)) /
+               (bnds.x2[1] - bnds.x2[0] + Fuzz<Real>()))
+              : vmesh(b, TE::F2, field::face::B(), k, j, i);
           vmesh(b, TE::CC, field::cell::B(2), k, j, i) =
-              0.5 * (vmesh(b, TE::F3, field::face::B(), k, j, i) +
-                     vmesh(b, TE::F3, field::face::B(), k + threed, j, i));
+            threed
+              ? (((bnds.x3[1] - xv[2]) * vmesh(b, TE::F3, field::face::B(), k, j, i) +
+                (xv[2] - bnds.x3[0]) *
+                  vmesh(b, TE::F3, field::face::B(), k + threed, j, i)) /
+               (bnds.x3[1] - bnds.x3[0] + Fuzz<Real>()))
+              : vmesh(b, TE::F3, field::face::B(), k, j, i);
           vmesh(b, TE::CC, field::cell::energy(), k, j, i) =
               0.5 * (SQR(vmesh(b, TE::CC, field::cell::B(0), k, j, i)) +
                      SQR(vmesh(b, TE::CC, field::cell::B(1), k, j, i)) +

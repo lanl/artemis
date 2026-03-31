@@ -184,60 +184,75 @@ TaskStatus ApplyFaceUpdate(MeshData<Real> *u0, MeshData<Real> *u1, const Real g0
       u0->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e + 1,
       KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
         geometry::Coords<GEOM> coords(cpars, v0.GetCoordinates(b), k, j, i);
+        geometry::Coords<GEOM> coords_kp(cpars, v0.GetCoordinates(b), k + three_d, j, i);
+        geometry::Coords<GEOM> coords_jp(cpars, v0.GetCoordinates(b), k, j + multi_d, i);
         Real &v0n = v0(b, TE::F1, field::face::B(), k, j, i);
         Real &v1n = v1(b, TE::F1, field::face::B(), k, j, i);
         v0n = g0 * v0n + g1 * v1n;
 
-        const Real bdt = beta_dt / coords.GetFaceAreaX1(vg, b, k, j, i)[0];
-        const Real dl2m = coords.GetEdgeLengthX2(vg, b, k, j, i);
-        const Real dl2p = coords.GetEdgeLengthX2(vg, b, k + three_d, j, i);
-        const Real dl3m = coords.GetEdgeLengthX3(vg, b, k, j, i);
-        const Real dl3p = coords.GetEdgeLengthX3(vg, b, k, j + multi_d, i);
+        const Real bdt = beta_dt / coords.GetFaceAreaX1()[0];
+        const auto &bnds = coords.GetBounds();
+        const auto &bnds_kp = coords_kp.GetBounds();
+        const auto &bnds_jp = coords_jp.GetBounds();
+        const Real dq2m = bnds.x2[1] - bnds.x2[0];
+        const Real dq2p = bnds_kp.x2[1] - bnds_kp.x2[0];
+        const Real dq3m = bnds.x3[1] - bnds.x3[0];
+        const Real dq3p = bnds_jp.x3[1] - bnds_jp.x3[0];
 
-        v0n -= bdt * ((dl3p * v0.flux(b, TE::E3, field::face::B(), k, j + multi_d, i) -
-                       dl3m * v0.flux(b, TE::E3, field::face::B(), k, j, i)) +
-                      (dl2m * v0.flux(b, TE::E2, field::face::B(), k, j, i) -
-                       dl2p * v0.flux(b, TE::E2, field::face::B(), k + three_d, j, i)));
+        v0n -= bdt * ((dq3p * v0.flux(b, TE::E3, field::face::B(), k, j + multi_d, i) -
+                       dq3m * v0.flux(b, TE::E3, field::face::B(), k, j, i)) +
+                      (dq2m * v0.flux(b, TE::E2, field::face::B(), k, j, i) -
+                       dq2p * v0.flux(b, TE::E2, field::face::B(), k + three_d, j, i)));
       });
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "ApplyFaceUpdate::X2", parthenon::DevExecSpace(), 0,
       u0->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e + multi_d, ib.s, ib.e,
       KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
         geometry::Coords<GEOM> coords(cpars, v0.GetCoordinates(b), k, j, i);
+        geometry::Coords<GEOM> coords_kp(cpars, v0.GetCoordinates(b), k + three_d, j, i);
+        geometry::Coords<GEOM> coords_ip(cpars, v0.GetCoordinates(b), k, j, i + 1);
         Real &v0n = v0(b, TE::F2, field::face::B(), k, j, i);
         Real &v1n = v1(b, TE::F2, field::face::B(), k, j, i);
         v0n = g0 * v0n + g1 * v1n;
 
-        const Real bdt = beta_dt / coords.GetFaceAreaX2(vg, b, k, j, i)[0];
-        const Real dl1m = coords.GetEdgeLengthX1(vg, b, k, j, i);
-        const Real dl1p = coords.GetEdgeLengthX1(vg, b, k + three_d, j, i);
-        const Real dl3m = coords.GetEdgeLengthX3(vg, b, k, j, i);
-        const Real dl3p = coords.GetEdgeLengthX3(vg, b, k, j, i + 1);
+        const Real bdt = beta_dt / coords.GetFaceAreaX2()[0];
+        const auto &bnds = coords.GetBounds();
+        const auto &bnds_kp = coords_kp.GetBounds();
+        const auto &bnds_ip = coords_ip.GetBounds();
+        const Real dq1m = bnds.x1[1] - bnds.x1[0];
+        const Real dq1p = bnds_kp.x1[1] - bnds_kp.x1[0];
+        const Real dq3m = bnds.x3[1] - bnds.x3[0];
+        const Real dq3p = bnds_ip.x3[1] - bnds_ip.x3[0];
 
-        v0n -= bdt * ((dl3m * v0.flux(b, TE::E3, field::face::B(), k, j, i) -
-                       dl3p * v0.flux(b, TE::E3, field::face::B(), k, j, i + 1)) +
-                      (dl1p * v0.flux(b, TE::E1, field::face::B(), k + three_d, j, i) -
-                       dl1m * v0.flux(b, TE::E1, field::face::B(), k, j, i)));
+        v0n -= bdt * ((dq3m * v0.flux(b, TE::E3, field::face::B(), k, j, i) -
+                       dq3p * v0.flux(b, TE::E3, field::face::B(), k, j, i + 1)) +
+                      (dq1p * v0.flux(b, TE::E1, field::face::B(), k + three_d, j, i) -
+                       dq1m * v0.flux(b, TE::E1, field::face::B(), k, j, i)));
       });
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "ApplyFaceUpdate::X3", parthenon::DevExecSpace(), 0,
       u0->NumBlocks() - 1, kb.s, kb.e + three_d, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
         geometry::Coords<GEOM> coords(cpars, v0.GetCoordinates(b), k, j, i);
+        geometry::Coords<GEOM> coords_jp(cpars, v0.GetCoordinates(b), k, j + multi_d, i);
+        geometry::Coords<GEOM> coords_ip(cpars, v0.GetCoordinates(b), k, j, i + 1);
         Real &v0n = v0(b, TE::F3, field::face::B(), k, j, i);
         Real &v1n = v1(b, TE::F3, field::face::B(), k, j, i);
         v0n = g0 * v0n + g1 * v1n;
 
-        const Real bdt = beta_dt / coords.GetFaceAreaX3(vg, b, k, j, i)[0];
-        const Real dl1m = coords.GetEdgeLengthX1(vg, b, k, j, i);
-        const Real dl1p = coords.GetEdgeLengthX1(vg, b, k, j + multi_d, i);
-        const Real dl2m = coords.GetEdgeLengthX2(vg, b, k, j, i);
-        const Real dl2p = coords.GetEdgeLengthX2(vg, b, k, j, i + 1);
+        const Real bdt = beta_dt / coords.GetFaceAreaX3()[0];
+        const auto &bnds = coords.GetBounds();
+        const auto &bnds_jp = coords_jp.GetBounds();
+        const auto &bnds_ip = coords_ip.GetBounds();
+        const Real dq1m = bnds.x1[1] - bnds.x1[0];
+        const Real dq1p = bnds_jp.x1[1] - bnds_jp.x1[0];
+        const Real dq2m = bnds.x2[1] - bnds.x2[0];
+        const Real dq2p = bnds_ip.x2[1] - bnds_ip.x2[0];
 
-        v0n -= bdt * ((dl2p * v0.flux(b, TE::E2, field::face::B(), k, j, i + 1) -
-                       dl2m * v0.flux(b, TE::E2, field::face::B(), k, j, i)) +
-                      (dl1m * v0.flux(b, TE::E1, field::face::B(), k, j, i) -
-                       dl1p * v0.flux(b, TE::E1, field::face::B(), k, j + multi_d, i)));
+        v0n -= bdt * ((dq2p * v0.flux(b, TE::E2, field::face::B(), k, j, i + 1) -
+                       dq2m * v0.flux(b, TE::E2, field::face::B(), k, j, i)) +
+                      (dq1m * v0.flux(b, TE::E1, field::face::B(), k, j, i) -
+                       dq1p * v0.flux(b, TE::E1, field::face::B(), k, j + multi_d, i)));
       });
 
   return TaskStatus::complete;

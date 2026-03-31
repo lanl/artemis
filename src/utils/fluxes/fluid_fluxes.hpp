@@ -346,11 +346,13 @@ inline TaskStatus AssembleEdgeEMFImpl(MeshData<Real> *md, PACK v, GEO vg,
           const auto hx2 = coords.template GetScaleFactorsFace<X2DIR>(vg, b, k, j, i);
           const auto hx2_im =
               coords.template GetScaleFactorsFace<X2DIR>(vg, b, k, j, i - 1);
-          v.flux(b, TE::E3, field::face::B(), k, j, i) =
-              0.25 * (-v.flux(b, X1DIR, field::cell::B(1), k, j, i) / hx1[1] -
-                      v.flux(b, X1DIR, field::cell::B(1), k, j - 1, i) / hx1_jm[1] +
-                      v.flux(b, X2DIR, field::cell::B(0), k, j, i) / hx2[0] +
-                      v.flux(b, X2DIR, field::cell::B(0), k, j, i - 1) / hx2_im[0]);
+          const Real h3e = coords.template GetEdgeScaleFactor<X3DIR>(vg, b, k, j, i);
+          Real &emf = v.flux(b, TE::E3, field::face::B(), k, j, i);
+          emf = h3e * 0.25 *
+                (-v.flux(b, X1DIR, field::cell::B(1), k, j, i) / hx1[1] -
+                 v.flux(b, X1DIR, field::cell::B(1), k, j - 1, i) / hx1_jm[1] +
+                 v.flux(b, X2DIR, field::cell::B(0), k, j, i) / hx2[0] +
+                 v.flux(b, X2DIR, field::cell::B(0), k, j, i - 1) / hx2_im[0]);
         });
   } else {
     parthenon::par_for(
@@ -359,8 +361,9 @@ inline TaskStatus AssembleEdgeEMFImpl(MeshData<Real> *md, PACK v, GEO vg,
         KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
           geometry::Coords<G> coords(cpars, vg.GetCoordinates(b), k, j, i);
           const auto hx1 = coords.template GetScaleFactorsFace<X1DIR>(vg, b, k, j, i);
-          v.flux(b, TE::E3, field::face::B(), k, j, i) =
-              -v.flux(b, X1DIR, field::cell::B(1), k, j, i) / hx1[1];
+          const Real h3e = coords.template GetEdgeScaleFactor<X3DIR>(vg, b, k, j, i);
+          Real &emf = v.flux(b, TE::E3, field::face::B(), k, j, i);
+          emf = -h3e * v.flux(b, X1DIR, field::cell::B(1), k, j, i) / hx1[1];
         });
   }
 
@@ -376,11 +379,13 @@ inline TaskStatus AssembleEdgeEMFImpl(MeshData<Real> *md, PACK v, GEO vg,
           const auto hx3 = coords.template GetScaleFactorsFace<X3DIR>(vg, b, k, j, i);
           const auto hx3_im =
               coords.template GetScaleFactorsFace<X3DIR>(vg, b, k, j, i - 1);
-          v.flux(b, TE::E2, field::face::B(), k, j, i) =
-              0.25 * (v.flux(b, X1DIR, field::cell::B(2), k, j, i) / hx1[2] +
-                      v.flux(b, X1DIR, field::cell::B(2), k - 1, j, i) / hx1_km[2] -
-                      v.flux(b, X3DIR, field::cell::B(0), k, j, i) / hx3[0] -
-                      v.flux(b, X3DIR, field::cell::B(0), k, j, i - 1) / hx3_im[0]);
+          const Real h2e = coords.template GetEdgeScaleFactor<X2DIR>(vg, b, k, j, i);
+          Real &emf = v.flux(b, TE::E2, field::face::B(), k, j, i);
+          emf = h2e * 0.25 *
+                (v.flux(b, X1DIR, field::cell::B(2), k, j, i) / hx1[2] +
+                 v.flux(b, X1DIR, field::cell::B(2), k - 1, j, i) / hx1_km[2] -
+                 v.flux(b, X3DIR, field::cell::B(0), k, j, i) / hx3[0] -
+                 v.flux(b, X3DIR, field::cell::B(0), k, j, i - 1) / hx3_im[0]);
         });
 
     if (multi_d) {
@@ -395,11 +400,13 @@ inline TaskStatus AssembleEdgeEMFImpl(MeshData<Real> *md, PACK v, GEO vg,
             const auto hx3 = coords.template GetScaleFactorsFace<X3DIR>(vg, b, k, j, i);
             const auto hx3_jm =
                 coords.template GetScaleFactorsFace<X3DIR>(vg, b, k, j - 1, i);
-            v.flux(b, TE::E1, field::face::B(), k, j, i) =
-                0.25 * (-v.flux(b, X2DIR, field::cell::B(2), k, j, i) / hx2[2] -
-                        v.flux(b, X2DIR, field::cell::B(2), k - 1, j, i) / hx2_km[2] +
-                        v.flux(b, X3DIR, field::cell::B(1), k, j, i) / hx3[1] +
-                        v.flux(b, X3DIR, field::cell::B(1), k, j - 1, i) / hx3_jm[1]);
+            const Real h1e = coords.template GetEdgeScaleFactor<X1DIR>(vg, b, k, j, i);
+            Real &emf = v.flux(b, TE::E1, field::face::B(), k, j, i);
+            emf = h1e * 0.25 *
+                  (-v.flux(b, X2DIR, field::cell::B(2), k, j, i) / hx2[2] -
+                   v.flux(b, X2DIR, field::cell::B(2), k - 1, j, i) / hx2_km[2] +
+                   v.flux(b, X3DIR, field::cell::B(1), k, j, i) / hx3[1] +
+                   v.flux(b, X3DIR, field::cell::B(1), k, j - 1, i) / hx3_jm[1]);
           });
     }
   } else {
@@ -409,8 +416,9 @@ inline TaskStatus AssembleEdgeEMFImpl(MeshData<Real> *md, PACK v, GEO vg,
         KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
           geometry::Coords<G> coords(cpars, vg.GetCoordinates(b), k, j, i);
           const auto hx1 = coords.template GetScaleFactorsFace<X1DIR>(vg, b, k, j, i);
-          v.flux(b, TE::E2, field::face::B(), k, j, i) =
-              v.flux(b, X1DIR, field::cell::B(2), k, j, i) / hx1[2];
+          const Real h2e = coords.template GetEdgeScaleFactor<X2DIR>(vg, b, k, j, i);
+          Real &emf = v.flux(b, TE::E2, field::face::B(), k, j, i);
+          emf = h2e * v.flux(b, X1DIR, field::cell::B(2), k, j, i) / hx1[2];
         });
 
     if (multi_d) {
@@ -420,8 +428,9 @@ inline TaskStatus AssembleEdgeEMFImpl(MeshData<Real> *md, PACK v, GEO vg,
           KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
             geometry::Coords<G> coords(cpars, vg.GetCoordinates(b), k, j, i);
             const auto hx2 = coords.template GetScaleFactorsFace<X2DIR>(vg, b, k, j, i);
-            v.flux(b, TE::E1, field::face::B(), k, j, i) =
-                -v.flux(b, X2DIR, field::cell::B(2), k, j, i) / hx2[2];
+            const Real h1e = coords.template GetEdgeScaleFactor<X1DIR>(vg, b, k, j, i);
+            Real &emf = v.flux(b, TE::E1, field::face::B(), k, j, i);
+            emf = -h1e * v.flux(b, X2DIR, field::cell::B(2), k, j, i) / hx2[2];
           });
     }
   }
@@ -445,8 +454,8 @@ inline TaskStatus AssembleEdgeEMF(MeshData<Real> *md) {
   static auto desc_g =
       MakePackDescriptor<geom::x1v, geom::x2v, geom::x3v, geom::dx1, geom::dx2, geom::dx3,
                          geom::hx1f1, geom::hx2f1, geom::hx3f1, geom::hx1f2, geom::hx2f2,
-                         geom::hx3f2, geom::hx1f3, geom::hx2f3, geom::hx3f3>(
-          resolved_pkgs.get());
+                         geom::hx3f2, geom::hx1f3, geom::hx2f3, geom::hx3f3, geom::hx1e1,
+                         geom::hx2e2, geom::hx3e3>(resolved_pkgs.get());
   const auto v = desc.GetPack(md);
   const auto vg = desc_g.GetPack(md);
 
@@ -584,21 +593,21 @@ TaskStatus FluxSourceImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, CONS vcons, FAC
           } else if constexpr (F == Fluid::gas) {
             // Pressure gradient force
             Real Pl = vp_.flux(b, d1, IPR, k, j, i) +
-                      (mhd)*vp_.flux(b, d1, field::cell::energy(), k, j, i);
+                      (mhd ? vp_.flux(b, d1, field::cell::energy(), k, j, i) : 0.0);
             Real Pr = vp_.flux(b, d1, IPR, k, j, i + 1) +
-                      (mhd)*vp_.flux(b, d1, field::cell::energy(), k, j, i + 1);
+                      (mhd ? vp_.flux(b, d1, field::cell::energy(), k, j, i + 1) : 0.0);
             vc_(b, IMX, k, j, i) += dtdx[0] * (Pl - Pr);
 
             Pl = vp_.flux(b, d2, IPR, k, j, i) +
-                 (mhd)*vp_.flux(b, d2, field::cell::energy(), k, j, i);
+                 (mhd ? vp_.flux(b, d2, field::cell::energy(), k, j, i) : 0.0);
             Pr = vp_.flux(b, d2, IPR, k, j + multi_d, i) +
-                 (mhd)*vp_.flux(b, d2, field::cell::energy(), k, j + multi_d, i);
+                 (mhd ? vp_.flux(b, d2, field::cell::energy(), k, j + multi_d, i) : 0.0);
             vc_(b, IMY, k, j, i) += dtdx[1] * (Pl - Pr);
 
             Pl = vp_.flux(b, d3, IPR, k, j, i) +
-                 (mhd)*vp_.flux(b, d3, field::cell::energy(), k, j, i);
+                 (mhd ? vp_.flux(b, d3, field::cell::energy(), k, j, i) : 0.0);
             Pr = vp_.flux(b, d3, IPR, k + three_d, j, i) +
-                 (mhd)*vp_.flux(b, d3, field::cell::energy(), k + three_d, j, i);
+                 (mhd ? vp_.flux(b, d3, field::cell::energy(), k + three_d, j, i) : 0.0);
             vc_(b, IMZ, k, j, i) += dtdx[2] * (Pl - Pr);
 
             // pdV source term
@@ -643,11 +652,11 @@ TaskStatus FluxSourceImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, CONS vcons, FAC
             } else if constexpr (F == Fluid::gas) {
               // Update momenta with mhd
               const Real t1 = SQR(vp_(b, IVX, k, j, i) + rfv[0]) -
-                              (mhd)*SQR(vp_(b, field::cell::B(0), k, j, i));
+                              (mhd ? SQR(vp_(b, field::cell::B(0), k, j, i)) : 0.0);
               const Real t2 = SQR(vp_(b, IVY, k, j, i) + rfv[1]) -
-                              (mhd)*SQR(vp_(b, field::cell::B(1), k, j, i));
+                              (mhd ? SQR(vp_(b, field::cell::B(1), k, j, i)) : 0.0);
               const Real t3 = SQR(vp_(b, IVZ, k, j, i) + rfv[2]) -
-                              (mhd)*SQR(vp_(b, field::cell::B(2), k, j, i));
+                              (mhd ? SQR(vp_(b, field::cell::B(2), k, j, i)) : 0.0);
               vc_(b, IMX, k, j, i) +=
                   x1dep_ * wdt * (dh1[0] * t1 + dh1[1] * t2 + dh1[2] * t3);
               vc_(b, IMY, k, j, i) +=

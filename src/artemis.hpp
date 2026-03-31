@@ -106,15 +106,9 @@ namespace field {
 namespace face {
 ARTEMIS_VARIABLE(field.face, B);
 } // namespace face
-namespace edge {
-ARTEMIS_VARIABLE(field.edge, E);
-ARTEMIS_VARIABLE(field.edge, J);
-} // namespace edge
 namespace cell {
 ARTEMIS_VARIABLE(field.cell, B);
 ARTEMIS_VARIABLE(field.cell, energy);
-ARTEMIS_VARIABLE(field.cell, E);
-ARTEMIS_VARIABLE(field.cell, J);
 ARTEMIS_VARIABLE(field.cell, divB);
 } // namespace cell
 } // namespace field

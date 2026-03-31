@@ -50,11 +50,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
                          Metadata::WithFluxes, Metadata::FillGhost});
   ArtemisUtils::EnrollArtemisFaceRefinementOps(m, coords, log);
   mhd->AddField<field::face::B>(m);
-  //   m = Metadata(
-  //       {Metadata::Edge, Metadata::Conserved, Metadata::Independent,
-  //       Metadata::WithFluxes});
-  //   mhd->AddField<field::edge::E>(m);
-  //   mhd->AddField<field::edge::J>(m);
+
   m = Metadata({Metadata::Cell, Metadata::Derived, Metadata::Intensive, Metadata::OneCopy,
                 Metadata::FillGhost, Metadata::WithFluxes},
                std::vector<int>({3}));
@@ -66,13 +62,6 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
 
   m = Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy});
   mhd->AddField<field::cell::divB>(m);
-
-  //   m = Metadata({Metadata::Cell, Metadata::Derived, Metadata::Intensive,
-  //   Metadata::OneCopy,
-  //                 Metadata::FillGhost},
-  //                std::vector<int>({3}));
-  //   mhd->AddField<field::cell::E>(m);
-  //   mhd->AddField<field::cell::J>(m);
   return mhd;
 }
 

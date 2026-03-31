@@ -39,7 +39,7 @@ artemis:
     _description: "How to provide unit conversions between code and physical units"
     base:
       _type: opt
-      _description: "Provide base unit conversions (length, time, mass, temperature)"
+      _description: "Provide base unit conversions (length, time, mass, temperature, current)"
     ppd:
       _type: opt
       _description: "AU, Year/(2 pi), solar mass units for protoplanetary disks"
@@ -59,6 +59,10 @@ artemis:
     _type: "Real"
     _default: "1.0"
     _description: "Physical units value of temperature equal to 1 code unit"
+  current:
+    _type: "Real"
+    _default: "1.0"
+    _description: "Physical units value of electrical current equal to 1 code unit; used to derive magnetic-field and magnetic-permeability conversions"
   radial_spacing:
     _type: string
     _default: "uniform"
@@ -70,6 +74,10 @@ physics:
     _type: "bool"
     _default: "true"
     _description: "Turn on the gas fluid"
+  mhd:
+    _type: "bool"
+    _default: "false"
+    _description: "Turn on ideal MHD and constrained-transport magnetic fields"
   dust:
     _type: "bool"
     _default: "false"

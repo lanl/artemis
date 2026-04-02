@@ -289,12 +289,15 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
             vb[2] * dens + v0(b, gas::cons::momentum(2), k, j, i) / hx[2]};
 
         Real E0 = v0(b, rad::cons::energy(), k, j, i);
-        // choose the ref scale
-
-        Real eref = std::sqrt(E0 * B);
-        if (eref == 0.0) eref = 0.5 * (E0 + B);
+        // choose a strictly positive reference scale to keep the normalized solve finite
+        const Real erad_floor = arad * SQR(SQR(tfloor));
+        const Real eref_geom = std::sqrt(std::max(E0, static_cast<Real>(0.0)) *
+                                         std::max(B, static_cast<Real>(0.0)));
+        const Real eref_avg = 0.5 * (std::abs(E0) + std::abs(B));
+        const Real eref =
+            std::max(erad_floor, std::max(eref_geom, std::max(eref_avg, Fuzz<Real>())));
         const Real fref = c * eref;
-        const Real efloor = SQR(SQR(tfloor)) * arad / eref;
+        const Real efloor = erad_floor / eref;
         const Real Bfloor = efloor;
 
         Q /= eref;
@@ -326,14 +329,25 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
         Real dEg = 0.0;
         Real dEr = 0.0;
         const Real icc = 1. / (c * chat * dens);
-        Real escale = et0 + c / chat * E;
+        const Real escale_floor = std::max(efloor, Fuzz<Real>());
+        const Real beta2_max = 1.0 - 1.0e-12;
 
         for (outer_iter = 1; outer_iter <= outer_max; outer_iter++) {
+          const Real E_prev = E;
+          const auto F_prev = F;
+          const auto v_prev = v;
 
           // Set some v and F quantities
           Real ke = 0.5 * dens * (SQR(v[0]) + SQR(v[1]) + SQR(v[2])) / eref;
           std::array<Real, 3> beta{v[0] / c, v[1] / c, v[2] / c};
-          const Real beta2 = SQR(beta[0]) + SQR(beta[1]) + SQR(beta[2]);
+          Real beta2 = SQR(beta[0]) + SQR(beta[1]) + SQR(beta[2]);
+          if (beta2 > beta2_max) {
+            const Real fac = std::sqrt(beta2_max / (beta2 + Fuzz<Real>()));
+            beta[0] *= fac;
+            beta[1] *= fac;
+            beta[2] *= fac;
+            beta2 = SQR(beta[0]) + SQR(beta[1]) + SQR(beta[2]);
+          }
           const Real g2 = 1. / (1. - beta2);
           const Real g = std::sqrt(g2);
 
@@ -381,6 +395,8 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
             Real Bnew = B + dB;
             B = (Bnew < Bfloor) ? Bfloor : Bnew;
 
+            const Real escale =
+                std::max(std::abs(et) + c / chat * std::abs(E), escale_floor);
             inner_err =
                 std::max((std::abs(Fi) / escale), (c / chat * std::abs(Fr) / escale));
             if (inner_err <= inner_tol) {
@@ -415,24 +431,94 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
                                         Fr0[1] + d1 * beta[1] + d2 * bdp[1],
                                         Fr0[2] + d1 * beta[2] + d2 * bdp[2]};
 
-          F = SolveRadFlux(1. + a, b, beta, rhs);
-
-          for (int d = 0; d < 3; d++) {
-            dF[d] = F[d] - Fr0[d];
-            dv[d] = -icc * dF[d] * fref;
-            v[d] = p0[d] / dens + dv[d];
-          }
-
           const Real dEk_prev = dEk;
-          dEk = 0.5 * dens *
-                (dv[0] * (v[0] + p0[0] / dens) + dv[1] * (v[1] + p0[1] / dens) +
-                 dv[2] * (v[2] + p0[2] / dens)) /
-                eref;
-          dEr = -chat / c * (dEg + dEk);
-          E = E0 + dEr;
+          const auto Fsolve = SolveRadFlux(1. + a, b, beta, rhs);
+          Real damp = 1.0;
+          Real Econs = E0;
+          for (int damp_iter = 0; damp_iter < 8; damp_iter++) {
+            for (int d = 0; d < 3; d++) {
+              F[d] = Fr0[d] + damp * (Fsolve[d] - Fr0[d]);
+              dF[d] = F[d] - Fr0[d];
+              dv[d] = -icc * dF[d] * fref;
+              v[d] = p0[d] / dens + dv[d];
+            }
 
-          // This needs to be something else related to the change from the last iteration
-          outer_err = std::abs(dEk - dEk_prev) / escale;
+            dEk = 0.5 * dens *
+                  (dv[0] * (v[0] + p0[0] / dens) + dv[1] * (v[1] + p0[1] / dens) +
+                   dv[2] * (v[2] + p0[2] / dens)) /
+                  eref;
+            dEr = -chat / c * (dEg + dEk);
+            Econs = E0 + dEr;
+            if (Econs >= efloor) {
+              break;
+            }
+            damp *= 0.5;
+          }
+          E = (Econs < efloor) ? efloor : Econs;
+
+          Real ke_outer = 0.5 * dens * (SQR(v[0]) + SQR(v[1]) + SQR(v[2])) / eref;
+          std::array<Real, 3> beta_outer{v[0] / c, v[1] / c, v[2] / c};
+          Real beta2_outer = SQR(beta_outer[0]) + SQR(beta_outer[1]) + SQR(beta_outer[2]);
+          if (beta2_outer > beta2_max) {
+            const Real fac = std::sqrt(beta2_max / (beta2_outer + Fuzz<Real>()));
+            beta_outer[0] *= fac;
+            beta_outer[1] *= fac;
+            beta_outer[2] *= fac;
+            beta2_outer = SQR(beta_outer[0]) + SQR(beta_outer[1]) + SQR(beta_outer[2]);
+          }
+          const Real g2_outer = 1. / (1. - beta2_outer);
+          const Real g_outer = std::sqrt(g2_outer);
+
+          auto fedd_outer =
+              EddingtonTensor<CLOSURE>({F[0] / (c * E), F[1] / (c * E), F[2] / (c * E)});
+          std::array<Real, 3> bdp_outer{beta_outer[0] * fedd_outer[TensIdx::X11] +
+                                            beta_outer[1] * fedd_outer[TensIdx::X12] +
+                                            beta_outer[2] * fedd_outer[TensIdx::X13],
+                                        beta_outer[0] * fedd_outer[TensIdx::X12] +
+                                            beta_outer[1] * fedd_outer[TensIdx::X22] +
+                                            beta_outer[2] * fedd_outer[TensIdx::X23],
+                                        beta_outer[0] * fedd_outer[TensIdx::X13] +
+                                            beta_outer[1] * fedd_outer[TensIdx::X23] +
+                                            beta_outer[2] * fedd_outer[TensIdx::X33]};
+          const Real bdbdp_outer = beta_outer[0] * bdp_outer[0] +
+                                   beta_outer[1] * bdp_outer[1] +
+                                   beta_outer[2] * bdp_outer[2];
+          const Real bdf_outer =
+              beta_outer[0] * F[0] + beta_outer[1] * F[1] + beta_outer[2] * F[2];
+          const Real sigp_outer =
+              chat * dt * opac_d.PlanckMeanAbsorptionCoefficient(dens, T);
+          const Real sigs_outer =
+              chat * dt * scat_d.RosselandMeanTotalScatteringCoefficient(dens, T);
+          const Real sigf_outer = sigp_outer + sigs_outer;
+          const Real ca_outer =
+              g_outer * (sigf_outer - g2_outer * sigs_outer * (1. + bdbdp_outer));
+          const Real cb_outer = g_outer * sigp_outer;
+          const Real cd_outer =
+              -g_outer * bdf_outer * (sigf_outer - 2. * g2_outer * sigs_outer);
+          const Real et_outer = ke_outer + eg;
+          const Real G0_outer = ca_outer * E - cb_outer * B + cd_outer;
+          const Real Fi_outer = (et_outer - et0) - c / chat * G0_outer - Q;
+          const Real Fr_outer = (E - E0) + G0_outer;
+          const Real escale =
+              std::max(std::abs(et_outer) + c / chat * std::abs(E), escale_floor);
+          Real flux_change = 0.0;
+          Real vel_change = 0.0;
+          for (int d = 0; d < 3; d++) {
+            const Real flux_scale = std::abs(F[d]) + std::abs(F_prev[d]) + Fuzz<Real>();
+            flux_change = std::max(flux_change, std::abs(F[d] - F_prev[d]) / flux_scale);
+            const Real vel_scale = std::abs(v[d]) + std::abs(v_prev[d]) + Fuzz<Real>();
+            vel_change = std::max(vel_change, std::abs(v[d] - v_prev[d]) / vel_scale);
+          }
+          const Real energy_change = std::abs(E - E_prev) / escale;
+          outer_err = std::max(std::abs(Fi_outer) / escale,
+                               c / chat * std::abs(Fr_outer) / escale);
+          outer_err = std::max(outer_err, std::abs(dEk - dEk_prev) / escale);
+          outer_err = std::max(outer_err, flux_change);
+          outer_err = std::max(outer_err, vel_change);
+          outer_err = std::max(outer_err, energy_change);
+          if (Econs < efloor) {
+            outer_err = std::max(outer_err, 1.0 + outer_tol);
+          }
           if (outer_err <= outer_tol) {
             break;
           }

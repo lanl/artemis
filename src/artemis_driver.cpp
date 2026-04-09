@@ -238,7 +238,7 @@ TaskCollection ArtemisDriver<GEOM>::StepTasks() {
     const Real bdt = integrator->beta[stage - 1] * integrator->dt;
 
     // Compute gravitational potential
-    if (do_self_gravity) SelfGravity::SolvePoisson(tc, pmesh);
+    if (do_self_gravity) SelfGravity::SolvePoisson(tc, pmesh, time, stage);
 
     TaskRegion &tr = tc.AddRegion(num_partitions);
     for (int i = 0; i < num_partitions; i++) {
@@ -330,8 +330,8 @@ TaskCollection ArtemisDriver<GEOM>::StepTasks() {
       // NOTE(@pdmullen): RK integrated, operator split cooling (RHS computed from U)
       TaskID cooling_src = drag_src;
       if (do_cooling) {
-        cooling_src =
-            tl.AddTask(drag_src, Gas::Cooling::CoolingSource<GEOM>, u0.get(), time, bdt);
+        cooling_src = tl.AddTask(drag_src, Gas::Cooling::CoolingSource<GEOM>, u0.get(),
+                                 time, bdt, stage);
       }
 
       // Set auxillary fields

@@ -179,6 +179,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
 
   params.Add("solver_pointer", psolver);
 
+  // Enroll in tstart/tstop machinery
+  ArtemisUtils::AddPackageTimeParams(params, block_name, pin);
+
   return self_gravity;
 }
 

@@ -33,6 +33,7 @@
 // Artemis includes
 #include "self_gravity/poisson_equation.hpp"
 #include "self_gravity/self_gravity.hpp"
+#include "utils/artemis_utils.hpp"
 
 using namespace parthenon::driver::prelude;
 
@@ -41,11 +42,26 @@ namespace SelfGravity {
 //----------------------------------------------------------------------------------------
 //! \fn TaskListStatus SelfGravity::PoissonDriver
 //! \brief
-void SolvePoisson(TaskCollection &tc, Mesh *pmesh) {
+void SolvePoisson(TaskCollection &tc, Mesh *pmesh, const Real time, const int stage) {
   using namespace parthenon;
   TaskID none(0);
 
   auto pkg = pmesh->packages.Get("self_gravity");
+
+  // Check if this package is active
+  const auto active = ArtemisUtils::CheckPackageStatus(pkg, time);
+  if (active == ArtemisUtils::PackageControl::inactive) {
+    return;
+  } else if (active == ArtemisUtils::PackageControl::shutdown) {
+    if ((Globals::my_rank == 0) && (stage == 1)) {
+      printf("Turning off self-gravity at t=%.8e...\n", time);
+    }
+    return;
+  } else if (active == ArtemisUtils::PackageControl::initial) {
+    if ((Globals::my_rank == 0) && (stage == 1)) {
+      printf("Turning on self-gravity at t=%.8e...\n", time);
+    }
+  }
   auto psolver =
       pkg->Param<std::shared_ptr<parthenon::solvers::SolverBase>>("solver_pointer");
 

@@ -40,6 +40,7 @@ template <Coordinates GEOM>
 TaskCollection MomentsTasks(Mesh *pmesh, const SimTime &tm,
                             parthenon::LowStorageIntegrator *integrator);
 
+template <Coordinates GEOM>
 void InitMesh(parthenon::Mesh *pmesh);
 //----------------------------------------------------------------------------------------
 //! \fn Real Moments::EstimateTimeStep

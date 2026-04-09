@@ -41,7 +41,7 @@ TaskListStatus MomentsDriver(Mesh *pmesh, const SimTime &tm,
     if (Globals::my_rank == 0) {
       printf("Turning on radiation moments at t=%.8e...\n", tm.time);
     }
-    Moments::InitMesh(pmesh);
+    Moments::InitMesh<GEOM>(pmesh);
   }
   const Real dtlimit = Moments::EstimateTimeStep<GEOM>(pmesh);
   const int nsteps = static_cast<int>(std::ceil(integrator->dt / dtlimit));

@@ -24,3 +24,11 @@ self_gravity:
     _type: Real
     _description: "Residual tolerance for Poisson solver"
     _default: 1.0e-12
+  tstart:
+    _type: Real
+    _description: "Turn on self-gravity at this time"
+    _default: "0.0"
+  tstop:
+    _type: Real
+    _description: "Turn off self-gravity at this time"
+    _default: "1e99"

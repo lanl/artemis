@@ -28,7 +28,7 @@ TaskListStatus MomentsDriver(Mesh *pmesh, const SimTime &tm,
                              parthenon::LowStorageIntegrator *integrator) {
   PARTHENON_INSTRUMENT
   // Craft a series of **equal** substeps that sum to the unsplit step
-  auto &pkg = pmesh->packages.Get("moments");
+  auto &pkg = pmesh->packages.Get("radiation");
   const auto active = ArtemisUtils::CheckPackageStatus(pkg, tm.time);
   if (active == ArtemisUtils::PackageControl::inactive) {
     return TaskListStatus::complete;

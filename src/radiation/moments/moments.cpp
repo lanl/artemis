@@ -92,8 +92,6 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   params.Add("full_coupling",
              pin->GetOrAddBoolean("radiation/moment", "full_coupling", true));
 
-  ArtemisUtils::AddPackageTimeParams(params, "radiation/moment", pin);
-
   // Radiation constants (including chat for Moments)
   // NOTE(@pdmullen): These are also stored in top level radiation package...
   const Real light = constants.GetCCode();

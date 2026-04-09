@@ -42,18 +42,26 @@ template <typename T>
 KOKKOS_FORCEINLINE_FUNCTION Real
 GetSpecificInternalEnergy(T &vmesh, const int b, const int n, const int k, const int j,
                           const int i, const Real de_switch, const Real dflr,
-                          const Real sieflr, const std::array<Real, 3> &hx) {
+                          const Real sieflr, const std::array<Real, 3> &hx,
+			  const bool do_mhd) { // YH: add mhd
   // Calculate kinetic energy
   const Real u_d = std::max(vmesh(b, gas::cons::density(n), k, j, i), dflr);
   const Real &rv1 = vmesh(b, gas::cons::momentum(VI(n, 0)), k, j, i) / hx[0];
   const Real &rv2 = vmesh(b, gas::cons::momentum(VI(n, 1)), k, j, i) / hx[1];
   const Real &rv3 = vmesh(b, gas::cons::momentum(VI(n, 2)), k, j, i) / hx[2];
   const Real ke = 0.5 * (SQR(rv1) + SQR(rv2) + SQR(rv3)) / u_d;
+  Real Bmag = 0.;
+  if (do_mhd) {
+    const Real &B1 = vmesh(b, gas::cons::Bfield(0), k, j, i);
+    const Real &B2 = vmesh(b, gas::cons::Bfield(1), k, j, i);
+    const Real &B3 = vmesh(b, gas::cons::Bfield(2), k, j, i);
+    Bmag = 0.5 * (SQR(B1) + SQR(B2) + SQR(B3));
+  }
 
   // Calculate conserved representation of
   // internal energy
   const Real e_cons = vmesh(b, gas::cons::total_energy(n), k, j, i);
-  const Real ue_cons = e_cons - ke;
+  const Real ue_cons = e_cons - ke - Bmag;
   const Real sie = (ue_cons > de_switch * e_cons)
                        ? ue_cons / u_d
                        : vmesh(b, gas::cons::internal_energy(n), k, j, i) / u_d;
@@ -69,12 +77,13 @@ GetSpecificInternalEnergy(T &vmesh, const int b, const int n, const int k, const
 template <Coordinates GEOM, typename T>
 KOKKOS_FORCEINLINE_FUNCTION Real GetSpecificInternalEnergy(
     T &vmesh, const int b, const int n, const int k, const int j, const int i,
-    const Real de_switch, const Real dflr, const Real sieflr) {
+    const Real de_switch, const Real dflr, const Real sieflr,
+    const bool do_mhd) { // YH: add mhd
   // Get scale factors
   geometry::Coords<GEOM> coords(vmesh.GetCoordinates(b), k, j, i);
   const auto &hx = coords.GetScaleFactors();
 
-  return GetSpecificInternalEnergy(vmesh, b, n, k, j, i, de_switch, dflr, sieflr, hx);
+  return GetSpecificInternalEnergy(vmesh, b, n, k, j, i, de_switch, dflr, sieflr, hx, do_mhd);
 }
 
 //----------------------------------------------------------------------------------------
@@ -183,7 +192,7 @@ void PrintArtemisConfiguration(Packages_t &packages);
 void EnrollArtemisRefinementOps(parthenon::Metadata &m, Coordinates coords);
 std::vector<std::vector<Real>> loadtxt(std::string fname);
 
-KOKKOS_FUNCTION
+KOKKOS_INLINE_FUNCTION
 Real CutCell2D(const std::array<Real, 4> &x, const std::array<Real, 4> &y,
                const std::array<Real, 2> &xc, const std::array<Real, 2> &nx);
 

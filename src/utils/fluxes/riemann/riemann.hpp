@@ -30,7 +30,7 @@ class RiemannSolver {
   solve(const EOS &eos, parthenon::team_mbr_t const &member, const int b, const int k,
         const int j, const int il, const int iu, const int dir,
         const parthenon::ScratchPad2D<Real> &wl, const parthenon::ScratchPad2D<Real> &wr,
-        const V1 &p, const V2 &q) const {
+        const V1 &p, const V2 &q, const bool do_mhd) const {
     PARTHENON_FAIL("No default implementation!");
   }
 };
@@ -41,5 +41,14 @@ class RiemannSolver {
 #include "hllc.hpp"
 #include "hlle.hpp"
 #include "llf.hpp"
-
+#include "../../../mhd/fluxes/riemann/hlld.hpp"
+#include "../../../mhd/fluxes/riemann/llf_xmhd.hpp"
+#include "../../../mhd/fluxes/riemann/hlld_xmhd.hpp"
+#include "../../../mhd/fluxes/riemann/llf_hall_xmhd.hpp"
+#include "../../../mhd/fluxes/riemann/hll_hall_xmhd.hpp"
+#include "../../../mhd/fluxes/riemann/hlle_hall_xmhd.hpp"
+#include "../../../mhd/fluxes/riemann/hlldc_llf_hall_xmhd.hpp"  // LLF-LLF + HLLD-HLLC
+#include "../../../mhd/fluxes/riemann/hlldc_hall_xmhd.hpp" // HLLD-HLL
+#include "../../../mhd/fluxes/riemann/hlldc_xmhd.hpp"
+#include "../../../mhd/fluxes/riemann/hlldc_llf_xmhd.hpp"
 #endif // ARTEMIS_UTILS_FLUXES_RIEMANN_RIEMANN_HPP_

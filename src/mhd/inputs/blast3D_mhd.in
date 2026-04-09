@@ -1,0 +1,82 @@
+# ========================================================================================
+#  (C) (or copyright) 2023-2024. Triad National Security, LLC. All rights reserved.
+#
+#  This program was produced under U.S. Government contract 89233218CNA000001 for Los
+#  Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
+#  for the U.S. Department of Energy/National Nuclear Security Administration. All rights
+#  in the program are reserved by Triad National Security, LLC, and the U.S. Department
+#  of Energy/National Nuclear Security Administration. The Government is granted for
+#  itself and others acting on its behalf a nonexclusive, paid-up, irrevocable worldwide
+#  license in this material to reproduce, prepare derivative works, distribute copies to
+#  the public, perform publicly and display publicly, and to permit others to do so.
+# ========================================================================================
+
+<artemis>
+problem = blast3D_mhd          # name of the pgen
+coordinates = cartesian  # coordinate system
+
+<parthenon/job>
+problem_id = blast3D_mhd  # problem ID: basename of output filenames
+
+<parthenon/output1>
+variables = gas.prim.density,  &
+            gas.prim.velocity, &
+            gas.prim.pressure, &
+	    gas.prim.Bfield, &   # I can compare to fcc to validate
+	    gas.cons.divB, &
+	    gas.face.bfield
+file_type = hdf5  # HDF5 data dump
+dt        = 0.002   # time increment between outputs
+ncycle    = 1
+
+<parthenon/time>
+nlim       = -1  # cycle limit
+tlim       = 0.01  # time limit
+integrator = rk2  # time integration algorithm
+ncycle_out = 100  # interval for stdout summary info
+
+<parthenon/mesh>
+nghost = 2
+refinement = adaptive
+numlevel = 3
+
+nx1    = 64       # Number of zones in X1-direction
+x1min  = -0.5       # minimum value of X1
+x1max  = 0.5       # maximum value of X1
+ix1_bc = outflow        
+ox1_bc = outflow        
+
+nx2    = 64         # Number of zones in X2-direction
+x2min  = -0.5       # minimum value of X2
+x2max  = 0.5       # maximum value of X2
+ix2_bc = outflow  # inner-X2 boundary flag
+ox2_bc = outflow  # outer-X2 boundary flag
+
+nx3    = 64         # Number of zones in X3-direction
+x3min  = -0.5       # minimum value of X3
+x3max  = 0.5       # maximum value of X3
+ix3_bc = outflow  # inner-X3 boundary flag
+ox3_bc = outflow  # outer-X3 boundary flag
+
+<parthenon/meshblock>
+nx1 = 32  # Number of cells in each MeshBlock, X1-dir
+nx2 = 32    # Number of cells in each MeshBlock, X2-dir
+nx3 = 32    # Number of cells in each MeshBlock, X3-dir
+
+<physics>
+gas = true
+mhd = true
+
+<gas>
+gamma = 1.4   # adiabatic index
+cfl = 0.3           # CFL number
+reconstruct = plm   # reconstruction algorithm
+riemann = llf      # Riemann solver
+dfloor = 1.0e-10
+siefloor = 1.0e-10
+refine_field = pressure
+refine_type = gradient
+refine_thr = 1000.0
+
+<problem>
+rdisc = 0.1

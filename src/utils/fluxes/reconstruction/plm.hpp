@@ -20,6 +20,8 @@
 // Artemis includes
 #include "artemis.hpp"
 
+#include "slope_limiter.hpp"
+
 // NOTE(PDMM): The following is taken directly from the open-source AthenaK software, and
 // adapted for Parthenon/Artemis by PDM
 
@@ -30,15 +32,13 @@ namespace ArtemisUtils {
 //! reconstruction in any dimension by passing in the appropriate q_im1, q_i, and q_ip1.
 KOKKOS_INLINE_FUNCTION
 void PLM(const Real &q_im1, const Real &q_i, const Real &q_ip1, Real &ql_ip1,
-         Real &qr_i) {
+         Real &qr_i, const TVDType TVD_type = TVDType::Original) {
   // compute L/R slopes
   Real dql = (q_i - q_im1);
   Real dqr = (q_ip1 - q_i);
 
-  // Apply limiters for Cartesian-like coordinate with uniform mesh spacing
-  Real dq2 = dql * dqr;
-  Real dqm = dq2 / (dql + dqr);
-  if (dq2 <= 0.0) dqm = 0.0;
+  // YH: Limit slope here e.g., TVD
+  Real dqm = 0.5 * ApplyTVD(TVD_type, dql, dqr);
 
   // compute ql_(i+1/2) and qr_(i-1/2) using limited slopes
   ql_ip1 = q_i + dqm;
@@ -82,14 +82,15 @@ class Reconstruction<ReconstructionMethod::plm, X1DIR, GEOM> {
   KOKKOS_INLINE_FUNCTION void apply(parthenon::team_mbr_t const &member, const int b,
                                     const int k, const int j, const int il, const int iu,
                                     const V &q, parthenon::ScratchPad2D<Real> &ql,
-                                    parthenon::ScratchPad2D<Real> &qr) const {
+                                    parthenon::ScratchPad2D<Real> &qr,
+				    const TVDType TVD_type) const {
     auto &pco = q.GetCoordinates(b);
     for (int n = q.GetLowerBound(b); n <= q.GetUpperBound(b); ++n) {
       parthenon::par_for_inner(
           DEFAULT_INNER_LOOP_PATTERN, member, il, iu, [&](const int i) {
             if constexpr (GEOM == Coordinates::cartesian) {
               PLM(q(b, n, k, j, i - 1), q(b, n, k, j, i), q(b, n, k, j, i + 1),
-                  ql(n, i + 1), qr(n, i));
+                  ql(n, i + 1), qr(n, i), TVD_type);
             } else {
               geometry::Coords<GEOM> coords_m(pco, k, j, i - 1);
               geometry::Coords<GEOM> coords_c(pco, k, j, i);
@@ -116,14 +117,15 @@ class Reconstruction<ReconstructionMethod::plm, X2DIR, GEOM> {
   KOKKOS_INLINE_FUNCTION void apply(parthenon::team_mbr_t const &member, const int b,
                                     const int k, const int j, const int il, const int iu,
                                     const V &q, parthenon::ScratchPad2D<Real> &ql_jp1,
-                                    parthenon::ScratchPad2D<Real> &qr_j) const {
+                                    parthenon::ScratchPad2D<Real> &qr_j,
+				    const TVDType TVD_type) const {
     auto &pco = q.GetCoordinates(b);
     for (int n = q.GetLowerBound(b); n <= q.GetUpperBound(b); ++n) {
       parthenon::par_for_inner(
           DEFAULT_INNER_LOOP_PATTERN, member, il, iu, [&](const int i) {
             if constexpr (GEOM == Coordinates::cartesian) {
               PLM(q(b, n, k, j - 1, i), q(b, n, k, j, i), q(b, n, k, j + 1, i),
-                  ql_jp1(n, i), qr_j(n, i));
+                  ql_jp1(n, i), qr_j(n, i), TVD_type);
             } else {
               geometry::Coords<GEOM> coords_m(pco, k, j - 1, i);
               geometry::Coords<GEOM> coords_c(pco, k, j, i);
@@ -150,14 +152,15 @@ class Reconstruction<ReconstructionMethod::plm, X3DIR, GEOM> {
   KOKKOS_INLINE_FUNCTION void apply(parthenon::team_mbr_t const &member, const int b,
                                     const int k, const int j, const int il, const int iu,
                                     const V &q, parthenon::ScratchPad2D<Real> &ql_kp1,
-                                    parthenon::ScratchPad2D<Real> &qr_k) const {
+                                    parthenon::ScratchPad2D<Real> &qr_k,
+				    const TVDType TVD_type) const {
     auto &pco = q.GetCoordinates(b);
     for (int n = q.GetLowerBound(b); n <= q.GetUpperBound(b); ++n) {
       parthenon::par_for_inner(
           DEFAULT_INNER_LOOP_PATTERN, member, il, iu, [&](const int i) {
             if constexpr (GEOM == Coordinates::cartesian) {
               PLM(q(b, n, k - 1, j, i), q(b, n, k, j, i), q(b, n, k + 1, j, i),
-                  ql_kp1(n, i), qr_k(n, i));
+                  ql_kp1(n, i), qr_k(n, i), TVD_type);
             } else {
               geometry::Coords<GEOM> coords_m(pco, k - 1, j, i);
               geometry::Coords<GEOM> coords_c(pco, k, j, i);

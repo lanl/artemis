@@ -50,7 +50,8 @@ class RiemannSolver<RSolver::hllc, FLUID_TYPE> {
   solve(const EOS &eos, parthenon::team_mbr_t const &member, const int b, const int k,
         const int j, const int il, const int iu, const int dir,
         const parthenon::ScratchPad2D<Real> &wl, const parthenon::ScratchPad2D<Real> &wr,
-        const V1 &p, const V2 &q, const V3 &vf) const {
+        const V1 &p, const V2 &q, const V3 &vf,
+	const bool do_mhd) const { // YH: add mhd
     using TE = parthenon::TopologicalElement;
     // Check sensibility of flux direction
     PARTHENON_REQUIRE(dir > 0 && dir <= 3, "Invalid flux direction!");
@@ -107,13 +108,13 @@ class RiemannSolver<RSolver::hllc, FLUID_TYPE> {
             qd = 0.5 * (wl_ipr + wr_ipr + (wl_ivx - wr_ivx) * qc); // P_mid
 
             // Compute sound speed in L,R
-            qe = (qd <= wl_ipr) ? 1.0
+            qe = (qd <= wl_ipr) ? 1.0 // YH: Eq. 10.69 Toro
                                 : std::sqrt(1.0 + alpha * ((qd / wl_ipr) - 1.0)); // ql
             qf = (qd <= wr_ipr) ? 1.0
                                 : std::sqrt(1.0 + alpha * ((qd / wr_ipr) - 1.0)); // qr
 
             // Compute the max/min wave speeds based on L/R
-            Real sl = wl_ivx - qa * qe;
+            Real sl = wl_ivx - qa * qe; // YH: Eq. 10.68 Toro
             Real sr = wr_ivx + qb * qf;
 
             // following min/max set to TINY_NUMBER to fix bug found in converging
@@ -132,7 +133,7 @@ class RiemannSolver<RSolver::hllc, FLUID_TYPE> {
             Real mr = -(wr_idn * qf);
 
             // Determine the contact wave speed...
-            Real am = (qc - qd) / (ml + mr);
+            Real am = (qc - qd) / (ml + mr); // YH: Eq. 10.70 Toro
             // ...and the pressure at the contact surface
             Real cp = (ml * qd + mr * qc) / (ml + mr);
             cp = cp > 0.0 ? cp : 0.0;

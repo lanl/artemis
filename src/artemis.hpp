@@ -42,12 +42,24 @@ ARTEMIS_VARIABLE(gas.cons, density);
 ARTEMIS_VARIABLE(gas.cons, total_energy);
 ARTEMIS_VARIABLE(gas.cons, internal_energy);
 ARTEMIS_VARIABLE(gas.cons, momentum);
+ARTEMIS_VARIABLE(gas.cons, Bfield); // YH: add this variable for magnetic flux 
+ARTEMIS_VARIABLE(gas.cons, Efield); // YH: for ease i start with directly interpolate to center
+ARTEMIS_VARIABLE(gas.cons, J);
+ARTEMIS_VARIABLE(gas.cons, Se); // YH: electron entropy density
+ARTEMIS_VARIABLE(gas.cons, divB);
+ARTEMIS_VARIABLE(gas.cons, divE);
 } // namespace cons
 namespace prim {
 ARTEMIS_VARIABLE(gas.prim, density);
 ARTEMIS_VARIABLE(gas.prim, pressure);
 ARTEMIS_VARIABLE(gas.prim, velocity);
 ARTEMIS_VARIABLE(gas.prim, sie);
+ARTEMIS_VARIABLE(gas.prim, Bfield);
+ARTEMIS_VARIABLE(gas.prim, Efield); // YH: for ease i start with directly interpolate to center
+ARTEMIS_VARIABLE(gas.prim, J);
+ARTEMIS_VARIABLE(gas.prim, Pe); // YH: electron pressure
+ARTEMIS_VARIABLE(gas.prim, Te);
+ARTEMIS_VARIABLE(gas.prim, Ti);
 } // namespace prim
 namespace diff {
 ARTEMIS_VARIABLE(gas.diff, momentum);
@@ -55,7 +67,50 @@ ARTEMIS_VARIABLE(gas.diff, energy);
 } // namespace diff
 namespace face {
 ARTEMIS_VARIABLE(gas.face, velocity);
-} // namespace face
+ARTEMIS_VARIABLE(gas.face, bfield); // YH: add MHD
+//ARTEMIS_VARIABLE(gas.face, lambdaL); // YH: for upw CT (Mignone 2020)
+//ARTEMIS_VARIABLE(gas.face, lambdaR);
+//ARTEMIS_VARIABLE(gas.face, velL); 
+//ARTEMIS_VARIABLE(gas.face, velR);
+}
+namespace edge { // YH: cell vertices variables
+ARTEMIS_VARIABLE(gas.edge, Efield);
+ARTEMIS_VARIABLE(gas.edge, J);
+ARTEMIS_VARIABLE(gas.edge, E_flux); // Eflux at edge not node as it is not divergence!
+}
+namespace node {
+ARTEMIS_VARIABLE(gas.node, E_flux); // Try Eflux from RS to correct asymmetry
+ARTEMIS_VARIABLE(gas.node, J_flux);
+ARTEMIS_VARIABLE(gas.node, EJ_src); // Another variant of EJSource update at node instead
+}
+namespace source { 
+ARTEMIS_VARIABLE(gas.source, expEJ_E);
+ARTEMIS_VARIABLE(gas.source, expEJ_J);
+// YH: intermediate variables to help with coding
+ARTEMIS_VARIABLE(gas.source, nonideal_fcc);
+ARTEMIS_VARIABLE(gas.source, nonideal_edge);
+ARTEMIS_VARIABLE(gas.source, nonideal_fcc1);
+ARTEMIS_VARIABLE(gas.source, nonideal_edge1);
+ARTEMIS_VARIABLE(gas.source, relativis_edge);
+ARTEMIS_VARIABLE(gas.source, relativis_fcc);
+
+// Store source to update
+ARTEMIS_VARIABLE(gas.source, mom);
+ARTEMIS_VARIABLE(gas.source, ener);
+ARTEMIS_VARIABLE(gas.source, Se);
+ARTEMIS_VARIABLE(gas.source, Bfield);
+}
+// YH: for evolved boundary
+namespace boundary {
+ARTEMIS_VARIABLE(gas.boundary, density);
+ARTEMIS_VARIABLE(gas.boundary, pressure);
+ARTEMIS_VARIABLE(gas.boundary, velocity);
+ARTEMIS_VARIABLE(gas.boundary, Bfield);
+ARTEMIS_VARIABLE(gas.boundary, Bfield_fcc);
+ARTEMIS_VARIABLE(gas.boundary, Efield);
+ARTEMIS_VARIABLE(gas.boundary, J);
+ARTEMIS_VARIABLE(gas.boundary, Pe);
+}
 } // namespace gas
 
 namespace dust {
@@ -90,12 +145,30 @@ enum class Coordinates {
   axisymmetric,
   null
 };
+// YH: add TVD type
+enum class TVDType {
+  Minmod,   // Most Diffusive
+  VanAlbada,
+  Original, // Van Leer
+  MC,
+  Superbee  // Least Diffusive
+};
+// YH: For resistivity model type
+enum class EtaType {
+  None,
+  IdealMHD,
+  Spitzer
+};
 // ...Riemann solvers
-enum class RSolver { hllc, hlle, llf, null };
+enum class RSolver { hllc, hlle, llf, hlld, llf_xmhd, hlld_xmhd, llf_hall_xmhd, hll_hall_xmhd, hlle_hall_xmhd, hlldc_llf_hall_xmhd, hlldc_hall_xmhd, hlldc_xmhd, hlldc_llf_xmhd, null };
 // ... Upwinding (left vs right state)
 enum class Upwind { l, r, null };
 // ...Reconstrution algorithms
-enum class ReconstructionMethod { pcm, plm, ppm, null };
+enum class ReconstructionMethod { pcm, plm, ppm, Bcorrection,  
+	plm_rho,   // Density-dependent slope limiter
+	plm_pp,    // Positive-preserving 
+	plm_modPe, // Fixed Superbee to Pe reconstruction
+	null };
 // ...Fluid types
 enum class Fluid { gas, dust, null };
 // ...Boundary conditions
@@ -109,6 +182,8 @@ enum class ArtemisBC {
   visc,
   user,
   periodic,
+  sym,
+  conducting,
   none
 };
 

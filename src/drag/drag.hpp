@@ -159,6 +159,7 @@ TaskStatus SelfDragSourceImpl(MeshData<Real> *md, const Real time, const Real dt
   auto &artemis_pkg = pm->packages.Get("artemis");
   const bool do_gas = artemis_pkg->template Param<bool>("do_gas");
   const bool do_dust = artemis_pkg->template Param<bool>("do_dust");
+  const bool do_mhd = artemis_pkg->template Param<bool>("do_mhd");
   auto &drag_pkg = pm->packages.Get("drag");
 
   Real de_switch = Null<Real>();
@@ -188,7 +189,8 @@ TaskStatus SelfDragSourceImpl(MeshData<Real> *md, const Real time, const Real dt
   static auto desc =
       MakePackDescriptor<gas::cons::total_energy, gas::cons::momentum, gas::cons::density,
                          gas::cons::internal_energy, dust::cons::momentum,
-                         dust::cons::density>(resolved_pkgs.get());
+                         dust::cons::density,
+			 gas::cons::Bfield>(resolved_pkgs.get()); // YH: add mhd
   auto vmesh = desc.GetPack(md);
   const auto ib = md->GetBoundsI(IndexDomain::interior);
   const auto jb = md->GetBoundsJ(IndexDomain::interior);
@@ -232,7 +234,7 @@ TaskStatus SelfDragSourceImpl(MeshData<Real> *md, const Real time, const Real dt
                 vmesh(b, gas::cons::momentum(VI(n, 2)), k, j, i) / (hx[2] * dens)};
 
             const Real sieg = ArtemisUtils::GetSpecificInternalEnergy(
-                vmesh, b, n, k, j, i, de_switch, dflr_gas, sieflr_gas, hx);
+                vmesh, b, n, k, j, i, de_switch, dflr_gas, sieflr_gas, hx, do_mhd);
 
             Real vd[3] = {0., 0., 0.};
 
@@ -306,6 +308,7 @@ TaskStatus SimpleDragSourceImpl(MeshData<Real> *md, const Real time, const Real 
   auto &drag_pkg = pm->packages.Get("drag");
   auto &dust_pkg = pm->packages.Get("dust");
   auto &gas_pkg = pm->packages.Get("gas");
+  const bool do_mhd = artemis_pkg->template Param<bool>("do_mhd");
   const Real de_switch = gas_pkg->template Param<Real>("de_switch");
   const Real dflr_gas = gas_pkg->template Param<Real>("dfloor");
   const Real sieflr_gas = gas_pkg->template Param<Real>("siefloor");
@@ -330,7 +333,8 @@ TaskStatus SimpleDragSourceImpl(MeshData<Real> *md, const Real time, const Real 
   static auto desc =
       MakePackDescriptor<gas::cons::total_energy, gas::cons::momentum, gas::cons::density,
                          gas::cons::internal_energy, dust::cons::momentum,
-                         dust::cons::density>(resolved_pkgs.get());
+                         dust::cons::density,
+			 gas::cons::Bfield>(resolved_pkgs.get()); // YH: add mhd
   auto vmesh = desc.GetPack(md);
   const auto ib = md->GetBoundsI(IndexDomain::interior);
   const auto jb = md->GetBoundsJ(IndexDomain::interior);
@@ -386,7 +390,7 @@ TaskStatus SimpleDragSourceImpl(MeshData<Real> *md, const Real time, const Real 
             vmesh(b, gas::cons::momentum(VI(0, 2)), k, j, i) / (hx[2] * dg)};
 
         const Real sieg = ArtemisUtils::GetSpecificInternalEnergy(
-            vmesh, b, 0, k, j, i, de_switch, dflr_gas, sieflr_gas, hx);
+            vmesh, b, 0, k, j, i, de_switch, dflr_gas, sieflr_gas, hx, do_mhd);
 
         // Target gas velocity
         Diffusion::DiffusionCoeff<DTYP, GEOM, Fluid::gas> dcoeff;

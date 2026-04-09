@@ -166,6 +166,11 @@ class CoordsBase {
   KOKKOS_INLINE_FUNCTION Real x2v() { return 0.5 * (bnds.x2[0] + bnds.x2[1]); }
   KOKKOS_INLINE_FUNCTION Real x3v() { return 0.5 * (bnds.x3[0] + bnds.x3[1]); }
 
+  // YH: add face centered coordinates for staggered grid
+  KOKKOS_INLINE_FUNCTION Real x1f() { return bnds.x1[0]; }
+  KOKKOS_INLINE_FUNCTION Real x2f() { return bnds.x2[0]; }
+  KOKKOS_INLINE_FUNCTION Real x3f() { return bnds.x3[0]; }
+
   // Scale factor functions and volume averaged scale factors
   // hxiv = \iht h_i dV/dV
   KOKKOS_INLINE_FUNCTION Real hx1(const Real x1, const Real x2, const Real x3) {
@@ -358,6 +363,62 @@ class CoordsBase {
     return {static_cast<T *>(this)->x1v(), static_cast<T *>(this)->x2v(),
             static_cast<T *>(this)->x3v()};
   }
+
+  // YH: add face-centered coordinates
+  KOKKOS_INLINE_FUNCTION std::array<Real, 3> GetFaceCenterX1() {
+    return {static_cast<T *>(this)->x1f(), static_cast<T *>(this)->x2v(),
+          static_cast<T *>(this)->x3v()};
+  }
+  KOKKOS_INLINE_FUNCTION std::array<Real, 3> GetFaceCenterX2() {
+    return {static_cast<T *>(this)->x1v(), static_cast<T *>(this)->x2f(),
+          static_cast<T *>(this)->x3v()};
+  }
+  KOKKOS_INLINE_FUNCTION std::array<Real, 3> GetFaceCenterX3() {
+    return {static_cast<T *>(this)->x1v(), static_cast<T *>(this)->x2v(),
+          static_cast<T *>(this)->x3f()};
+  }
+
+  // YH: add edge coordinates
+  KOKKOS_INLINE_FUNCTION std::array<Real, 3> GetEdgeCenterX1() {
+    return {static_cast<T *>(this)->x1v(),
+          static_cast<T *>(this)->x2f(),
+          static_cast<T *>(this)->x3f()};
+  }
+  KOKKOS_INLINE_FUNCTION std::array<Real, 3> GetEdgeCenterX2() {
+    return {static_cast<T *>(this)->x1f(),
+          static_cast<T *>(this)->x2v(),
+          static_cast<T *>(this)->x3f()};
+  }
+  KOKKOS_INLINE_FUNCTION std::array<Real, 3> GetEdgeCenterX3() {
+    return {static_cast<T *>(this)->x1f(),
+          static_cast<T *>(this)->x2f(),
+          static_cast<T *>(this)->x3v()};
+  }
+
+  //=====================================================================================================
+  // YH: follows Athena++ to get edge length req for CT
+  // Edge1 runs along x1, located at (x1v, x2f, x3f) as A++: (i,j-1/2,k-1/2), i.e. (x1v(i), x2f(j), x3f(k))
+  KOKKOS_INLINE_FUNCTION Real GetEdgeLengthX1() {
+    const Real xv[3] = {static_cast<T *>(this)->x1v(),
+                        static_cast<T *>(this)->x2f(),
+                        static_cast<T *>(this)->x3f()};
+    return static_cast<T *>(this)->hx1(xv[0], xv[1], xv[2]) * (bnds.x1[1] - bnds.x1[0]);
+  }
+  // Edge2 runs along x2, located at (x1f, x2v, x3f) as A++: (i-1/2,j,k-1/2), i.e. (x1f(i), x2v(j), x3f(k))
+  KOKKOS_INLINE_FUNCTION Real GetEdgeLengthX2() {
+    const Real xv[3] = {static_cast<T *>(this)->x1f(),
+                        static_cast<T *>(this)->x2v(),
+                        static_cast<T *>(this)->x3f()};
+    return static_cast<T *>(this)->hx2(xv[0], xv[1], xv[2]) * (bnds.x2[1] - bnds.x2[0]);
+  }
+  // Edge3 runs along x3, located at (x1f, x2f, x3v) as A++: (i-1/2,j-1/2,k), i.e. (x1f(i), x2f(j), x3v(k))
+  KOKKOS_INLINE_FUNCTION Real GetEdgeLengthX3() {
+    const Real xv[3] = {static_cast<T *>(this)->x1f(),
+                        static_cast<T *>(this)->x2f(),
+                        static_cast<T *>(this)->x3v()};
+    return static_cast<T *>(this)->hx3(xv[0], xv[1], xv[2]) * (bnds.x3[1] - bnds.x3[0]);
+  }
+  //=====================================================================================================
 
   KOKKOS_INLINE_FUNCTION std::array<Real, 3> GetScaleFactors() {
     // Get the volume averaged scale factors

@@ -65,8 +65,8 @@ TaskStatus ApplyUpdate(MeshData<Real> *u0, MeshData<Real> *u1, const int stage,
   const Real gam1 = integrator->gam1[stage - 1];
   const Real beta_dt = integrator->beta[stage - 1] * integrator->dt;
 
-  // Packing and indexing
-  std::vector<MetadataFlag> flags({Metadata::Conserved, Metadata::WithFluxes});
+  // Packing and indexing 
+  std::vector<MetadataFlag> flags({Metadata::Cell, Metadata::Conserved, Metadata::WithFluxes});
   static auto desc = MakePackDescriptor<any>(u0, flags, {parthenon::PDOpt::WithFluxes});
   const auto v0 = desc.GetPack(u0);
   const auto v1 = desc.GetPack(u1);
@@ -89,7 +89,6 @@ TaskStatus ApplyUpdate(MeshData<Real> *u0, MeshData<Real> *u1, const int stage,
         const auto ax3 = (three_d) ? coords.GetFaceAreaX3() : NewArray<Real, 2>(0.0);
 
         const Real vol = coords.Volume();
-
         for (int n = v0.GetLowerBound(b); n <= v0.GetUpperBound(b); ++n) {
           // compute flux divergence
           Real divf = (ax1[0] * v0.flux(b, X1DIR, n, k, j, i) -
@@ -101,13 +100,15 @@ TaskStatus ApplyUpdate(MeshData<Real> *u0, MeshData<Real> *u1, const int stage,
             divf += (ax3[0] * v0.flux(b, X3DIR, n, k, j, i) -
                      ax3[1] * v0.flux(b, X3DIR, n, k + 1, j, i));
 
-          // Apply update
+          // Apply update for cc values
           v0(b, n, k, j, i) =
               gam0 * v0(b, n, k, j, i) + gam1 * v1(b, n, k, j, i) + divf * beta_dt / vol;
         }
       });
+
   return TaskStatus::complete;
 }
+
 
 } // namespace ArtemisUtils
 

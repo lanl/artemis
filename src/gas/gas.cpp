@@ -30,6 +30,7 @@
 #include "utils/opacity/opacity.hpp"
 #include "utils/refinement/amr_criteria.hpp"
 #include "utils/units.hpp"
+#include "mhd/extended/defs.hpp"
 
 using ArtemisUtils::EOS;
 using ArtemisUtils::VI;
@@ -68,6 +69,18 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
     PARTHENON_REQUIRE(parthenon::Globals::nghost >= 2,
                       "PLM requires at least 2 ghost cells.");
     recon_method = ReconstructionMethod::plm;
+  } else if (recon.compare("plm_rho") == 0) {
+    PARTHENON_REQUIRE(parthenon::Globals::nghost >= 2,
+                      "PLM_PP requires at least 2 ghost cells.");
+    recon_method = ReconstructionMethod::plm_rho;
+  } else if (recon.compare("plm_pp") == 0) {
+    PARTHENON_REQUIRE(parthenon::Globals::nghost >= 2,
+                      "PLM_PP requires at least 2 ghost cells.");
+    recon_method = ReconstructionMethod::plm_pp;
+  } else if (recon.compare("plm_modPe") == 0) {
+    PARTHENON_REQUIRE(parthenon::Globals::nghost >= 2,
+                      "PLM_MODPE requires at least 2 ghost cells.");
+    recon_method = ReconstructionMethod::plm_modPe;
   } else if (recon.compare("ppm") == 0) {
     PARTHENON_REQUIRE(parthenon::Globals::nghost >= 3,
                       "PPM requires at least 3 ghost cells.");
@@ -90,6 +103,26 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
     riemann_solver = RSolver::hlle;
   } else if (riemann.compare("llf") == 0) {
     riemann_solver = RSolver::llf;
+  } else if (riemann.compare("hlld") == 0) {
+    riemann_solver = RSolver::hlld;
+  } else if (riemann.compare("llf_xmhd") == 0) {
+    riemann_solver = RSolver::llf_xmhd;
+  } else if (riemann.compare("hlld_xmhd") == 0) {
+    riemann_solver = RSolver::hlld_xmhd;
+  } else if (riemann.compare("llf_hall_xmhd") == 0) {
+    riemann_solver = RSolver::llf_hall_xmhd;
+  } else if (riemann.compare("hll_hall_xmhd") ==0) {
+    riemann_solver = RSolver::hll_hall_xmhd;
+  } else if (riemann.compare("hlle_hall_xmhd") ==0) {
+    riemann_solver = RSolver::hlle_hall_xmhd;
+  } else if (riemann.compare("hlldc_llf_hall_xmhd") == 0) {
+    riemann_solver = RSolver::hlldc_llf_hall_xmhd;
+  } else if (riemann.compare("hlldc_hall_xmhd") == 0) {
+    riemann_solver = RSolver::hlldc_hall_xmhd;
+  } else if (riemann.compare("hlldc_xmhd") == 0) {
+    riemann_solver = RSolver::hlldc_xmhd;
+  } else if (riemann.compare("hlldc_llf_xmhd") == 0) {
+    riemann_solver = RSolver::hlldc_llf_xmhd;
   } else {
     PARTHENON_FAIL("Riemann solver (gas) not recognized.");
   }
@@ -98,6 +131,38 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   // Courant, Friedrichs, & Lewy (CFL) Number
   const Real cfl_number = pin->GetOrAddReal("gas", "cfl", 0.8);
   params.Add("cfl", cfl_number);
+
+  // YH: Added these for BCs that have time dependence
+  params.Add("dt", 0.0, Params::Mutability::Restart);
+  params.Add("ncycle", 0, Params::Mutability::Restart);
+
+  // YH: To test which variables caused the dip in pressure
+  const Real dW_idn = pin->GetOrAddReal("gas", "dW_idn", 1.);
+  params.Add("dW_idn", dW_idn);
+  const Real dW_ipr = pin->GetOrAddReal("gas", "dW_ipr", 1.);
+  params.Add("dW_ipr", dW_ipr);
+  const Real dW_ise = pin->GetOrAddReal("gas", "dW_ise", 1.);
+  params.Add("dW_ise", dW_ise);
+  const Real dW_ivx = pin->GetOrAddReal("gas", "dW_ivx", 1.);
+  params.Add("dW_ivx", dW_ivx);
+  const Real dW_ivy = pin->GetOrAddReal("gas", "dW_ivy", 1.);
+  params.Add("dW_ivy", dW_ivy);
+  const Real dW_ivz = pin->GetOrAddReal("gas", "dW_ivz", 1.);
+  params.Add("dW_ivz", dW_ivz);
+  const Real dW_ibx = pin->GetOrAddReal("gas", "dW_ibx", 1.);
+  params.Add("dW_ibx", dW_ibx);
+  const Real dW_iby = pin->GetOrAddReal("gas", "dW_iby", 1.);
+  params.Add("dW_iby", dW_iby);
+  const Real dW_ibz = pin->GetOrAddReal("gas", "dW_ibz", 1.);
+  params.Add("dW_ibz", dW_ibz);
+  const Real dW_iJx = pin->GetOrAddReal("gas", "dW_iJx", 1.);
+  params.Add("dW_iJx", dW_iJx);
+  const Real dW_iJy = pin->GetOrAddReal("gas", "dW_iJy", 1.);
+  params.Add("dW_iJy", dW_iJy);
+  const Real dW_iJz = pin->GetOrAddReal("gas", "dW_iJz", 1.);
+  params.Add("dW_iJz", dW_iJz);
+  const Real dW_iPe = pin->GetOrAddReal("gas", "dW_iPe", 1.);
+  params.Add("dW_iPe", dW_iPe);
 
   // Equation of state
   const std::string eos_name = pin->GetOrAddString("gas", "eos", "ideal");
@@ -230,8 +295,10 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   // Floors
   const Real dfloor = pin->GetOrAddReal("gas", "dfloor", 1.0e-20);
   const Real siefloor = pin->GetOrAddReal("gas", "siefloor", 1.0e-20);
+  const Real Pefloor = pin->GetOrAddReal("mhd", "Pefloor", 1.0e-20);
   params.Add("dfloor", dfloor);
   params.Add("siefloor", siefloor);
+  params.Add("Pefloor", Pefloor);
 
   // Dual energy switch
   // When internal > de_switch * total we use the total
@@ -272,15 +339,21 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   // Control field for sparse gas fields
   std::string control_field = gas::cons::density::name();
 
+  // YH: Add user-defined metadata for ease
+  Metadata::AddUserFlag("Density");
+  Metadata::AddUserFlag("Velfield");
+  Metadata::AddUserFlag("Energy");
+
   // Conserved Gas Density
   Metadata m = Metadata({Metadata::Cell, Metadata::Conserved, Metadata::Independent,
+		  	 Metadata::GetUserFlag("Density"),
                          Metadata::WithFluxes, Metadata::Sparse});
   ArtemisUtils::EnrollArtemisRefinementOps(m, coords);
   m.SetSparseThresholds(0.0, 0.0, 0.0);
   gas->AddSparsePool<gas::cons::density>(m, control_field, fluidids);
 
   // Conserved Momenta
-  m = Metadata({Metadata::Cell, Metadata::Vector, Metadata::Conserved,
+  m = Metadata({Metadata::Cell, Metadata::Vector, Metadata::Conserved, Metadata::GetUserFlag("Velfield"),
                 Metadata::Independent, Metadata::WithFluxes, Metadata::Sparse},
                std::vector<int>({3}));
   ArtemisUtils::EnrollArtemisRefinementOps(m, coords);
@@ -289,7 +362,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
 
   // Conserved Gas Total Energy
   m = Metadata({Metadata::Cell, Metadata::Conserved, Metadata::WithFluxes,
-                Metadata::Sparse, Metadata::Restart});
+                Metadata::Sparse, Metadata::Restart, Metadata::GetUserFlag("Energy")});
   ArtemisUtils::EnrollArtemisRefinementOps(m, coords);
   m.SetSparseThresholds(0.0, 0.0, 0.0);
   gas->AddSparsePool<gas::cons::total_energy>(m, control_field, fluidids);
@@ -304,21 +377,23 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
 
   // Primitive Density
   m = Metadata({Metadata::Cell, Metadata::Derived, Metadata::Intensive, Metadata::OneCopy,
-                Metadata::FillGhost, Metadata::Sparse});
+                Metadata::FillGhost, Metadata::Sparse, Metadata::GetUserFlag("Density")});
   ArtemisUtils::EnrollArtemisRefinementOps(m, coords);
   m.SetSparseThresholds(0.0, 0.0, 0.0);
   gas->AddSparsePool<gas::prim::density>(m, control_field, fluidids);
 
   // Primitive Pressure (and associated Riemann pressures)
+  Metadata::AddUserFlag("Pressure");
   m = Metadata({Metadata::Cell, Metadata::Derived, Metadata::Intensive, Metadata::OneCopy,
-                Metadata::WithFluxes, Metadata::Sparse});
+                Metadata::WithFluxes, Metadata::Sparse, 
+		Metadata::FillGhost, Metadata::GetUserFlag("Pressure")});
   ArtemisUtils::EnrollArtemisRefinementOps(m, coords);
   m.SetSparseThresholds(0.0, 0.0, 0.0);
   gas->AddSparsePool<gas::prim::pressure>(m, control_field, fluidids);
 
   // Primitive Velocities
   m = Metadata({Metadata::Cell, Metadata::Vector, Metadata::Derived, Metadata::Intensive,
-                Metadata::OneCopy, Metadata::FillGhost, Metadata::Sparse},
+                Metadata::OneCopy, Metadata::FillGhost, Metadata::Sparse, Metadata::GetUserFlag("Velfield")},
                std::vector<int>({3}));
   ArtemisUtils::EnrollArtemisRefinementOps(m, coords);
   m.SetSparseThresholds(0.0, 0.0, 0.0);
@@ -335,6 +410,264 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   m = Metadata({Metadata::Face, Metadata::Derived, Metadata::OneCopy, Metadata::Sparse});
   m.SetSparseThresholds(0.0, 0.0, 0.0);
   gas->AddSparsePool<gas::face::velocity>(m, control_field, fluidids);
+
+  // YH: add params for tracking time required in time-dep. BCs
+  params.Add("track_time", 0.0, Params::Mutability::Restart);
+  params.Add("track_dt", 1.e-16, Params::Mutability::Restart); 
+
+  // YH: add type of slope limiter
+  auto tvd_type = pin->GetOrAddString("gas","tvd_type","original");
+  TVDType tvd_type_enum;
+  if (tvd_type == "original") {
+    tvd_type_enum = TVDType::Original;
+  } else if (tvd_type == "van_albada") {
+    tvd_type_enum = TVDType::VanAlbada;
+  } else if (tvd_type == "minmod") {
+    tvd_type_enum = TVDType::Minmod;
+  } else if (tvd_type == "mc") {
+    tvd_type_enum = TVDType::MC;
+  } else if (tvd_type == "superbee") {
+    tvd_type_enum = TVDType::Superbee;
+  }
+  params.Add("tvd_type", tvd_type_enum);
+
+  // YH: Add magnetic field for mhd - add cc Bfield for now as some part of code used nvars=vprim.GetMaxNumberOfVars() 
+  const bool do_mhd = pin->GetOrAddBoolean("physics", "mhd", false);
+  params.Add("do_mhd", do_mhd);
+  if (do_mhd) {
+    // YH: ensure dimensional constants are consistent
+    const Real vA_0 = B0/std::sqrt(n0*m_ion*mu0);
+    const Real v_vs_vA = abs(vA_0-char_speed)/char_speed*100.;
+    if (v_vs_vA > 1.) PARTHENON_FAIL("Error in dimensional constants as v NOT equal to vA!!!");
+
+    auto eta_type = Null<std::string>();
+    PARTHENON_REQUIRE(pin->DoesParameterExist("mhd", "eta_type"),
+                    "Missing Ohmic resistive type selection!");
+    eta_type = pin->GetString("mhd", "eta_type");
+    EtaType eta_type_enum; // Convert string once on host to ensure device safe
+    if (eta_type == "None") {
+      eta_type_enum = EtaType::None;
+    } else if (eta_type == "idealMHD") {
+      eta_type_enum = EtaType::IdealMHD;
+    } else if (eta_type == "Spitzer") {
+      eta_type_enum = EtaType::Spitzer;
+    } else {
+      PARTHENON_REQUIRE(false, "No such eta model!");
+    }
+    params.Add("eta_type", eta_type_enum);
+
+    auto ideal_Efield = Null<bool>();
+    PARTHENON_REQUIRE(pin->DoesParameterExist("mhd", "ideal_Efield"),
+		    "Do you need to initialize Efield using ideal MHD?");
+    ideal_Efield = pin->GetBoolean("mhd", "ideal_Efield");
+    params.Add("ideal_Efield", ideal_Efield);
+
+    Metadata::AddUserFlag("Bfield");
+    Metadata::AddUserFlag("Efield"); 
+    Metadata::AddUserFlag("Efield_flux");
+    Metadata::AddUserFlag("Jcurrent");
+    Metadata::AddUserFlag("electron");
+    Metadata::AddUserFlag("expEJ_E"); Metadata::AddUserFlag("expEJ_J");
+    Metadata::AddUserFlag("EJ_src");
+
+    auto MetadataBfield = Metadata::GetUserFlag("Bfield");
+    auto MetadataEfield = Metadata::GetUserFlag("Efield");
+    auto MetadataJcurrent = Metadata::GetUserFlag("Jcurrent");
+    m = Metadata({Metadata::Cell, Metadata::Vector, Metadata::Derived, Metadata::Intensive,
+                Metadata::OneCopy, MetadataBfield, Metadata::FillGhost},
+               std::vector<int>({3}));
+    gas->AddField<gas::prim::Bfield>(m);
+	
+    m = Metadata({Metadata::Cell, Metadata::Vector, Metadata::Conserved,
+                  Metadata::WithFluxes, MetadataBfield},
+               std::vector<int>({3}));
+    gas->AddField<gas::cons::Bfield>(m);
+    
+    // YH: face-centered magnetic field
+    m = Metadata({Metadata::Face, Metadata::Conserved, MetadataBfield,
+                Metadata::Independent, Metadata::FillGhost, Metadata::WithFluxes});
+    m.RegisterRefinementOps<parthenon::refinement_ops::ProlongateSharedMinMod,
+	    		    parthenon::refinement_ops::RestrictAverage,
+			    parthenon::refinement_ops::ProlongateInternalTothAndRoe>();
+    gas->AddField<gas::face::bfield>(m);
+
+    // YH: lambda for upw-CT (Mignone 2020)
+    /*Metadata::AddUserFlag("VelL");
+    m = Metadata({Metadata::Face, Metadata::Derived, Metadata::OneCopy, Metadata::FillGhost,
+                  Metadata::GetUserFlag("VelL")}, std::vector<int>({3}));
+    gas->AddField<gas::face::velL>(m);
+    Metadata::AddUserFlag("VelR");
+    m = Metadata({Metadata::Face, Metadata::Derived, Metadata::OneCopy, Metadata::FillGhost,
+                  Metadata::GetUserFlag("VelR")}, std::vector<int>({3}));
+    gas->AddField<gas::face::velR>(m);
+    Metadata::AddUserFlag("LambdaL"); 
+    m = Metadata({Metadata::Face, Metadata::Derived, Metadata::OneCopy, Metadata::FillGhost,
+		  Metadata::GetUserFlag("LambdaL")});
+    gas->AddField<gas::face::lambdaL>(m);
+    Metadata::AddUserFlag("LambdaR");
+    m = Metadata({Metadata::Face, Metadata::Derived, Metadata::OneCopy, Metadata::FillGhost,
+                  Metadata::GetUserFlag("LambdaR")});
+    gas->AddField<gas::face::lambdaR>(m);*/
+
+    // YH: magnetic field should remain divergence-free
+    m = Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy, MetadataBfield});
+    gas->AddField<gas::cons::divB>(m);
+    // YH: check divE as related to quasi-neutrality
+    m = Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy, MetadataEfield});
+    gas->AddField<gas::cons::divE>(m);
+
+    // YH: place E field or its components through Ohm's law at cell vertices
+    m = Metadata({Metadata::Edge, Metadata::Conserved, MetadataEfield,
+		    Metadata::Independent, Metadata::FillGhost});
+    gas->AddField<gas::edge::Efield>(m);
+    m = Metadata({Metadata::Edge, Metadata::GetUserFlag("Efield_flux"), 
+		    Metadata::FillGhost});
+    gas->AddField<gas::edge::E_flux>(m);
+    m = Metadata({Metadata::Node, Metadata::GetUserFlag("Efield_flux"), 
+		    Metadata::FillGhost}, std::vector<int>({9}));
+    gas->AddField<gas::node::E_flux>(m); // Add this to try correct asymmetry
+
+    m = Metadata({Metadata::Edge, Metadata::Conserved, MetadataJcurrent,
+                    Metadata::Independent, Metadata::FillGhost});
+    gas->AddField<gas::edge::J>(m);
+    m = Metadata({Metadata::Node, MetadataJcurrent, Metadata::Vector, Metadata::FillGhost},
+		    std::vector<int>({9})); // YH: instead of 2D matrix just use 1D vector
+    gas->AddField<gas::node::J_flux>(m);
+
+    m = Metadata({Metadata::Node, Metadata::GetUserFlag("EJ_src"), Metadata::Vector, 
+		    Metadata::FillGhost}, std::vector<int>({6})); 
+    gas->AddField<gas::node::EJ_src>(m);
+
+    // YH: place Efield & J at cell center for ease of coding for now
+    m = Metadata({Metadata::Cell, Metadata::Conserved, Metadata::Vector, MetadataEfield,
+                    Metadata::Derived, Metadata::WithFluxes},
+		    std::vector<int>({3}));
+    gas->AddField<gas::cons::Efield>(m);
+    m = Metadata({Metadata::Cell, Metadata::Vector, Metadata::Derived, Metadata::Intensive,
+                MetadataEfield, Metadata::OneCopy},
+               std::vector<int>({3}));
+    gas->AddField<gas::prim::Efield>(m); 
+
+    m = Metadata({Metadata::Cell, Metadata::Conserved, Metadata::Vector, MetadataJcurrent,
+                    Metadata::Derived, Metadata::WithFluxes},
+                    std::vector<int>({3}));
+    gas->AddField<gas::cons::J>(m);
+    m = Metadata({Metadata::Cell, Metadata::Vector, Metadata::Derived, Metadata::Intensive,
+                MetadataJcurrent, Metadata::OneCopy},
+               std::vector<int>({3}));
+    gas->AddField<gas::prim::J>(m);
+
+    Metadata::AddUserFlag("Temp_ion");
+    Metadata::AddUserFlag("Temp_elec");
+    m = Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy,
+                  Metadata::FillGhost, Metadata::GetUserFlag("Temp_ion")});
+    gas->AddField<gas::prim::Ti>(m);
+
+    // YH: Electron-related variables
+    m = Metadata({Metadata::Cell, Metadata::Conserved, Metadata::WithFluxes, 
+                Metadata::Independent, Metadata::FillGhost, Metadata::GetUserFlag("electron")});
+    gas->AddField<gas::cons::Se>(m);
+
+    m = Metadata({Metadata::Cell, Metadata::Derived, Metadata::Intensive, Metadata::OneCopy,
+		  Metadata::FillGhost, Metadata::GetUserFlag("electron")});
+    gas->AddField<gas::prim::Pe>(m);
+
+    m = Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy,
+                  Metadata::FillGhost, Metadata::GetUserFlag("Temp_elec")});
+    gas->AddField<gas::prim::Te>(m);
+
+    m = Metadata({Metadata::Edge, Metadata::Derived, Metadata::OneCopy,
+                    Metadata::FillGhost, Metadata::GetUserFlag("expEJ_E")});
+    gas->AddField<gas::source::expEJ_E>(m);
+    m = Metadata({Metadata::Edge, Metadata::Derived, Metadata::OneCopy,
+                    Metadata::FillGhost, Metadata::GetUserFlag("expEJ_J")});
+    gas->AddField<gas::source::expEJ_J>(m);
+    //YH: intermediate variables for computing source
+    Metadata::AddUserFlag("NonIdeal");
+    m = Metadata({Metadata::Face, Metadata::Derived, Metadata::OneCopy,                  
+		    Metadata::FillGhost, Metadata::GetUserFlag("NonIdeal")});
+    gas->AddField<gas::source::nonideal_fcc>(m);
+    m = Metadata({Metadata::Edge, Metadata::Derived, Metadata::OneCopy,
+                    Metadata::FillGhost, Metadata::GetUserFlag("NonIdeal")});
+    gas->AddField<gas::source::nonideal_edge>(m);
+    Metadata::AddUserFlag("NonIdeal1");
+    m = Metadata({Metadata::Face, Metadata::Derived, Metadata::OneCopy,
+                    Metadata::FillGhost, Metadata::GetUserFlag("NonIdeal1")});
+    gas->AddField<gas::source::nonideal_fcc1>(m);
+    m = Metadata({Metadata::Edge, Metadata::Derived, Metadata::OneCopy,
+                    Metadata::FillGhost, Metadata::GetUserFlag("NonIdeal1")});
+    gas->AddField<gas::source::nonideal_edge1>(m);
+    Metadata::AddUserFlag("Relativistic");
+    m = Metadata({Metadata::Face, Metadata::Derived, Metadata::OneCopy,
+                    Metadata::FillGhost, Metadata::GetUserFlag("Relativistic")});
+    gas->AddField<gas::source::relativis_fcc>(m);
+    m = Metadata({Metadata::Edge, Metadata::Derived, Metadata::OneCopy,
+                    Metadata::FillGhost, Metadata::GetUserFlag("Relativistic")});
+    gas->AddField<gas::source::relativis_edge>(m);
+
+    // Store source term to update
+    Metadata::AddUserFlag("Source_mom");
+    m = Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy,
+                    Metadata::FillGhost, Metadata::GetUserFlag("Source_mom")}
+		    , std::vector<int>({3}));
+    gas->AddField<gas::source::mom>(m);
+    Metadata::AddUserFlag("Source_ener");
+    m = Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy,
+                    Metadata::FillGhost, Metadata::GetUserFlag("Source_ener")});
+    gas->AddField<gas::source::ener>(m);
+    Metadata::AddUserFlag("Source_Se");
+    m = Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy,
+                    Metadata::FillGhost, Metadata::GetUserFlag("Source_Se")});
+    gas->AddField<gas::source::Se>(m);
+    Metadata::AddUserFlag("Source_Bfield");
+    m = Metadata({Metadata::Face, Metadata::Derived, Metadata::OneCopy,
+                    Metadata::FillGhost, Metadata::GetUserFlag("Source_Bfield")});
+    gas->AddField<gas::source::Bfield>(m);
+
+
+    // Boundary stuffs 
+    const std::string ox1_bctype = pin->GetString("parthenon/mesh", "ox1_bc");
+    if (ox1_bctype=="nrbc" or ox1_bctype=="orlanski") {
+      Metadata::AddUserFlag("Boundary");
+      m = Metadata({Metadata::Cell, Metadata::Derived, Metadata::Intensive, Metadata::OneCopy,
+                Metadata::FillGhost, Metadata::Sparse, Metadata::GetUserFlag("Boundary")});
+      m.SetSparseThresholds(0.0, 0.0, 0.0);
+      gas->AddSparsePool<gas::boundary::density>(m, control_field, fluidids);
+      m = Metadata({Metadata::Cell, Metadata::Derived, Metadata::Intensive, Metadata::OneCopy,
+                Metadata::WithFluxes, Metadata::Sparse,
+                Metadata::FillGhost, Metadata::GetUserFlag("Boundary")});
+      m.SetSparseThresholds(0.0, 0.0, 0.0);
+      gas->AddSparsePool<gas::boundary::pressure>(m, control_field, fluidids);
+      m = Metadata({Metadata::Cell, Metadata::Vector, Metadata::Derived, Metadata::Intensive,
+                Metadata::OneCopy, Metadata::FillGhost, Metadata::Sparse, 
+		Metadata::GetUserFlag("Boundary")}, std::vector<int>({3}));
+      m.SetSparseThresholds(0.0, 0.0, 0.0);
+      gas->AddSparsePool<gas::boundary::velocity>(m, control_field, fluidids);
+      m = Metadata({Metadata::Cell, Metadata::Vector, Metadata::Derived, Metadata::Intensive,
+                Metadata::OneCopy, Metadata::FillGhost, Metadata::Sparse,
+		Metadata::GetUserFlag("Boundary")}, std::vector<int>({3}));
+      m.SetSparseThresholds(0.0, 0.0, 0.0);
+      gas->AddSparsePool<gas::boundary::Bfield>(m, control_field, fluidids);
+      m = Metadata({Metadata::Face, Metadata::Derived, Metadata::Intensive,
+                Metadata::OneCopy, Metadata::FillGhost, Metadata::Sparse,
+                Metadata::GetUserFlag("Boundary")});
+      m.SetSparseThresholds(0.0, 0.0, 0.0);
+      gas->AddSparsePool<gas::boundary::Bfield_fcc>(m, control_field, fluidids);
+      m = Metadata({Metadata::Edge, Metadata::Derived, Metadata::Intensive,
+                Metadata::OneCopy, Metadata::FillGhost, Metadata::Sparse,
+                Metadata::GetUserFlag("Boundary")});
+      m.SetSparseThresholds(0.0, 0.0, 0.0);
+      gas->AddSparsePool<gas::boundary::Efield>(m, control_field, fluidids);
+      m = Metadata({Metadata::Edge, Metadata::Derived, Metadata::Intensive,
+                Metadata::OneCopy, Metadata::FillGhost, Metadata::Sparse,
+                Metadata::GetUserFlag("Boundary")});
+      m.SetSparseThresholds(0.0, 0.0, 0.0);
+      gas->AddSparsePool<gas::boundary::J>(m, control_field, fluidids);
+      m = Metadata({Metadata::Cell, Metadata::Derived, Metadata::Intensive, Metadata::OneCopy,                Metadata::FillGhost, Metadata::Sparse, Metadata::GetUserFlag("Boundary")});
+      m.SetSparseThresholds(0.0, 0.0, 0.0);
+      gas->AddSparsePool<gas::boundary::Pe>(m, control_field, fluidids);
+    }
+  }
 
   if (do_diffusion) {
     m = Metadata({Metadata::Face, Metadata::Flux, Metadata::Sparse},
@@ -458,8 +791,12 @@ Real EstimateTimestepMesh(MeshData<Real> *md) {
   auto &resolved_pkgs = pm->resolved_packages;
 
   auto &gas_pkg = pm->packages.Get("gas");
+  const Real gamma = gas_pkg->Param<Real>("adiabatic_index"); 
   auto &params = gas_pkg->AllParams();
   auto eos_d = params.template Get<EOS>("eos_d");
+
+  // YH: add mhd
+  auto do_mhd = pm->packages.Get("artemis")->Param<bool>("do_mhd");
 
   // NOTE(@pdmullen): Without FARGO, dt must be additionally limited by the linear
   // advection of the shear background flow (vy0 = -q Omega x)
@@ -473,8 +810,9 @@ Real EstimateTimestepMesh(MeshData<Real> *md) {
   }
 
   static auto desc =
-      MakePackDescriptor<gas::prim::density, gas::prim::velocity, gas::prim::sie>(
-          resolved_pkgs.get());
+      MakePackDescriptor<gas::prim::density, gas::prim::velocity, gas::prim::sie, 
+	  gas::prim::Bfield,
+	  gas::prim::J,gas::prim::Pe>(resolved_pkgs.get());
   auto vmesh = desc.GetPack(md);
   IndexRange ib = md->GetBoundsI(IndexDomain::interior);
   IndexRange jb = md->GetBoundsJ(IndexDomain::interior);
@@ -494,14 +832,52 @@ Real EstimateTimestepMesh(MeshData<Real> *md) {
           const Real &dens = vmesh(b, gas::prim::density(n), k, j, i);
           const Real &sie = vmesh(b, gas::prim::sie(n), k, j, i);
           const Real bulk = eos_d.BulkModulusFromDensityInternalEnergy(dens, sie);
-          const Real cs = std::sqrt(bulk / dens);
+	  Real a = std::sqrt(bulk / dens);
+	  Real ne = Null<Real>(); // YH: For XMHD
+	  Real ca = Null<Real>(); // YH: For MHD
+	  if (do_mhd) { // YH: account for fast magnetosonic speed at timestep
+	    Real bx = vmesh(b, gas::prim::Bfield(0), k, j, i);
+	    Real by = vmesh(b, gas::prim::Bfield(1), k, j, i);
+	    Real bz = vmesh(b, gas::prim::Bfield(2), k, j, i);
+	    ca = std::sqrt((SQR(bx)+SQR(by)+SQR(bz))/dens);
+	    Real cax = std::sqrt((SQR(bx))/dens);
+	    Real cay = std::sqrt((SQR(by))/dens);
+	    Real caz = std::sqrt((SQR(bz))/dens);
+	    Real can = std::min(cax,cay);
+	    can = std::min(can,caz);
+	    Real csa = SQR(a) + SQR(ca);	    
+	    Real acan = a * can;
+	    Real cf = std::sqrt(0.5*(csa + std::sqrt(SQR(csa) - 4*SQR(acan))));
+	    a = std::max(a,cf);
+
+	    // YH: account for electron speed
+	    Real press = bulk / gamma;
+	    Real a_elec = std::sqrt(bulk / dens) * sqrt(m_ion/me);
+	    a = std::max(a, a_elec);//std::max(a_elec, reduced_c));
+	  }
+	  const Real cs = a;
           Real denom = 0.0;
+	  Real mindx = 1.e9;
           for (int d = 0; d < ndim; d++) {
+	    Real vel = vmesh(b, gas::prim::velocity(VI(n, d)), k, j, i);
+	    if (do_mhd) { 
+		    ne = Z_ion * vmesh(b, gas::prim::density(n), k, j, i);
+		    Real ue = vel - (J0/(e_charge*n0*char_speed))*
+			    (vmesh(b, gas::prim::J(d), k, j, i)/ne);
+		    vel = std::max(abs(vel), abs(ue));
+	    }
             denom +=
-                (std::abs(vmesh(b, gas::prim::velocity(VI(n, d)), k, j, i)) + cs) / dx[d];
+                (std::abs(vel) + cs) / dx[d];
+	    mindx = std::min(mindx, dx[d]);
           }
           ldt = std::min(ldt, 1.0 / denom);
-        }
+	  /*if (do_mhd) {
+	    const Real Pe = vmesh(b, gas::prim::Pe(), k, j, i);
+	    const Real eta = resistivity::Spitzer(ne,Pe);
+	    ldt = std::min(ldt, (eta/(t0*mu0))*(1./SQR(ca)));
+	    //ldt = std::min(ldt, mindx/reduced_c);
+	  }*/
+	}
 
         if (do_shear) {
           const auto ww = BackgroundVelocity<GEOM>(qshear, om0, coords.x1v());
@@ -553,6 +929,8 @@ TaskStatus CalculateFluxes(MeshData<Real> *md, const bool pcm) {
   auto &resolved_pkgs = pm->resolved_packages;
 
   auto &pkg = pm->packages.Get("gas");
+  Params &params = pm->packages.Get("artemis")->AllParams();
+  const bool do_mhd = params.Get<bool>("do_mhd");
 
   static auto desc_prim =
       parthenon::MakePackDescriptor<gas::prim::density, gas::prim::velocity,
@@ -561,14 +939,44 @@ TaskStatus CalculateFluxes(MeshData<Real> *md, const bool pcm) {
   static auto desc_flux =
       parthenon::MakePackDescriptor<gas::cons::density, gas::cons::momentum,
                                     gas::cons::total_energy, gas::cons::internal_energy>(
-          resolved_pkgs.get(), {}, {parthenon::PDOpt::WithFluxes});
+          resolved_pkgs.get(), {}, {parthenon::PDOpt::WithFluxes}); 
   static auto desc_face =
-      parthenon::MakePackDescriptor<gas::face::velocity>(resolved_pkgs.get());
+      parthenon::MakePackDescriptor<gas::face::velocity>(resolved_pkgs.get()); 
   auto vprim = desc_prim.GetPack(md);
   auto vflux = desc_flux.GetPack(md);
   auto vface = desc_face.GetPack(md);
 
-  return ArtemisUtils::CalculateFluxes<Fluid::gas>(md, pkg, vprim, vflux, vface, pcm);
+  if (do_mhd) { // YH: add mhd
+    static auto desc_prim_mhd =
+      parthenon::MakePackDescriptor<gas::prim::density, gas::prim::velocity,
+                                    gas::prim::pressure, gas::prim::sie,
+				    gas::prim::Bfield,
+				    gas::prim::Efield,
+				    gas::prim::J,
+				    gas::prim::Pe>(
+          resolved_pkgs.get(), {}, {parthenon::PDOpt::WithFluxes});
+    static auto desc_flux_mhd =
+      parthenon::MakePackDescriptor<gas::cons::density, gas::cons::momentum,
+                                    gas::cons::total_energy, gas::cons::internal_energy,
+				    gas::cons::Bfield,
+				    gas::cons::Efield,
+				    gas::cons::J,
+				    gas::cons::Se>( // YH: for mhd
+          resolved_pkgs.get(), {}, {parthenon::PDOpt::WithFluxes});
+    static auto desc_face_mhd =
+      parthenon::MakePackDescriptor<gas::face::velocity,
+      				    gas::face::bfield>(resolved_pkgs.get());
+				    //gas::face::velL, // YH: for upw CT (Mignone 2020)
+                                    //gas::face::velR,
+				    //gas::face::lambdaL,
+				    //gas::face::lambdaR>(resolved_pkgs.get()); 
+    auto vprim_mhd = desc_prim_mhd.GetPack(md);
+    auto vflux_mhd = desc_flux_mhd.GetPack(md);
+    auto vface_mhd = desc_face_mhd.GetPack(md);
+    return ArtemisUtils::CalculateFluxes<Fluid::gas>(md, pkg, vprim_mhd, vflux_mhd, vface_mhd, pcm);
+  }
+
+  return ArtemisUtils::CalculateFluxes<Fluid::gas>(md, pkg, vprim, vflux, vface, pcm); 
 }
 
 //----------------------------------------------------------------------------------------

@@ -83,8 +83,8 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         const std::array<Real, 4> px{bbox.x1[0], bbox.x1[1], bbox.x1[1], bbox.x1[0]};
         const std::array<Real, 4> py{bbox.x2[0], bbox.x2[0], bbox.x2[1], bbox.x2[1]};
         const Real isqrt2 = std::sqrt(1. / 2.);
-        const Real vf1 = ArtemisUtils::CutCell2D(px, py, {0.5 * pars.y0, 0.5 * pars.y0},
-                                                 {isqrt2, isqrt2});
+        const Real vf1 = 0.;//ArtemisUtils::CutCell2D(px, py, {0.5 * pars.y0, 0.5 * pars.y0},
+                             //                    {isqrt2, isqrt2});
         const Real vf2 = 1.0 - vf1;
 
         const Real dens = vf1 * pars.rho1 + vf2 * pars.rho0;

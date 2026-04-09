@@ -47,7 +47,8 @@ class RiemannSolver<RSolver::llf, FLUID_TYPE> {
   solve(const EOS &eos, parthenon::team_mbr_t const &member, const int b, const int k,
         const int j, const int il, const int iu, const int dir,
         const parthenon::ScratchPad2D<Real> &wl, const parthenon::ScratchPad2D<Real> &wr,
-        const V1 &p, const V2 &q, const V3 &vf) const {
+        const V1 &p, const V2 &q, const V3 &vf,
+	const bool do_mhd) const {
     using TE = parthenon::TopologicalElement;
     // Check sensibility of flux direction
     PARTHENON_REQUIRE(dir > 0 && dir <= 3, "Invalid flux direction!");
@@ -59,7 +60,7 @@ class RiemannSolver<RSolver::llf, FLUID_TYPE> {
     // Obtain number of species
     int nvar = Null<int>();
     if constexpr (FLUID_TYPE == Fluid::gas) {
-      nvar = 6;
+      nvar = do_mhd ? 9 : 6;
     } else if constexpr (FLUID_TYPE == Fluid::dust) {
       nvar = 4;
     }
@@ -75,6 +76,10 @@ class RiemannSolver<RSolver::llf, FLUID_TYPE> {
       const int ISE = nspecies * 5 + n;
       [[maybe_unused]] const int IEN = IPR;
       [[maybe_unused]] const int IEG = ISE;
+      // YH: For mhd
+      [[maybe_unused]] const int ibx = ivx + 5;
+      [[maybe_unused]] const int iby = ivy + 5;
+      [[maybe_unused]] const int ibz = ivz + 5;
 
       [[maybe_unused]] Real igm1 = Null<Real>();
       [[maybe_unused]] Real gamma = Null<Real>();
@@ -100,11 +105,26 @@ class RiemannSolver<RSolver::llf, FLUID_TYPE> {
             [[maybe_unused]] Real wr_ipr = Null<Real>();
             [[maybe_unused]] Real wl_ise = Null<Real>();
             [[maybe_unused]] Real wr_ise = Null<Real>();
+	    // YH: added to account for mhd
+            [[maybe_unused]] Real wl_ibx = Null<Real>();
+            [[maybe_unused]] Real wl_iby = Null<Real>();
+            [[maybe_unused]] Real wl_ibz = Null<Real>();
+            [[maybe_unused]] Real wr_ibx = Null<Real>();
+            [[maybe_unused]] Real wr_iby = Null<Real>();
+            [[maybe_unused]] Real wr_ibz = Null<Real>();
             if constexpr (FLUID_TYPE == Fluid::gas) {
               wl_ipr = wl(IPR, i);
-              wl_ise = wl(ISE, i);
               wr_ipr = wr(IPR, i);
+	      wl_ise = wl(ISE, i);
               wr_ise = wr(ISE, i);
+	      if (do_mhd) {
+                wl_ibx = wl(ibx, i);
+                wl_iby = wl(iby, i);
+                wl_ibz = wl(ibz, i);
+                wr_ibx = wr(ibx, i);
+                wr_iby = wr(iby, i);
+                wr_ibz = wr(ibz, i);
+              } 
             }
 
             // Compute sum of L/R fluxes
@@ -114,16 +134,45 @@ class RiemannSolver<RSolver::llf, FLUID_TYPE> {
             Real fsum_mx = qa * wl_ivx + qb * wr_ivx;
             Real fsum_my = qa * wl_ivy + qb * wr_ivy;
             Real fsum_mz = qa * wl_ivz + qb * wr_ivz;
+	    if (do_mhd) {
+	      Real Bmag_l = 0.5 * (SQR(wl_ibx) + SQR(wl_iby) + SQR(wl_ibz));
+	      Real Bmag_r = 0.5 * (SQR(wr_ibx) + SQR(wr_iby) + SQR(wr_ibz));
+              fsum_mx += (Bmag_l - SQR(wl_ibx)) + (Bmag_r - SQR(wr_ibx));
+              fsum_my += - wl_ibx*wl_iby - wr_ibx*wr_iby;
+              fsum_mz += - wl_ibx*wl_ibz - wr_ibx*wr_ibz;
+            }
 
             [[maybe_unused]] Real el = Null<Real>();
             [[maybe_unused]] Real er = Null<Real>();
             [[maybe_unused]] Real fsum_e = Null<Real>();
+	    [[maybe_unused]] Real fsum_bx = Null<Real>();
+            [[maybe_unused]] Real fsum_by = Null<Real>();
+            [[maybe_unused]] Real fsum_bz = Null<Real>();
             if constexpr (FLUID_TYPE == Fluid::gas) {
               el = wl_ipr * igm1 +
                    0.5 * wl_idn * (SQR(wl_ivx) + SQR(wl_ivy) + SQR(wl_ivz));
               er = wr_ipr * igm1 +
                    0.5 * wr_idn * (SQR(wr_ivx) + SQR(wr_ivy) + SQR(wr_ivz));
+	      if (do_mhd) { // YH: account for magnetic field energy
+                el += 0.5 * (SQR(wl_ibx) + SQR(wl_iby) + SQR(wl_ibz));
+                er += 0.5 * (SQR(wr_ibx) + SQR(wr_iby) + SQR(wr_ibz));
+              }
               fsum_e = (el + wl_ipr) * wl_ivx + (er + wr_ipr) * wr_ivx;
+	      if (do_mhd) {
+                  Real BL_e = 0.5 * (SQR(wl_ibx) + SQR(wl_iby) + SQR(wl_ibz));
+                  Real BR_e = 0.5 * (SQR(wr_ibx) + SQR(wr_iby) + SQR(wr_ibz));
+                  fsum_e = (el + wl_ipr + BL_e) * wl_ivx + (er + wr_ipr + BR_e) * wr_ivx;
+                  fsum_e += - (wl_ibx*wl_ivx + wl_iby*wl_ivy + wl_ibz*wl_ivz) * wl_ibx
+                          - (wr_ibx*wr_ivx + wr_iby*wr_ivy + wr_ibz*wr_ivz) * wr_ibx;
+
+                  Real FyL = wl_iby * wl_ivx - wl_ibx * wl_ivy;
+                  Real FyR = wr_iby * wr_ivx - wr_ibx * wr_ivy;
+                  Real FzL = wl_ibz * wl_ivx - wl_ibx * wl_ivz;
+                  Real FzR = wr_ibz * wr_ivx - wr_ibx * wr_ivz;
+                  fsum_bx = 0.;
+                  fsum_by = FyL + FyR;
+                  fsum_bz = FzL + FzR;
+              }
             }
 
             // Compute max wave speed in L/R states (see Toro eq. 10.43)
@@ -131,7 +180,25 @@ class RiemannSolver<RSolver::llf, FLUID_TYPE> {
             if constexpr (FLUID_TYPE == Fluid::gas) {
               qa = std::sqrt(gamma * wl_ipr / wl_idn);
               qb = std::sqrt(gamma * wr_ipr / wr_idn);
-              a = std::max((std::abs(wl_ivx) + qa), (std::abs(wr_ivx) + qb));
+	      if (do_mhd) {
+                Real aL = std::sqrt(gamma * wl_ipr / wl_idn);
+                Real aR = std::sqrt(gamma * wr_ipr / wr_idn);
+                Real caL = std::sqrt((SQR(wl_ibx) + SQR(wl_iby) + SQR(wl_ibz)) / wl_idn);
+                Real caR = std::sqrt((SQR(wr_ibx) + SQR(wr_iby) + SQR(wr_ibz)) / wr_idn);
+                Real qaL = std::max(aL, caL);
+                Real qbR = std::max(aR, caR);
+                Real caL_x = std::sqrt(SQR(wl_ibx) / wl_idn);
+                Real caR_x = std::sqrt(SQR(wr_ibx) / wr_idn);
+                Real apcaL = SQR(aL) + SQR(caL);
+                Real apcaxL = aL * caL_x;
+                Real cfL = std::sqrt(0.5*((SQR(aL)+SQR(caL)) + std::sqrt(SQR(apcaL) - 4.*SQR(apcaxL))));
+                Real apcaR = SQR(aR) + SQR(caR);
+                Real apcaxR = aR * caR_x;
+                Real cfR = std::sqrt(0.5*((SQR(aR)+SQR(caR)) + std::sqrt(SQR(apcaR) - 4.*SQR(apcaxR))));
+                qa = std::max(qaL, cfL);
+                qb = std::max(qbR, cfR);
+              }
+	      a = std::max((std::abs(wl_ivx) + qa), (std::abs(wr_ivx) + qb));
             } else if constexpr (FLUID_TYPE == Fluid::dust) {
               a = std::max(std::abs(wl_ivx), std::abs(wr_ivx));
             }
@@ -143,8 +210,16 @@ class RiemannSolver<RSolver::llf, FLUID_TYPE> {
             Real du_mz = a * (wr_idn * wr_ivz - wl_idn * wl_ivz);
 
             [[maybe_unused]] Real du_e = Null<Real>();
+	    [[maybe_unused]] Real du_bx = Null<Real>();
+            [[maybe_unused]] Real du_by = Null<Real>();
+            [[maybe_unused]] Real du_bz = Null<Real>();
             if constexpr (FLUID_TYPE == Fluid::gas) {
               du_e = a * (er - el);
+	      if (do_mhd) {
+                du_bx = a * (wr_ibx - wl_ibx);
+                du_by = a * (wr_iby - wl_iby);
+                du_bz = a * (wr_ibz - wl_ibz);
+              }
             }
 
             // Set an approximate interface pressure for coordinate source terms
@@ -161,9 +236,17 @@ class RiemannSolver<RSolver::llf, FLUID_TYPE> {
             if constexpr (FLUID_TYPE == Fluid::gas) {
               q.flux(b, dir, IEN, k, j, i) = 0.5 * (fsum_e - du_e);
 
-              // Li, 2008, https://ui.adsabs.harvard.edu/abs/2008ASPC..385..273L/abstract
+	      // Li, 2008, https://ui.adsabs.harvard.edu/abs/2008ASPC..385..273L/abstract
+	      // YH: i think from Eq. 5
               q.flux(b, dir, IEG, k, j, i) = frho * ((frho >= 0.0) ? wl_ise : wr_ise);
+              // YH: I think velocity face for +ve but I set to magnetic field for mhd so don't modify vf if is do_mhd
               vf(b, fdir, n, k, j, i) = frho / ((frho >= 0.0) ? wl_idn : wr_idn);
+	      if (do_mhd) {
+                // YH: flux for Bfield
+                q.flux(b, dir, ibx, k, j, i) = 0.5 * (fsum_bx - du_bx);
+                q.flux(b, dir, iby, k, j, i) = 0.5 * (fsum_by - du_by);
+                q.flux(b, dir, ibz, k, j, i) = 0.5 * (fsum_bz - du_bz);
+              } 
             }
           });
     }

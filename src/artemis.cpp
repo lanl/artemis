@@ -61,6 +61,7 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
 
   // Determine input file specified physics
   const bool do_gas = pin->GetOrAddBoolean("physics", "gas", true);
+  const bool do_mhd = pin->GetOrAddBoolean("physics", "mhd", false);
   const bool do_dust = pin->GetOrAddBoolean("physics", "dust", false);
   const bool do_gravity = pin->GetOrAddBoolean("physics", "gravity", false);
   const bool do_nbody = pin->GetOrAddBoolean("physics", "nbody", false);
@@ -71,6 +72,7 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   const bool do_conduction = pin->GetOrAddBoolean("physics", "conduction", false);
   const bool do_radiation = pin->GetOrAddBoolean("physics", "radiation", false);
   artemis->AddParam("do_gas", do_gas);
+  artemis->AddParam("do_mhd", do_mhd);
   artemis->AddParam("do_dust", do_dust);
   artemis->AddParam("do_gravity", do_gravity);
   artemis->AddParam("do_nbody", do_nbody);
@@ -89,6 +91,8 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
                     "Conduction requires the gas package, but there is not gas!");
   PARTHENON_REQUIRE(!(do_radiation) || (do_radiation && do_gas),
                     "Radiation requires the gas package, but there is not gas!");
+  PARTHENON_REQUIRE(!(do_mhd) || (do_mhd && do_gas),
+                    "MHD requires the gas package, but there is not gas!");
 
   // Set coordinate system
   const int ndim = ProblemDimension(pin.get());

@@ -30,6 +30,9 @@
 #include "radiation/imc/imc.hpp"
 #include "rotating_frame/rotating_frame.hpp"
 #include "utils/integrators/artemis_integrator.hpp"
+#include "mhd/mhd.hpp"
+#include "mhd/extended/xmhd.hpp"
+#include "mhd/extended/huba/prescribed.hpp"
 
 using namespace parthenon::driver::prelude;
 
@@ -56,6 +59,7 @@ ArtemisDriver<GEOM>::ArtemisDriver(ParameterInput *pin, ApplicationInput *app_in
 
   // Fluids and/or physics requested
   do_gas = artemis_pkg->template Param<bool>("do_gas");
+  do_mhd = artemis_pkg->template Param<bool>("do_mhd");
   do_dust = artemis_pkg->template Param<bool>("do_dust");
   do_gravity = artemis_pkg->template Param<bool>("do_gravity");
   do_rotating_frame = artemis_pkg->template Param<bool>("do_rotating_frame");
@@ -158,6 +162,16 @@ TaskCollection ArtemisDriver<GEOM>::StepTasks() {
   const auto any = parthenon::BoundaryType::any;
   const int num_partitions = pmesh->DefaultNumPartitions();
 
+  // YH: extract gas package to update dt & ncycle for BCs which rely on time
+  auto &gas_pkg = pmesh->packages.Get("gas");
+  gas_pkg->UpdateParam("dt", tm.dt);
+  gas_pkg->UpdateParam("ncycle", tm.ncycle);
+  const bool ideal_Efield = gas_pkg->template Param<bool>("ideal_Efield");
+
+  // YH: track time so can use it for time-dep. BCs
+  gas_pkg->UpdateParam("track_time", tm.time);
+  gas_pkg->UpdateParam("track_dt",   tm.dt);
+
   // Deep copy u0 into u1 for integrator logic
   auto &init_region = tc.AddRegion(num_partitions);
   for (int i = 0; i < num_partitions; i++) {
@@ -165,6 +179,10 @@ TaskCollection ArtemisDriver<GEOM>::StepTasks() {
     auto &u0 = pmesh->mesh_data.GetOrAdd("u0", i);
     auto &u1 = pmesh->mesh_data.GetOrAdd("u1", i);
     tl.AddTask(none, ArtemisUtils::DeepCopyConservedData, u1.get(), u0.get());
+    if (do_mhd) {
+	    tl.AddTask(none, MHD::DeepCopyConservedFaceData, u1.get(), u0.get());
+	    tl.AddTask(none, XMHD::DeepCopyConservedEdgeData, u1.get(), u0.get());
+    }
   }
 
   // Now do explicit integration of unsplit physics
@@ -179,7 +197,7 @@ TaskCollection ArtemisDriver<GEOM>::StepTasks() {
       auto &u1 = pmesh->mesh_data.GetOrAdd("u1", i);
 
       // Start looking for incoming messages (including for flux correction)
-      auto start_recv = tl.AddTask(none, parthenon::StartReceiveBoundBufs<any>, u0);
+      auto start_recv = tl.AddTask(none, parthenon::StartReceiveBoundaryBuffers, u0);//StartReceiveBoundBufs<any>, u0);
       auto start_flx_recv = tl.AddTask(none, parthenon::StartReceiveFluxCorrections, u0);
 
       // Compute hydrodynamic fluxes
@@ -199,22 +217,82 @@ TaskCollection ArtemisDriver<GEOM>::StepTasks() {
         diff_flx = vflx | tflx;
       }
 
+      TaskID mhd_flx = none;
+      if (do_mhd) {
+        TaskID mhd_flx0 = tl.AddTask(gas_flx, MHD::CalculateEMF<GEOM>, u0.get());
+	mhd_flx = tl.AddTask(mhd_flx0, XMHD::CalculateEdgeFluxes<GEOM>,
+                     u0.get()); // Cal edge flux must be placed before CC update!!!
+      } else {mhd_flx = gas_flx;}
       // Communicate and set fluxes
       auto send_flx =
-          tl.AddTask(gas_flx | dust_flx | diff_flx,
+          tl.AddTask(gas_flx | dust_flx | diff_flx | mhd_flx,
                      parthenon::SendBoundBufs<parthenon::BoundaryType::flxcor_send>, u0);
       auto recv_flx = tl.AddTask(start_flx_recv, parthenon::ReceiveFluxCorrections, u0);
       auto set_flx = tl.AddTask(recv_flx, parthenon::SetFluxCorrections, u0);
 
-      // Apply flux divergence
-      auto update =
-          tl.AddTask(gas_flx | dust_flx | set_flx, ArtemisUtils::ApplyUpdate<GEOM>,
+      // YH: Update FCC values (YH: from integrator/artemis_integrator.hpp)
+      TaskID update_mhd=none;
+      if (do_mhd) {
+	 TaskID update_mhdm1 = none;
+	 if (tm.ncycle == 0 and stage == 1) {
+	   TaskID update_mhdm2 = none;
+	   if (ideal_Efield) {
+	     update_mhdm2 = tl.AddTask(set_flx, XMHD::InitEfield<GEOM>,
+		       u0.get(), u1.get());
+	   } else {
+	     update_mhdm2 = set_flx;
+	   }
+	   update_mhdm1 = tl.AddTask(update_mhdm2, XMHD::DeepCopyConservedEdgeData, u1.get(), u0.get());
+	 } else {
+	   update_mhdm1 = (gas_flx | dust_flx | set_flx | mhd_flx);
+	 }
+	 TaskID update_mhd0 = tl.AddTask(update_mhdm1, XMHD::ComputeExplicitSource<GEOM>,
+  		     u0.get(), stage, integrator.get()); // Must be placed before update otherwise will use edge updated values!!!
+	 //--------------Apply BC to source before using it to update----------------------
+	 TaskID update_mhd0p1 =
+          tl.AddTask(update_mhd0, ArtemisDerived::SetAuxillaryFields<GEOM>, u0.get());
+         TaskID update_mhd0p2 = tl.AddTask(update_mhd0p1, PreCommFillDerived<MeshData<Real>>, u0.get());
+         TaskID update_mhd0p3 = parthenon::AddBoundaryExchangeTasks(update_mhd0p2, tl, u0, pmesh->multilevel);
+         TaskID update_mhd0p4 = tl.AddTask(TQ::local_sync, update_mhd0p3, FillDerived<MeshData<Real>>, u0.get()); 
+	 //--------------------------------------------------------------------------------
+	 TaskID update_mhd1 = tl.AddTask(update_mhd0p4, MHD::ApplyUpdateCC<GEOM>,
                      u0.get(), u1.get(), stage, integrator.get());
+         TaskID update_mhd2 = tl.AddTask(update_mhd1, XMHD::ApplyUpdateEdge<GEOM>,
+                     u0.get(), u1.get(), stage, integrator.get());
+	 TaskID update_mhd2p1 = tl.AddTask(update_mhd2, MHD::ApplyUpdateFCC<GEOM>,
+                     u0.get(), u1.get(), stage, integrator.get());
+	 TaskID update_mhd3 = tl.AddTask(update_mhd2p1, XMHD::ApplyExplicitSource<GEOM>,
+                     u0.get(), stage, integrator.get());
+	 // YH: I will place source after all variables are updated with invisicd flux
+	 // -> Thus, If I set E=-u x B, it should be zero non-ideal source term
+	 // -> Need exchange boundaries because interpolation at interior edges may need boundary values and implicit is split from the above explicit.
+	 TaskID update_mhd3p1 =
+          tl.AddTask(update_mhd3, ArtemisDerived::SetAuxillaryFields<GEOM>, u0.get());
+         TaskID update_mhd3p2 = tl.AddTask(update_mhd3p1, PreCommFillDerived<MeshData<Real>>, u0.get()); // c2p
+
+	 TaskID update_mhd3p2p1 = update_mhd3p2;//tl.AddTask(update_mhd3p2, prescribed::init_cond<GEOM>, u0.get());
+
+	 TaskID update_mhd3p3 = parthenon::AddBoundaryExchangeTasks(update_mhd3p2p1, tl, u0, pmesh->multilevel);
+	 TaskID update_mhd3p4 = tl.AddTask(TQ::local_sync, update_mhd3p3, FillDerived<MeshData<Real>>, u0.get()); // p2c
+	 TaskID update_mhd4 = tl.AddTask(update_mhd3p4, Gas::CalculateFluxes, u0.get(), do_pcm);
+         TaskID update_mhd5 = tl.AddTask(update_mhd4, MHD::CalculateEMF<GEOM>, u0.get());
+	 auto update_mhd5p1 =
+          tl.AddTask(update_mhd5,
+                     parthenon::SendBoundBufs<parthenon::BoundaryType::flxcor_send>, u0);
+      	 auto update_mhd5p2 = tl.AddTask(update_mhd5p1, parthenon::ReceiveFluxCorrections, u0);
+      	 auto update_mhd5p3 = tl.AddTask(update_mhd5p2, parthenon::SetFluxCorrections, u0);
+
+	 update_mhd = tl.AddTask(update_mhd5p3, XMHD::ApplyEJSource_direcSplit<GEOM>,
+                     u0.get(), u1.get(), stage, integrator.get());
+      } else {
+	 update_mhd = tl.AddTask(gas_flx | dust_flx | set_flx | mhd_flx, ArtemisUtils::ApplyUpdate<GEOM>,
+                     u0.get(), u1.get(), stage, integrator.get());
+      }
 
       // Apply "coordinate source terms"
-      TaskID gas_coord_src = update, dust_coord_src = update;
-      if (do_gas) gas_coord_src = tl.AddTask(update, Gas::FluxSource, u0.get(), bdt);
-      if (do_dust) dust_coord_src = tl.AddTask(update, Dust::FluxSource, u0.get(), bdt);
+      TaskID gas_coord_src = update_mhd, dust_coord_src = update_mhd;
+      if (do_gas) gas_coord_src = tl.AddTask(update_mhd, Gas::FluxSource, u0.get(), bdt);
+      if (do_dust) dust_coord_src = tl.AddTask(update_mhd, Dust::FluxSource, u0.get(), bdt);
 
       // Apply (gas) diffusion sources
       // NOTE(@pdmullen): I believe set_flx dependency implicitly inside gas_coord_src,
@@ -259,8 +337,10 @@ TaskCollection ArtemisDriver<GEOM>::StepTasks() {
       // Set (remaining) fields to be communicated
       auto c2p = tl.AddTask(set_aux, PreCommFillDerived<MeshData<Real>>, u0.get());
 
-      // Set boundary conditions (both physical and logical)
-      auto bcs = parthenon::AddBoundaryExchangeTasks(c2p, tl, u0, pmesh->multilevel);
+      TaskID c2p_p1 = c2p;//tl.AddTask(c2p, prescribed::init_cond<GEOM>, u0.get());
+
+      // Set boundary conditions (both physical and logical) - ownership model
+      auto bcs = parthenon::AddBoundaryExchangeTasks(c2p_p1, tl, u0, pmesh->multilevel);
 
       // Sync fields
       auto p2c = tl.AddTask(TQ::local_sync, bcs, FillDerived<MeshData<Real>>, u0.get());
@@ -273,6 +353,8 @@ TaskCollection ArtemisDriver<GEOM>::StepTasks() {
       }
     }
   }
+
+  if (tm.dt < 1.e-12) PARTHENON_FAIL("Error as dt < 1.e-10!!!"); 
 
   return tc;
 }

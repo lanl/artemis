@@ -31,6 +31,7 @@ void PrintArtemisConfiguration(Packages_t &packages) {
     const auto units = params.Get<Units>("units");
     std::string msg = "";
     if (params.Get<bool>("do_gas")) msg += "Gas\n";
+    if (params.Get<bool>("do_mhd")) msg += hfill + "MHD\n";
     if (params.Get<bool>("do_dust")) msg += hfill + "Dust\n";
     if (params.Get<bool>("do_gravity")) msg += hfill + "Gravity\n";
     if (params.Get<bool>("do_rotating_frame")) msg += hfill + "Rotating frame\n";
@@ -149,7 +150,7 @@ std::vector<std::vector<Real>> loadtxt(std::string fname) {
   return table;
 }
 
-KOKKOS_FUNCTION
+KOKKOS_INLINE_FUNCTION
 Real CutCell2D(const std::array<Real, 4> &x, const std::array<Real, 4> &y,
                const std::array<Real, 2> &xc, const std::array<Real, 2> &nx) {
   // Cuts a 2D rectangle with the given plane

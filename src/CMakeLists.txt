@@ -74,6 +74,25 @@ set (SRC_LIST
   pgen/shock.hpp
   pgen/strat.hpp
   pgen/thermalization.hpp
+  pgen/sst.hpp
+
+  mhd/mhd.hpp
+  mhd/fluxes/recon/Bcorrection.hpp
+  mhd/fluxes/riemann/hlld.hpp
+  mhd/pgen/brio_wu.hpp
+  mhd/pgen/blast_mhd.hpp
+  mhd/pgen/rotor_mhd.hpp
+  mhd/pgen/current_sheet_mhd.hpp
+  mhd/pgen/blast3D_mhd.hpp
+  mhd/pgen/plasmoid_mhd.hpp
+  mhd/pgen/orszag_tang_mhd.hpp
+  mhd/pgen/linear_wave_mhd.hpp
+  mhd/pgen/fast_shock.hpp
+  mhd/pgen/huba_hall.hpp
+  mhd/pgen/whistler_wave.hpp
+  mhd/pgen/field_diffusion.hpp
+  mhd/pgen/brio_wu_reversed.hpp
+  mhd/pgen/EMwave.hpp
 
   radiation/imc/imc.hpp
 

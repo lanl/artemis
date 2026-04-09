@@ -56,7 +56,8 @@ class RiemannSolver<RSolver::hlle, FLUID_TYPE> {
   solve(const EOS &eos, parthenon::team_mbr_t const &member, const int b, const int k,
         const int j, const int il, const int iu, const int dir,
         const parthenon::ScratchPad2D<Real> &wl, const parthenon::ScratchPad2D<Real> &wr,
-        const V1 &p, const V2 &q, const V3 &vf) const {
+        const V1 &p, const V2 &q, const V3 &vf,
+	const bool do_mhd) const { // YH: add mhd
     using TE = parthenon::TopologicalElement;
     // Check sensibility of flux direction
     PARTHENON_REQUIRE(dir > 0 && dir <= 3, "Invalid flux direction!");

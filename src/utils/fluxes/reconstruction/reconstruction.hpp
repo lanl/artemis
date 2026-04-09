@@ -27,7 +27,29 @@ class Reconstruction {
   KOKKOS_INLINE_FUNCTION void apply(parthenon::team_mbr_t const &member, const int b,
                                     const int k, const int j, const int il, const int iu,
                                     const V &q, parthenon::ScratchPad2D<Real> &ql,
-                                    parthenon::ScratchPad2D<Real> &qr) const {
+                                    parthenon::ScratchPad2D<Real> &qr,
+				    const TVDType TVD_type) const {
+    PARTHENON_FAIL("No default implementation!");
+  }
+
+  template <typename V1, typename V2>
+  KOKKOS_INLINE_FUNCTION void apply_fcc(parthenon::team_mbr_t const &member, const int b,
+                                    const int k, const int j, const int il, const int iu,
+                                    const V1 &q, parthenon::ScratchPad2D<Real> &ql,
+                                    parthenon::ScratchPad2D<Real> &qr, const V2 &qf) const {
+    PARTHENON_FAIL("No default implementation!");
+  }
+
+  // YH: For positive-preserving scheme where dW now depends on each other in terms of variables
+  template <typename V>
+  KOKKOS_INLINE_FUNCTION void apply_pp(parthenon::team_mbr_t const &member, const int b,
+                                    const int k, const int j, const int il, const int iu,
+                                    const V &q, parthenon::ScratchPad2D<Real> &ql,
+                                    parthenon::ScratchPad2D<Real> &qr,
+				    parthenon::ScratchPad2D<Real> &dW,
+				    const Real gamma, const Real dt,
+                                    const TVDType TVD_type,
+				    const Real dW_sw[16]) const {
     PARTHENON_FAIL("No default implementation!");
   }
 };
@@ -38,5 +60,9 @@ class Reconstruction {
 #include "pcm.hpp"
 #include "plm.hpp"
 #include "ppm.hpp"
+#include "../../../mhd/fluxes/recon/Bcorrection.hpp"
+#include "../../../mhd/fluxes/recon/plm_rho.hpp"
+#include "../../../mhd/fluxes/recon/plm_pp.hpp"
+#include "../../../mhd/fluxes/recon/plm_modPe.hpp"
 
 #endif // ARTEMIS_UTILS_FLUXES_RECONSTRUCTION_RECONSTRUCTION_HPP_

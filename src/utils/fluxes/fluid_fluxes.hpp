@@ -83,9 +83,31 @@ TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PackPrim vprim,
   const auto ib = md->GetBoundsI(IndexDomain::interior);
   const auto jb = md->GetBoundsJ(IndexDomain::interior);
   const auto kb = md->GetBoundsK(IndexDomain::interior);
-  const int ncells1 = (ib.e - ib.s + 1) + 2 * parthenon::Globals::nghost;
+  const int ncells1 = (ib.e - ib.s + 1) + 2 * parthenon::Globals::nghost; 
   const bool multi_d = (pm->ndim > 1);
   const bool three_d = (pm->ndim > 2);
+
+  auto &artemis_pkg = pm->packages.Get("artemis");
+  const auto do_mhd = artemis_pkg->template Param<bool>("do_mhd");
+  auto &gas_pkg = pm->packages.Get("gas");
+  const auto tvd_type = gas_pkg->template Param<TVDType>("tvd_type");
+
+  // YH: for positive preserving scheme
+  const Real gamma = gas_pkg->template Param<Real>("adiabatic_index"); 
+  const double dt = gas_pkg->Param<double>("track_dt");
+  const Real dW_idn = gas_pkg->template Param<Real>("dW_idn");
+  const Real dW_ipr = gas_pkg->template Param<Real>("dW_ipr");
+  const Real dW_ise = gas_pkg->template Param<Real>("dW_ise");
+  const Real dW_ivx = gas_pkg->template Param<Real>("dW_ivx");
+  const Real dW_ivy = gas_pkg->template Param<Real>("dW_ivy");
+  const Real dW_ivz = gas_pkg->template Param<Real>("dW_ivz");
+  const Real dW_ibx = gas_pkg->template Param<Real>("dW_ibx");
+  const Real dW_iby = gas_pkg->template Param<Real>("dW_iby");
+  const Real dW_ibz = gas_pkg->template Param<Real>("dW_ibz");
+  const Real dW_iJx = gas_pkg->template Param<Real>("dW_iJx");
+  const Real dW_iJy = gas_pkg->template Param<Real>("dW_iJy");
+  const Real dW_iJz = gas_pkg->template Param<Real>("dW_iJz");
+  const Real dW_iPe = gas_pkg->template Param<Real>("dW_iPe");
 
   // Adiabatic index, if used
   EOS eos;
@@ -98,12 +120,19 @@ TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PackPrim vprim,
   // even if some blocks don't contain all species
   const int nspecies = pkg->template Param<int>("nspecies");
   const int nvars = vprim.GetMaxNumberOfVars();
-  int scr_size = ScratchPad2D<Real>::shmem_size(nvars, ncells1) * 2;
+  const ReconstructionMethod recon_method =
+      pkg->template Param<ReconstructionMethod>("recon");
+  const bool applyPP = (recon_method == ReconstructionMethod::plm_pp);
+  int sz = applyPP ? 3 : 2; // YH: Need store dW for PP
+  int scr_size = ScratchPad2D<Real>::shmem_size(nvars, ncells1) * sz;
   const int scr_level = pkg->template Param<int>("scr_level");
-
   // X1-Flux
-  int il = ib.s, iu = ib.e + 1;
-  int jl = jb.s, ju = jb.e, kl = kb.s, ku = kb.e;
+  // -> For some reason my code need -2 (otherwise NaN) & +2 (otherwise oscillation at right end), thus, I need to use 3 ghost cells for now. I need to figure out which part of my code (probably interpolation) requires this additional flux computation at boundaries.
+  int il = ib.s - 2, iu = ib.e + 2;
+  int jl = jb.s, ju = jb.e;
+  if (multi_d) {jl -= 2; ju += 2;} // YH: to account for fcc bfield in CT 
+  int kl = kb.s, ku = kb.e;
+  if (three_d) {kl -= 2; ku += 2;}
   parthenon::par_for_outer(
       DEFAULT_OUTER_LOOP_PATTERN, "CalculateFluxes::X1-Flux", DevExecSpace(), scr_size,
       scr_level, 0, md->NumBlocks() - 1, kl, ku, jl, ju,
@@ -113,12 +142,30 @@ TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PackPrim vprim,
 
         // Reconstruct qR[i] and qL[i+1]
         Reconstruction<RECON, X1DIR, GEOM> recon;
-        recon.apply(mbr, b, k, j, il - 1, iu, vprim, wl, wr);
+	if constexpr (RECON == ReconstructionMethod::plm_pp) {
+	  ScratchPad2D<Real> dw(mbr.team_scratch(scr_level), nvars, ncells1);
+	  const Real dW_sw[16] = {dW_idn,dW_ivx,dW_ivy,dW_ivz,dW_ipr,dW_ise,
+                          dW_ibx,dW_iby,dW_ibz,1,1,1,dW_iJx,dW_iJy,dW_iJz,dW_iPe};
+	  recon.apply_pp(mbr, b, k, j, il, iu, vprim, wl, wr, dw, gamma, 
+			 dt, tvd_type,dW_sw);
+	} else {
+          recon.apply(mbr, b, k, j, il, iu, vprim, wl, wr, tvd_type);
+	}
+	// YH: Add wl(il) as may need it for flux which is used for my XMHD where the v0_B.flux(i=1) from CT
+        //     is used through interpolation... -> For now temp fix to avoid nan at boundary
+        for (int nv=0; nv<nvars; ++nv) {
+          wl(nv,il) = wl(nv,il+1); // YH: cause recon update ql(i+1) & qr(i)
+        }
+	mbr.team_barrier();
+	if (do_mhd) {
+	  Reconstruction<ReconstructionMethod::Bcorrection, X1DIR, GEOM> recon_mhd;
+	  recon_mhd.apply_fcc(mbr, b, k, j, il, iu, vprim, wl, wr, vface);
+	} 
         mbr.team_barrier();
 
         // Compute fluxes over[is, ie + 1]
-        RiemannSolver<RIEMANN, FLUID_TYPE> riemann;
-        riemann.solve(eos, mbr, b, k, j, il, iu, X1DIR, wl, wr, vprim, vflux, vface);
+        RiemannSolver<RIEMANN, FLUID_TYPE> riemann; 
+        riemann.solve(eos, mbr, b, k, j, il, iu, X1DIR, wl, wr, vprim, vflux, vface, do_mhd);
         mbr.team_barrier();
 
         // Scale X1-momentum flux by appropriate scale factor for coord system
@@ -127,9 +174,12 @@ TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PackPrim vprim,
 
   // X2-Flux
   if (multi_d) {
-    jl = jb.s - 1, ju = jb.e + 1;
-    il = ib.s, iu = ib.e, kl = kb.s, ku = kb.e;
-    scr_size = ScratchPad2D<Real>::shmem_size(nvars, ncells1) * 3;
+    jl = jb.s - 2, ju = jb.e + 2;
+    il = ib.s - 2, iu = ib.e + 2;
+    kl = kb.s, ku = kb.e;
+    if (three_d) {kl -= 2; ku += 2;}
+    sz = applyPP ? 4 : 3; // Need store dW for PP
+    scr_size = ScratchPad2D<Real>::shmem_size(nvars, ncells1) * sz;
     parthenon::par_for_outer(
         DEFAULT_OUTER_LOOP_PATTERN, "CalculateFluxes::X2-Flux", DevExecSpace(), scr_size,
         scr_level, 0, md->NumBlocks() - 1, kl, ku,
@@ -150,14 +200,32 @@ TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PackPrim vprim,
 
             // Reconstruct qR[j] and qL[j+1]
             Reconstruction<RECON, X2DIR, GEOM> recon;
-            recon.apply(mbr, b, k, j, il, iu, vprim, wl_jp1, wr);
+	    if constexpr (RECON == ReconstructionMethod::plm_pp) {
+	      ScratchPad2D<Real> dw(mbr.team_scratch(scr_level), nvars, ncells1);
+	      const Real dW_sw[16] = {dW_idn,dW_ivx,dW_ivy,dW_ivz,dW_ipr,dW_ise,
+                          dW_ibx,dW_iby,dW_ibz,1,1,1,dW_iJx,dW_iJy,dW_iJz,dW_iPe};
+	      recon.apply_pp(mbr, b, k, j, il, iu, vprim, wl_jp1, wr, dw, gamma, 
+			     dt, tvd_type,dW_sw);
+	    } else {
+              recon.apply(mbr, b, k, j, il, iu, vprim, wl_jp1, wr, tvd_type);
+	    }
+	    if (j==jl) {
+	      for (int nv=0; nv<nvars; ++nv) {
+                wl(nv,il) = wl_jp1(nv,il); // YH: cause recon update ql(i+1) & qr(i)
+              }
+	    }
+	    mbr.team_barrier();
+	    if (do_mhd) {
+	      Reconstruction<ReconstructionMethod::Bcorrection, X2DIR, GEOM> recon_mhd;
+	      recon_mhd.apply_fcc(mbr, b, k, j, il, iu, vprim, wl, wr, vface);
+	    }
             mbr.team_barrier();
 
-            if (j > jl) {
+            if (j > jl) { 
               // compute fluxes over [js,je+1]
               RiemannSolver<RIEMANN, FLUID_TYPE> riemann;
               riemann.solve(eos, mbr, b, k, j, il, iu, X2DIR, wl, wr, vprim, vflux,
-                            vface);
+                            vface, do_mhd);
               mbr.team_barrier();
 
               // Scale X2-momentum flux by appropriate scale factor for coord system
@@ -169,9 +237,11 @@ TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PackPrim vprim,
 
   // X3-Flux
   if (three_d) {
-    kl = kb.s - 1, ku = kb.e + 1;
-    il = ib.s, iu = ib.e, jl = jb.s, ju = jb.e;
-    scr_size = ScratchPad2D<Real>::shmem_size(nvars, ncells1) * 3;
+    kl = kb.s - 2, ku = kb.e + 2;
+    il = ib.s - 2, iu = ib.e + 2; 
+    jl = jb.s - 2, ju = jb.e + 2;
+    sz = applyPP ? 4 : 3; // Need store dW for PP
+    scr_size = ScratchPad2D<Real>::shmem_size(nvars, ncells1) * sz;
     parthenon::par_for_outer(
         DEFAULT_OUTER_LOOP_PATTERN, "Hydro::X3-Flux", DevExecSpace(), scr_size, scr_level,
         0, md->NumBlocks() - 1, jl, ju,
@@ -192,14 +262,32 @@ TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PackPrim vprim,
 
             // Reconstruct qR[k] and qL[k+1]
             Reconstruction<RECON, X3DIR, GEOM> recon;
-            recon.apply(mbr, b, k, j, il, iu, vprim, wl_kp1, wr);
+	    if constexpr (RECON == ReconstructionMethod::plm_pp) {
+	      ScratchPad2D<Real> dw(mbr.team_scratch(scr_level), nvars, ncells1);
+	      const Real dW_sw[16] = {dW_idn,dW_ivx,dW_ivy,dW_ivz,dW_ipr,dW_ise,
+                          dW_ibx,dW_iby,dW_ibz,1,1,1,dW_iJx,dW_iJy,dW_iJz,dW_iPe};
+	      recon.apply_pp(mbr, b, k, j, il, iu, vprim, wl_kp1, wr, dw, gamma, 
+			     dt, tvd_type,dW_sw);
+	    } else {
+              recon.apply(mbr, b, k, j, il, iu, vprim, wl_kp1, wr, tvd_type);
+	    }
+	    if (k==kl) {
+              for (int nv=0; nv<nvars; ++nv) {
+                wl(nv,il) = wl_kp1(nv,il); // YH: cause recon update ql(i+1) & qr(i)
+              }
+            }
+	    mbr.team_barrier();
+	    if (do_mhd) {
+	      Reconstruction<ReconstructionMethod::Bcorrection, X3DIR, GEOM> recon_mhd;
+	      recon_mhd.apply_fcc(mbr, b, k, j, il, iu, vprim, wl, wr, vface);
+	    }
             mbr.team_barrier();
 
             // compute fluxes over [ks,ke+1]
-            if (k > kl) {
+            if (k > kl) { 
               RiemannSolver<RIEMANN, FLUID_TYPE> riemann;
               riemann.solve(eos, mbr, b, k, j, il, iu, X3DIR, wl, wr, vprim, vflux,
-                            vface);
+                            vface, do_mhd);
               mbr.team_barrier();
 
               // Scale X3-momentum flux by appropriate scale factor for coord system
@@ -208,7 +296,6 @@ TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PackPrim vprim,
           }
         });
   }
-
   return TaskStatus::complete;
 }
 
@@ -218,7 +305,7 @@ TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PackPrim vprim,
 template <Coordinates GEOM, Fluid FLUID_TYPE, RSolver RIEMANN, typename PackPrim,
           typename PackFlux, typename PackFace, typename PKG>
 TaskStatus CalculateFluxesReconSelect(MeshData<Real> *md, PKG &pkg, PackPrim vprim,
-                                      PackFlux vflux, PackFace vface, const bool pcm) {
+                                      PackFlux vflux, PackFace vface, const bool pcm) { 
   const ReconstructionMethod recon_method =
       pkg->template Param<ReconstructionMethod>("recon");
 
@@ -231,6 +318,15 @@ TaskStatus CalculateFluxesReconSelect(MeshData<Real> *md, PKG &pkg, PackPrim vpr
   } else if (recon_method == ReconstructionMethod::ppm) {
     return CalculateFluxesImpl<GEOM, FLUID_TYPE, RIEMANN, ReconstructionMethod::ppm>(
         md, pkg, vprim, vflux, vface);
+  } else if (recon_method == ReconstructionMethod::plm_rho) {
+    return CalculateFluxesImpl<GEOM, FLUID_TYPE, RIEMANN, ReconstructionMethod::plm_rho>(
+        md, pkg, vprim, vflux, vface);
+  } else if (recon_method == ReconstructionMethod::plm_pp) {
+    return CalculateFluxesImpl<GEOM, FLUID_TYPE, RIEMANN, ReconstructionMethod::plm_pp>(
+        md, pkg, vprim, vflux, vface);
+  } else if (recon_method == ReconstructionMethod::plm_modPe) {
+    return CalculateFluxesImpl<GEOM, FLUID_TYPE, RIEMANN, ReconstructionMethod::plm_modPe>(
+        md, pkg, vprim, vflux, vface);
   } else {
     PARTHENON_FAIL("Reconstruction method not recognized!");
   }
@@ -242,7 +338,7 @@ TaskStatus CalculateFluxesReconSelect(MeshData<Real> *md, PKG &pkg, PackPrim vpr
 template <Coordinates GEOM, Fluid FLUID_TYPE, typename PackPrim, typename PackFlux,
           typename PackFace, typename PKG>
 TaskStatus CalculateFluxesRiemannSelect(MeshData<Real> *md, PKG &pkg, PackPrim vprim,
-                                        PackFlux vflux, PackFace vface, const bool pcm) {
+                                        PackFlux vflux, PackFace vface, const bool pcm) { 
   const RSolver riemann_method = pkg->template Param<RSolver>("rsolver");
 
   if (riemann_method == RSolver::hllc) {
@@ -253,6 +349,36 @@ TaskStatus CalculateFluxesRiemannSelect(MeshData<Real> *md, PKG &pkg, PackPrim v
                                                                        vflux, vface, pcm);
   } else if (riemann_method == RSolver::llf) {
     return CalculateFluxesReconSelect<GEOM, FLUID_TYPE, RSolver::llf>(md, pkg, vprim,
+                                                                      vflux, vface, pcm);
+  } else if (riemann_method == RSolver::hlld) {
+    return CalculateFluxesReconSelect<GEOM, FLUID_TYPE, RSolver::hlld>(md, pkg, vprim,
+                                                                      vflux, vface, pcm);
+  } else if (riemann_method == RSolver::llf_xmhd) {
+    return CalculateFluxesReconSelect<GEOM, FLUID_TYPE, RSolver::llf_xmhd>(md, pkg, vprim,
+                                                                      vflux, vface, pcm);
+  } else if (riemann_method == RSolver::hlld_xmhd) {
+    return CalculateFluxesReconSelect<GEOM, FLUID_TYPE, RSolver::hlld_xmhd>(md, pkg, vprim,
+                                                                      vflux, vface, pcm);
+  } else if (riemann_method == RSolver::llf_hall_xmhd) {
+    return CalculateFluxesReconSelect<GEOM, FLUID_TYPE, RSolver::llf_hall_xmhd>(md, pkg, vprim,
+                                                                      vflux, vface, pcm);
+  } else if (riemann_method == RSolver::hll_hall_xmhd) {
+    return CalculateFluxesReconSelect<GEOM, FLUID_TYPE, RSolver::hll_hall_xmhd>(md, pkg, vprim,
+                                                                      vflux, vface, pcm);
+  } else if (riemann_method == RSolver::hlle_hall_xmhd) {
+    return CalculateFluxesReconSelect<GEOM, FLUID_TYPE, RSolver::hlle_hall_xmhd>(md, pkg, vprim,
+                                                                      vflux, vface, pcm);
+  } else if (riemann_method == RSolver::hlldc_llf_hall_xmhd) {
+    return CalculateFluxesReconSelect<GEOM, FLUID_TYPE, RSolver::hlldc_llf_hall_xmhd>(md, pkg, vprim,
+                                                                      vflux, vface, pcm);
+  } else if (riemann_method == RSolver::hlldc_hall_xmhd) {
+    return CalculateFluxesReconSelect<GEOM, FLUID_TYPE, RSolver::hlldc_hall_xmhd>(md, pkg, vprim,
+                                                                      vflux, vface, pcm);
+  } else if (riemann_method == RSolver::hlldc_xmhd) {
+    return CalculateFluxesReconSelect<GEOM, FLUID_TYPE, RSolver::hlldc_xmhd>(md, pkg, vprim,
+                                                                      vflux, vface, pcm);
+  } else if (riemann_method == RSolver::hlldc_llf_xmhd) {
+    return CalculateFluxesReconSelect<GEOM, FLUID_TYPE, RSolver::hlldc_llf_xmhd>(md, pkg, vprim,
                                                                       vflux, vface, pcm);
   } else {
     PARTHENON_FAIL("Riemann solver not recognized!");
@@ -265,7 +391,7 @@ TaskStatus CalculateFluxesRiemannSelect(MeshData<Real> *md, PKG &pkg, PackPrim v
 template <Fluid FLUID_TYPE, typename PackPrim, typename PackFlux, typename PackFace,
           typename PKG>
 TaskStatus CalculateFluxes(MeshData<Real> *md, PKG &pkg, PackPrim vprim, PackFlux vflux,
-                           PackFace vface, const bool pcm) {
+                           PackFace vface, const bool pcm) { 
   const Coordinates sys = pkg->template Param<Coordinates>("coords");
 
   if (sys == Coordinates::cartesian) {

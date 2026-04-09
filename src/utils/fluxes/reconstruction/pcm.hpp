@@ -34,7 +34,8 @@ class Reconstruction<ReconstructionMethod::pcm, X1DIR, GEOM> {
   KOKKOS_INLINE_FUNCTION void apply(parthenon::team_mbr_t const &member, const int b,
                                     const int k, const int j, const int il, const int iu,
                                     const V &q, parthenon::ScratchPad2D<Real> &ql,
-                                    parthenon::ScratchPad2D<Real> &qr) const {
+                                    parthenon::ScratchPad2D<Real> &qr,
+				    const TVDType TVD_type) const {
     for (int n = q.GetLowerBound(b); n <= q.GetUpperBound(b); ++n) {
       parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, member, il, iu,
                                [&](const int i) {
@@ -55,7 +56,8 @@ class Reconstruction<ReconstructionMethod::pcm, X2DIR, GEOM> {
   KOKKOS_INLINE_FUNCTION void apply(parthenon::team_mbr_t const &member, const int b,
                                     const int k, const int j, const int il, const int iu,
                                     const V &q, parthenon::ScratchPad2D<Real> &ql_jp1,
-                                    parthenon::ScratchPad2D<Real> &qr_j) const {
+                                    parthenon::ScratchPad2D<Real> &qr_j,
+				    const TVDType TVD_type) const {
     for (int n = q.GetLowerBound(b); n <= q.GetUpperBound(b); ++n) {
       parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, member, il, iu,
                                [&](const int i) {
@@ -76,7 +78,8 @@ class Reconstruction<ReconstructionMethod::pcm, X3DIR, GEOM> {
   KOKKOS_INLINE_FUNCTION void apply(parthenon::team_mbr_t const &member, const int b,
                                     const int k, const int j, const int il, const int iu,
                                     const V &q, parthenon::ScratchPad2D<Real> &ql_kp1,
-                                    parthenon::ScratchPad2D<Real> &qr_k) const {
+                                    parthenon::ScratchPad2D<Real> &qr_k,
+				    const TVDType TVD_type) const {
     for (int n = q.GetLowerBound(b); n <= q.GetUpperBound(b); ++n) {
       parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, member, il, iu,
                                [&](const int i) {

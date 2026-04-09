@@ -50,6 +50,8 @@ TaskStatus BetaCooling(MeshData<Real> *md, const Real time, const Real dt) {
   const auto dflr_gas = gas_pkg->template Param<Real>("dfloor");
   const auto sieflr_gas = gas_pkg->template Param<Real>("siefloor");
 
+  const bool do_mhd = pm->packages.Get("artemis")->template Param<bool>("do_mhd");
+
   Real gm = Null<Real>();
   const bool do_gravity = pm->packages.Get("artemis")->template Param<bool>("do_gravity");
   if (do_gravity) gm = pm->packages.Get("gravity")->template Param<Real>("gm");
@@ -61,7 +63,8 @@ TaskStatus BetaCooling(MeshData<Real> *md, const Real time, const Real dt) {
   TempParams tpars = cooling_pkg->template Param<TempParams>("tpars");
 
   static auto desc = MakePackDescriptor<gas::cons::momentum, gas::cons::total_energy,
-                                        gas::cons::internal_energy, gas::cons::density>(
+                                        gas::cons::internal_energy, gas::cons::density,
+					gas::cons::Bfield>( // YH: add mhd
       resolved_pkgs.get());
   auto vmesh = desc.GetPack(md);
   const auto ib = md->GetBoundsI(IndexDomain::interior);
@@ -109,7 +112,7 @@ TaskStatus BetaCooling(MeshData<Real> *md, const Real time, const Real dt) {
           Real &eint = vmesh(b, gas::cons::internal_energy(n), k, j, i);
 
           const Real sie = ArtemisUtils::GetSpecificInternalEnergy<GEOM>(
-              vmesh, b, n, k, j, i, dflr_gas, sieflr_gas, de_switch);
+              vmesh, b, n, k, j, i, dflr_gas, sieflr_gas, de_switch, do_mhd);
 
           // Compute the energy change from the temperature change.
           const Real &dens = vmesh(b, gas::cons::density(n), k, j, i);

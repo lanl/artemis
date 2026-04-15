@@ -317,7 +317,7 @@ TaskStatus FluxSourceImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, CONS vcons, FAC
   const auto &artemis_pkg = md->GetParentPointer()->packages.Get("artemis");
   const auto &cpars = artemis_pkg->template Param<geometry::CoordParams>("coord_params");
   const auto do_mhd = artemis_pkg->template Param<bool>("do_mhd");
-  const Real mu0_code =
+  const Real mu0_ =
       do_mhd
           ? md->GetParentPointer()->packages.Get("mhd")->template Param<Real>("mu0_code")
           : 1.0;
@@ -447,6 +447,7 @@ TaskStatus FluxSourceImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, CONS vcons, FAC
           [[maybe_unused]] const auto x1dep_ = x1dep;
           [[maybe_unused]] const auto x2dep_ = x2dep;
           [[maybe_unused]] const auto x3dep_ = x3dep;
+          [[maybe_unused]] const auto mu0 = mu0_;
           if constexpr (G != Coordinates::cartesian) {
             // Extract primitive weighted timestep
             Real wdt = vp_(b, n, k, j, i) * dt;
@@ -463,13 +464,13 @@ TaskStatus FluxSourceImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, CONS vcons, FAC
               // Update momenta with mhd
               const Real t1 =
                   SQR(vp_(b, IVX, k, j, i) + rfv[0]) -
-                  (mhd ? SQR(vp_(b, field::cell::B(0), k, j, i)) / mu0_code : 0.0);
+                  (mhd ? SQR(vp_(b, field::cell::B(0), k, j, i)) / mu0 : 0.0);
               const Real t2 =
                   SQR(vp_(b, IVY, k, j, i) + rfv[1]) -
-                  (mhd ? SQR(vp_(b, field::cell::B(1), k, j, i)) / mu0_code : 0.0);
+                  (mhd ? SQR(vp_(b, field::cell::B(1), k, j, i)) / mu0 : 0.0);
               const Real t3 =
                   SQR(vp_(b, IVZ, k, j, i) + rfv[2]) -
-                  (mhd ? SQR(vp_(b, field::cell::B(2), k, j, i)) / mu0_code : 0.0);
+                  (mhd ? SQR(vp_(b, field::cell::B(2), k, j, i)) / mu0 : 0.0);
               vc_(b, IMX, k, j, i) +=
                   x1dep_ * wdt * (dh1[0] * t1 + dh1[1] * t2 + dh1[2] * t3);
               vc_(b, IMY, k, j, i) +=

@@ -65,6 +65,8 @@ void PrintParticle(const int id, const ParticleParams &part) {
             << "Sink: " << part.racc << "\n"
             << "gamma: " << part.gamma << "\n"
             << "beta: " << part.beta << "\n"
+            << "J2: " << part.J2 << "\n"
+            << "Cd: " << part.Cd << "\n"
             << "couple: " << part.couple << "\n"
             << "target_rad: " << part.target_rad << "\n"
             << "live: " << part.live << "\n"
@@ -166,6 +168,8 @@ void ReadParticleBlock(ParameterInput *pin, parthenon::InputBlock *pib,
     // <nbody/particle1>
     part.m = pin->GetReal(pib->block_name, "mass");
     part.radius = pin->GetOrAddReal(pib->block_name, "radius", 0.0);
+    part.J2 = pin->GetOrAddReal(pib->block_name, "j2", 0.0);
+    part.Cd = pin->GetOrAddReal(pib->block_name, "cd", 0.0);
     part.couple = pin->GetOrAddInteger(pib->block_name, "couple", 1);
     part.live = pin->GetOrAddInteger(pib->block_name, "live", 0);
     part.live_after = pin->GetOrAddReal(pib->block_name, "live_after", 0.0);
@@ -541,6 +545,8 @@ int ReadNBodySystemBlock(ParameterInput *pin, parthenon::InputBlock *pib,
     if (len > ++icol) p.beta = (row[icol]);
     if (len > ++icol) p.target_rad = (row[icol]);
     if (len > ++icol) p.radius = (row[icol]);
+    if (len > ++icol) p.J2 = (row[icol]);
+    if (len > ++icol) p.Cd = (row[icol]);
     p.init = 1;
     parts[id] = p;
     count++;
@@ -556,7 +562,7 @@ int ReadNBodySystemBlock(ParameterInput *pin, parthenon::InputBlock *pib,
 //! Initialize a planetary system from a file
 //!
 //! The input file should read:
-//! # q  a   e   i  f omega   bigOm   sft gamma  beta  target_rad radius
+//! # q  a   e   i  f omega   bigOm   sft gamma  beta  target_rad radius J2 Cd
 //!
 //! User must add the central object with a separate particle / binary / system block
 int ReadPlanetarySystemBlock(ParameterInput *pin, parthenon::InputBlock *pib,
@@ -604,6 +610,8 @@ int ReadPlanetarySystemBlock(ParameterInput *pin, parthenon::InputBlock *pib,
     if (len > ++icol) p.beta = row[icol];
     if (len > ++icol) p.target_rad = row[icol];
     if (len > ++icol) p.radius = row[icol];
+    if (len > ++icol) p.J2 = row[icol];
+    if (len > ++icol) p.Cd = row[icol];
     Real rb[3] = {Null<Real>()}, vb[3] = {Null<Real>()};
     init_orbit(1.0, orb, rb, vb);
     p.m = q;

@@ -47,6 +47,8 @@ struct ParticleParams {
   Real vx;
   Real vy;
   Real vz;
+  Real J2;
+  Real Cd;
 };
 
 //----------------------------------------------------------------------------------------
@@ -66,6 +68,7 @@ class Particle {
   Real live_after;
   Real rs, racc, gamma, beta;
   Real target_rad;
+  Real cd, cq;
   int spline;
 
   KOKKOS_DEFAULTED_FUNCTION Particle() = default;
@@ -81,6 +84,8 @@ class Particle {
     GM = G * pars.m;
     radius = pars.radius;
     rs = pars.rs;
+    cq = 1.5 * pars.J2 * GM * SQR(radius);
+    cd = 0.5 * pars.Cd * M_PI * SQR(radius);
     racc = pars.racc;
     gamma = pars.gamma;
     beta = pars.beta;
@@ -176,7 +181,13 @@ class Particle {
   Real grav_pot(const std::array<Real, 3> &x) const {
     const auto &dx = RelativePosition(x);
     const Real dr2 = SQR(dx[0]) + SQR(dx[1]) + SQR(dx[2]);
-    return -GM * idr1(dr2);
+    const Real ir = idr1(dr2);
+    Real pot = -GM * ir;
+    if (cq != 0.0) {
+      const Real ir3 = idr3(dr2);
+      pot += cq * ir3 * (3.0 * SQR(dx[2] * ir) - 1.0);
+    }
+    return pot;
   }
 
   KOKKOS_INLINE_FUNCTION
@@ -187,8 +198,33 @@ class Particle {
     for (int d = 0; d < 3; d++) {
       g[d] += -GM * idr3_ * dx[d];
     }
+    if (cq != 0.0) {
+      const Real idr1_ = idr1(dr2);
+      const Real idr2_ = SQR(idr1_);
+      const Real z2r2 = 5.0 * SQR(dx[2]) * idr2_;
+      g[0] += 3.0 * cq * dx[0] * idr3_ * idr2_ * (z2r2 - 1.0);
+      g[1] += 3.0 * cq * dx[1] * idr3_ * idr2_ * (z2r2 - 1.0);
+      g[2] += 9.0 * cq * dx[2] * idr3_ * idr2_ * (z2r2 - 3.0);
+    }
   }
 
+  KOKKOS_INLINE_FUNCTION
+  void drag(const Real den, const std::array<Real, 3> &v, const std::array<Real, 3> &vb,
+            const Real dt, Real *dmom, Real *dEk) const {
+
+    // Note that this is the back reaction on the gas
+    const std::array<Real, 3> vrel{v[0] + vb[0], v[1] + vb[1], v[2] + vb[2]};
+    const auto &dv = RelativeVelocity(vrel);
+    const Real fac = dt * cd * std::sqrt(SQR(dv[0]) + SQR(dv[1]) + SQR(dv[2]));
+
+    for (int i = 0; i < 3; i++) {
+      // Note that for a non-zero background velocity
+      // the first term is v and the last terms use the v+v_back
+      const Real vxp = v[i] + fac * dv[i];
+      dmom[i] += den * fac * dv[i];
+      *dEk += 0.5 * (v[i] + vxp) * den * fac * dv[i];
+    }
+  }
   KOKKOS_INLINE_FUNCTION
   void accrete(const std::array<Real, 3> &x, const Real den, const std::array<Real, 3> &v,
                const std::array<Real, 3> &vb, const Real dt, Real *dm, Real *dmom,

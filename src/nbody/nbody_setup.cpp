@@ -66,6 +66,8 @@ void PrintParticle(const int id, const ParticleParams &part) {
             << "gamma: " << part.gamma << "\n"
             << "beta: " << part.beta << "\n"
             << "J2: " << part.J2 << "\n"
+            << "spin=(" << part.spin[0] << "," << part.spin[1] << "," << part.spin[2]
+            << ")\n"
             << "Cd: " << part.Cd << "\n"
             << "couple: " << part.couple << "\n"
             << "target_rad: " << part.target_rad << "\n"
@@ -155,6 +157,9 @@ ParticleParams CreateNewParticle(Real m, Real radius, Real rs, std::string stype
   part.live = live;
   part.live_after = live_after;
   part.radius = radius;
+  part.spin[0] = 0.0;
+  part.spin[1] = 0.0;
+  part.spin[2] = 1.0;
   return part;
 }
 
@@ -169,6 +174,9 @@ void ReadParticleBlock(ParameterInput *pin, parthenon::InputBlock *pib,
     part.m = pin->GetReal(pib->block_name, "mass");
     part.radius = pin->GetOrAddReal(pib->block_name, "radius", 0.0);
     part.J2 = pin->GetOrAddReal(pib->block_name, "j2", 0.0);
+    part.spin[0] = pin->GetOrAddReal(pib->block_name, "spin_x", 0.0);
+    part.spin[1] = pin->GetOrAddReal(pib->block_name, "spin_y", 0.0);
+    part.spin[2] = pin->GetOrAddReal(pib->block_name, "spin_z", 1.0);
     part.Cd = pin->GetOrAddReal(pib->block_name, "cd", 0.0);
     part.couple = pin->GetOrAddInteger(pib->block_name, "couple", 1);
     part.live = pin->GetOrAddInteger(pib->block_name, "live", 0);
@@ -499,7 +507,7 @@ int ReadTripleBlock(ParameterInput *pin, parthenon::InputBlock *pib,
 //! \fn  int NBody::ReadNBodySystemBlock
 //! \brief Initializes a generic N-body system from a file
 //! The input file should read:
-//! # mass  x  y  z  vx   vy   vz   sft  gamma  beta target_rad
+//! # mass  x  y  z  vx   vy   vz   sft  gamma  beta target_rad Cd J2 spin
 int ReadNBodySystemBlock(ParameterInput *pin, parthenon::InputBlock *pib,
                          std::map<int, ParticleParams> &parts) {
   const int couple = pin->GetOrAddInteger(pib->block_name, "couple", 1);
@@ -545,8 +553,12 @@ int ReadNBodySystemBlock(ParameterInput *pin, parthenon::InputBlock *pib,
     if (len > ++icol) p.beta = (row[icol]);
     if (len > ++icol) p.target_rad = (row[icol]);
     if (len > ++icol) p.radius = (row[icol]);
-    if (len > ++icol) p.J2 = (row[icol]);
     if (len > ++icol) p.Cd = (row[icol]);
+    if (len > ++icol) p.J2 = (row[icol]);
+    if (len > ++icol) p.spin[0] = (row[icol]);
+    if (len > ++icol) p.spin[1] = (row[icol]);
+    if (len > ++icol) p.spin[2] = (row[icol]);
+
     p.init = 1;
     parts[id] = p;
     count++;
@@ -562,7 +574,7 @@ int ReadNBodySystemBlock(ParameterInput *pin, parthenon::InputBlock *pib,
 //! Initialize a planetary system from a file
 //!
 //! The input file should read:
-//! # q  a   e   i  f omega   bigOm   sft gamma  beta  target_rad radius J2 Cd
+//! # q  a   e   i  f omega   bigOm   sft gamma  beta  target_rad radius Cd J2 spin
 //!
 //! User must add the central object with a separate particle / binary / system block
 int ReadPlanetarySystemBlock(ParameterInput *pin, parthenon::InputBlock *pib,
@@ -610,8 +622,11 @@ int ReadPlanetarySystemBlock(ParameterInput *pin, parthenon::InputBlock *pib,
     if (len > ++icol) p.beta = row[icol];
     if (len > ++icol) p.target_rad = row[icol];
     if (len > ++icol) p.radius = row[icol];
-    if (len > ++icol) p.J2 = row[icol];
-    if (len > ++icol) p.Cd = row[icol];
+    if (len > ++icol) p.Cd = (row[icol]);
+    if (len > ++icol) p.J2 = (row[icol]);
+    if (len > ++icol) p.spin[0] = (row[icol]);
+    if (len > ++icol) p.spin[1] = (row[icol]);
+    if (len > ++icol) p.spin[2] = (row[icol]);
     Real rb[3] = {Null<Real>()}, vb[3] = {Null<Real>()};
     init_orbit(1.0, orb, rb, vb);
     p.m = q;

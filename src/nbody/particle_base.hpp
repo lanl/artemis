@@ -49,6 +49,7 @@ struct ParticleParams {
   Real vz;
   Real J2;
   Real Cd;
+  Real spin[3];
 };
 
 //----------------------------------------------------------------------------------------
@@ -60,6 +61,7 @@ class Particle {
   Real pos[3], vel[3];
   Real xf[3], vf[3];
   Real force[3];
+  Real spin[3];
   Real GM;
   Real radius;
   int couple;
@@ -86,6 +88,9 @@ class Particle {
     rs = pars.rs;
     cq = 1.5 * pars.J2 * GM * SQR(radius);
     cd = 0.5 * pars.Cd * M_PI * SQR(radius);
+    spin[0] = pars.spin[0];
+    spin[1] = pars.spin[1];
+    spin[2] = pars.spin[2];
     racc = pars.racc;
     gamma = pars.gamma;
     beta = pars.beta;
@@ -185,7 +190,8 @@ class Particle {
     Real pot = -GM * ir;
     if (cq != 0.0) {
       const Real ir3 = idr3(dr2);
-      pot += cq * ir3 * (3.0 * SQR(dx[2] * ir) - 1.0);
+      const Real q = spin[0] * dx[0] + spin[1] * dx[1] + spin[2] * dx[2];
+      pot += cq * ir3 * (3.0 * SQR(q * ir) - 1.0);
     }
     return pot;
   }
@@ -201,10 +207,12 @@ class Particle {
     if (cq != 0.0) {
       const Real idr1_ = idr1(dr2);
       const Real idr2_ = SQR(idr1_);
-      const Real z2r2 = 5.0 * SQR(dx[2]) * idr2_;
-      g[0] += 3.0 * cq * dx[0] * idr3_ * idr2_ * (z2r2 - 1.0);
-      g[1] += 3.0 * cq * dx[1] * idr3_ * idr2_ * (z2r2 - 1.0);
-      g[2] += 9.0 * cq * dx[2] * idr3_ * idr2_ * (z2r2 - 3.0);
+      const Real idr5_ = idr2_ * idr3_;
+      const Real q = spin[0] * dx[0] + spin[1] * dx[1] + spin[2] * dx[2];
+      const Real z2r2 = 5.0 * SQR(q) * idr2_;
+      for (int d = 0; d < 3; d++) {
+        g[d] += cq * idr5_ * ((z2r2 - 1.) * dx[d] - 2.0 * q * spin[d]);
+      }
     }
   }
 

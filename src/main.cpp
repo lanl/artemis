@@ -127,6 +127,7 @@ parthenon::DriverStatus LaunchWorkFlow(parthenon::ParthenonManager &pman,
 int ArtemisFinalize(const DriverStatus status, const bool quick_exit,
                     parthenon::ParthenonManager &pman) {
 
+  ArtemisUtils::Finalize();
   int ret = 3;
   if (status == DriverStatus::complete) {
     if (Globals::my_rank == 0) std::cout << "artemis driver complete!" << std::endl;

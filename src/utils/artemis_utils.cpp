@@ -13,6 +13,7 @@
 
 // C++ headers
 #include "artemis_utils.hpp"
+#include "nbody/nbody.hpp"
 #include "nbody/nbody_utils.hpp"
 #include "units.hpp"
 
@@ -281,5 +282,10 @@ ReconstructionMethod ChooseReconMethod(std::string recon) {
   PARTHENON_FAIL("Reconstruction method not recognized.");
   return ReconstructionMethod::pcm;
 }
+
+//----------------------------------------------------------------------------------------
+//! \fn  void Artemis::Finalize
+//! \brief Finalize any packages that require it
+void Finalize() { NBody::Finalize(); }
 
 } // namespace ArtemisUtils

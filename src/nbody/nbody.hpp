@@ -29,6 +29,11 @@ extern Real PN;
 extern Real c;
 extern int include_pn2;
 extern bool extras;
+extern bool J2;
+extern Real *J2vals;
+extern Real *sx;
+extern Real *sy;
+extern Real *sz;
 extern bool merge_on_collision;
 } // namespace RebAttrs
 
@@ -59,6 +64,8 @@ void InitializeFromRestart(Mesh *pm);
 void SaveForRestart(Mesh *pm);
 
 void Outputs(Mesh *pm, const Real time);
+
+void Finalize();
 
 } // namespace NBody
 

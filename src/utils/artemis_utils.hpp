@@ -99,8 +99,7 @@ struct array_type {
   }
 
   KOKKOS_FORCEINLINE_FUNCTION // initialize myArray to 0
-      void
-      init() {
+      void init() {
     for (int i = 0; i < N; i++) {
       myArray[i] = 0;
     }
@@ -250,6 +249,8 @@ Real CutCell2D(const std::array<Real, 4> &x, const std::array<Real, 4> &y,
   }
   return vol_inside / vol;
 }
+
+void Finalize();
 
 } // namespace ArtemisUtils
 

@@ -26,20 +26,51 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   auto rframe_pkg = std::make_shared<StateDescriptor>("rotating_frame");
   Params &params = rframe_pkg->AllParams();
 
-  const Real omega = pin->GetReal("rotating_frame", "omega");
+  const Real omega = pin->GetOrAddReal("rotating_frame", "omega", 0.0);
   const Real qshear = pin->GetOrAddReal("rotating_frame", "qshear", 0.0);
-  PARTHENON_REQUIRE(omega != 0.0, "rotating_frame/omega cannot be zero! To disable, set "
-                                  "physics/rotating_frame = false");
+  const bool do_rotating_frame = pin->GetOrAddBoolean("physics", "rotating_frame", false);
+  if (do_rotating_frame) {
+    PARTHENON_REQUIRE(omega != 0.0,
+                      "rotating_frame/omega cannot be zero! To disable, set "
+                      "physics/rotating_frame = false");
+  }
+
+  // Coordinates
+  const int ndim = ProblemDimension(pin);
+  std::string sys = pin->GetOrAddString("artemis", "coordinates", "cartesian");
+  Coordinates coords = geometry::CoordSelect(sys, ndim);
+
+  // qshear is only valid for cartesian (shearing box)
   if (qshear != 0) {
-    const std::string sys = pin->GetString("artemis", "coordinates");
     PARTHENON_REQUIRE(
         sys == "cartesian",
         "rotating_frame/qshear must be zero for non-Cartesian coordinate systems!");
     PARTHENON_REQUIRE(parthenon::Globals::nghost >= 2,
                       "Rotating frame advection step requires at least 2 ghost cells.");
   }
+
+  // GM for orbital advection in curvilinear coordinates
+  Real gm = pin->GetOrAddReal("rotating_frame", "gm", 0.0);
+  const bool do_orbital_advection =
+      pin->GetOrAddBoolean("physics", "orbital_advection", false);
+  if (do_orbital_advection) {
+    if (geometry::is_cartesian(coords)) {
+      PARTHENON_REQUIRE(qshear > 0.0, "Cartesian orbital advection requires qshear > 0!");
+      PARTHENON_REQUIRE(do_rotating_frame,
+                        "Cartesian orbital advection requires rotating_frame = true!");
+    } else {
+      PARTHENON_REQUIRE(
+          coords != Coordinates::spherical1D,
+          "Orbital advection cannot be used with 1D spherical coordinates!");
+      PARTHENON_REQUIRE(gm > 0.0,
+                        "Orbital advection in curvilinear coordinates requires gm > 0!");
+    }
+  }
+
   params.Add("omega", omega);
   params.Add("qshear", qshear);
+  params.Add("gm", gm);
+  params.Add("do_orbital_advection", do_orbital_advection);
 
   // Linear advection timestep controls
   const Real cfl = pin->GetOrAddReal("rotating_frame", "cfl", 0.9);
@@ -53,13 +84,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   recon_method = ArtemisUtils::ChooseReconMethod(recon);
   params.Add("recon", recon_method);
 
-  // Coordinates
-  const int ndim = ProblemDimension(pin);
-  std::string sys = pin->GetOrAddString("artemis", "coordinates", "cartesian");
-  Coordinates coords = geometry::CoordSelect(sys, ndim);
   params.Add("coords", coords);
 
-  // Rotating frame timestep (if do_shear)
+  // Rotating frame / orbital advection timestep
   if (coords == Coordinates::cartesian) {
     rframe_pkg->EstimateTimestepMesh = EstimateTimestepMesh<Coordinates::cartesian>;
   } else if (coords == Coordinates::spherical1D) {
@@ -119,38 +146,54 @@ TaskStatus RotatingFrameForce(MeshData<Real> *md, const Real time, const Real dt
 
 //----------------------------------------------------------------------------------------
 //! \fn Real RotatingFrame::EstimateTimestep
-//! \brief Compute multiple of linear advection timestep (if do_shear)
+//! \brief Compute multiple of linear advection timestep (if do_orbital_advection)
 template <Coordinates GEOM>
 Real EstimateTimestepMesh(MeshData<Real> *md) {
   PARTHENON_INSTRUMENT
   auto pmesh = md->GetParentPointer();
-  const bool do_shear = pmesh->packages.Get("artemis")->template Param<bool>("do_shear");
-  if (!(do_shear)) return Big<Real>();
+  const bool do_oa =
+      pmesh->packages.Get("artemis")->template Param<bool>("do_orbital_advection");
+  if (!do_oa) return Big<Real>();
 
   auto &rframe_pkg = pmesh->packages.Get("rotating_frame");
   const Real &dt_ratio = rframe_pkg->template Param<Real>("dt_ratio");
-  return EstimateTimestep(pmesh, dt_ratio);
+  return EstimateTimestep<GEOM>(pmesh, dt_ratio);
 }
 
 //----------------------------------------------------------------------------------------
 //! \fn Real RotatingFrame::EstimateTimeStep
 //! \brief Not enrolled in parthenon's determination for global dt
+template <Coordinates GEOM>
 Real EstimateTimestep(parthenon::Mesh *pmesh, const Real dt_ratio) {
   PARTHENON_INSTRUMENT
   // Extract rotating frame params
   auto &rframe_pkg = pmesh->packages.Get("rotating_frame");
   const Real &om0 = rframe_pkg->Param<Real>("omega");
   const Real &qshear = rframe_pkg->Param<Real>("qshear");
+  const Real &gm = rframe_pkg->Param<Real>("gm");
   const Real &cfl = rframe_pkg->template Param<Real>("cfl");
 
   // Compute linear advection timestep to sub-cycle
   Real min_dt = Big<Real>();
   for (auto const &pmb : pmesh->block_list) {
-    const auto &reg = pmb->block_size;
-    const auto wp = BackgroundVelocity<Coordinates::cartesian>(qshear, om0, reg.xmax_[0]);
-    const auto wm = BackgroundVelocity<Coordinates::cartesian>(qshear, om0, reg.xmin_[0]);
-    const Real dx2 = (reg.xmax_[1] - reg.xmin_[1]) / reg.nx_[1];
-    min_dt = std::min(min_dt, dx2 / std::max(std::abs(wp[1]), std::abs(wm[1])));
+    [[maybe_unused]] const auto &reg = pmb->block_size;
+    if constexpr (GEOM == Coordinates::cartesian) {
+      const auto wp = BackgroundVelocity<GEOM>(qshear, om0, gm, {reg.xmax_[0], 0.0, 0.0});
+      const auto wm = BackgroundVelocity<GEOM>(qshear, om0, gm, {reg.xmin_[0], 0.0, 0.0});
+      const Real dx2 = (reg.xmax_[1] - reg.xmin_[1]) / reg.nx_[1];
+      min_dt = std::min(min_dt, dx2 / std::max(std::abs(wp[1]), std::abs(wm[1])));
+    } else if constexpr (GEOM == Coordinates::cylindrical) {
+      const Real Rmin = reg.xmin_[0];
+      const Real zmin = reg.xmin_[2];
+      const Real dphi = (reg.xmax_[1] - reg.xmin_[1]) / reg.nx_[1];
+      const Real omega_max = OmegaKep(gm, Rmin, zmin) - om0;
+      min_dt = std::min(min_dt, dphi / std::abs(omega_max));
+    } else if constexpr (GEOM == Coordinates::spherical3D) {
+      const Real rmin = reg.xmin_[0];
+      const Real dphi = (reg.xmax_[2] - reg.xmin_[2]) / reg.nx_[2];
+      const Real omega_max = OmegaKep(gm, rmin) - om0;
+      min_dt = std::min(min_dt, dphi / std::abs(omega_max));
+    }
   }
 #ifdef MPI_PARALLEL
   PARTHENON_MPI_CHECK(MPI_Allreduce(MPI_IN_PLACE, &min_dt, 1, MPI_PARTHENON_REAL, MPI_MIN,
@@ -168,5 +211,12 @@ template Real EstimateTimestepMesh<Coordinates::spherical1D>(MD *md);
 template Real EstimateTimestepMesh<Coordinates::spherical2D>(MD *md);
 template Real EstimateTimestepMesh<Coordinates::spherical3D>(MD *md);
 template Real EstimateTimestepMesh<Coordinates::axisymmetric>(MD *md);
+
+template Real EstimateTimestep<Coordinates::cartesian>(parthenon::Mesh *, const Real);
+template Real EstimateTimestep<Coordinates::cylindrical>(parthenon::Mesh *, const Real);
+template Real EstimateTimestep<Coordinates::spherical1D>(parthenon::Mesh *, const Real);
+template Real EstimateTimestep<Coordinates::spherical2D>(parthenon::Mesh *, const Real);
+template Real EstimateTimestep<Coordinates::spherical3D>(parthenon::Mesh *, const Real);
+template Real EstimateTimestep<Coordinates::axisymmetric>(parthenon::Mesh *, const Real);
 
 } // namespace RotatingFrame

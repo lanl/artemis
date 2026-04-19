@@ -37,6 +37,7 @@
 #include "geometry/geometry.hpp"
 #include "gravity/nbody_gravity.hpp"
 #include "nbody/nbody.hpp"
+#include "rotating_frame/rotating_frame.hpp"
 #include "utils/artemis_utils.hpp"
 #include "utils/eos/eos.hpp"
 #include "utils/units.hpp"
@@ -68,6 +69,7 @@ struct DiskParams {
   bool do_gas, do_dust, do_moment, do_imc;
   bool nbody_temp;
   bool quiet_start;
+  bool do_oa;
   bool log;
   bool multi_d, three_d;
 };
@@ -203,13 +205,21 @@ KOKKOS_INLINE_FUNCTION State ComputeDiskProfile(
   const Real nu = ViscosityProfile(pgen, eos_d, rt, xcyl[2]);
   const Real vr = pgen.quiet_start ? 0.0 : -1.5 * nu / xcyl[0];
 
-  // Construct the total cylindrical velocity
+  // Construct the cylindrical velocity in the rotating frame.
   const Real vcyl[3] = {vr, vp - pgen.omf * xcyl[0], 0.0};
 
-  // and convert it to the problem geometry
+  // Convert to coordinate basis
   res.gvel1 = ArtemisUtils::VDot(vcyl, ex1);
   res.gvel2 = ArtemisUtils::VDot(vcyl, ex2);
   res.gvel3 = ArtemisUtils::VDot(vcyl, ex3);
+
+  // Subtract the background velocity
+  if (pgen.do_oa) {
+    const auto vbg = RotatingFrame::BackgroundVelocity<GEOM>(0.0, pgen.omf, pgen.gm, xv);
+    res.gvel1 -= vbg[0];
+    res.gvel2 -= vbg[1];
+    res.gvel3 -= vbg[2];
+  }
 
   if (!(do_dust)) return res;
 
@@ -219,6 +229,14 @@ KOKKOS_INLINE_FUNCTION State ComputeDiskProfile(
   res.dvel1 = ArtemisUtils::VDot(vkep, ex1);
   res.dvel2 = ArtemisUtils::VDot(vkep, ex2);
   res.dvel3 = ArtemisUtils::VDot(vkep, ex3);
+
+  // Subtract the background velocity for dust too
+  if (pgen.do_oa) {
+    const auto vbg = RotatingFrame::BackgroundVelocity<GEOM>(0.0, pgen.omf, pgen.gm, xv);
+    res.dvel1 -= vbg[0];
+    res.dvel2 -= vbg[1];
+    res.dvel3 -= vbg[2];
+  }
 
   return res;
 }
@@ -305,6 +323,7 @@ inline void InitDiskParams(MeshBlock *pmb, ParameterInput *pin) {
     } else {
       disk_params.omf = 0.0;
     }
+    disk_params.do_oa = params.Get<bool>("do_orbital_advection");
     if (params.Get<bool>("do_viscosity")) {
       const auto vtype = pin->GetString("gas/viscosity", "type");
       if (vtype == "alpha") {
@@ -518,6 +537,30 @@ void DiskBoundaryVisc(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) {
         const auto &[xcylm1, scr1m1, scr2m1, scr3m1] = cm1.ConvertToCylWithVec(xvm1);
         const Real epm1[3] = {scr1m1[1], scr2m1[1], scr3m1[1]};
 
+        // background velocity
+        Real vbg_a = 0.0, vbg_p1 = 0.0, vbg_m1 = 0.0, vbg_g = 0.0;
+        if (dp.do_oa) {
+          const auto ba =
+              RotatingFrame::BackgroundVelocity<GEOM>(0.0, dp.omf, dp.gm, xva);
+          const Real ba3[3] = {ba[0], ba[1], ba[2]};
+          vbg_a = ArtemisUtils::VDot(ba3, epa);
+
+          const auto bp =
+              RotatingFrame::BackgroundVelocity<GEOM>(0.0, dp.omf, dp.gm, xvp1);
+          const Real bp3[3] = {bp[0], bp[1], bp[2]};
+          vbg_p1 = ArtemisUtils::VDot(bp3, epp1);
+
+          const auto bm =
+              RotatingFrame::BackgroundVelocity<GEOM>(0.0, dp.omf, dp.gm, xvm1);
+          const Real bm3[3] = {bm[0], bm[1], bm[2]};
+          vbg_m1 = ArtemisUtils::VDot(bm3, epm1);
+
+          const auto bg = RotatingFrame::BackgroundVelocity<GEOM>(0.0, dp.omf, dp.gm, xv);
+          const Real bg3[3] = {bg[0], bg[1], bg[2]};
+          const Real ep_g[3] = {ex1[1], ex2[1], ex3[1]};
+          vbg_g = ArtemisUtils::VDot(bg3, ep_g);
+        }
+
         // Compute cell separations (using logarithmics if necessary)
         const Real xma = std::log(xv[ix1] / xva[ix1]);
         const Real dx = std::log(xvp1[ix1] / xvm1[ix1]);
@@ -545,10 +588,12 @@ void DiskBoundaryVisc(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) {
             Real gvm1[3] = {v(0, gas::prim::velocity(VI(n, 0)), im1[0], im1[1], im1[2]),
                             v(0, gas::prim::velocity(VI(n, 1)), im1[0], im1[1], im1[2]),
                             v(0, gas::prim::velocity(VI(n, 2)), im1[0], im1[1], im1[2])};
-            const Real gvp = ArtemisUtils::VDot(gva, epa) + dp.omf * xcyla[0];
+            const Real gvp = ArtemisUtils::VDot(gva, epa) + dp.omf * xcyla[0] + vbg_a;
             const Real gvz = ArtemisUtils::VDot(gva, eza);
-            const Real gvp1p = ArtemisUtils::VDot(gvp1, epp1) + dp.omf * xcylp1[0];
-            const Real gvm1p = ArtemisUtils::VDot(gvm1, epm1) + dp.omf * xcylm1[0];
+            const Real gvp1p =
+                ArtemisUtils::VDot(gvp1, epp1) + dp.omf * xcylp1[0] + vbg_p1;
+            const Real gvm1p =
+                ArtemisUtils::VDot(gvm1, epm1) + dp.omf * xcylm1[0] + vbg_m1;
             const Real dgvp = std::log(gvp1p / gvm1p);
             const Real vpg = gvp * std::exp(dgvp * xmadx);
             Real rhog, gvR;
@@ -564,7 +609,7 @@ void DiskBoundaryVisc(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) {
               gvR = -dp.mdot / (2 * M_PI * xcyl[0] * rhog);
             }
 
-            const Real gvcyl[3] = {gvR, vpg - dp.omf * xcyl[0], gvz};
+            const Real gvcyl[3] = {gvR, vpg - dp.omf * xcyl[0] - vbg_g, gvz};
             const Real gvel[3] = {ArtemisUtils::VDot(gvcyl, ex1),
                                   ArtemisUtils::VDot(gvcyl, ex2),
                                   ArtemisUtils::VDot(gvcyl, ex3)};
@@ -595,14 +640,16 @@ void DiskBoundaryVisc(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) {
             Real dvm1[3] = {v(0, dust::prim::velocity(VI(n, 0)), im1[0], im1[1], im1[2]),
                             v(0, dust::prim::velocity(VI(n, 1)), im1[0], im1[1], im1[2]),
                             v(0, dust::prim::velocity(VI(n, 2)), im1[0], im1[1], im1[2])};
-            const Real dvp = ArtemisUtils::VDot(dva, epa) + dp.omf * xcyla[0];
+            const Real dvp = ArtemisUtils::VDot(dva, epa) + dp.omf * xcyla[0] + vbg_a;
             const Real dvR = ArtemisUtils::VDot(dva, eRa);
             const Real dvz = ArtemisUtils::VDot(dva, eza);
-            const Real dvp1p = ArtemisUtils::VDot(dvp1, epp1) + dp.omf * xcylp1[0];
-            const Real dvm1p = ArtemisUtils::VDot(dvm1, epm1) + dp.omf * xcylm1[0];
+            const Real dvp1p =
+                ArtemisUtils::VDot(dvp1, epp1) + dp.omf * xcylp1[0] + vbg_p1;
+            const Real dvm1p =
+                ArtemisUtils::VDot(dvm1, epm1) + dp.omf * xcylm1[0] + vbg_m1;
             const Real ddvp = std::log(dvp1p / dvm1p);
-            const Real dvcyl[3] = {dvR, dvp * std::exp(ddvp * xmadx) - dp.omf * xcyl[0],
-                                   dvz};
+            const Real dvcyl[3] = {
+                dvR, dvp * std::exp(ddvp * xmadx) - dp.omf * xcyl[0] - vbg_g, dvz};
             const Real dvel[3] = {ArtemisUtils::VDot(dvcyl, ex1),
                                   ArtemisUtils::VDot(dvcyl, ex2),
                                   ArtemisUtils::VDot(dvcyl, ex3)};
@@ -779,6 +826,32 @@ void DiskBoundaryExtrap(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) 
 
         const auto &[xcylm1, scr1m1, scr2m1, scr3m1] = coords.ConvertToCylWithVec(xvm1);
         const Real epm1[3] = {scr1m1[1], scr2m1[1], scr3m1[1]};
+
+        // background velocity
+        Real vbg_a = 0.0, vbg_p1 = 0.0, vbg_m1 = 0.0, vbg_g = 0.0;
+        if (dp.do_oa) {
+          const auto ba =
+              RotatingFrame::BackgroundVelocity<GEOM>(0.0, dp.omf, dp.gm, xva);
+          const Real ba3[3] = {ba[0], ba[1], ba[2]};
+          vbg_a = ArtemisUtils::VDot(ba3, epa);
+
+          const auto bp =
+              RotatingFrame::BackgroundVelocity<GEOM>(0.0, dp.omf, dp.gm, xvp1);
+          const Real bp3[3] = {bp[0], bp[1], bp[2]};
+          vbg_p1 = ArtemisUtils::VDot(bp3, epp1);
+
+          const auto bm =
+              RotatingFrame::BackgroundVelocity<GEOM>(0.0, dp.omf, dp.gm, xvm1);
+          const Real bm3[3] = {bm[0], bm[1], bm[2]};
+          vbg_m1 = ArtemisUtils::VDot(bm3, epm1);
+
+          const auto bgg =
+              RotatingFrame::BackgroundVelocity<GEOM>(0.0, dp.omf, dp.gm, xv);
+          const Real bg3[3] = {bgg[0], bgg[1], bgg[2]};
+          const Real ep_g[3] = {ex1[1], ex2[1], ex3[1]};
+          vbg_g = ArtemisUtils::VDot(bg3, ep_g);
+        }
+
         // Compute cell separations (using logarithmics if necessary)
         const Real xma = (lnx) ? std::log(xv[ix1] / xva[ix1]) : xv[ix1] - xva[ix1];
         const Real dx = (lnx) ? std::log(xvp1[ix1] / xvm1[ix1]) : xvp1[ix1] - xvm1[ix1];
@@ -806,14 +879,16 @@ void DiskBoundaryExtrap(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) 
             Real gvm1[3] = {v(0, gas::prim::velocity(VI(n, 0)), im1[0], im1[1], im1[2]),
                             v(0, gas::prim::velocity(VI(n, 1)), im1[0], im1[1], im1[2]),
                             v(0, gas::prim::velocity(VI(n, 2)), im1[0], im1[1], im1[2])};
-            const Real gvp = ArtemisUtils::VDot(gva, epa) + dp.omf * xcyla[0];
+            const Real gvp = ArtemisUtils::VDot(gva, epa) + dp.omf * xcyla[0] + vbg_a;
             const Real gvR = ArtemisUtils::VDot(gva, eRa);
             const Real gvz = ArtemisUtils::VDot(gva, eza);
-            const Real gvp1p = ArtemisUtils::VDot(gvp1, epp1) + dp.omf * xcylp1[0];
-            const Real gvm1p = ArtemisUtils::VDot(gvm1, epm1) + dp.omf * xcylm1[0];
+            const Real gvp1p =
+                ArtemisUtils::VDot(gvp1, epp1) + dp.omf * xcylp1[0] + vbg_p1;
+            const Real gvm1p =
+                ArtemisUtils::VDot(gvm1, epm1) + dp.omf * xcylm1[0] + vbg_m1;
             const Real dgvp = std::log(gvp1p / gvm1p);
-            const Real gvcyl[3] = {gvR, gvp * std::exp(dgvp * xmadx) - dp.omf * xcyl[0],
-                                   gvz};
+            const Real gvcyl[3] = {
+                gvR, gvp * std::exp(dgvp * xmadx) - dp.omf * xcyl[0] - vbg_g, gvz};
             const Real gvel[3] = {ArtemisUtils::VDot(gvcyl, ex1),
                                   ArtemisUtils::VDot(gvcyl, ex2),
                                   ArtemisUtils::VDot(gvcyl, ex3)};
@@ -846,14 +921,16 @@ void DiskBoundaryExtrap(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) 
             Real dvm1[3] = {v(0, dust::prim::velocity(VI(n, 0)), im1[0], im1[1], im1[2]),
                             v(0, dust::prim::velocity(VI(n, 1)), im1[0], im1[1], im1[2]),
                             v(0, dust::prim::velocity(VI(n, 2)), im1[0], im1[1], im1[2])};
-            const Real dvp = ArtemisUtils::VDot(dva, epa) + dp.omf * xcyla[0];
+            const Real dvp = ArtemisUtils::VDot(dva, epa) + dp.omf * xcyla[0] + vbg_a;
             const Real dvR = ArtemisUtils::VDot(dva, eRa);
             const Real dvz = ArtemisUtils::VDot(dva, eza);
-            const Real dvp1p = ArtemisUtils::VDot(dvp1, epp1) + dp.omf * xcylp1[0];
-            const Real dvm1p = ArtemisUtils::VDot(dvm1, epm1) + dp.omf * xcylm1[0];
+            const Real dvp1p =
+                ArtemisUtils::VDot(dvp1, epp1) + dp.omf * xcylp1[0] + vbg_p1;
+            const Real dvm1p =
+                ArtemisUtils::VDot(dvm1, epm1) + dp.omf * xcylm1[0] + vbg_m1;
             const Real ddvp = std::log(dvp1p / dvm1p);
-            const Real dvcyl[3] = {dvR, dvp * std::exp(ddvp * xmadx) - dp.omf * xcyl[0],
-                                   dvz};
+            const Real dvcyl[3] = {
+                dvR, dvp * std::exp(ddvp * xmadx) - dp.omf * xcyl[0] - vbg_g, dvz};
             const Real dvel[3] = {ArtemisUtils::VDot(dvcyl, ex1),
                                   ArtemisUtils::VDot(dvcyl, ex2),
                                   ArtemisUtils::VDot(dvcyl, ex3)};

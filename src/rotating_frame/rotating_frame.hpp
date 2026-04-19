@@ -94,14 +94,6 @@ KOKKOS_FORCEINLINE_FUNCTION Real OmegaKep(const Real gm, const Real R) {
 }
 
 //----------------------------------------------------------------------------------------
-//! \fn  Real RotatingFrame::OmegaKep (R, z)
-//! \brief Returns Keplerian angular velocity at cylindrical position (R, z),
-//!        expanded to leading order in (z/R)^2
-KOKKOS_FORCEINLINE_FUNCTION Real OmegaKep(const Real gm, const Real R, const Real z) {
-  return OmegaKep(gm, R) * (1.0 - 0.75 * z * z / (R * R));
-}
-
-//----------------------------------------------------------------------------------------
 //! \fn std::array<Real, 3> RotatingFrame::BackgroundVelocity
 //! \brief Returns the background velocity in coordinate basis.
 template <Coordinates GEOM>
@@ -112,8 +104,7 @@ BackgroundVelocity(const Real qshear, const Real omega, const Real gm,
     return {0.0, -qshear * omega * xv[0], 0.0};
   } else if constexpr (GEOM == Coordinates::cylindrical) {
     const Real R = xv[0];
-    const Real z = xv[2];
-    const Real vphi = R * (OmegaKep(gm, R, z) - omega);
+    const Real vphi = R * (OmegaKep(gm, R) - omega);
     return {0.0, vphi, 0.0};
   } else if constexpr (GEOM == Coordinates::spherical3D ||
                        GEOM == Coordinates::spherical2D) {
@@ -122,8 +113,7 @@ BackgroundVelocity(const Real qshear, const Real omega, const Real gm,
     return {0.0, 0.0, vphi};
   } else if constexpr (GEOM == Coordinates::axisymmetric) {
     const Real R = xv[0];
-    const Real z = xv[1];
-    const Real vphi = R * (OmegaKep(gm, R, z) - omega);
+    const Real vphi = R * (OmegaKep(gm, R) - omega);
     return {0.0, 0.0, vphi};
   }
   return {0.0, 0.0, 0.0};
@@ -147,31 +137,19 @@ KOKKOS_INLINE_FUNCTION std::array<Real, 3> StrainRate(const Real qshear, const R
     }
   } else if constexpr (GEOM == Coordinates::cylindrical) {
     const Real R = xf[0];
-    const Real z = xf[2];
-    const Real om_k = OmegaKep(gm, R);
-    const Real zR2 = z * z / (R * R);
-    const Real rdOdR = -1.5 * om_k * (1.0 - 1.75 * zR2);
-    const Real rdOdz = -1.5 * om_k * z / R;
+    const Real rdOdR = -1.5 * OmegaKep(gm, R);
     if constexpr (XDIR == X1DIR) {
       return {0.0, rdOdR, 0.0}; // {T_R^R, T_φ^R, T_z^R}
     } else if constexpr (XDIR == X2DIR) {
-      return {rdOdR, 0.0, rdOdz}; // {T_R^φ, T_φ^φ, T_z^φ}
-    } else if constexpr (XDIR == X3DIR) {
-      return {0.0, rdOdz, 0.0}; // {T_R^z, T_φ^z, T_z^z}
+      return {rdOdR, 0.0, 0.0}; // {T_R^φ, T_φ^φ, T_z^φ}
     }
   } else if constexpr (GEOM == Coordinates::axisymmetric) {
     const Real R = xf[0];
-    const Real z = xf[1];
-    const Real om_k = OmegaKep(gm, R);
-    const Real zR2 = z * z / (R * R);
-    const Real rdOdR = -1.5 * om_k * (1.0 - 1.75 * zR2);
-    const Real rdOdz = -1.5 * om_k * z / R;
+    const Real rdOdR = -1.5 * OmegaKep(gm, R);
     if constexpr (XDIR == X1DIR) {
       return {0.0, 0.0, rdOdR}; // {T_R^R, T_z^R, T_φ^R}
-    } else if constexpr (XDIR == X2DIR) {
-      return {0.0, 0.0, rdOdz}; // {T_R^z, T_z^z, T_φ^z}
     } else if constexpr (XDIR == X3DIR) {
-      return {rdOdR, rdOdz, 0.0}; // {T_R^φ, T_z^φ, T_φ^φ}
+      return {rdOdR, 0.0, 0.0}; // {T_R^φ, T_z^φ, T_φ^φ}
     }
   } else if constexpr (GEOM == Coordinates::spherical3D ||
                        GEOM == Coordinates::spherical2D) {
@@ -217,18 +195,13 @@ struct OrbitalAdvection {
     return std::sqrt(gm / (R * R * R));
   }
 
-  KOKKOS_FORCEINLINE_FUNCTION Real OmegaKep(const Real R, const Real z) const {
-    return OmegaKep(R) * (1.0 - 0.75 * z * z / (R * R));
-  }
-
   KOKKOS_INLINE_FUNCTION std::array<Real, 3>
   BackgroundVelocity(const std::array<Real, 3> &xv) const {
     if constexpr (GEOM == Coordinates::cartesian) {
       return {0.0, -qshear * omega_f * xv[0], 0.0};
     } else if constexpr (GEOM == Coordinates::cylindrical) {
       const Real R = xv[0];
-      const Real z = xv[2];
-      const Real vphi = R * (OmegaKep(R, z) - omega_f);
+      const Real vphi = R * (OmegaKep(R) - omega_f);
       return {0.0, vphi, 0.0};
     } else if constexpr (GEOM == Coordinates::spherical3D ||
                          GEOM == Coordinates::spherical2D) {
@@ -237,8 +210,7 @@ struct OrbitalAdvection {
       return {0.0, 0.0, vphi};
     } else if constexpr (GEOM == Coordinates::axisymmetric) {
       const Real R = xv[0];
-      const Real z = xv[1];
-      const Real vphi = R * (OmegaKep(R, z) - omega_f);
+      const Real vphi = R * (OmegaKep(R) - omega_f);
       return {0.0, 0.0, vphi};
     }
     return {0.0, 0.0, 0.0};
@@ -248,7 +220,7 @@ struct OrbitalAdvection {
     if constexpr (GEOM == Coordinates::cartesian) {
       return dwdt * xc[0];
     } else if constexpr (GEOM == Coordinates::cylindrical) {
-      return (OmegaKep(xc[0], xc[2]) - omega_f) * scdt;
+      return (OmegaKep(xc[0]) - omega_f) * scdt;
     } else {
       return (OmegaKep(xc[0]) - omega_f) * scdt;
     }
@@ -263,12 +235,8 @@ struct OrbitalAdvection {
       ri.grad[phi_idx] += dwdt * ri.grad[0];
     } else if constexpr (GEOM == Coordinates::cylindrical) {
       const Real Rc = ri.xc[0];
-      const Real zc = ri.xc[2];
-      const Real om_k = OmegaKep(Rc);
-      const Real zR2 = zc * zc / (Rc * Rc);
-      const Real dOdR = -1.5 * om_k / Rc * (1.0 - 1.75 * zR2);
-      const Real dOdz = -1.5 * om_k * zc / (Rc * Rc);
-      ri.grad[phi_idx] += (dOdR * ri.grad[0] + dOdz * ri.grad[2]) * scdt;
+      const Real dOdR = -1.5 * OmegaKep(Rc) / Rc;
+      ri.grad[phi_idx] += dOdR * ri.grad[0] * scdt;
     } else {
       const Real rc = ri.xc[0];
       const Real dOdr = -1.5 * OmegaKep(rc) / rc;
@@ -285,15 +253,11 @@ struct OrbitalAdvection {
       return flip * dwdt * r.xc[0] * r.dx[0] * r.dx[2];
     } else if constexpr (GEOM == Coordinates::cylindrical) {
       const Real alpha = std::sqrt(gm) * scdt;
-      const Real beta = -0.75 * alpha;
       const Real omf_dt = omega_f * scdt;
       const Real Rm = r.bnds.x1[0], Rp = r.bnds.x1[1];
-      const Real zm = r.bnds.x3[0], zp = r.bnds.x3[1];
-      const Real Q0 = zp - zm;
-      const Real Q2 = (zp * zp * zp - zm * zm * zm) / 3.0;
-      return flip *
-             (alpha * PowerInt(Rm, Rp, -0.5) * Q0 + beta * PowerInt(Rm, Rp, -2.5) * Q2 -
-              omf_dt * PowerInt(Rm, Rp, 1.0) * Q0);
+      const Real Q0 = r.bnds.x3[1] - r.bnds.x3[0];
+      return flip * Q0 *
+             (alpha * PowerInt(Rm, Rp, -0.5) - omf_dt * PowerInt(Rm, Rp, 1.0));
     } else {
       const Real alpha = std::sqrt(gm) * scdt;
       const Real omf_dt = omega_f * scdt;
@@ -320,33 +284,23 @@ struct OrbitalAdvection {
               three_d * r.xc[2] * I0};
     } else if constexpr (GEOM == Coordinates::cylindrical) {
       const Real alpha = std::sqrt(gm) * scdt;
-      const Real beta = -0.75 * alpha;
       const Real omf_dt = omega_f * scdt;
       const Real Rm = r.bnds.x1[0], Rp = r.bnds.x1[1];
       const Real zm = r.bnds.x3[0], zp = r.bnds.x3[1];
-      const Real zp2 = SQR(zp), zm2 = SQR(zm);
       const Real Q0 = zp - zm;
-      const Real Q1 = 0.5 * (zp2 - zm2);
-      const Real Q2 = (zp * zp2 - zm * zm2) / 3.0;
-      const Real Q3 = 0.25 * (SQR(zp2) - SQR(zm2));
-      const Real Q4 = (std::pow(zp, 5) - std::pow(zm, 5)) / 5.0;
+      const Real Q1 = 0.5 * (SQR(zp) - SQR(zm));
 
       const Real R05 = PowerInt(Rm, Rp, -0.5);
       const Real R10 = PowerInt(Rm, Rp, 1.0);
-      const Real R25 = PowerInt(Rm, Rp, -2.5);
 
-      const Real I1R = flip * (alpha * PowerInt(Rm, Rp, 0.5) * Q0 +
-                               beta * PowerInt(Rm, Rp, -1.5) * Q2 -
-                               omf_dt * PowerInt(Rm, Rp, 2.0) * Q0);
+      const Real I1R =
+          flip * Q0 * (alpha * PowerInt(Rm, Rp, 0.5) - omf_dt * PowerInt(Rm, Rp, 2.0));
       const Real phi0 = r.bnds.x2[(vb < 0.0)];
-      const Real dphi2_int =
-          0.5 * flip *
-          (SQR(alpha) * PowerInt(Rm, Rp, -2.0) * Q0 +
-           2.0 * alpha * beta * PowerInt(Rm, Rp, -4.0) * Q2 +
-           SQR(beta) * PowerInt(Rm, Rp, -6.0) * Q4 - 2.0 * alpha * omf_dt * R05 * Q0 -
-           2.0 * beta * omf_dt * R25 * Q2 + SQR(omf_dt) * R10 * Q0);
+      const Real dphi2_int = 0.5 * flip * Q0 *
+                             (SQR(alpha) * PowerInt(Rm, Rp, -2.0) -
+                              2.0 * alpha * omf_dt * R05 + SQR(omf_dt) * R10);
       const Real I1phi = phi0 * I0 + dphi2_int;
-      const Real I1z = flip * (alpha * R05 * Q1 + beta * R25 * Q3 - omf_dt * R10 * Q1);
+      const Real I1z = flip * (alpha * R05 * Q1 - omf_dt * R10 * Q1);
       return {I1R, I1phi, I1z};
     } else {
       const Real alpha = std::sqrt(gm) * scdt;

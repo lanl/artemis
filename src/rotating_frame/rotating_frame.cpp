@@ -184,9 +184,8 @@ Real EstimateTimestep(parthenon::Mesh *pmesh, const Real dt_ratio) {
       min_dt = std::min(min_dt, dx2 / std::max(std::abs(wp[1]), std::abs(wm[1])));
     } else if constexpr (GEOM == Coordinates::cylindrical) {
       const Real Rmin = reg.xmin_[0];
-      const Real zmin = reg.xmin_[2];
       const Real dphi = (reg.xmax_[1] - reg.xmin_[1]) / reg.nx_[1];
-      const Real omega_max = OmegaKep(gm, Rmin, zmin) - om0;
+      const Real omega_max = OmegaKep(gm, Rmin) - om0;
       min_dt = std::min(min_dt, dphi / std::abs(omega_max));
     } else if constexpr (GEOM == Coordinates::spherical3D) {
       const Real rmin = reg.xmin_[0];

@@ -374,22 +374,31 @@ KOKKOS_INLINE_FUNCTION void RemapCons(const geometry::CoordParams &cpars, const 
   auto apply_skew = [&](ReconInfo &ri) {
     if constexpr (GEOM == Coordinates::cartesian) {
       ri.xc[phi_idx] += dwdt * ri.xc[rad_idx];
+    } else if constexpr (GEOM == Coordinates::cylindrical) {
+      const Real Rc = ri.xc[0];
+      const Real zc = ri.xc[2];
+      ri.xc[phi_idx] += (OmegaKep(gm, Rc, zc) - omega_f) * scdt;
     } else {
-      const Real Rc = ri.xc[rad_idx];
-      const Real alpha = std::sqrt(gm) * scdt;
-      const Real dphi_c = alpha * std::pow(Rc, -1.5) - omega_f * scdt;
-      ri.xc[phi_idx] += dphi_c;
+      const Real rc = ri.xc[0];
+      ri.xc[phi_idx] += (OmegaKep(gm, rc) - omega_f) * scdt;
     }
   };
 
   auto apply_grad_skew = [&](ReconInfo &ri) {
     if constexpr (GEOM == Coordinates::cartesian) {
       ri.grad[phi_idx] += dwdt * ri.grad[rad_idx];
+    } else if constexpr (GEOM == Coordinates::cylindrical) {
+      const Real Rc = ri.xc[0];
+      const Real zc = ri.xc[2];
+      const Real om_k = OmegaKep(gm, Rc);
+      const Real zR2 = zc * zc / (Rc * Rc);
+      const Real dOdR = -1.5 * om_k / Rc * (1.0 - 1.75 * zR2);
+      const Real dOdz = -1.5 * om_k * zc / (Rc * Rc);
+      ri.grad[phi_idx] += (dOdR * ri.grad[0] + dOdz * ri.grad[2]) * scdt;
     } else {
-      const Real Rc = ri.xc[rad_idx];
-      const Real alpha = std::sqrt(gm) * scdt;
-      const Real ddphi_dR = -1.5 * alpha * std::pow(Rc, -2.5);
-      ri.grad[phi_idx] += ddphi_dR * ri.grad[rad_idx];
+      const Real rc = ri.xc[0];
+      const Real dOdr = -1.5 * OmegaKep(gm, rc) / rc;
+      ri.grad[phi_idx] += dOdr * ri.grad[0] * scdt;
     }
   };
 
@@ -470,7 +479,7 @@ TaskStatus LagrangeRemapImpl(MeshData<Real> *u0, const V1 &v0, const V2 &vg,
           const auto xc0 = coords.GetCellCenter(vg, b, k, jb.s, i);
           const Real vb = (GEOM == Coordinates::cartesian)
                               ? (dwdt * 0.5 * (coords.bnds.x1[0] + coords.bnds.x1[1]))
-                              : ((std::sqrt(gm / (CUB(xc0[0]))) - omega_f) * scdt);
+                              : ((OmegaKep(gm, xc0[0], xc0[2]) - omega_f) * scdt);
           if (vb < 0.0) {
             RemapCons<GEOM, Upwind::r, R>(cpars, v0, vg, multi_d, three_d, dwdt, gm,
                                           omega_f, scdt, b, k, jb, i);
@@ -488,7 +497,7 @@ TaskStatus LagrangeRemapImpl(MeshData<Real> *u0, const V1 &v0, const V2 &vg,
           geometry::Coords<GEOM> coords(cpars, v0.GetCoordinates(b), kb.s, j, i);
           const auto xc0 = coords.GetCellCenter(vg, b, kb.s, j, i);
           const Real Rc = xc0[0];
-          const Real vb = (std::sqrt(gm / (CUB(Rc))) - omega_f) * scdt;
+          const Real vb = (OmegaKep(gm, Rc) - omega_f) * scdt;
           if (vb < 0.0) {
             RemapCons<GEOM, Upwind::r, R>(cpars, v0, vg, multi_d, three_d, dwdt, gm,
                                           omega_f, scdt, b, j, kb, i);

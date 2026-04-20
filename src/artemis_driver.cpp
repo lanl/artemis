@@ -319,7 +319,7 @@ TaskCollection ArtemisDriver<GEOM>::StepTasks() {
 
       // Apply rotating frame source term
       TaskID rframe_src = rt_src;
-      if (do_rotating_frame) {
+      if (do_rotating_frame || do_orbital_advection) {
         rframe_src =
             tl.AddTask(rt_src, RotatingFrame::RotatingFrameForce, u0.get(), time, bdt);
       }

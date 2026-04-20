@@ -610,7 +610,7 @@ TaskStatus MomentumFluxImpl(MeshData<Real> *md, DiffCoeffParams dp, PKG &pkg,
   if (do_oa || do_rf) {
     auto &rframe_pkg = pm->packages.Get("rotating_frame");
     qshear = rframe_pkg->template Param<Real>("qshear");
-    om0 = rframe_pkg->template Param<Real>("omega");
+    om0 = do_rf ? rframe_pkg->template Param<Real>("omega") : 0.0;
     gm_bg = rframe_pkg->template Param<Real>("gm");
   }
   const auto &cpars =

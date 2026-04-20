@@ -99,11 +99,20 @@ TaskStatus ShearingBoxImpl(MeshData<Real> *md, const Real om0, const Real qshear
 //! \fn  TaskStatus RotatingFrameImpl
 //! \brief Calculate the rotating frame body forces
 template <Coordinates GEOM>
-TaskStatus RotatingFrameImpl(MeshData<Real> *md, const Real om0, const bool do_gas,
-                             const bool do_dust, const Real dt) {
+TaskStatus RotatingFrameImpl(MeshData<Real> *md, const Real om0, const bool do_oa,
+                             const Real gm, const bool do_gas, const bool do_dust,
+                             const Real dt) {
   PARTHENON_INSTRUMENT
   // Adds the rotating frame terms to the azimuthal momentum equation and the energy
   // equation. Note that in comments in this function, R is always the cylindrical radius.
+  //
+  // When orbital advection is active, the stored primitive velocity is
+  //   v_stored = v_full - v_bg(R)
+  // where v_bg = R*(OmegaKep(R) - omega_f) in the phi direction. The Riemann solver
+  // transports the stored momentum, so we must correct for the missing background
+  // angular momentum flux: d(rho*v_stored)/dt -= (1/V) * div(F_rho * v_bg).
+  // The RF part (omega_f * R) uses the RFWeights formulation; the OA part uses
+  // face-centered v_bg directly.
 
   auto pm = md->GetParentPointer();
   auto &resolved_pkgs = pm->resolved_packages;
@@ -146,9 +155,47 @@ TaskStatus RotatingFrameImpl(MeshData<Real> *md, const Real om0, const bool do_g
         const auto &ax2 = coords.GetFaceAreaX2(vg, b, k, j, i);
         const auto &ax3 = coords.GetFaceAreaX3(vg, b, k, j, i);
         const Real vol = coords.GetVolume(vg, b, k, j, i);
+
+        // Compute face-centered OA background angular velocity (OmegaKep - omega_f)
+        // for the orbital advection transport correction.
+        // Face coordinates give us R at each face.
+        Real oa_lbg_x1m = 0.0, oa_lbg_x1p = 0.0;
+        Real oa_lbg_x2m = 0.0, oa_lbg_x2p = 0.0;
+        Real oa_lbg_x3m = 0.0, oa_lbg_x3p = 0.0;
+        if (do_oa) {
+          const Real Rc = xcyl[0];
+          const Real lbg_c = Rc * Rc * (OmegaKep(gm, xv[0]) - om0);
+
+          // x1 faces
+          const auto xf1m = coords.FaceCenX1(geometry::CellFace::lower);
+          const auto xf1p = coords.FaceCenX1(geometry::CellFace::upper);
+          const Real Rf1m = coords.ConvertToCyl(xf1m)[0];
+          const Real Rf1p = coords.ConvertToCyl(xf1p)[0];
+          oa_lbg_x1m = lbg_c - Rf1m * Rf1m * (OmegaKep(gm, xf1m[0]) - om0);
+          oa_lbg_x1p = Rf1p * Rf1p * (OmegaKep(gm, xf1p[0]) - om0) - lbg_c;
+
+          if (multi_d) {
+            const auto xf2m = coords.FaceCenX2(geometry::CellFace::lower);
+            const auto xf2p = coords.FaceCenX2(geometry::CellFace::upper);
+            const Real Rf2m = coords.ConvertToCyl(xf2m)[0];
+            const Real Rf2p = coords.ConvertToCyl(xf2p)[0];
+            oa_lbg_x2m = lbg_c - Rf2m * Rf2m * (OmegaKep(gm, xf2m[0]) - om0);
+            oa_lbg_x2p = Rf2p * Rf2p * (OmegaKep(gm, xf2p[0]) - om0) - lbg_c;
+          }
+          if (three_d) {
+            const auto xf3m = coords.FaceCenX3(geometry::CellFace::lower);
+            const auto xf3p = coords.FaceCenX3(geometry::CellFace::upper);
+            const Real Rf3m = coords.ConvertToCyl(xf3m)[0];
+            const Real Rf3p = coords.ConvertToCyl(xf3p)[0];
+            oa_lbg_x3m = lbg_c - Rf3m * Rf3m * (OmegaKep(gm, xf3m[0]) - om0);
+            oa_lbg_x3p = Rf3p * Rf3p * (OmegaKep(gm, xf3p[0]) - om0) - lbg_c;
+          }
+        }
+
         if (do_gas) {
           for (int n = 0; n < vf.GetSize(b, gas::cons::density()); ++n) {
 
+            // Rotating frame angular momentum transport correction (omega * R^2 part)
             const Real divf =
                 (vf.flux(b, X1DIR, gas::cons::density(n), k, j, i) * ax1[0] * bx1[0] +
                  vf.flux(b, X1DIR, gas::cons::density(n), k, j, i + 1) * ax1[1] *
@@ -162,12 +209,31 @@ TaskStatus RotatingFrameImpl(MeshData<Real> *md, const Real om0, const bool do_g
                      vf.flux(b, X3DIR, gas::cons::density(n), k + three_d, j, i) *
                          ax3[1] * bx3[1]);
 
-            // dUphi/dt = - f . phi_hat where f = div.F phi_hat,cyl
-            vf(b, gas::cons::momentum(VI(n, 0)), k, j, i) -= omdt * (divf / vol) * ex1[1];
-            vf(b, gas::cons::momentum(VI(n, 1)), k, j, i) -= omdt * (divf / vol) * ex2[1];
-            vf(b, gas::cons::momentum(VI(n, 2)), k, j, i) -= omdt * (divf / vol) * ex3[1];
+            // OA angular momentum transport correction
+            // div(F_rho * l_bg) using face-centered l_bg
+            Real oa_divfl = 0.0;
+            if (do_oa) {
+              oa_divfl =
+                  (vf.flux(b, X1DIR, gas::cons::density(n), k, j, i) * ax1[0] *
+                       oa_lbg_x1m +
+                   vf.flux(b, X1DIR, gas::cons::density(n), k, j, i + 1) * ax1[1] *
+                       oa_lbg_x1p) +
+                  multi_d * (vf.flux(b, X2DIR, gas::cons::density(n), k, j, i) * ax2[0] *
+                                 oa_lbg_x2m +
+                             vf.flux(b, X2DIR, gas::cons::density(n), k, j + multi_d, i) *
+                                 ax2[1] * oa_lbg_x2p) +
+                  three_d * (vf.flux(b, X3DIR, gas::cons::density(n), k, j, i) * ax3[0] *
+                                 oa_lbg_x3m +
+                             vf.flux(b, X3DIR, gas::cons::density(n), k + three_d, j, i) *
+                                 ax3[1] * oa_lbg_x3p);
+            }
 
-            // average or area weighted? (Fm + Fp)/2 or (Ap*Fp + Am*Fm)/(Am + Ap)
+            const Real mom_src = dt / vol * (om0 * divf + oa_divfl);
+            vf(b, gas::cons::momentum(VI(n, 0)), k, j, i) -= mom_src * ex1[1];
+            vf(b, gas::cons::momentum(VI(n, 1)), k, j, i) -= mom_src * ex2[1];
+            vf(b, gas::cons::momentum(VI(n, 2)), k, j, i) -= mom_src * ex3[1];
+
+            // Energy correction: only the rotating frame centrifugal work
             const Real fx[3] = {
                 0.5 * (vf.flux(b, X1DIR, gas::cons::density(n), k, j, i) +
                        vf.flux(b, X1DIR, gas::cons::density(n), k, j, i + 1)),
@@ -185,6 +251,7 @@ TaskStatus RotatingFrameImpl(MeshData<Real> *md, const Real om0, const bool do_g
         }
         if (do_dust) {
           for (int n = 0; n < vf.GetSize(b, dust::cons::density()); ++n) {
+            // Rotating frame correction
             const Real divf =
                 (vf.flux(b, X1DIR, dust::cons::density(n), k, j, i) * ax1[0] * bx1[0] +
                  vf.flux(b, X1DIR, dust::cons::density(n), k, j, i + 1) * ax1[1] *
@@ -198,12 +265,30 @@ TaskStatus RotatingFrameImpl(MeshData<Real> *md, const Real om0, const bool do_g
                            vf.flux(b, X3DIR, dust::cons::density(n), k + three_d, j, i) *
                                ax3[1] * bx3[1]);
 
-            vf(b, dust::cons::momentum(VI(n, 0)), k, j, i) -=
-                omdt * (divf / vol) * ex1[1];
-            vf(b, dust::cons::momentum(VI(n, 1)), k, j, i) -=
-                omdt * (divf / vol) * ex2[1];
-            vf(b, dust::cons::momentum(VI(n, 2)), k, j, i) -=
-                omdt * (divf / vol) * ex3[1];
+            // OA correction for dust
+            Real oa_divfl = 0.0;
+            if (do_oa) {
+              oa_divfl =
+                  (vf.flux(b, X1DIR, dust::cons::density(n), k, j, i) * ax1[0] *
+                       oa_lbg_x1m +
+                   vf.flux(b, X1DIR, dust::cons::density(n), k, j, i + 1) * ax1[1] *
+                       oa_lbg_x1p) +
+                  multi_d *
+                      (vf.flux(b, X2DIR, dust::cons::density(n), k, j, i) * ax2[0] *
+                           oa_lbg_x2m +
+                       vf.flux(b, X2DIR, dust::cons::density(n), k, j + multi_d, i) *
+                           ax2[1] * oa_lbg_x2p) +
+                  three_d *
+                      (vf.flux(b, X3DIR, dust::cons::density(n), k, j, i) * ax3[0] *
+                           oa_lbg_x3m +
+                       vf.flux(b, X3DIR, dust::cons::density(n), k + three_d, j, i) *
+                           ax3[1] * oa_lbg_x3p);
+            }
+
+            const Real mom_src = dt / vol * (om0 * divf + oa_divfl);
+            vf(b, dust::cons::momentum(VI(n, 0)), k, j, i) -= mom_src * ex1[1];
+            vf(b, dust::cons::momentum(VI(n, 1)), k, j, i) -= mom_src * ex2[1];
+            vf(b, dust::cons::momentum(VI(n, 2)), k, j, i) -= mom_src * ex3[1];
           }
         }
       });

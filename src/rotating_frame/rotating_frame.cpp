@@ -120,23 +120,31 @@ TaskStatus RotatingFrameForce(MeshData<Real> *md, const Real time, const Real dt
   const bool do_dust = artemis_pkg->Param<bool>("do_dust");
   const auto coords = artemis_pkg->Param<Coordinates>("coords");
 
+  const bool do_rotating_frame = artemis_pkg->Param<bool>("do_rotating_frame");
   auto &rframe_pkg = pm->packages.Get("rotating_frame");
-  const Real om0 = rframe_pkg->Param<Real>("omega");
+  const Real om0 = do_rotating_frame ? rframe_pkg->Param<Real>("omega") : 0.0;
   const Real qshear = rframe_pkg->Param<Real>("qshear");
+  const bool do_oa = rframe_pkg->Param<bool>("do_orbital_advection");
+  const Real gm = rframe_pkg->Param<Real>("gm");
 
   // Switch for the different implementations based on coordinate system
   if (coords == Coordinates::cartesian) {
     return ShearingBoxImpl(md, om0, qshear, do_gas, do_dust, dt);
   } else if (coords == Coordinates::axisymmetric) {
-    return RotatingFrameImpl<Coordinates::axisymmetric>(md, om0, do_gas, do_dust, dt);
+    return RotatingFrameImpl<Coordinates::axisymmetric>(md, om0, do_oa, gm, do_gas,
+                                                        do_dust, dt);
   } else if (coords == Coordinates::spherical1D) {
-    return RotatingFrameImpl<Coordinates::spherical1D>(md, om0, do_gas, do_dust, dt);
+    return RotatingFrameImpl<Coordinates::spherical1D>(md, om0, do_oa, gm, do_gas,
+                                                       do_dust, dt);
   } else if (coords == Coordinates::spherical2D) {
-    return RotatingFrameImpl<Coordinates::spherical2D>(md, om0, do_gas, do_dust, dt);
+    return RotatingFrameImpl<Coordinates::spherical2D>(md, om0, do_oa, gm, do_gas,
+                                                       do_dust, dt);
   } else if (coords == Coordinates::spherical3D) {
-    return RotatingFrameImpl<Coordinates::spherical3D>(md, om0, do_gas, do_dust, dt);
+    return RotatingFrameImpl<Coordinates::spherical3D>(md, om0, do_oa, gm, do_gas,
+                                                       do_dust, dt);
   } else if (coords == Coordinates::cylindrical) {
-    return RotatingFrameImpl<Coordinates::cylindrical>(md, om0, do_gas, do_dust, dt);
+    return RotatingFrameImpl<Coordinates::cylindrical>(md, om0, do_oa, gm, do_gas,
+                                                       do_dust, dt);
   } else {
     PARTHENON_FAIL("Rotating frame is not consistent with this coordinate system");
   }

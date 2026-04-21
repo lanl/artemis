@@ -331,18 +331,20 @@ struct OrbitalAdvection {
 //----------------------------------------------------------------------------------------
 //! \fn  RemapUpdate
 //! \brief Conservative intersection-remap update using OrbitalAdvection struct.
+//! Only interior cells (js <= j/jp <= je in the sweep direction) are updated.
 template <Coordinates GEOM, typename V1>
 KOKKOS_INLINE_FUNCTION void
 RemapUpdate(const OrbitalAdvection<GEOM> &oa, const V1 &v0, const ReconInfo &rp,
             const ReconInfo &r, const Real vb, const int three_d, const int b,
-            const int n, const int k, const int j, const int jp, const int i) {
+            const int n, const int k, const int j, const int jp, const int i,
+            const int js, const int je) {
   const Real flip = (vb < 0.0) ? -1.0 : 1.0;
   const Real I0 = oa.ComputeI0(r, flip);
   const auto I1 = oa.ComputeI1(r, flip, vb, I0, three_d);
   const Real dq =
       (rp.q - ArtemisUtils::VDot(rp.grad, rp.xc)) * I0 + ArtemisUtils::VDot(rp.grad, I1);
-  v0(b, n, k, j, i) += dq / r.vol;
-  v0(b, n, k, jp, i) -= dq / rp.vol;
+  if (j >= js && j <= je) v0(b, n, k, j, i) += dq / r.vol;
+  if (jp >= js && jp <= je) v0(b, n, k, jp, i) -= dq / rp.vol;
 }
 
 //----------------------------------------------------------------------------------------
@@ -416,9 +418,11 @@ RemapCons(const OrbitalAdvection<GEOM> &oa, const geometry::CoordParams &cpars,
         oa.ApplyGradSkew(rd);
       }
       if constexpr (phi_is_x2) {
-        RemapUpdate<GEOM>(oa, v0, ru, rc, vb, three_d, b, n, k, j, j + joff, i);
+        RemapUpdate<GEOM>(oa, v0, ru, rc, vb, three_d, b, n, k, j, j + joff, i, jb.s,
+                          jb.e);
       } else {
-        RemapUpdate<GEOM>(oa, v0, ru, rc, vb, three_d, b, n, j, k, j + joff, i);
+        RemapUpdate<GEOM>(oa, v0, ru, rc, vb, three_d, b, n, j, k, j + joff, i, jb.s,
+                          jb.e);
       }
       ru = rc;
       rc = rd;

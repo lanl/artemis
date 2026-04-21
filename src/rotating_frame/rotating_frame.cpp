@@ -182,6 +182,9 @@ Real EstimateTimestep(parthenon::Mesh *pmesh, const Real dt_ratio) {
   const Real &cfl = rframe_pkg->template Param<Real>("cfl");
 
   // Compute linear advection timestep to sub-cycle
+  const bool log_coords = pmesh->packages.Get("artemis")
+                              ->template Param<geometry::CoordParams>("coord_params")
+                              .log;
   Real min_dt = Big<Real>();
   for (auto const &pmb : pmesh->block_list) {
     [[maybe_unused]] const auto &reg = pmb->block_size;
@@ -191,12 +194,14 @@ Real EstimateTimestep(parthenon::Mesh *pmesh, const Real dt_ratio) {
       const Real dx2 = (reg.xmax_[1] - reg.xmin_[1]) / reg.nx_[1];
       min_dt = std::min(min_dt, dx2 / std::max(std::abs(wp[1]), std::abs(wm[1])));
     } else if constexpr (GEOM == Coordinates::cylindrical) {
-      const Real Rmin = reg.xmin_[0];
+      // For log-R coordinates reg.xmin_[0] stores log(Rmin), not Rmin
+      const Real Rmin = log_coords ? std::exp(reg.xmin_[0]) : reg.xmin_[0];
       const Real dphi = (reg.xmax_[1] - reg.xmin_[1]) / reg.nx_[1];
       const Real omega_max = OmegaKep(gm, Rmin) - om0;
       min_dt = std::min(min_dt, dphi / std::abs(omega_max));
     } else if constexpr (GEOM == Coordinates::spherical3D) {
-      const Real rmin = reg.xmin_[0];
+      // For log-r coordinates reg.xmin_[0] stores log(rmin), not rmin
+      const Real rmin = log_coords ? std::exp(reg.xmin_[0]) : reg.xmin_[0];
       const Real dphi = (reg.xmax_[2] - reg.xmin_[2]) / reg.nx_[2];
       const Real omega_max = OmegaKep(gm, rmin) - om0;
       min_dt = std::min(min_dt, dphi / std::abs(omega_max));

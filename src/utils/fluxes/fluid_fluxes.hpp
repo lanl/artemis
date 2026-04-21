@@ -294,10 +294,11 @@ TaskStatus FluxSourceImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, CONS vcons, FAC
         [[maybe_unused]] Real omf_ = omf;
         [[maybe_unused]] Real qshear_ = qshear;
         [[maybe_unused]] Real gm_ = gm;
+        [[maybe_unused]] bool do_oa_ = do_oa;
         if constexpr (F != Fluid::radiation) {
           const auto &xv = coords.GetCellCenter(vg, b, k, j, i);
           rfv = RotatingFrame::RotationVelocity<G>(xv, omf_);
-          if (do_oa) {
+          if (do_oa_) {
             const auto bgv = RotatingFrame::BackgroundVelocity<G>(qshear_, omf_, gm_, xv);
             for (int d = 0; d < 3; d++)
               rfv[d] += bgv[d];

@@ -49,6 +49,7 @@ struct ParticleParams {
   Real vz;
   Real J2;
   Real Cd;
+  Real rdrag;
   Real spin[3];
 };
 
@@ -70,7 +71,7 @@ class Particle {
   Real live_after;
   Real rs, racc, gamma, beta;
   Real target_rad;
-  Real cd, cq;
+  Real cd, cq, rdrag;
   int spline;
 
   KOKKOS_DEFAULTED_FUNCTION Particle() = default;
@@ -88,6 +89,7 @@ class Particle {
     rs = pars.rs;
     cq = 1.5 * pars.J2 * GM * SQR(radius);
     cd = 0.5 * pars.Cd * M_PI * SQR(radius);
+    rdrag = pars.rdrag;
     spin[0] = pars.spin[0];
     spin[1] = pars.spin[1];
     spin[2] = pars.spin[2];
@@ -217,13 +219,18 @@ class Particle {
   }
 
   KOKKOS_INLINE_FUNCTION
-  void drag(const Real den, const std::array<Real, 3> &v, const std::array<Real, 3> &vb,
-            const Real dt, Real *dmom, Real *dEk) const {
+  void drag(const Real den, const std::array<Real, 3> &x, const std::array<Real, 3> &v,
+            const std::array<Real, 3> &vb, const Real dtvol, Real *dmom,
+            Real *dEk) const {
 
     // Note that this is the back reaction on the gas
+    const auto &dx = RelativePosition(x);
+    if (SQR(dx[0]) + SQR(dx[1]) + SQR(dx[2]) > SQR(rdrag)) return;
     const std::array<Real, 3> vrel{v[0] + vb[0], v[1] + vb[1], v[2] + vb[2]};
     const auto &dv = RelativeVelocity(vrel);
-    const Real fac = dt * cd * std::sqrt(SQR(dv[0]) + SQR(dv[1]) + SQR(dv[2]));
+
+    // cd has units of cm^2
+    const Real fac = dtvol * cd * std::sqrt(SQR(dv[0]) + SQR(dv[1]) + SQR(dv[2]));
 
     for (int i = 0; i < 3; i++) {
       // Note that for a non-zero background velocity

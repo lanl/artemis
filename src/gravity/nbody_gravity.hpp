@@ -83,7 +83,7 @@ NBodyGravityImpl(V1 &vmesh, V2 &vg, const geometry::Coords<GEOM> &coords,
 
       // Drag
       if (pl.cd != 0.0) {
-        pl.drag(dens, vcart, vf, dt, dmom, &dek);
+        pl.drag(dens, xcart, vcart, vf, dt / vol, dmom, &dek);
       }
 
       const Real dmx1 = dmom[0] * ex1[0] + dmom[1] * ex1[1] + dmom[2] * ex1[2];
@@ -106,13 +106,13 @@ NBodyGravityImpl(V1 &vmesh, V2 &vg, const geometry::Coords<GEOM> &coords,
       cei += dei;
 
       // Track the back reaction onto the planet
-      lforce.myArray[0] -= vol * dm / dt;     // Mass accreted
-      lforce.myArray[1] -= g[0] * dens * vol; // X-Force due to gravity
-      lforce.myArray[2] -= g[1] * dens * vol; // Y-Force...
-      lforce.myArray[3] -= g[2] * dens * vol; // Z-Force...
-      lforce.myArray[4] -= dmom[0] / dt;      // X-Force due to accretion and drag
-      lforce.myArray[5] -= dmom[1] / dt;      // Y-Force
-      lforce.myArray[6] -= dmom[2] / dt;      // Z-Force
+      lforce.myArray[0] -= vol * dm / dt;      // Mass accreted
+      lforce.myArray[1] -= g[0] * dens * vol;  // X-Force due to gravity
+      lforce.myArray[2] -= g[1] * dens * vol;  // Y-Force...
+      lforce.myArray[3] -= g[2] * dens * vol;  // Z-Force...
+      lforce.myArray[4] -= vol * dmom[0] / dt; // X-Force due to accretion and drag
+      lforce.myArray[5] -= vol * dmom[1] / dt; // Y-Force
+      lforce.myArray[6] -= vol * dmom[2] / dt; // Z-Force
     }
   }
 

@@ -37,8 +37,8 @@ elif [[ $LMOD_SYSTEM_NAME == frontier ]]; then
     PARTITION="frontier-gpu"
 elif [[ $HOSTNAME == rzvernal* || $CLUSTER == rzvernal ]]; then
     PARTITION="rzvernal-gpu"
-elif [[ $HOSTNAME == rzadams* || $CLUSTER == rzadams ]]; then
-    PARTITION="rzadams-gpu"
+elif [[ $HOSTNAME == rzadams* || $CLUSTER == rzadams || $HOSTNAME == tuolumne* ]]; then
+    PARTITION="elcap-gpu"
 else # Catch-all for Darwin
     if [[ $HOSTNAME == darwin-fe* ]]; then
         echo "Currently on darwin frontend node; formatting is supported but not compilation"
@@ -114,18 +114,26 @@ elif [[ $PARTITION == "rzvernal-gpu" ]]; then
     export ARTEMIS_SUITE=rzvernal-gpu
     export HDF5_USE_FILE_LOCKING='FALSE'
     echo "...setup SUCCEEDED"
-elif [[ $PARTITION == "rzadams-gpu" ]]; then
-    module load PrgEnv-amd
-    module load craype-accel-amd-gfx942
-    module load cray-hdf5-parallel
+elif [[ $PARTITION == "elcap-gpu" ]]; then
+#    module load PrgEnv-amd
+#    module load craype-accel-amd-gfx942
+#    module load cray-hdf5-parallel
+    module swap PrgEnv-cray PrgEnv-amd
+    module swap amd amd/7.2.0
+    module load cray-mpich cray-hdf5-parallel
+
+
     export MPICH_GPU_SUPPORT_ENABLED=1
     export MPICH_GPU_MANAGED_MEMORY_SUPPORT_ENABLED=1
     export MPICH_GPU_IPC_ENABLED=1
     export MPICH_GPU_NO_ASYNC_COPY=1
+    export HSA_XNACK=1
+    export LIBS="$PE_MPICH_GTL_DIR_amd_gfx942 $PE_MPICH_GTL_LIBS_amd_gfx942 -lxpmem"
+    export LDFLAGS="-Wl,-rpath,${PE_MPICH_GTL_DIR_amd_gfx942:2}"
     module load cray-python/3.11.5
     # -- may need miniconda script
-    module load cmake
-    export ARTEMIS_SUITE=rzadams-gpu
+    module load cmake/3.29.2
+    export ARTEMIS_SUITE=elcap-gpu
     export HDF5_USE_FILE_LOCKING='FALSE'
     echo "...setup SUCCEEDED"
 elif [[ $PARTITION == "darwin-fe" ]]; then

@@ -90,10 +90,10 @@ ARTEMIS_VARIABLE(rad.opac, scattering);
 } // namespace opac
 namespace star {
 ARTEMIS_VARIABLE(rad.star, absorption);
-SWARM_VARIABLE(Real, rad.star, flux);
-SWARM_VARIABLE(Real, rad.star, v);
-SWARM_VARIABLE(Real, rad.star, x);
-SWARM_VARIABLE(int, rad.star, ijk);
+PAR_SWARMVAR(Real, rad.star, flux);
+PAR_SWARMVAR(Real, rad.star, v);
+PAR_SWARMVAR(Real, rad.star, x);
+PAR_SWARMVAR(int, rad.star, ijk);
 } // namespace star
 } // namespace rad
 

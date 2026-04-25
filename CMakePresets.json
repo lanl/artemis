@@ -116,20 +116,70 @@
       }
     },
     {
-      "name": "elcap-gpu-release",
+      "name": "elcap-cpu-debug",
       "cacheVariables": {
         "CMAKE_MAKE_PROGRAM": "$env{MAKE_PROGRAM}",
-        "CMAKE_BUILD_TYPE": "Release",
-        "CMAKE_C_COMPILER": "cc",
-	"CMAKE_EXE_LINKER_FLAGS": "$env{LIBS} $env{LDFLAGS}",
-        "ARTEMIS_ENABLE_HIP": "ON",
-	"Kokkos_ARCH_AMD_GFX942_APU": "ON",
-	"PARTHENON_DISABLE_HDF5_COMPRESSION" : "ON",
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_C_COMPILER": "amdclang",
+        "CMAKE_CXX_COMPILER": "amdclang++",
+        "Kokkos_ENABLE_DEBUG_BOUNDS_CHECK": "ON",
+        "PARTHENON_DISABLE_HDF5_COMPRESSION" : "ON",
         "HDF5_INCLUDE_DIR": "$env{HDF5_ROOT}/include",
         "HDF5_INCLUDE_DIRS": "$env{HDF5_ROOT}/include",
         "HDF5_LIBRARIES": "$env{HDF5_ROOT}/lib",
         "HDF5_HL_LIBRARIES": "$env{HDF5_ROOT}/lib"
       }
+    },
+    {
+      "name": "elcap-cpu-release",
+      "cacheVariables": {
+        "CMAKE_MAKE_PROGRAM": "$env{MAKE_PROGRAM}",
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_C_COMPILER": "amdclang",
+        "CMAKE_CXX_COMPILER": "amdclang++",
+        "PARTHENON_DISABLE_HDF5_COMPRESSION" : "ON",
+        "HDF5_INCLUDE_DIR": "$env{HDF5_ROOT}/include",
+        "HDF5_INCLUDE_DIRS": "$env{HDF5_ROOT}/include",
+        "HDF5_LIBRARIES": "$env{HDF5_ROOT}/lib",
+        "HDF5_HL_LIBRARIES": "$env{HDF5_ROOT}/lib"
+     }
+    },
+    {
+      "name": "elcap-gpu-debug",
+      "cacheVariables": {
+        "CMAKE_MAKE_PROGRAM": "$env{MAKE_PROGRAM}",
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_C_COMPILER": "amdclang",
+        "CMAKE_CXX_COMPILER": "amdclang++",
+        "CMAKE_PREFIX_PATH" : "/opt/rocm-7.2.1",
+        "CMAKE_EXE_LINKER_FLAGS": "$env{LIBS} $env{LDFLAGS}",
+        "ARTEMIS_ENABLE_HIP": "ON",
+        "Kokkos_ARCH_AMD_GFX942_APU": "ON",
+        "Kokkos_ENABLE_DEBUG_BOUNDS_CHECK": "ON",
+        "PARTHENON_DISABLE_HDF5_COMPRESSION" : "ON",
+        "HDF5_INCLUDE_DIR": "$env{HDF5_ROOT}/include",
+        "HDF5_INCLUDE_DIRS": "$env{HDF5_ROOT}/include",
+        "HDF5_LIBRARIES": "$env{HDF5_ROOT}/lib",
+        "HDF5_HL_LIBRARIES": "$env{HDF5_ROOT}/lib"
+      }
+    },
+    {
+      "name": "elcap-gpu-release",
+      "cacheVariables": {
+        "CMAKE_MAKE_PROGRAM": "$env{MAKE_PROGRAM}",
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_C_COMPILER": "amdclang",
+        "CMAKE_CXX_COMPILER": "amdclang++",
+        "CMAKE_PREFIX_PATH" : "/opt/rocm-7.2.1",
+        "CMAKE_EXE_LINKER_FLAGS": "$env{LIBS} $env{LDFLAGS}",
+        "ARTEMIS_ENABLE_HIP": "ON",
+        "Kokkos_ARCH_AMD_GFX942_APU": "ON",
+        "PARTHENON_DISABLE_HDF5_COMPRESSION" : "ON",
+        "HDF5_INCLUDE_DIR": "$env{HDF5_ROOT}/include",
+        "HDF5_INCLUDE_DIRS": "$env{HDF5_ROOT}/include",
+        "HDF5_LIBRARIES": "$env{HDF5_ROOT}/lib",
+        "HDF5_HL_LIBRARIES": "$env{HDF5_ROOT}/lib"
+     }
     },
     {
       "name": "venado-gpu-debug",

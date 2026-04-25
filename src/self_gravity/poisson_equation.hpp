@@ -51,7 +51,7 @@ class PoissonEquation {
                        std::shared_ptr<parthenon::MeshData<Real>> &md_in,
                        std::shared_ptr<parthenon::MeshData<Real>> &md_out) {
     auto flux_res = tl.AddTask(depends_on, CalculateFluxes, md_mat, md_in);
-    if (!(md_mat->grid.type == parthenon::GridType::two_level_composite)) {
+    if (!(md_mat->grid.type() == parthenon::GridType::two_level_composite)) {
       auto start_flxcor =
           tl.AddTask(flux_res, parthenon::StartReceiveFluxCorrections, md_in);
       auto send_flxcor =
@@ -64,7 +64,7 @@ class PoissonEquation {
   }
 
   template <parthenon::CoordinateDirection dir, class coords_t>
-  KOKKOS_INLINE_FUNCTION auto
+  KOKKOS_INLINE_FUNCTION static auto
   GetEffectiveInverseDx2(const coords_t &coords, const coords_t &coords_p,
                          const coords_t &coords_m, const int k, const int j,
                          const int i) {
@@ -145,8 +145,7 @@ class PoissonEquation {
     return TaskStatus::complete;
   }
 
-  static parthenon::TaskStatus
-  CalculateFluxes(std::shared_ptr<parthenon::MeshData<Real>> &md_mat,
+  static parthenon::TaskStatus CalculateFluxes(std::shared_ptr<parthenon::MeshData<Real>> &md_mat,
                   std::shared_ptr<parthenon::MeshData<Real>> &md) {
     using namespace parthenon;
     const int ndim = md->GetMeshPointer()->ndim;

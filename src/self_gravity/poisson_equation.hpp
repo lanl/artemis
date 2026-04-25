@@ -145,7 +145,8 @@ class PoissonEquation {
     return TaskStatus::complete;
   }
 
-  static parthenon::TaskStatus CalculateFluxes(std::shared_ptr<parthenon::MeshData<Real>> &md_mat,
+  static parthenon::TaskStatus
+  CalculateFluxes(std::shared_ptr<parthenon::MeshData<Real>> &md_mat,
                   std::shared_ptr<parthenon::MeshData<Real>> &md) {
     using namespace parthenon;
     const int ndim = md->GetMeshPointer()->ndim;

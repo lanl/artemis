@@ -14,6 +14,7 @@
 // Artemis includes
 #include "drag.hpp"
 #include "artemis.hpp"
+#include "drag_impl.hpp"
 #include "geometry/geometry.hpp"
 #include "utils/eos/eos.hpp"
 
@@ -166,10 +167,63 @@ TaskStatus DragSource(MeshData<Real> *md, const Real time, const Real dt) {
             md, time, dt, dp, eos_d, gas_self_par, dust_self_par, stop_par);
       }
     }
+  } else if (ctype = Coupling::full) {
+    if (do_gas) {
+      if (do_dust) {
+
+      } else {
+        if (gas_drag == GasDrag::hard_sphere) {
+          return FullDragSourceImpl<GasDrag::hard_sphere, DustDrag::none>(md, time, dt,
+                                                                          eos_d);
+        } else {
+          PARTHENON_FAIL("Unkown gas drag model!");
+          return TaskStatus::complete;
+        }
+      }
+    } else if (do_dust) {
+      // Just dust
+
+    } else {
+      PARTHENON_FAIL("No fluids to drag!");
+      return TaskStatus::complete;
+    }
   } else {
     PARTHENON_FAIL("Invalid drag model!");
+    return TaskStatus::complete;
   }
   return TaskStatus::complete;
+}
+
+TaskStatus ApplyClosure(MeshData<Real> *md, const Real dt) {
+  PARTHENON_INSTRUMENT
+  using parthenon::MakePackDescriptor;
+  using TE = parthenon::TopologicalElement;
+  auto pm = md->GetParentPointer();
+  auto &resolved_pkgs = pm->resolved_packages;
+
+  // Packing and indexing
+  static auto desc = MakePackDescriptor<gas::cons::density>(resolved_pkgs.get());
+  auto vmesh = desc.GetPack(md);
+
+  int nmax;
+  parthenon::par_reduce(
+      DEFAULT_LOOP_PATTERN, "MaxSize", DevExecSpace(), 0, md->NumBlocks() - 1,
+      KOKKOS_LAMBDA(const int b, int &lmax) {
+        lmax = std::max(lmax, vmesh.GetSize(b, gas::cons::density()));
+      },
+      Kokkos::Max<int>(nmax));
+
+  DevExecSpace().fence();
+  // nothing to do
+  if (nmax == 1) return TaskStatus::complete;
+
+  // Special cases
+  if (nmax == 2) {
+    return CoupleTwoFluidsImpl(md, dt);
+  }
+
+  // General case
+  return CoupleNFluidsImpl(md, nmax, dt);
 }
 
 //----------------------------------------------------------------------------------------

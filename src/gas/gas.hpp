@@ -28,6 +28,7 @@ Real EstimateTimestepMesh(MeshData<Real> *md);
 
 TaskStatus CalculateFluxes(MeshData<Real> *md, const bool pcm);
 TaskStatus FluxSource(MeshData<Real> *md, const Real dt);
+TaskStatus ApplyClosure(MeshData<Real> *md, const Real dt);
 
 template <Coordinates GEOM>
 TaskStatus DiffusionUpdate(MeshData<Real> *md, const Real dt);

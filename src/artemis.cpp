@@ -100,6 +100,7 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   const bool do_radiation = pin->GetOrAddBoolean("physics", "radiation", false);
   const bool do_coagulation = pin->GetOrAddBoolean("physics", "coagulation", false);
   const bool do_raytrace = pin->GetOrAddBoolean("physics", "raytrace", false);
+  const bool do_closure = pin->GetOrAddBoolean("physics", "closure", false);
 
   // Determine input file specified algorithms
   const bool do_imc = do_radiation && pin->DoesBlockExist("radiation/imc");
@@ -142,6 +143,7 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   artemis->AddParam("do_shear", do_shear);
   artemis->AddParam("do_raytrace", do_raytrace);
   artemis->AddParam("update_fluxes", update_fluxes);
+  artemis->AddParam("do_closure", do_closure);
 
   // Set coordinate system
   const int ndim = ProblemDimension(pin.get());
@@ -231,6 +233,8 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   // Add history for all packages with history output
   if (do_gas) Gas::AddHistory(coords, packages.Get("gas")->AllParams());
   if (do_dust) Dust::AddHistory(coords, packages.Get("dust")->AllParams());
+
+  params.Add("do_sparse", pin->GetBoolean("parthenon/sparse", "enable_sparse"));
 
   // Add artemis package
   packages.Add(artemis);

@@ -73,10 +73,13 @@ ArtemisDriver<GEOM>::ArtemisDriver(ParameterInput *pin, ApplicationInput *app_in
   do_moment = artemis_pkg->template Param<bool>("do_moment");
   do_coagulation = artemis_pkg->template Param<bool>("do_coagulation");
   do_raytrace = artemis_pkg->template Param<bool>("do_raytrace");
+  do_closure = artemis_pkg->template Param<bool>("do_closure");
 
   // Update fluxes option--gas fields are needed for radiation temperature updates but for
   // rad-only test problems turn off advection
   update_fluxes = artemis_pkg->template Param<bool>("update_fluxes");
+
+  do_sparse = artemis_pkg->template Param<bool>("do_sparse");
 
   // Moments integrator
   if (do_moment) {
@@ -366,6 +369,10 @@ TaskCollection ArtemisDriver<GEOM>::PostStepTasks() {
     auto refine = new_dt;
     if (pmesh->adaptive) {
       refine = tl.AddTask(new_dt, parthenon::Refinement::Tag<MeshData<Real>>, u0.get());
+    }
+    auto dealloc = refine;
+    if (do_sparse) {
+      dealloc = tl.AddTask(refine, parthenon::Update::SparseDealloc, u0.get());
     }
   }
 

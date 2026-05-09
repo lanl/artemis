@@ -48,6 +48,13 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   auto gas = std::make_shared<StateDescriptor>("gas");
   Params &params = gas->AllParams();
 
+  // Number of gas species
+  const int nspecies = pin->GetOrAddInteger("gas", "nspecies", 1);
+  params.Add("nspecies", nspecies);
+  std::vector<int> fluidids;
+  for (int n = 0; n < nspecies; ++n)
+    fluidids.push_back(n);
+
   // Fluid behavior for this package
   Fluid fluid_type = Fluid::gas;
   params.Add("fluid_type", fluid_type);
@@ -324,20 +331,28 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
     params.Add("cond_params", dp);
   }
 
-  // Number of gas species
-  const int nspecies = pin->GetOrAddInteger("gas", "nspecies", 1);
-  params.Add("nspecies", nspecies);
-  std::vector<int> fluidids;
-  for (int n = 0; n < nspecies; ++n)
-    fluidids.push_back(n);
-
   // Scratch for gas flux
   const int scr_level = pin->GetOrAddInteger("gas", "scr_level", 0);
   params.Add("scr_level", scr_level);
 
+  params.Add("radius", pin->GetOrAddInteger("gas", "radius_cgs", 0.0) *
+                           units.GetLengthPhysicalToCode());
+
   // Logarithmic gridding?
   const bool log =
       pin->GetOrAddString("artemis", "radial_spacing", "uniform") == "logarithmic";
+
+  Real sparse_alloc_thresh =
+      pin->GetOrAddReal("gas", "density_allocation_threshold", 1e-30);
+  Real sparse_dealloc_thresh =
+      pin->GetOrAddReal("gas", "density_deallocation_threshold", 1e-32);
+  if (nspecies == 1) {
+    sparse_alloc_thresh = 0.0;
+    sparse_dealloc_thresh = 0.0;
+  }
+
+  params.Add("sparse_alloc_thresh", sparse_alloc_thresh);
+  params.Add("sparse_dealloc_thresh", sparse_dealloc_thresh);
 
   // Control field for sparse gas fields
   std::string control_field = gas::cons::density::name();
@@ -346,7 +361,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   Metadata m = Metadata({Metadata::Cell, Metadata::Conserved, Metadata::Independent,
                          Metadata::WithFluxes, Metadata::Sparse});
   ArtemisUtils::EnrollArtemisRefinementOps(m, coords, log);
-  m.SetSparseThresholds(0.0, 0.0, 0.0);
+  m.SetSparseThresholds(sparse_alloc_thresh, sparse_dealloc_thresh, 0.0);
   gas->AddSparsePool<gas::cons::density>(m, control_field, fluidids);
 
   // Conserved Momenta

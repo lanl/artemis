@@ -31,7 +31,6 @@ set (SRC_LIST
 
   gas/gas.cpp
   gas/gas.hpp
-  gas/closure.cpp
   gas/cooling/beta_cooling.cpp
   gas/cooling/cooling.cpp
   gas/cooling/cooling.hpp

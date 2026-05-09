@@ -52,7 +52,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   lw_params.rho1 = pin->GetOrAddReal("problem", "rho1", 1.0);
   lw_params.pres1 = pin->GetOrAddReal("problem", "pres1", 1.0);
 
-  const auto &eos = gas_pkg->Param<ArtemisUtils::EOS>("eos_d");
+  const auto &eos = gas_pkg->Param<ParArray1D<ArtemisUtils::EOS>>("eos_d");
 
   // packing and capture variables for kernel
   auto &md = pmb->meshblock_data.Get();
@@ -89,7 +89,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         const Real pres = vf1 * pars.pres1 + vf2 * pars.pres0;
 
         v(0, gas::prim::density(0), k, j, i) = dens;
-        v(0, gas::prim::sie(0), k, j, i) = ArtemisUtils::EofPR(eos, pres, dens);
+        v(0, gas::prim::sie(0), k, j, i) = ArtemisUtils::EofPR(eos(0), pres, dens);
         v(0, gas::prim::velocity(0), k, j, i) = 0.0;
         v(0, gas::prim::velocity(1), k, j, i) = 0.0;
         v(0, gas::prim::velocity(2), k, j, i) = 0.0;

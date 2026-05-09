@@ -273,9 +273,9 @@ TaskStatus EvalOpac(MeshData<Real> *md) {
   auto &rt_pkg = pm->packages.Get("raytrace");
   auto &gas_pkg = pm->packages.Get("gas");
 
-  ArtemisUtils::EOS eos_d = gas_pkg->template Param<ArtemisUtils::EOS>("eos_d");
-  ArtemisUtils::Opacity opacity_d =
-      rt_pkg->template Param<ArtemisUtils::Opacity>("opacity_d");
+  ParArray1D<ArtemisUtils::EOS> eos_d =
+      gas_pkg->Param<ParArray1D<ArtemisUtils::EOS>>("eos_d");
+  ArtemisUtils::Opacity opacity_d = rt_pkg->Param<ArtemisUtils::Opacity>("opacity_d");
 
   static auto desc =
       MakePackDescriptor<gas::prim::density, gas::prim::sie, rad::star::absorption>(
@@ -295,7 +295,7 @@ TaskStatus EvalOpac(MeshData<Real> *md) {
         //%%%%%%%%%%%%%%%%
         // Evaluated at T*
         //%%%%%%%%%%%%%%%%
-        const Real temp = eos_d.TemperatureFromDensityInternalEnergy(rho, sie);
+        const Real temp = eos_d(0).TemperatureFromDensityInternalEnergy(rho, sie);
         vmesh(b, rad::star::absorption(), k, j, i) =
             opacity_d.AbsorptionCoefficient(rho, temp, 1.0);
       });

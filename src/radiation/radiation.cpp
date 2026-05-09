@@ -87,9 +87,9 @@ TaskStatus SetOpacities(MeshData<Real> *md) {
   auto &resolved_pkgs = pm->resolved_packages;
   auto &gas_pkg = pm->packages.Get("gas");
 
-  EOS eos_d = gas_pkg->template Param<EOS>("eos_d");
-  MeanOpacity opacity_d = gas_pkg->template Param<MeanOpacity>("opacity_d");
-  MeanScattering scattering_d = gas_pkg->template Param<MeanScattering>("scattering_d");
+  const auto &eos_d = gas_pkg->template Param<ParArray1D<EOS>>("eos_d");
+  auto &opacity_d = gas_pkg->template Param<MeanOpacity>("opacity_d");
+  auto &scattering_d = gas_pkg->template Param<MeanScattering>("scattering_d");
 
   // Packing and indexing
   // TODO(): Will eventually incorporate other fluids
@@ -108,7 +108,7 @@ TaskStatus SetOpacities(MeshData<Real> *md) {
       KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
         const Real &rho = vmesh(b, gas::prim::density(), k, j, i);
         const Real &sie = vmesh(b, gas::prim::sie(), k, j, i);
-        const Real temp = eos_d.TemperatureFromDensityInternalEnergy(rho, sie);
+        const Real temp = eos_d(0).TemperatureFromDensityInternalEnergy(rho, sie);
         Real &aa = vmesh(b, rad::opac::absorption(), k, j, i);
         Real &ss = vmesh(b, rad::opac::scattering(), k, j, i);
 

@@ -59,12 +59,12 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto artemis_pkg = pmb->packages.Get("artemis");
   const bool do_gas = artemis_pkg->Param<bool>("do_gas");
   const bool do_dust = artemis_pkg->Param<bool>("do_dust");
-  EOS eos_d;
+  ParArray1D<EOS> eos_d;
   if (do_gas) {
     auto gas_pkg = pmb->packages.Get("gas");
     PARTHENON_REQUIRE(gas_pkg->Param<int>("nspecies") == 1,
                       "Constant pgen requires a single gas species.")
-    eos_d = gas_pkg->Param<EOS>("eos_d");
+    eos_d = gas_pkg->Param<ParArray1D<EOS>>("eos_d");
     constant_params.g_rho = pin->GetOrAddReal("problem", "gas_rho", 1.0);
     constant_params.g_vx1 = pin->GetOrAddReal("problem", "gas_vx1", 0.0);
     constant_params.g_vx2 = pin->GetOrAddReal("problem", "gas_vx2", 0.0);
@@ -151,7 +151,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           v(0, gas::prim::velocity(2), k, j, i) =
               (pars.g_vx1 * ex3[0] + pars.g_vx2 * ex3[1] + pars.g_vx3 * ex3[2]);
           v(0, gas::prim::sie(0), k, j, i) =
-              eos_d.InternalEnergyFromDensityTemperature(pars.g_rho, pars.g_temp);
+              eos_d(0).InternalEnergyFromDensityTemperature(pars.g_rho, pars.g_temp);
         }
         if (do_dust) {
           for (int n = 0; n < v.GetSize(0, dust::prim::density()); ++n) {

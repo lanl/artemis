@@ -53,13 +53,13 @@ template <Fluid FLUID_TYPE, Closure CTYPE>
 struct RiemannSolver<RSolver::hlle, FLUID_TYPE, CTYPE,
                      std::enable_if_t<FLUID_TYPE != Fluid::radiation>> {
   template <typename V1, typename V2, typename V3>
-  KOKKOS_INLINE_FUNCTION void operator()(const EOS &eos, const Real c, const Real chat,
-                                         parthenon::team_mbr_t const &member, const int b,
-                                         const int k, const int j, const int il,
-                                         const int iu, const int dir,
-                                         const parthenon::ScratchPad2D<Real> &wl,
-                                         const parthenon::ScratchPad2D<Real> &wr,
-                                         const V1 &p, const V2 &q, const V3 &vf) const {
+  KOKKOS_INLINE_FUNCTION void
+  operator()(const ParArray1D<EOS> &eos, const Real c, const Real chat,
+             parthenon::team_mbr_t const &member, const int b, const int k, const int j,
+             const int il, const int iu, const int dir,
+             const parthenon::ScratchPad2D<Real> &wl,
+             const parthenon::ScratchPad2D<Real> &wr, const V1 &p, const V2 &q,
+             const V3 &vf) const {
     using TE = parthenon::TopologicalElement;
     // Check sensibility of flux direction
     PARTHENON_REQUIRE(dir > 0 && dir <= 3, "Invalid flux direction!");
@@ -230,13 +230,13 @@ template <Fluid FLUID_TYPE, Closure CTYPE>
 struct RiemannSolver<RSolver::hlle, FLUID_TYPE, CTYPE,
                      std::enable_if_t<FLUID_TYPE == Fluid::radiation>> {
   template <typename V1, typename V2, typename V3>
-  KOKKOS_INLINE_FUNCTION void operator()(const EOS &eos, const Real c, const Real chat,
-                                         parthenon::team_mbr_t const &member, const int b,
-                                         const int k, const int j, const int il,
-                                         const int iu, const int dir,
-                                         const parthenon::ScratchPad2D<Real> &wl,
-                                         const parthenon::ScratchPad2D<Real> &wr,
-                                         const V1 &p, const V2 &q, const V3 &vf) const {
+  KOKKOS_INLINE_FUNCTION void
+  operator()(const ParArray1D<EOS> &eos, const Real c, const Real chat,
+             parthenon::team_mbr_t const &member, const int b, const int k, const int j,
+             const int il, const int iu, const int dir,
+             const parthenon::ScratchPad2D<Real> &wl,
+             const parthenon::ScratchPad2D<Real> &wr, const V1 &p, const V2 &q,
+             const V3 &vf) const {
     using TE = parthenon::TopologicalElement;
     // Check sensibility of flux direction
     PARTHENON_REQUIRE(dir > 0 && dir <= 3, "Invalid flux direction!");

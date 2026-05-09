@@ -50,7 +50,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   PARTHENON_REQUIRE(!(update_fluxes),
                     "Crooked pipe problem requires update fluxes to be off!");
   auto gas_pkg = pmb->packages.Get("gas");
-  const auto eos = gas_pkg->Param<EOS>("eos_d");
+  const auto eos = gas_pkg->Param<ParArray1D<EOS>>("eos_d");
   Real ar = Null<Real>();
   if (do_moment) {
     auto rad_pkg = pmb->packages.Get("moments");
@@ -118,21 +118,21 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           // default thin cell
           v(0, gas::prim::density(), k, j, i) = rho_thin;
           v(0, gas::prim::sie(), k, j, i) =
-              eos.InternalEnergyFromDensityTemperature(rho_thin, t_init);
+              eos(0).InternalEnergyFromDensityTemperature(rho_thin, t_init);
 
           for (const auto &iregion : thick_regions) {
             if (xl >= iregion[0] && xu <= iregion[1] && yl >= iregion[2] &&
                 yu <= iregion[3]) {
               v(0, gas::prim::density(), k, j, i) = rho_thick;
               v(0, gas::prim::sie(), k, j, i) =
-                  eos.InternalEnergyFromDensityTemperature(rho_thick, t_init);
+                  eos(0).InternalEnergyFromDensityTemperature(rho_thick, t_init);
             }
           }
           for (const auto &iregion : thin_source_regions) {
             if (xl >= iregion[0] && xu <= iregion[1] && yl >= iregion[2] &&
                 yu <= iregion[3]) {
               v(0, gas::prim::sie(), k, j, i) =
-                  eos.InternalEnergyFromDensityTemperature(rho_thin, t_source);
+                  eos(0).InternalEnergyFromDensityTemperature(rho_thin, t_source);
             }
           }
         });

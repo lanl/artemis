@@ -86,33 +86,71 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   if (pin->DoesBlockExist("gas/eos/ideal") || (pin->DoesParameterExist("gas", "gamma"))) {
     const std::string block_name =
         pin->DoesBlockExist("gas/eos/ideal") ? "gas/eos/ideal" : "gas";
-    const Real gamma = pin->GetOrAddReal(block_name, "gamma", 1.66666666667);
-    auto cv = Null<Real>();
-    auto mu = Null<Real>();
+    std::vector<Real> gamma_default(nspecies, 1.66666666667);
+    std::vector<Real> mu_default(nspecies, Null<Real>());
+    std::vector<Real> cv_default(nspecies, Null<Real>());
+
+    auto gamma_v = pin->GetOrAddVector<Real>(block_name, "gamma", gamma_default);
+    PARTHENON_REQUIRE(gamma_v.size() == static_cast<size_t>(nspecies),
+                      "gamma must have nspecies entries");
+    auto cv_v = cv_default;
+    auto mu_v = mu_default;
     if (pin->DoesParameterExist(block_name, "cv")) {
       PARTHENON_REQUIRE(!pin->DoesParameterExist("gas", "mu"),
                         "Cannot specify both cv and mu");
-      cv = pin->GetReal(block_name, "cv");
-      PARTHENON_REQUIRE(cv > 0, "Only positive cv allowed!");
-      mu = constants.GetKBCode() / ((gamma - 1.) * constants.GetAMUCode() * cv);
+      cv_v = pin->GetVector<Real>(block_name, "cv");
+      PARTHENON_REQUIRE(cv_v.size() == static_cast<size_t>(nspecies),
+                        "cv must have nspecies entries");
+      for (int n = 0; n < nspecies; ++n) {
+        PARTHENON_REQUIRE(cv_v[n] > 0, "Only positive cv allowed!");
+        mu_v[n] = constants.GetKBCode() /
+                  ((gamma_v[n] - 1.) * constants.GetAMUCode() * cv_v[n]);
+      }
     } else {
-      mu = pin->GetOrAddReal(block_name, "mu", 1.);
-      PARTHENON_REQUIRE(mu > 0, "Only positive mean molecular weight allowed!");
-      cv = constants.GetKBCode() / ((gamma - 1.) * constants.GetAMUCode() * mu);
+      std::vector<Real> mu_ones(nspecies, 1.);
+      mu_v = pin->GetOrAddVector<Real>(block_name, "mu", mu_ones);
+      PARTHENON_REQUIRE(mu_v.size() == static_cast<size_t>(nspecies),
+                        "mu must have nspecies entries");
+      for (int n = 0; n < nspecies; ++n) {
+        PARTHENON_REQUIRE(mu_v[n] > 0, "Only positive mean molecular weight allowed!");
+        cv_v[n] = constants.GetKBCode() /
+                  ((gamma_v[n] - 1.) * constants.GetAMUCode() * mu_v[n]);
+      }
     }
+
+    ParArray1D<Real> gamma("gamma", nspecies);
+    ParArray1D<Real> mu("mu", nspecies);
+    ParArray1D<Real> cv("cv", nspecies);
+    auto h_gamma = gamma.GetHostMirror();
+    auto h_mu = mu.GetHostMirror();
+    auto h_cv = cv.GetHostMirror();
+    for (int n = 0; n < nspecies; ++n) {
+      h_gamma(n) = gamma_v[n];
+      h_mu(n) = mu_v[n];
+      h_cv(n) = cv_v[n];
+    }
+    gamma.DeepCopy(h_gamma);
+    mu.DeepCopy(h_mu);
+    cv.DeepCopy(h_cv);
+
     eos_type = "ideal";
-    params.Add("kbmu", constants.GetKBCode() / (mu * constants.GetAMUCode()));
+    params.Add("kbmu", constants.GetKBCode() / (mu_v[0] * constants.GetAMUCode()));
     params.Add("mu", mu);
     params.Add("cv", cv);
     params.Add("kb", constants.GetKBCode());
     params.Add("amu", constants.GetAMUCode());
-    params.Add("Rgas", constants.GetKBCode() / (constants.GetAMUCode() * mu));
-    EOS eos_host = singularity::UnitSystem<singularity::IdealGas>(
-        singularity::IdealGas(gamma - 1., cv * units.GetSpecificHeatCodeToPhysical()),
-        singularity::eos_units_init::LengthTimeUnitsInit(), units.GetTimeCodeToPhysical(),
-        units.GetMassCodeToPhysical(), units.GetLengthCodeToPhysical(),
-        units.GetTemperatureCodeToPhysical());
-    EOS eos_device = eos_host.GetOnDevice();
+    params.Add("Rgas", constants.GetKBCode() / (constants.GetAMUCode() * mu_v[0]));
+    ParArray1D<EOS> eos_device("eos_d", nspecies);
+    auto eos_host = eos_device.GetHostMirror();
+    for (int n = 0; n < nspecies; ++n) {
+      eos_host(n) = singularity::UnitSystem<singularity::IdealGas>(
+          singularity::IdealGas(gamma_v[n] - 1.,
+                                cv_v[n] * units.GetSpecificHeatCodeToPhysical()),
+          singularity::eos_units_init::LengthTimeUnitsInit(),
+          units.GetTimeCodeToPhysical(), units.GetMassCodeToPhysical(),
+          units.GetLengthCodeToPhysical(), units.GetTemperatureCodeToPhysical());
+      eos_device(n) = eos_host(n).GetOnDevice();
+    }
     params.Add("eos_h", eos_host);
     params.Add("eos_d", eos_device);
     // TODO This needs to be removed when we convert everything to EOS calls
@@ -123,37 +161,74 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
     const std::string block_name = "gas/eos/h-he";
     if (pin->DoesParameterExist(block_name, "eos_file")) {
       // load from file
-      const std::string filename = pin->GetString(block_name, "eos_file");
-      EOS eos_host = singularity::UnitSystem<ArtemisEOS::IdealHHe>(
-          ArtemisEOS::IdealHHe(filename),
-          singularity::eos_units_init::LengthTimeUnitsInit(),
-          units.GetTimeCodeToPhysical(), units.GetMassCodeToPhysical(),
-          units.GetLengthCodeToPhysical(), units.GetTemperatureCodeToPhysical());
-      EOS eos_device = eos_host.GetOnDevice();
-      params.Add("mu", pin->GetOrAddReal(block_name, "mu", 1.));
+      std::vector<std::string> filenames(nspecies, "");
+      pin->GetOrAddVector<std::string>(block_name, "eos_file", filenames);
+      ParArray1D<EOS> eos_device("eos_d", nspecies);
+      ParArray1D<EOS> eos_host = eos_device.GetHostMirror();
+      for (int n = 0; n < nspecies; ++n) {
+        eos_host(n) = singularity::UnitSystem<ArtemisEOS::IdealHHe>(
+            ArtemisEOS::IdealHHe(filenames[n]),
+            singularity::eos_units_init::LengthTimeUnitsInit(),
+            units.GetTimeCodeToPhysical(), units.GetMassCodeToPhysical(),
+            units.GetLengthCodeToPhysical(), units.GetTemperatureCodeToPhysical());
+        eos_device(n) = eos_host(n).GetOnDevice();
+      }
+      std::vector<Real> mu_default(nspecies, 1.);
+      auto mu_v = pin->GetOrAddVector<Real>(block_name, "mu", mu_default);
+      PARTHENON_REQUIRE(mu_v.size() == static_cast<size_t>(nspecies),
+                        "mu must have nspecies entries");
+      ParArray1D<Real> mu("mu", nspecies);
+      auto h_mu = mu.GetHostMirror();
+      for (int n = 0; n < nspecies; ++n) {
+        h_mu(n) = mu_v[n];
+      }
+      mu.DeepCopy(h_mu);
+      params.Add("mu", mu);
       params.Add("eos_h", eos_host);
       params.Add("eos_d", eos_device);
     } else {
       const std::string save_to_file =
           pin->GetOrAddString(block_name, "save_to_file", "");
-      const Real X = pin->GetReal(block_name, "x");
-      const Real Y = pin->GetReal(block_name, "y");
       const Real ltmin = pin->GetOrAddReal(block_name, "ltmin", 0);
       const Real ltmax = pin->GetOrAddReal(block_name, "ltmax", 6);
       const Real ldmin = pin->GetOrAddReal(block_name, "ldmin", -15);
       const Real ldmax = pin->GetOrAddReal(block_name, "ldmax", -3);
       const int nd = pin->GetOrAddInteger(block_name, "nd", 100);
       const int nt = pin->GetOrAddInteger(block_name, "nt", 100);
-      ArtemisEOS::IdealHHe eos_base(X, Y, ltmin, ltmax, nt, ldmin, ldmax, nd,
-                                    save_to_file, true);
-      eos_base.SetFloors(siefloor, 0.0, dfloor, 0.0);
 
-      EOS eos_host = singularity::UnitSystem<ArtemisEOS::IdealHHe>(
-          std::move(eos_base), singularity::eos_units_init::LengthTimeUnitsInit(),
-          units.GetTimeCodeToPhysical(), units.GetMassCodeToPhysical(),
-          units.GetLengthCodeToPhysical(), units.GetTemperatureCodeToPhysical());
-      EOS eos_device = eos_host.GetOnDevice();
-      params.Add("mu", pin->GetOrAddReal(block_name, "mu", 1.));
+      std::vector<Real> X_v(nspecies, 0.);
+      std::vector<Real> Y_v(nspecies, 0.);
+      X_v = pin->GetVector<Real>(block_name, "x");
+      Y_v = pin->GetVector<Real>(block_name, "y");
+      PARTHENON_REQUIRE(X_v.size() == static_cast<size_t>(nspecies),
+                        "x must have nspecies entries");
+      PARTHENON_REQUIRE(Y_v.size() == static_cast<size_t>(nspecies),
+                        "y must have nspecies entries");
+
+      ParArray1D<EOS> eos_device("eos_d", nspecies);
+      auto eos_host = eos_device.GetHostMirror();
+      for (int n = 0; n < nspecies; ++n) {
+        ArtemisEOS::IdealHHe eos_base(X_v[n], Y_v[n], ltmin, ltmax, nt, ldmin, ldmax, nd,
+                                      save_to_file, true);
+        eos_base.SetFloors(siefloor, 0.0, dfloor, 0.0);
+
+        eos_host(n) = singularity::UnitSystem<ArtemisEOS::IdealHHe>(
+            std::move(eos_base), singularity::eos_units_init::LengthTimeUnitsInit(),
+            units.GetTimeCodeToPhysical(), units.GetMassCodeToPhysical(),
+            units.GetLengthCodeToPhysical(), units.GetTemperatureCodeToPhysical());
+        eos_device(n) = eos_host(n).GetOnDevice();
+      }
+      auto mu_v =
+          pin->GetOrAddVector<Real>(block_name, "mu", std::vector<Real>(nspecies, 1.));
+      PARTHENON_REQUIRE(mu_v.size() == static_cast<size_t>(nspecies),
+                        "mu must have nspecies entries");
+      ParArray1D<Real> mu("mu", nspecies);
+      auto h_mu = mu.GetHostMirror();
+      for (int n = 0; n < nspecies; ++n) {
+        h_mu(n) = mu_v[n];
+      }
+      mu.DeepCopy(h_mu);
+      params.Add("mu", mu);
       params.Add("eos_h", eos_host);
       params.Add("eos_d", eos_device);
     }
@@ -162,29 +237,61 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
     eos_type = "sesame_re";
     params.Add("eos_type", eos_type);
     const std::string block_name = "gas/eos/sesame_re";
-    std::string filename = pin->GetString(block_name, "eos_file");
-    EOS eos_host = singularity::UnitSystem<singularity::SpinerEOSDependsRhoSie>(
-        singularity::SpinerEOSDependsRhoSie(filename, "gas"),
-        singularity::eos_units_init::LengthTimeUnitsInit(), units.GetTimeCodeToPhysical(),
-        units.GetMassCodeToPhysical(), units.GetLengthCodeToPhysical(),
-        units.GetTemperatureCodeToPhysical());
-    EOS eos_device = eos_host.GetOnDevice();
+    auto filenames = pin->GetVector<std::string>(block_name, "eos_file");
+    PARTHENON_REQUIRE(filenames.size() == static_cast<size_t>(nspecies),
+                      "eos_file must have nspecies entries");
+    ParArray1D<EOS> eos_device("eos_d", nspecies);
+    auto eos_host = eos_device.GetHostMirror();
+    for (int n = 0; n < nspecies; ++n) {
+      eos_host(n) = singularity::UnitSystem<singularity::SpinerEOSDependsRhoE>(
+          singularity::SpinerEOSDependsRhoE(filenames[n], "gas"),
+          singularity::eos_units_init::LengthTimeUnitsInit(),
+          units.GetTimeCodeToPhysical(), units.GetMassCodeToPhysical(),
+          units.GetLengthCodeToPhysical(), units.GetTemperatureCodeToPhysical());
+      eos_device(n) = eos_host(n).GetOnDevice();
+    }
+    std::vector<Real> mu_default(nspecies, 1.);
+    auto mu_v = pin->GetOrAddVector<Real>(block_name, "mu", mu_default);
+    PARTHENON_REQUIRE(mu_v.size() == static_cast<size_t>(nspecies),
+                      "mu must have nspecies entries");
+    ParArray1D<Real> mu("mu", nspecies);
+    auto h_mu = mu.GetHostMirror();
+    for (int n = 0; n < nspecies; ++n) {
+      h_mu(n) = mu_v[n];
+    }
+    mu.DeepCopy(h_mu);
+    params.Add("mu", mu);
     params.Add("eos_h", eos_host);
     params.Add("eos_d", eos_device);
-    params.Add("mu", pin->GetOrAddReal(block_name, "mu", 1.));
   } else if (pin->DoesBlockExist("gas/eos/sesame_rt")) {
     eos_type = "sesame_rt";
     const std::string block_name = "gas/eos/sesame_rt";
-    std::string filename = pin->GetString(block_name, "eos_file");
-    EOS eos_host = singularity::UnitSystem<singularity::SpinerEOSDependsRhoT>(
-        singularity::SpinerEOSDependsRhoT(filename, "gas"),
-        singularity::eos_units_init::LengthTimeUnitsInit(), units.GetTimeCodeToPhysical(),
-        units.GetMassCodeToPhysical(), units.GetLengthCodeToPhysical(),
-        units.GetTemperatureCodeToPhysical());
-    EOS eos_device = eos_host.GetOnDevice();
+    auto filenames = pin->GetVector<std::string>(block_name, "eos_file");
+    PARTHENON_REQUIRE(filenames.size() == static_cast<size_t>(nspecies),
+                      "eos_file must have nspecies entries");
+    ParArray1D<EOS> eos_device("eos_d", nspecies);
+    auto eos_host = eos_device.GetHostMirror();
+    for (int n = 0; n < nspecies; ++n) {
+      eos_host(n) = singularity::UnitSystem<singularity::SpinerEOSDependsRhoT>(
+          singularity::SpinerEOSDependsRhoT(filenames[n], "gas"),
+          singularity::eos_units_init::LengthTimeUnitsInit(),
+          units.GetTimeCodeToPhysical(), units.GetMassCodeToPhysical(),
+          units.GetLengthCodeToPhysical(), units.GetTemperatureCodeToPhysical());
+      eos_device(n) = eos_host(n).GetOnDevice();
+    }
+    std::vector<Real> mu_default(nspecies, 1.);
+    auto mu_v = pin->GetOrAddVector<Real>(block_name, "mu", mu_default);
+    PARTHENON_REQUIRE(mu_v.size() == static_cast<size_t>(nspecies),
+                      "mu must have nspecies entries");
+    ParArray1D<Real> mu("mu", nspecies);
+    auto h_mu = mu.GetHostMirror();
+    for (int n = 0; n < nspecies; ++n) {
+      h_mu(n) = mu_v[n];
+    }
+    mu.DeepCopy(h_mu);
+    params.Add("mu", mu);
     params.Add("eos_h", eos_host);
     params.Add("eos_d", eos_device);
-    params.Add("mu", pin->GetOrAddReal(block_name, "mu", 1.));
 #endif // WITH_SESAME
 #endif // SPINER_USE_HDF
   } else {
@@ -192,7 +299,6 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   }
 
   params.Add("eos_type", eos_type);
-
   // Riemann solver
   RSolver riemann_solver = RSolver::null;
   const std::string riemann = pin->GetOrAddString("gas", "riemann", "hllc-general");
@@ -555,7 +661,7 @@ Real EstimateTimestepMesh(MeshData<Real> *md) {
 
   auto &gas_pkg = pm->packages.Get("gas");
   auto &params = gas_pkg->AllParams();
-  auto eos_d = params.template Get<EOS>("eos_d");
+  const auto &eos_d = params.template Get<ParArray1D<EOS>>("eos_d");
 
   static auto desc =
       MakePackDescriptor<gas::prim::density, gas::prim::velocity, gas::prim::sie,

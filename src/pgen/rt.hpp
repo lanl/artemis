@@ -58,7 +58,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   RT_params.freq = pin->GetOrAddReal("problem", "frequency", 6 * M_PI);
   RT_params.amp = pin->GetOrAddReal("problem", "amplitude", 0.01);
 
-  const auto &eos = gas_pkg->Param<ArtemisUtils::EOS>("eos_d");
+  const auto &eos = gas_pkg->template Param<ParArray1D<ArtemisUtils::EOS>>("eos_d");
 
   // packing and capture variables for kernel
   auto &md = pmb->meshblock_data.Get();
@@ -115,7 +115,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         const int fid = (upper) ? 1 : 0;
 
         v(0, gas::prim::density(fid), k, j, i) = dens;
-        v(0, gas::prim::sie(fid), k, j, i) = ArtemisUtils::EofPR(eos, pres, dens);
+        v(0, gas::prim::sie(fid), k, j, i) = ArtemisUtils::EofPR(eos(0), pres, dens);
         v(0, gas::prim::velocity(VI(fid, 0)), k, j, i) = 0.0;
         v(0, gas::prim::velocity(VI(fid, 1)), k, j, i) =
             pars.amp * std::cos(pars.freq * xc);

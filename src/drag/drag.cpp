@@ -20,10 +20,14 @@
 
 using ArtemisUtils::EOS;
 namespace Drag {
+
+// Forward declaration — defined later in this TU, after drag_impl.hpp functions
+TaskStatus ApplyClosure(MeshData<Real> *md, const Real dt);
 //----------------------------------------------------------------------------------------
 //! \fn  StateDescriptor Drag::Initialize
 //! \brief Adds intialization function for damping package
-std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
+std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
+                                            const ArtemisUtils::Constants &constants) {
   auto drag = std::make_shared<StateDescriptor>("drag");
   Params &params = drag->AllParams();
 
@@ -82,6 +86,16 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     params.Add("stopping_time_params", StoppingTimeParams("dust/stopping_time", pin));
   }
 
+  // Coupling::full — Chapman-Cowling N-fluid coupling
+  if (type == Coupling::full) {
+    PARTHENON_REQUIRE(do_gas, "drag type full requires at least one gas species");
+    PARTHENON_REQUIRE(pin->GetOrAddInteger("gas", "nspecies", 1) > 1,
+                      "drag type full requires gas.nspecies > 1");
+    PARTHENON_REQUIRE(pin->DoesBlockExist("drag/full"),
+                      "drag type full requires a [drag/full] input block");
+    params.Add("full_coupling_params", FullCouplingParams(pin, constants));
+  }
+
   return drag;
 }
 
@@ -97,7 +111,7 @@ TaskStatus DragSource(MeshData<Real> *md, const Real time, const Real dt) {
   // Extract artemis parameters
   auto &artemis_pkg = pm->packages.Get("artemis");
   const bool do_gas = artemis_pkg->template Param<bool>("do_gas");
-  const bool do_dust = artemis_pkg->template Param<bool>("do_gas");
+  const bool do_dust = artemis_pkg->template Param<bool>("do_dust");
 
   // Extract drag parameters
   auto &drag_pkg = pm->packages.Get("drag");
@@ -110,13 +124,13 @@ TaskStatus DragSource(MeshData<Real> *md, const Real time, const Real dt) {
     if (do_gas && gas_self_par.damp_to_visc) {
       auto &gas_pkg = pm->packages.Get("gas");
       const auto &dp = gas_pkg->template Param<Diffusion::DiffCoeffParams>("visc_params");
-      const auto &eos_d = gas_pkg->template Param<EOS>("eos_d");
+      const auto eos_d = gas_pkg->template Param<ParArray1D<EOS>>("eos_d");
       if (dp.type == Diffusion::DiffType::viscosity_plaw) {
         return SelfDragSourceImpl<Diffusion::DiffType::viscosity_plaw, GEOM>(
-            md, time, dt, dp, eos_d, gas_self_par, dust_self_par);
+            md, time, dt, dp, eos_d(0), gas_self_par, dust_self_par);
       } else if (dp.type == Diffusion::DiffType::viscosity_alpha) {
         return SelfDragSourceImpl<Diffusion::DiffType::viscosity_alpha, GEOM>(
-            md, time, dt, dp, eos_d, gas_self_par, dust_self_par);
+            md, time, dt, dp, eos_d(0), gas_self_par, dust_self_par);
       } else {
         PARTHENON_FAIL("The chosen viscosity model does not work with damping");
       }
@@ -129,7 +143,7 @@ TaskStatus DragSource(MeshData<Real> *md, const Real time, const Real dt) {
   } else if (ctype == Coupling::simple_dust) {
     auto &gas_pkg = pm->packages.Get("gas");
     auto &dust_pkg = pm->packages.Get("dust");
-    const auto &eos_d = gas_pkg->template Param<EOS>("eos_d");
+    const auto eos_d = gas_pkg->template Param<ParArray1D<EOS>>("eos_d");
     const auto stop_par =
         drag_pkg->template Param<StoppingTimeParams>("stopping_time_params");
     if (gas_self_par.damp_to_visc) {
@@ -138,21 +152,21 @@ TaskStatus DragSource(MeshData<Real> *md, const Real time, const Real dt) {
         if (stop_par.model == DragModel::constant) {
           return SimpleDragSourceImpl<Diffusion::DiffType::viscosity_plaw,
                                       DragModel::constant, GEOM>(
-              md, time, dt, dp, eos_d, gas_self_par, dust_self_par, stop_par);
+              md, time, dt, dp, eos_d(0), gas_self_par, dust_self_par, stop_par);
         } else if (stop_par.model == DragModel::stokes) {
           return SimpleDragSourceImpl<Diffusion::DiffType::viscosity_plaw,
                                       DragModel::stokes, GEOM>(
-              md, time, dt, dp, eos_d, gas_self_par, dust_self_par, stop_par);
+              md, time, dt, dp, eos_d(0), gas_self_par, dust_self_par, stop_par);
         }
       } else if (dp.type == Diffusion::DiffType::viscosity_alpha) {
         if (stop_par.model == DragModel::constant) {
           return SimpleDragSourceImpl<Diffusion::DiffType::viscosity_alpha,
                                       DragModel::constant, GEOM>(
-              md, time, dt, dp, eos_d, gas_self_par, dust_self_par, stop_par);
+              md, time, dt, dp, eos_d(0), gas_self_par, dust_self_par, stop_par);
         } else if (stop_par.model == DragModel::stokes) {
           return SimpleDragSourceImpl<Diffusion::DiffType::viscosity_alpha,
                                       DragModel::stokes, GEOM>(
-              md, time, dt, dp, eos_d, gas_self_par, dust_self_par, stop_par);
+              md, time, dt, dp, eos_d(0), gas_self_par, dust_self_par, stop_par);
         }
       } else {
         PARTHENON_FAIL("The chosen viscosity model does not work with damping");
@@ -161,32 +175,16 @@ TaskStatus DragSource(MeshData<Real> *md, const Real time, const Real dt) {
       Diffusion::DiffCoeffParams dp;
       if (stop_par.model == DragModel::constant) {
         return SimpleDragSourceImpl<Diffusion::DiffType::null, DragModel::constant, GEOM>(
-            md, time, dt, dp, eos_d, gas_self_par, dust_self_par, stop_par);
+            md, time, dt, dp, eos_d(0), gas_self_par, dust_self_par, stop_par);
       } else if (stop_par.model == DragModel::stokes) {
         return SimpleDragSourceImpl<Diffusion::DiffType::null, DragModel::stokes, GEOM>(
-            md, time, dt, dp, eos_d, gas_self_par, dust_self_par, stop_par);
+            md, time, dt, dp, eos_d(0), gas_self_par, dust_self_par, stop_par);
       }
     }
-  } else if (ctype = Coupling::full) {
-    if (do_gas) {
-      if (do_dust) {
-
-      } else {
-        if (gas_drag == GasDrag::hard_sphere) {
-          return FullDragSourceImpl<GasDrag::hard_sphere, DustDrag::none>(md, time, dt,
-                                                                          eos_d);
-        } else {
-          PARTHENON_FAIL("Unkown gas drag model!");
-          return TaskStatus::complete;
-        }
-      }
-    } else if (do_dust) {
-      // Just dust
-
-    } else {
-      PARTHENON_FAIL("No fluids to drag!");
-      return TaskStatus::complete;
-    }
+  } else if (ctype == Coupling::full) {
+    // Chapman-Cowling implicit coupling for N gas species.
+    // ApplyClosure assembles and solves the per-cell coupling matrix.
+    return ApplyClosure(md, dt);
   } else {
     PARTHENON_FAIL("Invalid drag model!");
     return TaskStatus::complete;
@@ -219,11 +217,11 @@ TaskStatus ApplyClosure(MeshData<Real> *md, const Real dt) {
 
   // Special cases
   if (nmax == 2) {
-    return CoupleTwoFluidsImpl(md, dt);
+    return CoupleTwoFluids(md, dt);
   }
 
   // General case
-  return CoupleNFluidsImpl(md, nmax, dt);
+  return CoupleNFluids(md, nmax, dt);
 }
 
 //----------------------------------------------------------------------------------------

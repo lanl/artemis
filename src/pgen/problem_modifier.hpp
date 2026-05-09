@@ -120,6 +120,9 @@ void ProblemModifier(parthenon::ParthenonManager *pman) {
                                                strat::ExtrapInnerX3<G>);
     pman->app_input->RegisterBoundaryCondition(BF::outer_x3, "extrap",
                                                strat::ExtrapOuterX3<G>);
+  } else if (artemis_problem == "escape_1d") {
+    pman->app_input->RegisterBoundaryCondition(
+        BF::inner_x1, "hydrostatic", escape_1d::Escape1DInnerX1<G, ID::inner_x1>);
   } else if (artemis_problem == "beam") {
     pman->app_input->RegisterBoundaryCondition(BF::inner_x1, "beam",
                                                beam::BeamInnerX1<G>);

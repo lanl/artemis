@@ -22,6 +22,7 @@
 #include "utils/artemis_utils.hpp"
 #include "utils/diffusion/diffusion_coeff.hpp"
 #include "utils/eos/eos.hpp"
+#include "utils/units.hpp"
 
 using namespace parthenon::package::prelude;
 using ArtemisUtils::EOS;
@@ -53,8 +54,14 @@ namespace Drag {
 */
 
 // ... Coupling types
-enum class Coupling { simple_dust, self, null };
-// ... Drag models
+enum class Coupling { simple_dust, self, full, null };
+
+// ... Interspecies drag models for the full Chapman-Cowling coupling path
+// hard_sphere   - calibrated hard-sphere collision integrals (first backend)
+// lj            - Lennard-Jones surrogate collision integrals
+enum class GasDragModel { hard_sphere, lj, null };
+
+// ... Drag models for the simple dust-gas coupling path
 enum class DragModel { constant, stokes, null };
 
 //----------------------------------------------------------------------------------------
@@ -65,6 +72,8 @@ inline Coupling ChooseDrag(const std::string choice) {
     return Coupling::self;
   } else if (choice == "simple_dust") {
     return Coupling::simple_dust;
+  } else if (choice == "full") {
+    return Coupling::full;
   } else {
     PARTHENON_FAIL("Bad choice of drag type");
     return Coupling::null;
@@ -158,7 +167,82 @@ struct StoppingTimeParams {
 };
 
 //----------------------------------------------------------------------------------------
-std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
+//! \struct FullCouplingParams
+//! \brief Parameters for the full Chapman-Cowling interspecies coupling
+//!
+//! Species are indexed 0..nspecies-1, matching gas.nspecies ordering.
+//! mu_s[n]       - mean molecular mass of species n (in AMU)
+//! sigma_s[n]    - effective hard-sphere diameter (collision cross-section radius) in
+//! code
+//!                 length units, or the LJ sigma parameter for the lj model
+//! eps_s[n]      - LJ epsilon/kB (K) for the lj model (unused for hard_sphere)
+//! dof_s[n]      - internal degrees of freedom per molecule (e.g. 3 for monatomic,
+//!                 5 for diatomic); used for energy-exchange weighting
+struct FullCouplingParams {
+  GasDragModel model;
+  int nspecies;
+  ParArray1D<Real> mu_s;    // molecular mass per species [AMU]
+  ParArray1D<Real> sigma_s; // collision diameter / LJ sigma per species [code length]
+  ParArray1D<Real> eps_s;   // LJ epsilon/kB per species [K] (lj model only)
+  ParArray1D<Real> dof_s;   // internal DOF per molecule per species
+
+  FullCouplingParams() : model(GasDragModel::null), nspecies(0) {}
+
+  FullCouplingParams(ParameterInput *pin, const ArtemisUtils::Constants &constants) {
+    const std::string block = "drag/full";
+    nspecies = pin->GetOrAddInteger("gas", "nspecies", 1);
+
+    const std::string model_str =
+        pin->GetOrAddString(block, "collision_model", "hard_sphere");
+    if (model_str == "hard_sphere") {
+      model = GasDragModel::hard_sphere;
+    } else if (model_str == "lj") {
+      model = GasDragModel::lj;
+    } else {
+      PARTHENON_FAIL("drag/full collision_model must be hard_sphere or lj");
+      model = GasDragModel::null;
+    }
+
+    mu_s = ParArray1D<Real>("drag_mu", nspecies);
+    sigma_s = ParArray1D<Real>("drag_sigma", nspecies);
+    eps_s = ParArray1D<Real>("drag_eps", nspecies);
+    dof_s = ParArray1D<Real>("drag_dof", nspecies);
+
+    auto h_mu = mu_s.GetHostMirror();
+    auto h_sigma = sigma_s.GetHostMirror();
+    auto h_eps = eps_s.GetHostMirror();
+    auto h_dof = dof_s.GetHostMirror();
+
+    std::vector<Real> mu_v = pin->GetVector<Real>(block, "mu");
+    std::vector<Real> sigma_v = pin->GetVector<Real>(block, "sigma");
+
+    // Optional: LJ epsilon and internal DOF (default to monatomic hard-sphere)
+    std::vector<Real> eps_v(nspecies, 0.0);
+    std::vector<Real> dof_v(nspecies, 3.0);
+    if (pin->DoesParameterExist(block, "eps")) eps_v = pin->GetVector<Real>(block, "eps");
+    if (pin->DoesParameterExist(block, "dof")) dof_v = pin->GetVector<Real>(block, "dof");
+
+    PARTHENON_REQUIRE(static_cast<int>(mu_v.size()) == nspecies,
+                      "drag/full mu must have nspecies entries");
+    PARTHENON_REQUIRE(static_cast<int>(sigma_v.size()) == nspecies,
+                      "drag/full sigma must have nspecies entries");
+
+    for (int n = 0; n < nspecies; ++n) {
+      h_mu(n) = mu_v[n];
+      h_sigma(n) = sigma_v[n];
+      h_eps(n) = eps_v[n];
+      h_dof(n) = dof_v[n];
+    }
+    mu_s.DeepCopy(h_mu);
+    sigma_s.DeepCopy(h_sigma);
+    eps_s.DeepCopy(h_eps);
+    dof_s.DeepCopy(h_dof);
+  }
+};
+
+//----------------------------------------------------------------------------------------
+std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
+                                            const ArtemisUtils::Constants &constants);
 
 template <Coordinates GEOM>
 TaskStatus DragSource(MeshData<Real> *md, const Real time, const Real dt);

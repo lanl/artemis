@@ -16,8 +16,13 @@
 // Parthenon includes
 #include <parthenon/package.hpp>
 
+// KokkosKernels batched LU
+#include <KokkosBatched_Getrf.hpp>
+#include <KokkosBatched_Getrs.hpp>
+
 // Artemis includes
 #include "artemis.hpp"
+#include "collision_integrals.hpp"
 #include "drag.hpp"
 #include "geometry/geometry.hpp"
 #include "utils/artemis_utils.hpp"
@@ -439,22 +444,24 @@ TaskStatus SimpleDragSourceImpl(MeshData<Real> *md, const Real time, const Real 
   return TaskStatus::complete;
 }
 
-template <GasDragModel GD, DustDragModel DD>
 TaskStatus CoupleTwoFluids(MeshData<Real> *md, const Real dt) {
   PARTHENON_INSTRUMENT
   using parthenon::MakePackDescriptor;
   using TE = parthenon::TopologicalElement;
-
-  constexpr int NMAX = 2;
 
   auto pm = md->GetParentPointer();
   auto &resolved_pkgs = pm->resolved_packages;
 
   // Extract gas package and params
   auto &gas_pkg = pm->packages.Get("gas");
-  const auto &eos_d = gas_pkg->template Param<EOS>("eos_d");
+  const auto eos_d = gas_pkg->template Param<ParArray1D<EOS>>("eos_d");
   const auto dflr_gas = gas_pkg->template Param<Real>("dfloor");
   const auto sieflr_gas = gas_pkg->template Param<Real>("siefloor");
+  const auto de_switch = gas_pkg->template Param<Real>("de_switch");
+
+  // Extract coupling params
+  auto &drag_pkg = pm->packages.Get("drag");
+  const auto &fcp = drag_pkg->template Param<FullCouplingParams>("full_coupling_params");
 
   // Packing and indexing
   static auto desc = MakePackDescriptor<gas::cons::momentum, gas::cons::total_energy,
@@ -465,44 +472,90 @@ TaskStatus CoupleTwoFluids(MeshData<Real> *md, const Real dt) {
   const auto jb = md->GetBoundsJ(IndexDomain::interior);
   const auto kb = md->GetBoundsK(IndexDomain::interior);
 
+  // Device copies of species properties
+  auto mu_s = fcp.mu_s;
+  auto sigma_s = fcp.sigma_s;
+  auto eps_s = fcp.eps_s;
+  auto dof_s = fcp.dof_s;
+  const GasDragModel cmodel = fcp.model;
+
   parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "Couple2Fluids", DevExecSpace(), 0, md->NumBlocks() - 1, kb.s,
-      kb.e, jb.s, jb.e, ib.s, ib.e,
+      DEFAULT_LOOP_PATTERN, "CoupleTwoFluids", DevExecSpace(), 0, md->NumBlocks() - 1,
+      kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
-        if (vmesh.GetSize(b, gas::cons::density()) <= 1) return;
+        if (vmesh.GetSize(b, gas::cons::density()) < 2) return;
 
-        const int ni = vmesh(b, gas::cons::density(0)).sparse_id;
-        const int nj = vmesh(b, gas::cons::density(1)).sparse_id;
-
-        const Real &di = vmesh(b, gas::cons::density(0), k, j, i);
-        const Real &dj = vmesh(b, gas::cons::density(1), k, j, i);
-        const Real mui = 0.5;
-        const Real muj = 1.0 - mui;
-
-        // coupling rate
-        const Real a = 10.0 * dj;
-
-        std::array<Real, 3> dv{0.0};
+        // --- Extract species state ---
+        // Species 0
+        Real &d0 = vmesh(b, gas::cons::density(0), k, j, i);
+        Real &e0 = vmesh(b, gas::cons::total_energy(0), k, j, i);
+        d0 = std::max(d0, dflr_gas);
         std::array<Real, 3> hx{1.0, 1.0, 1.0};
-        std::array<Real, 3> dv0{0.0};
-        std::array<Real, 3> dv1{0.0};
-        Real dE = 0.0;
+        Real sie0 = ArtemisUtils::DualEnergySIE(vmesh, b, 0, k, j, i, de_switch, hx);
+        sie0 = std::max(sie0, sieflr_gas);
+        const Real T0 = eos_d(0).TemperatureFromDensityInternalEnergy(d0, sie0);
+
+        // Species 1
+        Real &d1 = vmesh(b, gas::cons::density(1), k, j, i);
+        Real &e1 = vmesh(b, gas::cons::total_energy(1), k, j, i);
+        d1 = std::max(d1, dflr_gas);
+        Real sie1 = ArtemisUtils::DualEnergySIE(vmesh, b, 1, k, j, i, de_switch, hx);
+        sie1 = std::max(sie1, sieflr_gas);
+        const Real T1 = eos_d(1).TemperatureFromDensityInternalEnergy(d1, sie1);
+
+        // --- Momentum coupling ---
+        // Compute Chapman-Cowling drag coefficient K_01 [mass/(vol*time)]
+        const Real T_pair = 0.5 * (T0 + T1);
+        const Real K01 =
+            CollisionIntegrals::DragCoeff(cmodel, mu_s(0), mu_s(1), sigma_s(0),
+                                          sigma_s(1), eps_s(0), eps_s(1), d0, d1, T_pair);
+
+        // Implicit velocity relaxation: dv/dt = K/rho * (v_other - v)
+        // Solve exactly for dt: delta_v = K*dt*(v1-v0) / (1 + K*dt*(1/d0+1/d1))
+        const Real alpha = K01 * dt;
+        const Real denom = 1.0 + alpha * (1.0 / d0 + 1.0 / d1);
+
         for (int d = 0; d < 3; d++) {
-          const Real vj = vmesh(b, gas::cons::momentum(VI(1, d)), k, j, i) / dj;
-          const Real vi = vmesh(b, gas::cons::momentum(VI(0, d)), k, j, i) / di;
-          const Real dv = vj - vi;
-          const Real dvi = a / (1. + 2 * a) * dv;
-          const Real dvj = -a / (1. + 2 * a) * dv;
-          // Reconstruct vj - vi
-          dv[d] = (vj - vi) + (dvj - dvi);
+          Real &p0 = vmesh(b, gas::cons::momentum(VI(0, d)), k, j, i);
+          Real &p1 = vmesh(b, gas::cons::momentum(VI(1, d)), k, j, i);
+          const Real v0 = p0 / d0;
+          const Real v1 = p1 / d1;
+          const Real dv = (v1 - v0) * alpha / denom;
+          const Real dm0 = d0 * dv;  // momentum gained by species 0
+          const Real dm1 = -d1 * dv; // momentum lost by species 1
+          p0 += dm0;
+          p1 += dm1;
+          // Energy: work done by drag force (conservative, dE = F * v_mid)
+          const Real v0n = p0 / d0;
+          const Real v1n = p1 / d1;
+          e0 += 0.5 * (v0 + v0n) * dm0;
+          e1 += 0.5 * (v1 + v1n) * dm1;
         }
-        vmesh(b, gas::cons::momentum(VI(0, d)), k, j, i) += di * dv0[d];
-        vmesh(b, gas::cons::momentum(VI(1, d)), k, j, i) += dj * dv1[d];
+        e0 = std::max(e0, d0 * sieflr_gas);
+        e1 = std::max(e1, d1 * sieflr_gas);
+
+        // --- Thermal (energy) coupling ---
+        // Chapman-Cowling thermal relaxation: dT/dt = nu_E*(T_other - T)
+        const Real cv0 = eos_d(0).SpecificHeatFromDensityTemperature(d0, T0);
+        const Real cv1 = eos_d(1).SpecificHeatFromDensityTemperature(d1, T1);
+        const Real nu_E = CollisionIntegrals::ThermalRelaxRate(
+            cmodel, mu_s(0), mu_s(1), sigma_s(0), sigma_s(1), eps_s(0), eps_s(1),
+            dof_s(0), dof_s(1), d0, d1, T_pair);
+        const Real beta = nu_E * dt;
+        const Real Cdenom =
+            1.0 + beta * (d0 * cv0 + d1 * cv1) / (d0 * cv0 * d1 * cv1 + Fuzz<Real>());
+        const Real dT = beta * (T1 - T0) / Cdenom;
+        const Real dE0 = d0 * cv0 * dT;
+        const Real dE1 = -d1 * cv1 * dT;
+        vmesh(b, gas::cons::total_energy(0), k, j, i) += dE0;
+        vmesh(b, gas::cons::total_energy(1), k, j, i) += dE1;
+        // Keep internal energy in sync for the dual-energy switch
+        vmesh(b, gas::cons::internal_energy(0), k, j, i) += dE0;
+        vmesh(b, gas::cons::internal_energy(1), k, j, i) += dE1;
       });
   return TaskStatus::complete;
 }
 
-template <GasDragModel GD, DustDragModel DD>
 TaskStatus CoupleNFluids(MeshData<Real> *md, const int nmax, const Real dt) {
   PARTHENON_INSTRUMENT
   using parthenon::MakePackDescriptor;
@@ -512,9 +565,19 @@ TaskStatus CoupleNFluids(MeshData<Real> *md, const int nmax, const Real dt) {
 
   // Extract gas package and params
   auto &gas_pkg = pm->packages.Get("gas");
-  const auto &eos_d = gas_pkg->template Param<EOS>("eos_d");
+  const auto eos_d = gas_pkg->template Param<ParArray1D<EOS>>("eos_d");
   const auto dflr_gas = gas_pkg->template Param<Real>("dfloor");
   const auto sieflr_gas = gas_pkg->template Param<Real>("siefloor");
+  const auto de_switch = gas_pkg->template Param<Real>("de_switch");
+
+  // Extract coupling params
+  auto &drag_pkg = pm->packages.Get("drag");
+  const auto &fcp = drag_pkg->template Param<FullCouplingParams>("full_coupling_params");
+  auto mu_s = fcp.mu_s;
+  auto sigma_s = fcp.sigma_s;
+  auto eps_s = fcp.eps_s;
+  auto dof_s = fcp.dof_s;
+  const GasDragModel cmodel = fcp.model;
 
   // Packing and indexing
   static auto desc = MakePackDescriptor<gas::cons::momentum, gas::cons::total_energy,
@@ -534,55 +597,185 @@ TaskStatus CoupleNFluids(MeshData<Real> *md, const int nmax, const Real dt) {
 
   const int ncells1 = iu - il + 1;
 
+  // Scratch: velocity/temperature per species (nmax each), plus LU system (nmax x nmax)
+  // We process one spatial direction at a time; thermal solve is a separate nmax rhs.
+  // Layout: vel_n[ncells1, nmax], T_n[ncells1, nmax], rho_n[ncells1, nmax],
+  //         A[ncells1, nmax, nmax], IPIV[ncells1, nmax], rhs[ncells1, nmax]
   const int scr_level = 1;
-  const int scr_size = ScratchPad2D<int>::shmem_size(ncells1, nmax)          // ids
-                       + ScratchPad2D<Real>::shmem_size(ncells1, nmax) +     // rhs
-                       ScratchPad3D<Real>::shmem_size(ncells1, nmax, nmax) + // Matrix
-                       ScratchPad3D<int>::shmem_size(ncells1, nmax, nmax);   // Pivots
+  const int scr_size =
+      ScratchPad2D<Real>::shmem_size(ncells1, nmax) * 4     // vel, T, rho, rhs
+      + ScratchPad3D<Real>::shmem_size(ncells1, nmax, nmax) // A
+      + ScratchPad2D<int>::shmem_size(ncells1, nmax);       // IPIV
 
   parthenon::par_for_outer(
       DEFAULT_OUTER_LOOP_PATTERN, "CoupleNFluids", DevExecSpace(), scr_size, scr_level, 0,
       md->NumBlocks() - 1, kl, ku, jl, ju,
       KOKKOS_LAMBDA(parthenon::team_mbr_t mbr, const int b, const int k, const int j) {
-        const int nmax = vmesh.GetSize(b, gas::cons::density());
-        if (nmax <= 1) return;
-        // Could call N=2
-        ScratchPad2D<int> ids(mbr.team_scratch(scr_level), ncells1, nmax);
+        const int ns = vmesh.GetSize(b, gas::cons::density());
+        if (ns <= 1) return;
+
+        // Allocate scratch
+        ScratchPad2D<Real> vel_s(mbr.team_scratch(scr_level), ncells1, nmax);
+        ScratchPad2D<Real> T_s(mbr.team_scratch(scr_level), ncells1, nmax);
+        ScratchPad2D<Real> rho_s(mbr.team_scratch(scr_level), ncells1, nmax);
         ScratchPad2D<Real> rhs(mbr.team_scratch(scr_level), ncells1, nmax);
         ScratchPad3D<Real> A(mbr.team_scratch(scr_level), ncells1, nmax, nmax);
         ScratchPad2D<int> IPIV(mbr.team_scratch(scr_level), ncells1, nmax);
 
-        // Fill matrices
-        parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, mbr, il, iu,
-                                 [&](const int i) {
-                                   // Fill
-                                 });
-        mbr.team_barrier();
+        // -----------------------------------------------------------------
+        // Fill: load species state and assemble momentum coupling system.
+        // We solve each spatial direction independently with the same K_ij matrix.
+        // The system is:
+        //   (I + dt * K_hat) * v_new = v_old
+        // where K_hat_{nn} = sum_{m!=n} K_nm / rho_n
+        //       K_hat_{nm} = -K_nm / rho_n   (m != n)
+        // This is solved direction-by-direction by reusing A (same matrix per direction).
+        // -----------------------------------------------------------------
 
-        // Solve using LU
+        // Step 1: load densities, temperatures, floor
         parthenon::par_for_inner(
             DEFAULT_INNER_LOOP_PATTERN, mbr, il, iu, [&](const int i) {
-              // Need to be a slice up to this blocks actual nmax
-              auto A_ = Kokkos::subview(A, i, Kokkos::ALL, Kokkos::ALL);
-              auto IPIV_ = Kokkos::subview(IPIV, i, Kokkos::ALL);
-              auto RHS_ = Kokkos::subview(rhs, i, Kokkos::ALL);
+              std::array<Real, 3> hx{1.0, 1.0, 1.0};
+              for (int n = 0; n < ns; ++n) {
+                Real &dens = vmesh(b, gas::cons::density(n), k, j, i);
+                dens = std::max(dens, dflr_gas);
+                rho_s(i - il, n) = dens;
+                Real sie =
+                    ArtemisUtils::DualEnergySIE(vmesh, b, n, k, j, i, de_switch, hx);
+                sie = std::max(sie, sieflr_gas);
+                T_s(i - il, n) = eos_d(n).TemperatureFromDensityInternalEnergy(dens, sie);
+              }
+            });
+        mbr.team_barrier();
 
+        // Step 2: build coupling matrix A and solve for each momentum direction
+        for (int dir = 0; dir < 3; ++dir) {
+          parthenon::par_for_inner(
+              DEFAULT_INNER_LOOP_PATTERN, mbr, il, iu, [&](const int i) {
+                const int li = i - il;
+                // Build A (identity + dt * K_hat) and rhs (= v_old)
+                for (int n = 0; n < ns; ++n) {
+                  const Real rho_n = rho_s(li, n);
+                  const Real T_n = T_s(li, n);
+                  Real &p = vmesh(b, gas::cons::momentum(VI(n, dir)), k, j, i);
+                  const Real v_n = p / rho_n;
+                  vel_s(li, n) = v_n;
+                  rhs(li, n) = v_n;
+                  // Diagonal: 1 + sum_m K_nm / rho_n
+                  Real diag = 1.0;
+                  for (int m = 0; m < ns; ++m) {
+                    if (m == n) continue;
+                    const Real T_pair = 0.5 * (T_n + T_s(li, m));
+                    const Real K_nm = CollisionIntegrals::DragCoeff(
+                        cmodel, mu_s(n), mu_s(m), sigma_s(n), sigma_s(m), eps_s(n),
+                        eps_s(m), rho_n, rho_s(li, m), T_pair);
+                    diag += dt * K_nm / rho_n;
+                    A(li, n, m) = -dt * K_nm / rho_n;
+                  }
+                  A(li, n, n) = diag;
+                  IPIV(li, n) = 0;
+                }
+              });
+          mbr.team_barrier();
+
+          // Solve A * v_new = v_old
+          parthenon::par_for_inner(
+              DEFAULT_INNER_LOOP_PATTERN, mbr, il, iu, [&](const int i) {
+                const int li = i - il;
+                auto A_ = Kokkos::subview(A, li, Kokkos::ALL, Kokkos::ALL);
+                auto IPIV_ = Kokkos::subview(IPIV, li, Kokkos::ALL);
+                auto RHS_ = Kokkos::subview(rhs, li, Kokkos::ALL);
+                KokkosBatched::SerialGetrf<KokkosBatched::Algo::Getrf::Unblocked>::invoke(
+                    A_, IPIV_);
+                KokkosBatched::SerialGetrs<
+                    KokkosBatched::Trans::NoTranspose,
+                    KokkosBatched::Algo::Getrs::Unblocked>::invoke(A_, IPIV_, RHS_);
+              });
+          mbr.team_barrier();
+
+          // Apply momentum and kinetic energy updates
+          parthenon::par_for_inner(
+              DEFAULT_INNER_LOOP_PATTERN, mbr, il, iu, [&](const int i) {
+                const int li = i - il;
+                for (int n = 0; n < ns; ++n) {
+                  const Real rho_n = rho_s(li, n);
+                  const Real v_old = vel_s(li, n);
+                  const Real v_new = rhs(li, n); // solution overwrites rhs
+                  const Real dv = v_new - v_old;
+                  vmesh(b, gas::cons::momentum(VI(n, dir)), k, j, i) += rho_n * dv;
+                  // Kinetic energy change: 0.5*rho*(v_new^2 - v_old^2)
+                  vmesh(b, gas::cons::total_energy(n), k, j, i) +=
+                      0.5 * rho_n * (v_new * v_new - v_old * v_old);
+                }
+              });
+          mbr.team_barrier();
+        } // dir loop
+
+        // -----------------------------------------------------------------
+        // Thermal relaxation: same implicit pattern with scalar K_E matrix
+        // -----------------------------------------------------------------
+        parthenon::par_for_inner(
+            DEFAULT_INNER_LOOP_PATTERN, mbr, il, iu, [&](const int i) {
+              const int li = i - il;
+              for (int n = 0; n < ns; ++n) {
+                const Real rho_n = rho_s(li, n);
+                const Real T_n = T_s(li, n);
+                const Real cv_n = eos_d(n).SpecificHeatFromDensityTemperature(rho_n, T_n);
+                rhs(li, n) = T_n;
+                Real diag = 1.0;
+                for (int m = 0; m < ns; ++m) {
+                  if (m == n) continue;
+                  const Real T_pair = 0.5 * (T_n + T_s(li, m));
+                  const Real rho_m = rho_s(li, m);
+                  const Real cv_m =
+                      eos_d(m).SpecificHeatFromDensityTemperature(rho_m, T_s(li, m));
+                  const Real nu_E = CollisionIntegrals::ThermalRelaxRate(
+                      cmodel, mu_s(n), mu_s(m), sigma_s(n), sigma_s(m), eps_s(n),
+                      eps_s(m), dof_s(n), dof_s(m), rho_n, rho_m, T_pair);
+                  // dT_n/dt = nu_E/cv_n * (T_m - T_n)
+                  const Real rate = dt * nu_E / (rho_n * cv_n + Fuzz<Real>());
+                  diag += rate;
+                  A(li, n, m) = -rate;
+                }
+                A(li, n, n) = diag;
+                IPIV(li, n) = 0;
+              }
+            });
+        mbr.team_barrier();
+
+        parthenon::par_for_inner(
+            DEFAULT_INNER_LOOP_PATTERN, mbr, il, iu, [&](const int i) {
+              const int li = i - il;
+              auto A_ = Kokkos::subview(A, li, Kokkos::ALL, Kokkos::ALL);
+              auto IPIV_ = Kokkos::subview(IPIV, li, Kokkos::ALL);
+              auto RHS_ = Kokkos::subview(rhs, li, Kokkos::ALL);
               KokkosBatched::SerialGetrf<KokkosBatched::Algo::Getrf::Unblocked>::invoke(
                   A_, IPIV_);
-
-              // Solve A * x = b with getrs
               KokkosBatched::SerialGetrs<
                   KokkosBatched::Trans::NoTranspose,
                   KokkosBatched::Algo::Getrs::Unblocked>::invoke(A_, IPIV_, RHS_);
             });
         mbr.team_barrier();
 
-        // Transfer
-        parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, mbr, il, iu,
-                                 [&](const int i) {
-                                   // Fill
-                                 });
-      });
+        // Apply temperature change as internal/total energy update
+        parthenon::par_for_inner(
+            DEFAULT_INNER_LOOP_PATTERN, mbr, il, iu, [&](const int i) {
+              const int li = i - il;
+              for (int n = 0; n < ns; ++n) {
+                const Real rho_n = rho_s(li, n);
+                const Real T_old = T_s(li, n);
+                const Real T_new = rhs(li, n);
+                const Real cv_n =
+                    eos_d(n).SpecificHeatFromDensityTemperature(rho_n, T_old);
+                const Real dE = rho_n * cv_n * (T_new - T_old);
+                vmesh(b, gas::cons::total_energy(n), k, j, i) += dE;
+                vmesh(b, gas::cons::internal_energy(n), k, j, i) += dE;
+                // Floor total energy
+                vmesh(b, gas::cons::total_energy(n), k, j, i) = std::max(
+                    vmesh(b, gas::cons::total_energy(n), k, j, i), rho_n * sieflr_gas);
+              }
+            });
+      }); // par_for_outer
   return TaskStatus::complete;
 }
 

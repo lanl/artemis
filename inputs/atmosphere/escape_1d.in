@@ -7,28 +7,38 @@
 # bound but gets entrained by species 0 through drag.
 #
 # Grid: 1D spherical, r in [r0, 10*r0] with 512 uniform cells.
-# Units: SI-like code units where G = 1, M_star = 1, r0 = 1.
+#
+# Units: SCALEFREE (artemis/physical_units defaults to scalefree, so
+# G = kB = m_u = 1 in code units).  We further pick GM = r0 = 1, so:
+#   v_esc^2     = 2 GM/r0       = 2
+#   t_dyn       = r0 / v_esc    = 1/sqrt(2) ~ 0.71
+#   c_s,iso^2   = kB T / (mu m_u) = T0 / mu   (T "in code units", NOT Kelvin)
+#   escape par  lambda_n        = GM mu_n / (kB T0 r0 / m_u) = mu_n / T0
+#
+# Choosing T0 = 0.2 gives:
+#   lambda_H = 5   (Parker wind, sonic point r_c = GM/(2 c_s^2) = 2.5)
+#   lambda_O = 80  (heavy species strongly bound, dragged out by H wind)
 # =============================================================================
 
 <artemis>
   problem    = escape_1d
-  coordinates = spherical1D
-
+  coordinates = spherical
+  
 <parthenon/job>
   problem_id = escape_1d
 
 <parthenon/time>
   nlim      = -1
-  tlim      = 10.0        # run to t = 10 t_dyn (r0/v_esc)
+  tlim      = 10.0        # ~14 t_dyn (t_dyn = r0/v_esc = 1/sqrt(2))
   integrator = rk2
-  ncycle_out = 100
+  ncycle_out = 1
 
 <parthenon/mesh>
   nx1     = 512
   x1min   = 1.0           # inner radius r0
   x1max   = 10.0          # outer radius
-  ix1_bc  = user          # custom inner BC (hydrostatic inflow)
-  ox1_bc  = user          # custom outer BC (outflow)
+  ix1_bc  = hydrostatic          # custom inner BC (hydrostatic inflow)
+  ox1_bc  = outflow         # custom outer BC (outflow)
 
   nx2 = 1
   x2min = 0.0
@@ -37,18 +47,20 @@
   ox2_bc = outflow
 
   nx3 = 1
-  x3min = 0.0
-  x3max = 6.28318530717959
+  x3min = -0.5 
+  x3max = 0.5 
   ix3_bc = outflow
   ox3_bc = outflow
 
 <parthenon/meshblock>
-  nx1 = 64
+  nx1 = 512
+  nx2 = 1
+  nx3 = 1
 
 <parthenon/output0>
   file_type  = hdf5
   dt         = 0.1
-  variables  = gas.prim.density, gas.prim.velocity, gas.prim.sie
+  variables  = gas.prim.density, gas.prim.velocity, gas.prim.sie, gas.prim.temperature, gas.prim.pressure
 
 <parthenon/output1>
   file_type  = hst
@@ -57,9 +69,8 @@
 # Gas: two-species ideal gas
 <gas>
   nspecies = 2
-  gamma    = 1.6666666667
-  mu       = 1.0            # shared default (overridden per species)
-  species_mu = 1.0 16.0     # H, O [AMU]
+  gamma    = 1.6666666667, 1.6666666667
+  mu = 1.0, 16.0     # H, O [AMU]
   dfloor   = 1.0e-12
   siefloor = 1.0e-12
 
@@ -75,13 +86,16 @@
 <drag/full>
   collision_model = hard_sphere
   # mu [AMU], sigma [code length = r0], dof (H: 5 for diatomic, O: 3 monatomic)
-  mu    = 1.0  16.0
-  sigma = 1.0e-3  1.0e-3   # collision diameters ~1e-3 r0 (calibrate for your scenario)
-  dof   = 5.0  3.0
+  mu    = 1.0 , 16.0
+  sigma = 1.0e-3,  1.0e-3   # collision diameters ~1e-3 r0 (calibrate for your scenario)
+  dof   = 5.0,  3.0
 
 # Problem parameters
 <problem>
-  T0    = 1.0e4    # isothermal temperature [K]
+  # Isothermal temperature in CODE units (scalefree: kB = m_u = 1, so the
+  # natural temperature scale is GM m_u/(kB r0) = 1).
+  # T0 = 0.2 yields lambda_H = mu_H/T0 = 5 (Parker wind, r_c = 2.5).
+  T0    = 0.2     # code units (NOT Kelvin)
   r0    = 1.0      # inner radius [code length]
   gm    = 1.0      # G*M [code units]
   rho0_0 = 1.0e-4  # base density species 0 (H) at r0

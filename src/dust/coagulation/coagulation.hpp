@@ -16,6 +16,11 @@
 #ifndef DUST_COAGULATION_COAGULATION_HPP_
 #define DUST_COAGULATION_COAGULATION_HPP_
 
+#include <Kokkos_Core.hpp>
+
+#include "KokkosBatched_LU_Decl.hpp"
+#include "KokkosBatched_SolveLU_Decl.hpp"
+
 #include "utils/artemis_utils.hpp"
 #include "utils/units.hpp"
 using ArtemisUtils::VI;
@@ -82,6 +87,19 @@ struct CoagParams {
   int integrator;    // coag time integrator
   bool use_adaptive; // adaptive step size
   bool mom_coag;     // mom-preserving coagulation
+
+  // Backward-Euler implicit step controls (Part 1).
+  // When `implicit` is true, CoagulationOneCell takes a single implicit step
+  // for the dust number-density evolution over the coagulation dt instead of
+  // the explicit (possibly adaptive) substepping driven by `integrator` /
+  // `use_adaptive`. Velocities are advanced using the existing
+  // momentum-conserving update at the accepted implicit state.
+  bool implicit;       // use backward-Euler instead of explicit RK
+  int newton_max_iter; // max Newton iterations per cell
+  Real newton_tol;     // relative tolerance on Newton residual
+  Real newton_fd_eps;  // relative perturbation for FD Jacobian (unused with analytic J)
+  bool newton_verbose; // print per-iteration Newton diagnostics
+  int newton_jac_lag; // reuse factored Jacobian for this many Newton iters before rebuild
 
   int pgrid;        // dust grid
   Real chi;         // chi parameter
@@ -837,17 +855,436 @@ void SourceNQS3(const parthenon::team_mbr_t &mbr, const int &n, const int &nm1,
 }
 
 //----------------------------------------------------------------------------------------
+//! \fn  void Dust::Coagulation::BuildRateCache
+//  \brief Precompute collision rates for all active pairs (i,j) with i<=mimax.
+//         Rates are independent of number density so they need only be computed once
+//         per cell per implicit solve (they depend only on vel, stime, mass_grid, etc.).
+//         rcoag(i,j) = R^coag_{ij},  rfrag(i,j) = R^frag_{ij}, both stored symmetrically.
+template <typename RateView2D>
+KOKKOS_INLINE_FUNCTION void
+BuildRateCache(const parthenon::team_mbr_t &mbr, const int &nm1, const int &mimax,
+               const ScratchPad1D<Real> &vel, const ScratchPad1D<Real> &stime,
+               const StateParams &kernel, const ParArray1D<Real> &mass_grid,
+               const ParArray3D<Real> &coagR3D, const bool &surface,
+               const RateParams &rate, const RateView2D &rcoag, const RateView2D &rfrag) {
+  parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, mbr, 0, mimax, [&](const int i) {
+    for (int j = 0; j <= i; j++) {
+      const Real rc = CoagulationRate<DustInteractionType::Coagulation>(
+          i, j, nm1, kernel, vel, stime, mass_grid, coagR3D, surface, rate);
+      const Real rf = CoagulationRate<DustInteractionType::Fragmentation>(
+          i, j, nm1, kernel, vel, stime, mass_grid, coagR3D, surface, rate);
+      rcoag(i, j) = rc;
+      rcoag(j, i) = rc;
+      rfrag(i, j) = rf;
+      rfrag(j, i) = rf;
+    }
+  });
+  mbr.team_barrier();
+}
+
+//----------------------------------------------------------------------------------------
+//! \fn  void Dust::Coagulation::SourceFromCache
+//  \brief Evaluate the coagulation+fragmentation source using precomputed rate arrays.
+//         Replaces Source() inside the Newton loop; does not recompute CoagulationRate.
+template <typename RateView2D>
+KOKKOS_INLINE_FUNCTION void
+SourceFromCache(const parthenon::team_mbr_t &mbr, const int &nm1, const int &mimax,
+                const int &pgrid, const ScratchPad1D<Real> &source,
+                const ScratchPad1D<Real> &dustdens, const ParArray2D<int> &idx_largest,
+                const ParArray1D<Real> &mass_grid, const ParArray3D<Real> &coagR3D,
+                const ParArray3D<int> &Kijk_sym_ind, const ParArray3D<Real> &Kijk_sym,
+                const RateView2D &rcoag, const RateView2D &rfrag) {
+  parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, mbr, 0, nm1,
+                           [&](const int i) { source(i) = 0.0; });
+  mbr.team_barrier();
+  // Coagulation gain/loss.
+  parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, mbr, 0, mimax, [&](const int i) {
+    for (int j = 0; j <= i; j++) {
+      const Real val = dustdens(i) * dustdens(j) * rcoag(i, j);
+      for (int nz = 0; nz < 4; nz++) {
+        const int k = Kijk_sym_ind(i, j, nz);
+        if (k >= 0) Kokkos::atomic_add(&source(k), Kijk_sym(i, j, nz) * val);
+      }
+    }
+  });
+  mbr.team_barrier();
+  // Fragmentation redistribution.
+  parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, mbr, 0, nm1, [&](const int k) {
+    for (int j = k; j <= mimax; j++) {
+      Real val = 0.0;
+      for (int i2 = 0; i2 <= mimax; i2++)
+        for (int j2 = 0; j2 <= i2; j2++)
+          if (idx_largest(i2, j2) == j)
+            val +=
+                coagR3D(cidx::Aij, i2, j2) * dustdens(i2) * dustdens(j2) * rfrag(i2, j2);
+      source(k) += coagR3D(cidx::Pij, k, j) / mass_grid(k) * val;
+    }
+  });
+  mbr.team_barrier();
+  // Cratering small partner.
+  parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, mbr, 0, mimax, [&](const int j) {
+    Real sum0 = 0.0;
+    for (int i = j; i <= mimax; i++)
+      sum0 -= dustdens(i) * dustdens(j) * rfrag(i, j);
+    source(j) += sum0;
+  });
+  mbr.team_barrier();
+  // Cratering large partner + full fragmentation.
+  parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, mbr, 0, mimax, [&](const int i) {
+    Real sum0 = 0.0;
+    for (int j = 0; j <= i - pgrid - 1; j++)
+      sum0 += coagR3D(cidx::epsij, i, j) * dustdens(i) * dustdens(j) * rfrag(i, j);
+    if (i - pgrid - 1 >= 0) Kokkos::atomic_add(&source(i - 1), sum0);
+    sum0 = -sum0;
+    const int i1 = std::max(0, i - pgrid);
+    for (int j = i1; j <= i; j++)
+      sum0 -= dustdens(i) * dustdens(j) * rfrag(i, j);
+    Kokkos::atomic_add(&source(i), sum0);
+  });
+  mbr.team_barrier();
+}
+
+//----------------------------------------------------------------------------------------
+//! \fn  void Dust::Coagulation::AnalyticJacobian
+//  \brief Build J = I - dt * dS/dn analytically for the active block [0,nact_m1],
+//         treating all collision rates as frozen at their cached values.
+//
+//  dS_k/dn_q is derived by differentiating the bilinear products n_i*n_j in each
+//  source term. The rate factors (rcoag, rfrag, Kijk, Pij, epsij, Aij) are constants.
+template <typename JacView2D, typename RateView2D>
+KOKKOS_INLINE_FUNCTION void
+AnalyticJacobian(const parthenon::team_mbr_t &mbr, const int &nm1, const int &nact_m1,
+                 const int &pgrid, const ScratchPad1D<Real> &dustdens,
+                 const ParArray2D<int> &idx_largest, const ParArray1D<Real> &mass_grid,
+                 const ParArray3D<Real> &coagR3D, const ParArray3D<int> &Kijk_sym_ind,
+                 const ParArray3D<Real> &Kijk_sym, const RateView2D &rcoag,
+                 const RateView2D &rfrag, const Real &dt, const JacView2D &jac) {
+  // Initialize to identity.
+  parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, mbr, 0, nact_m1,
+                           [&](const int row) {
+                             for (int col = 0; col <= nact_m1; col++)
+                               jac(row, col) = (row == col) ? Real(1.0) : Real(0.0);
+                           });
+  mbr.team_barrier();
+
+  // Contribution from coagulation gain/loss (InitializeSource).
+  // S_k += Kijk*R^coag_{ij}*n_i*n_j  =>  dS_k/dn_q = Kijk*R^coag_{qj}*n_j (i=q term)
+  //                                                  + Kijk*R^coag_{iq}*n_i (j=q term,
+  //                                                  i!=j)
+  // When i==j the stored val=n_i^2 so d/dn_i = 2*n_i; we account for this by adding
+  // the n_j contribution twice (since n_j=n_i in that case).
+  parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, mbr, 0, nact_m1, [&](const int i) {
+    for (int j = 0; j <= i && j <= nact_m1; j++) {
+      const Real rij = rcoag(i, j);
+      const Real ni = dustdens(i), nj = dustdens(j);
+      for (int nz = 0; nz < 4; nz++) {
+        const int k = Kijk_sym_ind(i, j, nz);
+        if (k < 0 || k > nact_m1) continue;
+        const Real Kval = Kijk_sym(i, j, nz) * rij;
+        // Perturbing n_i: dS_k/dn_i += Kval * n_j
+        Kokkos::atomic_add(&jac(k, i), -dt * Kval * nj);
+        // Perturbing n_j (i!=j): dS_k/dn_j += Kval * n_i
+        if (i != j)
+          Kokkos::atomic_add(&jac(k, j), -dt * Kval * ni);
+        else
+          // i==j: product is n_i^2, d/dn_i = 2*n_i => add n_j=n_i once more
+          Kokkos::atomic_add(&jac(k, i), -dt * Kval * nj);
+      }
+    }
+  });
+  mbr.team_barrier();
+
+  // Contribution from FragmentationSource.
+  // S_k += Pij(k,j)/m_k * Aij(i2,j2)*rfrag(i2,j2)*n_i2*n_j2  for each (i2,j2) with idx==j
+  // => dS_k/dn_i2 += Pij(k,j)/m_k * Aij*rfrag * n_j2
+  //    dS_k/dn_j2 += Pij(k,j)/m_k * Aij*rfrag * n_i2  (i2!=j2)
+  parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, mbr, 0, nact_m1, [&](const int k) {
+    for (int j = k; j <= nact_m1; j++) {
+      const Real Pkj_mk = coagR3D(cidx::Pij, k, j) / mass_grid(k);
+      for (int i2 = 0; i2 <= nact_m1; i2++) {
+        for (int j2 = 0; j2 <= i2 && j2 <= nact_m1; j2++) {
+          if (idx_largest(i2, j2) != j) continue;
+          const Real coeff = Pkj_mk * coagR3D(cidx::Aij, i2, j2) * rfrag(i2, j2);
+          Kokkos::atomic_add(&jac(k, i2), -dt * coeff * dustdens(j2));
+          if (i2 != j2)
+            Kokkos::atomic_add(&jac(k, j2), -dt * coeff * dustdens(i2));
+          else
+            Kokkos::atomic_add(&jac(k, i2), -dt * coeff * dustdens(j2));
+        }
+      }
+    }
+  });
+  mbr.team_barrier();
+
+  // Contribution from CrateringSource.
+  // S_j += -sum_{i>=j} rfrag(i,j)*n_i*n_j
+  // dS_j/dn_i (i!=j): +rfrag(i,j)*n_j   (becomes +dt in J)
+  // dS_j/dn_j:        +sum_{i>=j} rfrag(i,j)*n_i
+  parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, mbr, 0, nact_m1, [&](const int j) {
+    Real dSj_dnjj = 0.0;
+    for (int i = j; i <= nact_m1; i++) {
+      const Real rij = rfrag(i, j);
+      if (i != j) Kokkos::atomic_add(&jac(j, i), dt * rij * dustdens(j));
+      dSj_dnjj += rij * dustdens(i);
+    }
+    Kokkos::atomic_add(&jac(j, j), dt * dSj_dnjj);
+  });
+  mbr.team_barrier();
+
+  // Contribution from FinalizeSource.
+  // Sub-term A: S_{i-1} += epsij(i,j)*rfrag(i,j)*n_i*n_j  for j <= i-pgrid-1
+  // Sub-term B: S_i     -= sum_{j=i1..i} rfrag(i,j)*n_i*n_j
+  parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, mbr, 0, nact_m1, [&](const int i) {
+    // Sub-term A: deposit into row i-1
+    for (int j = 0; j <= i - pgrid - 1 && j <= nact_m1; j++) {
+      const int krow = i - 1;
+      if (krow < 0 || krow > nact_m1) continue;
+      const Real coeff = coagR3D(cidx::epsij, i, j) * rfrag(i, j);
+      Kokkos::atomic_add(&jac(krow, i), -dt * coeff * dustdens(j));
+      Kokkos::atomic_add(&jac(krow, j), -dt * coeff * dustdens(i));
+    }
+    // Sub-term B: deposit into row i (negative source terms)
+    const int i1 = std::max(0, i - pgrid);
+    for (int j = i1; j <= i && j <= nact_m1; j++) {
+      const Real rij = rfrag(i, j);
+      Kokkos::atomic_add(&jac(i, i), dt * rij * dustdens(j));
+      if (i != j)
+        Kokkos::atomic_add(&jac(i, j), dt * rij * dustdens(i));
+      else
+        Kokkos::atomic_add(&jac(i, i), dt * rij * dustdens(j));
+    }
+  });
+  mbr.team_barrier();
+}
+
+//----------------------------------------------------------------------------------------
+//! \fn  void Dust::Coagulation::CoagulationOneCellImplicit
+//  \brief One backward-Euler implicit step over the coagulation dt.
+//
+//  Three performance optimizations over the naive FD-Jacobian approach:
+//  1. Rate caching: pairwise collision rates precomputed once before the Newton loop.
+//  2. Analytic Jacobian: J = I - dt*dS/dn built analytically from the bilinear source
+//     structure (rates frozen), replacing nact full Source() evaluations per iteration.
+//  3. Jacobian lagging: the factored Jacobian is reused for coag.newton_jac_lag Newton
+//     iterations before rebuilding, amortising the O(nact^2) Jacobian build cost.
+template <bool kDebugPrint, typename JacView2D, typename ResidView2D, typename RateView2D>
+KOKKOS_INLINE_FUNCTION int CoagulationOneCellImplicit(
+    parthenon::team_mbr_t const &mbr, const bool &surface, const Real & /*time*/,
+    const Real &dt, const StateParams &kernel, const ScratchPad1D<Real> &dustdens,
+    const ScratchPad1D<Real> &stime, const ScratchPad1D<Real> &vel, const int &nvel,
+    const ScratchPad1D<Real> &Q, const ScratchPad1D<Real> &nQs, const CoagParams &coag,
+    const CoagArrays &coag_arrays, const RateParams &rate,
+    const ScratchPad1D<Real> &source, const ScratchPad1D<Real> &n_new,
+    const ScratchPad1D<Real> & /*n_trial*/, const ScratchPad1D<Real> & /*src_pert*/,
+    const ScratchPad1D<Real> &n_old, const ResidView2D &residual, const JacView2D &jac,
+    const RateView2D &rcoag, const RateView2D &rfrag) {
+  const int nm1 = coag.nm - 1;
+  const int &pgrid = coag.pgrid;
+  const Real &dfloor = coag.dfloor;
+  const Real &chi = coag.chi;
+  const bool &do_momentum_conserving_update = coag.mom_coag;
+  const int max_iter = coag.newton_max_iter;
+  const Real tol = coag.newton_tol;
+  const int jac_lag = std::max(1, coag.newton_jac_lag);
+
+  auto &idx_largest = coag_arrays.idx_largest;
+  auto &mass_grid = coag_arrays.mass_grid;
+  auto &coagR3D = coag_arrays.coagR3D;
+  auto &Kijk_sym_ind = coag_arrays.Kijk_sym_ind;
+  auto &Kijk_sym = coag_arrays.Kijk_sym;
+
+  // Convert to number densities and stash initial state.
+  ConvertToNumberDensity(mbr, nm1, dustdens, mass_grid, dfloor);
+  parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, mbr, 0, nm1, [&](const int i) {
+    n_old(i) = dustdens(i);
+    n_new(i) = dustdens(i);
+  });
+  mbr.team_barrier();
+
+  constexpr int pgrid_pad_extra = 2;
+  constexpr Real kStagnFactor = 0.9;
+
+  // Precompute rates once over the initial active range.
+  // FindMIMax returns INT_MIN identity when no bin is populated; clamp to -1 to signal.
+  const int mimax_init_raw = FindMIMax(mbr, nm1, n_new, mass_grid, dfloor);
+  if (mimax_init_raw < 0) {
+    // Cell has no populated bins; nothing to do.
+    ConvertToVolumeDensity(mbr, nm1, dustdens, mass_grid);
+    return 0;
+  }
+  const int nact_cache_m1 = std::min(nm1, mimax_init_raw + pgrid + pgrid_pad_extra);
+  BuildRateCache(mbr, nm1, nact_cache_m1, vel, stime, kernel, mass_grid, coagR3D, surface,
+                 rate, rcoag, rfrag);
+
+  int iter = 0;
+  Real last_res_norm = 0.0;
+  Real prev_res_norm = std::numeric_limits<Real>::max();
+  int last_nact = 0;
+  bool stagnated = false;
+  int jac_age = jac_lag; // force build on first iteration
+  int last_nact_m1 = -1; // track nact from previous iter to detect size change
+
+  for (iter = 0; iter < max_iter; iter++) {
+    // Active subsystem size from current iterate.
+    const int mimax_raw = FindMIMax(mbr, nm1, n_new, mass_grid, dfloor);
+    if (mimax_raw < 0) break; // all bins collapsed below floor
+    const int mimax = mimax_raw;
+    const int nact_m1 = std::min(nm1, mimax + pgrid + pgrid_pad_extra);
+    const int nact = nact_m1 + 1;
+
+    // Evaluate source using cached rates.
+    parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, mbr, 0, nm1,
+                             [&](const int i) { dustdens(i) = n_new(i); });
+    mbr.team_barrier();
+    SourceFromCache(mbr, nm1, nact_m1, pgrid, source, dustdens, idx_largest, mass_grid,
+                    coagR3D, Kijk_sym_ind, Kijk_sym, rcoag, rfrag);
+
+    // Residual: ||F||_inf / ||n||_inf.
+    Real F_inf = 0.0, n_inf = 0.0;
+    parthenon::par_reduce_inner(
+        parthenon::inner_loop_pattern_ttr_tag, mbr, 0, nact_m1,
+        [&](const int i, Real &lmax) {
+          const Real Ri = n_new(i) - n_old(i) - dt * source(i);
+          residual(i, 0) = Ri;
+          const Real ai = std::abs(Ri);
+          if (ai > lmax) lmax = ai;
+        },
+        Kokkos::Max<Real>(F_inf));
+    parthenon::par_reduce_inner(
+        parthenon::inner_loop_pattern_ttr_tag, mbr, 0, nact_m1,
+        [&](const int i, Real &lmax) {
+          const Real ai = std::abs(n_new(i));
+          if (ai > lmax) lmax = ai;
+        },
+        Kokkos::Max<Real>(n_inf));
+    const Real res_norm = F_inf / std::max(n_inf, std::numeric_limits<Real>::min());
+    last_res_norm = res_norm;
+    last_nact = nact;
+
+    if (kDebugPrint) {
+      Kokkos::single(Kokkos::PerTeam(mbr), [&]() {
+        printf("[coag-impl] iter=%d nact=%d mimax=%d res=%.3e tol=%.3e jac_age=%d\n",
+               iter, nact, mimax, res_norm, tol, jac_age);
+      });
+    }
+    if (res_norm < tol) break;
+    if (iter > 0 && res_norm > kStagnFactor * prev_res_norm) {
+      stagnated = true;
+      if (kDebugPrint) {
+        Kokkos::single(Kokkos::PerTeam(mbr), [&]() {
+          printf("[coag-impl] stagnation detected res=%.3e prev=%.3e iter=%d\n", res_norm,
+                 prev_res_norm, iter);
+        });
+      }
+      break;
+    }
+    prev_res_norm = res_norm;
+
+    // Build analytic Jacobian if the lag has expired or nact grew; otherwise reuse.
+    auto jac_act = Kokkos::subview(jac, Kokkos::pair<int, int>(0, nact),
+                                   Kokkos::pair<int, int>(0, nact));
+    auto rhs_act =
+        Kokkos::subview(residual, Kokkos::pair<int, int>(0, nact), Kokkos::ALL());
+    if (jac_age >= jac_lag || nact_m1 > last_nact_m1) {
+      AnalyticJacobian(mbr, nm1, nact_m1, pgrid, dustdens, idx_largest, mass_grid,
+                       coagR3D, Kijk_sym_ind, Kijk_sym, rcoag, rfrag, dt, jac);
+      KokkosBatched::TeamLU<parthenon::team_mbr_t,
+                            KokkosBatched::Algo::LU::Unblocked>::invoke(mbr, jac_act);
+      mbr.team_barrier();
+      jac_age = 0;
+      last_nact_m1 = nact_m1;
+    }
+
+    // Solve with the (possibly lagged) factored Jacobian.
+    parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, mbr, 0, nact_m1,
+                             [&](const int i) { residual(i, 0) = -residual(i, 0); });
+    mbr.team_barrier();
+    KokkosBatched::TeamSolveLU<parthenon::team_mbr_t, KokkosBatched::Trans::NoTranspose,
+                               KokkosBatched::Algo::Trsm::Unblocked>::invoke(mbr, jac_act,
+                                                                             rhs_act);
+    mbr.team_barrier();
+
+    // Newton update with non-negativity floor.
+    parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, mbr, 0, nact_m1,
+                             [&](const int i) {
+                               Real ni = n_new(i) + residual(i, 0);
+                               const Real nfloor = 0.01 * dfloor / mass_grid(i);
+                               if (ni < nfloor) ni = nfloor;
+                               n_new(i) = ni;
+                             });
+    mbr.team_barrier();
+    jac_age++;
+  }
+
+  if (kDebugPrint) {
+    Kokkos::single(Kokkos::PerTeam(mbr), [&]() {
+      const int iters_done = (iter < max_iter) ? iter + 1 : max_iter;
+      if (stagnated) {
+        printf("[coag-impl] STAGNATED after %d iters res=%.3e tol=%.3e nact=%d dt=%.3e\n",
+               iters_done, last_res_norm, tol, last_nact, dt);
+      } else if (iter >= max_iter) {
+        printf("[coag-impl] WARNING: hit max_iter=%d last_res=%.3e tol=%.3e nact=%d "
+               "dt=%.3e\n",
+               max_iter, last_res_norm, tol, last_nact, dt);
+      } else {
+        printf("[coag-impl] converged in %d iters res=%.3e nact=%d dt=%.3e\n", iters_done,
+               last_res_norm, last_nact, dt);
+      }
+    });
+  }
+
+  // Commit source = (n_new - n_old)/dt for UpdateVelocityNQ.
+  const Real inv_dt = 1.0 / dt;
+  parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, mbr, 0, nm1, [&](const int i) {
+    dustdens(i) = n_old(i);
+    source(i) = (n_new(i) - n_old(i)) * inv_dt;
+  });
+  mbr.team_barrier();
+
+  // Find mimax for momentum source (uses accepted state n_new).
+  const int mimax_final_raw = FindMIMax(mbr, nm1, n_new, mass_grid, dfloor);
+  const int mimax = (mimax_final_raw >= 0) ? mimax_final_raw : 0;
+
+  // Momentum-conserving velocity update at the accepted implicit state.
+  if (do_momentum_conserving_update) {
+    parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, mbr, 0, nm1,
+                             [&](const int i) { dustdens(i) = n_new(i); });
+    mbr.team_barrier();
+    for (int n = 0; n < nvel; n++) {
+      ZeroSourceNQ(mbr, n, nm1, Q, nQs, vel, kernel.nvel);
+      SourceNQ(mbr, n, nm1, mimax, pgrid, Q, nQs, dustdens, vel, stime, kernel, mass_grid,
+               coagR3D, Kijk_sym_ind, Kijk_sym, chi, surface, rate);
+      parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, mbr, 0, nm1,
+                               [&](const int i) { dustdens(i) = n_old(i); });
+      mbr.team_barrier();
+      UpdateVelocityNQ(mbr, n, nm1, Q, nQs, vel, kernel.nvel, dustdens, source, mass_grid,
+                       dt, dfloor);
+      parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, mbr, 0, nm1,
+                               [&](const int i) { dustdens(i) = n_new(i); });
+      mbr.team_barrier();
+    }
+  }
+
+  // Commit and convert back to volume density.
+  parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, mbr, 0, nm1,
+                           [&](const int i) { dustdens(i) = n_new(i); });
+  mbr.team_barrier();
+  ConvertToVolumeDensity(mbr, nm1, dustdens, mass_grid);
+  return iter + 1;
+}
+
+//----------------------------------------------------------------------------------------
 //! \fn  void Dust::Coagulation::CoagulationOneCell
 //  \brief
-KOKKOS_INLINE_FUNCTION
-int CoagulationOneCell(parthenon::team_mbr_t const &mbr, const bool &surface,
-                       const Real &time, Real &dt_sync, const StateParams &kernel,
-                       const ScratchPad1D<Real> &dustdens,
-                       const ScratchPad1D<Real> &stime, const ScratchPad1D<Real> &vel,
-                       const int &nvel, const ScratchPad1D<Real> &Q,
-                       const ScratchPad1D<Real> &nQs, const CoagParams &coag,
-                       const CoagArrays &coag_arrays, const RateParams &rate,
-                       const ScratchPad1D<Real> &source, const ScratchPad1D<Real> &Q2) {
+template <typename RateView2D>
+KOKKOS_INLINE_FUNCTION int CoagulationOneCell(
+    parthenon::team_mbr_t const &mbr, const bool &surface, const Real &time,
+    Real &dt_sync, const StateParams &kernel, const ScratchPad1D<Real> &dustdens,
+    const ScratchPad1D<Real> &stime, const ScratchPad1D<Real> &vel, const int &nvel,
+    const ScratchPad1D<Real> &Q, const ScratchPad1D<Real> &nQs, const CoagParams &coag,
+    const CoagArrays &coag_arrays, const RateParams &rate,
+    const ScratchPad1D<Real> &source, const ScratchPad1D<Real> &Q2,
+    const RateView2D &rcoag, const RateView2D &rfrag) {
   // Params
   const int nm1 = coag.nm - 1;
   const Real &cfl = coag.cfl;
@@ -885,10 +1322,12 @@ int CoagulationOneCell(parthenon::team_mbr_t const &mbr, const bool &surface,
   // Update distribution
   ConvertToNumberDensity(mbr, nm1, dustdens, mass_grid, dfloor);
   while (std::abs(time_dummy - time_goal) > 1e-6 * dt) {
-    // Set source
+    // Set source using cached rates (BuildRateCache once per step, then SourceFromCache).
     const int mimax = FindMIMax(mbr, nm1, dustdens, mass_grid, dfloor);
-    Source(mbr, nm1, mimax, pgrid, source, dustdens, vel, stime, kernel, idx_largest,
-           mass_grid, coagR3D, Kijk_sym_ind, Kijk_sym, surface, rate);
+    BuildRateCache(mbr, nm1, mimax, vel, stime, kernel, mass_grid, coagR3D, surface, rate,
+                   rcoag, rfrag);
+    SourceFromCache(mbr, nm1, mimax, pgrid, source, dustdens, idx_largest, mass_grid,
+                    coagR3D, Kijk_sym_ind, Kijk_sym, rcoag, rfrag);
 
     int mimax2 = Null<int>();
     if (!(do_adaptive) || (coag_int == 1)) {
@@ -897,10 +1336,10 @@ int CoagulationOneCell(parthenon::team_mbr_t const &mbr, const bool &surface,
       dt_sync = dt_sync1;
       if (coag_int == 3) {
         mimax2 = FindMIMaxNQS3(mbr, nm1, dt, dustdens, source, Q, mass_grid, dfloor);
-        // now Q stores dustdens + dt*source(), nQs will be used for temperary source(*)
-        ZeroSource(mbr, nm1, nQs);
-        Source(mbr, nm1, mimax2, pgrid, nQs, Q, vel, stime, kernel, idx_largest,
-               mass_grid, coagR3D, Kijk_sym_ind, Kijk_sym, surface, rate);
+        // now Q stores dustdens + dt*source(), nQs will be used for temporary source(*)
+        // Rates are density-independent so the cached rcoag/rfrag are still valid.
+        SourceFromCache(mbr, nm1, mimax2, pgrid, nQs, Q, idx_largest, mass_grid, coagR3D,
+                        Kijk_sym_ind, Kijk_sym, rcoag, rfrag);
       }
     } else { // adaptive third-order method
       // Set source
@@ -908,10 +1347,10 @@ int CoagulationOneCell(parthenon::team_mbr_t const &mbr, const bool &surface,
       Real emax = Null<Real>();
       while (1) {
         mimax2 = FindMIMaxNQS3(mbr, nm1, h, dustdens, source, Q, mass_grid, dfloor);
-        // now Q stores dustdens + dt*source(), nQs will be used for temperary source(*)
-        ZeroSource(mbr, nm1, nQs);
-        Source(mbr, nm1, mimax2, pgrid, nQs, Q, vel, stime, kernel, idx_largest,
-               mass_grid, coagR3D, Kijk_sym_ind, Kijk_sym, surface, rate);
+        // now Q stores dustdens + dt*source(), nQs will be used for temporary source(*)
+        // Rates are density-independent so the cached rcoag/rfrag are still valid.
+        SourceFromCache(mbr, nm1, mimax2, pgrid, nQs, Q, idx_largest, mass_grid, coagR3D,
+                        Kijk_sym_ind, Kijk_sym, rcoag, rfrag);
         emax = ComputeError(mbr, mimax, mimax2, h, h0, dustdens, source, nQs, err_eps);
         if (emax <= 1.0) break;
         h = std::max(S * h * std::pow(emax, pshrink), 0.1 * h);

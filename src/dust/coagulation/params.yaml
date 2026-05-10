@@ -10,7 +10,37 @@ coagulation:
   coag_int:
     _type: int
     _default: 3
-    _description: "Coagulation time integration method[forward Euler(1), Heun's method(3)]" 
+    _description: "Coagulation time integration method[forward Euler(1), Heun's method(3)]"
+
+  coag_implicit:
+    _type: bool
+    _default: "false"
+    _description: "Use one backward-Euler implicit step over the hydro coag dt instead of the explicit substepping (overrides coag_int and coag_use_adaptive_step for the density update)"
+
+  coag_newton_tol:
+    _type: Real
+    _default: 1.0e-4
+    _description: "Relative tolerance for the implicit-coagulation Newton iteration (FD-Jacobian Newton typically plateaus near sqrt(fd_eps); 1e-4 is a realistic target)"
+
+  coag_newton_max_iter:
+    _type: int
+    _default: 20
+    _description: "Maximum number of Newton iterations for the implicit-coagulation step"
+
+  coag_newton_fd_eps:
+    _type: Real
+    _default: 1.0e-8
+    _description: "Relative perturbation used to build the finite-difference Jacobian for the implicit Newton solve (~sqrt(double-eps) is optimal for forward FD)"
+
+  coag_newton_verbose:
+    _type: bool
+    _default: "false"
+    _description: "Print per-iteration Newton diagnostics for the implicit coagulation step (one line per cell per iteration)"
+
+  coag_jac_lag:
+    _type: int
+    _default: 4
+    _description: "Number of Newton iterations to reuse a factored Jacobian before rebuilding. 1 = rebuild every iteration (no lagging). Larger values reduce the cost of Jacobian assembly at the price of slower Newton convergence per rebuild.  Only used when coag_implicit=true."
 
   coag_use_adaptive_step:
     _type: bool

@@ -58,6 +58,15 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin, Params &gas_par
       pin->GetOrAddBoolean("dust/coagulation", "coag_use_adaptive_step", true);
   dcpars.mom_coag = pin->GetOrAddBoolean("dust/coagulation", "coag_mom_preserve", true);
   dcpars.ncall_max = pin->GetOrAddInteger("dust/coagulation", "coag_nsteps_max", 1000);
+  dcpars.implicit = pin->GetOrAddBoolean("dust/coagulation", "coag_implicit", false);
+  dcpars.newton_max_iter =
+      pin->GetOrAddInteger("dust/coagulation", "coag_newton_max_iter", 20);
+  dcpars.newton_tol = pin->GetOrAddReal("dust/coagulation", "coag_newton_tol", 1.0e-6);
+  dcpars.newton_fd_eps =
+      pin->GetOrAddReal("dust/coagulation", "coag_newton_fd_eps", 1.0e-6);
+  dcpars.newton_verbose =
+      pin->GetOrAddBoolean("dust/coagulation", "coag_newton_verbose", false);
+  dcpars.newton_jac_lag = pin->GetOrAddInteger("dust/coagulation", "coag_jac_lag", 4);
   dcpars.const_omega =
       pin->GetOrAddBoolean("dust/coagulation", "const_coag_omega", false);
   dcpars.err_eps = pin->GetOrAddReal("dust/coagulation", "err_eps", 0.1);
@@ -79,7 +88,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin, Params &gas_par
   if (dcpars.coord) dcpars.rho0 *= dcpars.length0;
 
   // Adaptivity
-  if (dcpars.use_adaptive) {
+  if (dcpars.use_adaptive && !dcpars.implicit) {
     if (dcpars.integrator == 3) {
       dcpars.pgrow = -0.5;
       dcpars.pshrink = -1.0;
@@ -94,6 +103,11 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin, Params &gas_par
       PARTHENON_FAIL(msg);
     }
     dcpars.err_con = std::pow((5. / dcpars.S), (1. / dcpars.pgrow));
+  } else {
+    // Defaults that are unused on the implicit path.
+    dcpars.pgrow = -0.5;
+    dcpars.pshrink = -1.0;
+    dcpars.err_con = 0.0;
   }
 
   // Dust sizes
@@ -275,8 +289,40 @@ TaskStatus CoagulationStep(MeshData<Real> *md, const Real time, const Real dt) {
   }
 
   // Coagulation
-  size_t isize = (5 + nvel + (coag.integrator == 3 && coag.mom_coag)) * nspecies;
+  // Implicit (backward-Euler) path needs extra per-cell scratch (n_new, n_trial,
+  // src_pert, n_old) plus a (nspecies x 1) residual / RHS view.
+  const bool use_implicit = coag.implicit;
+  const size_t implicit_extra =
+      use_implicit ? (4 * static_cast<size_t>(nspecies) + static_cast<size_t>(nspecies))
+                   : 0;
+  size_t isize =
+      (5 + nvel + (coag.integrator == 3 && coag.mom_coag)) * nspecies + implicit_extra;
   size_t scr_size = ScratchPad1D<Real>::shmem_size(isize);
+
+  // Token-backed dense Jacobian pool: one (nspecies x nspecies) slot per concurrent
+  // execution-space worker. Indexed by Kokkos UniqueToken so each team that solves
+  // the implicit step grabs a unique slot, providing thread-safety without putting
+  // a full Jacobian in team scratch.
+  using TokenT =
+      Kokkos::Experimental::UniqueToken<parthenon::DevExecSpace,
+                                        Kokkos::Experimental::UniqueTokenScope::Instance>;
+  TokenT token(parthenon::DevExecSpace{});
+  // One slot per concurrent worker; always allocated so the explicit path can also
+  // use rate caching via BuildRateCache+SourceFromCache.
+  const int ntokens = token.size();
+  const int nsp_pool_jac = use_implicit ? nspecies : 0;
+  Kokkos::View<Real ***, parthenon::LayoutWrapper, parthenon::DevMemSpace> jac_pool(
+      Kokkos::view_alloc(Kokkos::WithoutInitializing, "Dust::Coagulation::jac_pool"),
+      ntokens, nsp_pool_jac, nsp_pool_jac);
+  // Rate-cache pools: R_coag(i,j) and R_frag(i,j) precomputed once per cell per
+  // coagulation call; shared by both explicit and implicit paths.
+  Kokkos::View<Real ***, parthenon::LayoutWrapper, parthenon::DevMemSpace> rcoag_pool(
+      Kokkos::view_alloc(Kokkos::WithoutInitializing, "Dust::Coagulation::rcoag_pool"),
+      ntokens, nspecies, nspecies),
+      rfrag_pool(Kokkos::view_alloc(Kokkos::WithoutInitializing,
+                                    "Dust::Coagulation::rfrag_pool"),
+                 ntokens, nspecies, nspecies);
+
   ArtemisUtils::par_for_outer(
       DEFAULT_OUTER_LOOP_PATTERN, "Dust::Coagulation", parthenon::DevExecSpace(),
       scr_size, scr_level, 0, md->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
@@ -291,6 +337,14 @@ TaskStatus CoagulationStep(MeshData<Real> *md, const Real time, const Real dt) {
         ScratchPad1D<Real> nQs(mbr.team_scratch(scr_level), nspecies);
         ScratchPad1D<Real> Q2(mbr.team_scratch(scr_level),
                               (coag.integrator == 3 && coag.mom_coag) * nspecies);
+        // Implicit-only scratch (zero-sized in explicit mode).
+        const int impl_n = use_implicit ? nspecies : 0;
+        ScratchPad1D<Real> n_new(mbr.team_scratch(scr_level), impl_n);
+        ScratchPad1D<Real> n_trial(mbr.team_scratch(scr_level), impl_n);
+        ScratchPad1D<Real> src_pert(mbr.team_scratch(scr_level), impl_n);
+        ScratchPad1D<Real> n_old(mbr.team_scratch(scr_level), impl_n);
+        ScratchPad2D<Real> residual(mbr.team_scratch(scr_level), impl_n,
+                                    impl_n > 0 ? 1 : 0);
 
         // Actual npecies this block reported by SparsePack
         const int nm = vmesh.GetSize(b, dust::prim::density());
@@ -339,9 +393,42 @@ TaskStatus CoagulationStep(MeshData<Real> *md, const Real time, const Real dt) {
         // Coagulation Kernel
         // NOTE(@pdmullen): mbr.team_barrier() included at end of CoagulationOneCell
         // NOTE(@pdmullen): ncall could be stored or reduced (see 0a5d72b)
-        const int ncall = Coagulation::CoagulationOneCell(
-            mbr, surface, time1, dt_sync, kernel, rhod, stime, vel, nvel, Q, nQs, coag,
-            coag_arrays, rate, source, Q2);
+        int ncall = 0;
+        if (use_implicit) {
+          // Acquire a thread-safe slot from the UniqueToken pool for the Jacobian and
+          // rate caches. Acquire/release on the team leader.
+          int tid = 0;
+          Kokkos::single(
+              Kokkos::PerTeam(mbr), [&](int &out) { out = token.acquire(); }, tid);
+          auto jac = Kokkos::subview(jac_pool, tid, Kokkos::ALL(), Kokkos::ALL());
+          auto rcoag = Kokkos::subview(rcoag_pool, tid, Kokkos::ALL(), Kokkos::ALL());
+          auto rfrag = Kokkos::subview(rfrag_pool, tid, Kokkos::ALL(), Kokkos::ALL());
+          if (coag.newton_verbose) {
+            ncall = Coagulation::CoagulationOneCellImplicit<true>(
+                mbr, surface, time1, dt_sync, kernel, rhod, stime, vel, nvel, Q, nQs,
+                coag, coag_arrays, rate, source, n_new, n_trial, src_pert, n_old,
+                residual, jac, rcoag, rfrag);
+          } else {
+            ncall = Coagulation::CoagulationOneCellImplicit<false>(
+                mbr, surface, time1, dt_sync, kernel, rhod, stime, vel, nvel, Q, nQs,
+                coag, coag_arrays, rate, source, n_new, n_trial, src_pert, n_old,
+                residual, jac, rcoag, rfrag);
+          }
+          Kokkos::single(Kokkos::PerTeam(mbr), [&]() { token.release(tid); });
+        } else {
+          // Explicit path: acquire rate-cache slot (no jac needed).
+          int tid_ex = 0;
+          Kokkos::single(
+              Kokkos::PerTeam(mbr), [&](int &out) { out = token.acquire(); }, tid_ex);
+          auto rcoag_ex =
+              Kokkos::subview(rcoag_pool, tid_ex, Kokkos::ALL(), Kokkos::ALL());
+          auto rfrag_ex =
+              Kokkos::subview(rfrag_pool, tid_ex, Kokkos::ALL(), Kokkos::ALL());
+          ncall = Coagulation::CoagulationOneCell(
+              mbr, surface, time1, dt_sync, kernel, rhod, stime, vel, nvel, Q, nQs, coag,
+              coag_arrays, rate, source, Q2, rcoag_ex, rfrag_ex);
+          Kokkos::single(Kokkos::PerTeam(mbr), [&]() { token.release(tid_ex); });
+        }
 
         // Update dust density and momentum after coagulation
         parthenon::par_for_inner(

@@ -18,6 +18,7 @@
 
 // Artemis includes
 #include "artemis.hpp"
+#include "dust/coagulation/coagulation.hpp"
 #include "geometry/geometry.hpp"
 #include "utils/artemis_utils.hpp"
 #include "utils/diffusion/diffusion_coeff.hpp"
@@ -375,6 +376,29 @@ TaskStatus SimpleDragSourceImpl(MeshData<Real> *md, const Real time, const Real 
   const auto grain_density = dust_pkg->template Param<Real>("grain_density");
   const Real dflr_dust = dust_pkg->template Param<Real>("dfloor");
 
+  // Optional within-bin size reconstruction (Phase 4): when coagulation is enabled
+  // and configured with bin_recon != Constant, the Stokes stopping time uses the
+  // bin-averaged effective size <a>_i implied by the PL profile rather than the
+  // point value sizes(id). When coagulation is off, we leave the legacy point-size
+  // behavior intact via a Constant sentinel and zero-length ParArray1D guards.
+  bool drag_use_bin_recon = false;
+  Dust::Coagulation::BinRecon drag_bin_recon = Dust::Coagulation::BinRecon::Constant;
+  ParArray1D<Real> drag_log_widths;
+  ParArray1D<Real> drag_mass_grid;
+  if (artemis_pkg->template Param<bool>("do_coagulation")) {
+    auto &coag_pkg = pm->packages.Get("coagulation");
+    const auto &coag_pars =
+        coag_pkg->template Param<Dust::Coagulation::CoagParams>("coag_pars");
+    if (coag_pars.bin_recon != Dust::Coagulation::BinRecon::Constant) {
+      const auto &coag_arrs =
+          coag_pkg->template Param<Dust::Coagulation::CoagArrays>("coag_arrs");
+      drag_use_bin_recon = true;
+      drag_bin_recon = coag_pars.bin_recon;
+      drag_log_widths = coag_arrs.log_widths;
+      drag_mass_grid = coag_arrs.mass_grid;
+    }
+  }
+
   const auto &cpars = artemis_pkg->template Param<geometry::CoordParams>("coord_params");
 
   // Packing and indexing
@@ -394,14 +418,16 @@ TaskStatus SimpleDragSourceImpl(MeshData<Real> *md, const Real time, const Real 
       DEFAULT_LOOP_PATTERN, "SimpleDrag", parthenon::DevExecSpace(), 0,
       md->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
+        // Bin-recon aliases (suffixed to mirror the sizes_/grain_density_ convention
+        // used below for [[maybe_unused]] guarded captures).
+        [[maybe_unused]] const bool drag_use_bin_recon_ = drag_use_bin_recon;
+        [[maybe_unused]] auto &drag_log_widths_ = drag_log_widths;
+        [[maybe_unused]] auto &drag_mass_grid_ = drag_mass_grid;
         // Extract coordinates
         geometry::Coords<GEOM> coords(cpars, vmesh.GetCoordinates(b), k, j, i);
         const auto &xv = coords.GetCellCenter(vg, b, k, j, i);
         const auto &hx = coords.GetScaleFactors(vg, b, k, j, i);
         const auto &[xcyl, ex1, ex2, ex3] = coords.ConvertToCylWithVec(xv);
-
-        // Compute the ramp for this cell
-        // Ramps are quadratic, eg. the left regions is SQR( (X - ix)/(ix - xmin) )
         const std::array<Real, 3> bg{
             dt * (gasp.irate[0] * ((xv[0] < gasp.ix[0]) *
                                    SQR((xv[0] - gasp.ix[0]) / (gasp.ix[0] - x1min))) +
@@ -493,8 +519,26 @@ TaskStatus SimpleDragSourceImpl(MeshData<Real> *md, const Real time, const Real 
           Real tc = tp.tau(id);
           [[maybe_unused]] auto &sizes_ = sizes;
           if constexpr (DRAG == DragModel::stokes) {
+            Real a_eff = sizes_(id);
+            if (drag_use_bin_recon_) {
+              const Real rho_i = dens * drag_mass_grid_(n);
+              const int im1 = (n == 0) ? 0 : n - 1;
+              const int ip1 = (n == nspecies - 1) ? nspecies - 1 : n + 1;
+              const Real rho_im1 =
+                  vmesh(b, dust::cons::density(im1), k, j, i) * drag_mass_grid_(im1);
+              const Real rho_ip1 =
+                  vmesh(b, dust::cons::density(ip1), k, j, i) * drag_mass_grid_(ip1);
+              const Real sigma =
+                  Dust::Coagulation::BinSlopeMCLimited(rho_im1, rho_i, rho_ip1);
+              const Real dx = drag_log_widths_(n);
+              if (rho_i > 0.0 && dx > 0.0) {
+                const Real m1r =
+                    Dust::Coagulation::BinMomentLogA(1.0, dx, rho_i, sigma, 1.0);
+                if (m1r > 0.0) a_eff *= m1r;
+              }
+            }
             tc = std::max(tp.tau_min, std::min(tp.tau_max, tp.scale * grain_density_ /
-                                                               dg * sizes_(id) / vth));
+                                                               dg * a_eff / vth));
           }
           const Real alpha = dt * ((tc <= 0.0) ? Big<Real>() : 1.0 / tc);
           for (int d = 0; d < 3; d++) {
@@ -529,8 +573,26 @@ TaskStatus SimpleDragSourceImpl(MeshData<Real> *md, const Real time, const Real 
           Real tc = tp.tau(id);
           [[maybe_unused]] auto &sizes_ = sizes;
           if constexpr (DRAG == DragModel::stokes) {
+            Real a_eff = sizes_(id);
+            if (drag_use_bin_recon_) {
+              const Real rho_i = dens * drag_mass_grid_(n);
+              const int im1 = (n == 0) ? 0 : n - 1;
+              const int ip1 = (n == nspecies - 1) ? nspecies - 1 : n + 1;
+              const Real rho_im1 =
+                  vmesh(b, dust::cons::density(im1), k, j, i) * drag_mass_grid_(im1);
+              const Real rho_ip1 =
+                  vmesh(b, dust::cons::density(ip1), k, j, i) * drag_mass_grid_(ip1);
+              const Real sigma =
+                  Dust::Coagulation::BinSlopeMCLimited(rho_im1, rho_i, rho_ip1);
+              const Real dx = drag_log_widths_(n);
+              if (rho_i > 0.0 && dx > 0.0) {
+                const Real m1r =
+                    Dust::Coagulation::BinMomentLogA(1.0, dx, rho_i, sigma, 1.0);
+                if (m1r > 0.0) a_eff *= m1r;
+              }
+            }
             tc = std::max(tp.tau_min, std::min(tp.tau_max, tp.scale * grain_density_ /
-                                                               dg * sizes_(id) / vth));
+                                                               dg * a_eff / vth));
           }
           const Real alpha = dt * ((tc <= 0.0) ? Big<Real>() : 1.0 / tc);
           // Update dust momenta

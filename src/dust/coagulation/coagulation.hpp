@@ -47,7 +47,8 @@ void InitializeArray(const int nm, int &pgrid, const Real &rho_p, const Real &ch
                      const Real &a, const ParArray1D<Real> dsize,
                      ParArray2D<int> idx_largest, ParArray1D<Real> mass_grid,
                      ParArray3D<Real> coag3d, ParArray3D<int> Kijk_sym_ind,
-                     ParArray3D<Real> Kijk_sym);
+                     ParArray3D<Real> Kijk_sym, ParArray1D<Real> log_centers,
+                     ParArray1D<Real> log_widths);
 
 // Diagonstics functions
 using DiagPack_t = parthenon::SparsePack<gas::prim::density, gas::prim::sie,
@@ -64,6 +65,12 @@ void WriteCoagulationDiagnostics(MeshData<Real> *md, const Real time, const Real
 // Constants that enumerate coagulation kernel
 enum cidx { Djk, Aij, Pij, epsij, dalp, rate_coef };
 enum class DustInteractionType { Coagulation, Fragmentation };
+
+// Within-bin reconstruction model used by coagulation (and Stokes drag when wired).
+//   Constant     -- each bin is a delta function at its representative size (default).
+//   PLMLogSize   -- piecewise linear in ln(a), slope-limited from neighbors; evolved
+//                   state is unchanged, only microphysical coefficients differ.
+enum class BinRecon { Constant, PLMLogSize };
 
 // Coagulation State Parameters
 // NOTE(@pdmullen): Shared between various inline function calls
@@ -113,6 +120,10 @@ struct CoagParams {
 
   Real rho0;    // physical-to-code unit conversion density
   Real length0; // physical-to-code unit conversion length
+
+  // Within-bin size reconstruction (Phase 2 opt-in; see BinRecon).
+  // Default is BinRecon::Constant which preserves existing behavior exactly.
+  BinRecon bin_recon;
 };
 
 // Coagulation Rate Parameters
@@ -132,6 +143,17 @@ struct CoagArrays {
   ParArray3D<Real> coagR3D;
   ParArray3D<int> Kijk_sym_ind;
   ParArray3D<Real> Kijk_sym;
+
+  // Within-bin size geometry. Populated unconditionally from the (log-spaced)
+  // dust sizes so they are always available; only consumed when bin_recon !=
+  // Constant. log_centers(i) = ln(a_i); log_widths(i) is the width of bin i in
+  // ln(a) measured between geometric-mean edges to neighboring bins.
+  ParArray1D<Real> log_centers;
+  ParArray1D<Real> log_widths;
+  // Physical dust size grid (already multiplied by length0); shared with the
+  // coagulation initialisation. Needed by within-bin reconstruction to convert
+  // moment ratios back to absolute sizes when correcting collision cross sections.
+  ParArray1D<Real> dsize;
 };
 
 //----------------------------------------------------------------------------------------
@@ -203,19 +225,138 @@ Real Qplus(const Real &m1, const Real &Q1, const Real &m2, const Real &Q2) {
 }
 
 //----------------------------------------------------------------------------------------
-//! \fn  Real Dust::Coagulation::CoagulationRate
-//  \brief Calculate Rij
+//! \fn  Real Dust::Coagulation::BinSlopeMCLimited
+//  \brief Monotonized-central limited slope of the mass-per-log-size density rho_log
+//         across one size bin, given the bin-averaged densities of bin i and its two
+//         neighbors. Returns the slope sigma_i scaled so the within-bin profile is
+//             f_i(xi) = rho_avg_i + sigma_i * xi,    xi = (x - x_i)/dx_i in [-1/2, 1/2].
+//         Includes a positivity cap |sigma| <= 2 rho_avg so f_i >= 0 at bin edges.
+//         Returns 0 when neighbor differences disagree in sign (extremum) or when
+//         rho_avg_i is non-positive (empty bin).
+KOKKOS_FORCEINLINE_FUNCTION
+Real BinSlopeMCLimited(const Real rho_im1, const Real rho_i, const Real rho_ip1) {
+  if (!(rho_i > 0.0)) return 0.0;
+  const Real dL = rho_i - rho_im1;
+  const Real dR = rho_ip1 - rho_i;
+  if (dL * dR <= 0.0) return 0.0;
+  const Real s = (dL > 0.0) ? 1.0 : -1.0;
+  const Real adL = (dL > 0.0) ? dL : -dL;
+  const Real adR = (dR > 0.0) ? dR : -dR;
+  const Real adC = 0.5 * (adL + adR); // |0.5*(rho_ip1 - rho_im1)| with consistent sign
+  Real m = 2.0 * adL;
+  if (2.0 * adR < m) m = 2.0 * adR;
+  if (adC < m) m = adC;
+  // Positivity cap: keep f_i >= 0 at bin edges.
+  if (2.0 * rho_i < m) m = 2.0 * rho_i;
+  return s * m;
+}
+
+//----------------------------------------------------------------------------------------
+//! \fn  Real Dust::Coagulation::BinMomentLogA
+//  \brief Bin-averaged moment <a^p> for a piecewise-linear-in-log-size profile of the
+//         mass-per-log-size density f_i(xi) = rho_avg + sigma * xi over bin i, with
+//         xi = (x - x_i)/dx_i in [-1/2, 1/2] and x = ln(a). Mass per unit log a is the
+//         conserved quantity so the bin-mass weighted moment evaluates to
+//             <a^p> = a_i^p * ( I0(alpha) + (sigma/rho_avg) * I1(alpha) ),
+//         where alpha = p * dx_i, I0(alpha) = (2/alpha) sinh(alpha/2), and
+//         I1(alpha) = dI0/dalpha. The constant (sigma=0) branch reproduces the
+//         standard log-bin moment correction. Stable small-alpha series fallback is
+//         used to avoid 0/0 near alpha = 0.
+KOKKOS_FORCEINLINE_FUNCTION
+Real BinMomentLogA(const Real ai, const Real dx, const Real rho_avg, const Real sigma,
+                   const Real p) {
+  const Real alpha = p * dx;
+  const Real abs_a = (alpha >= 0.0) ? alpha : -alpha;
+  Real I0, I1;
+  if (abs_a < 1.0e-3) {
+    const Real a2 = alpha * alpha;
+    // I0 ≈ 1 + α^2/24 + α^4/1920
+    I0 = 1.0 + a2 * (1.0 / 24.0) + a2 * a2 * (1.0 / 1920.0);
+    // I1 ≈ α/12 + α^3/480
+    I1 = alpha * (1.0 / 12.0) + alpha * a2 * (1.0 / 480.0);
+  } else {
+    const Real h = 0.5 * alpha;
+    const Real sh = std::sinh(h);
+    const Real ch = std::cosh(h);
+    I0 = (2.0 / alpha) * sh;
+    // I1 = (cosh(α/2) - 2 sinh(α/2)/α) / α
+    I1 = (ch - 2.0 * sh / alpha) / alpha;
+  }
+  const Real ai_p = std::pow(ai, p);
+  const Real ratio = (rho_avg > 0.0) ? (sigma / rho_avg) : 0.0;
+  return ai_p * (I0 + ratio * I1);
+}
+
+//----------------------------------------------------------------------------------------
+//! \fn  void Dust::Coagulation::ComputeBinSizeMomentRatios
+//  \brief Fill per-bin moment ratios mPr(i) = <a^P>_i / a_i^P (P=1,2,3) from a
+//         piecewise-linear-in-log-size reconstruction of the dust mass density.
+//         Reconstruction is built from the cell-local bin-averaged mass density,
+//         which is dustdens(i)*mass_grid(i) (i.e. the mass-per-bin), with an
+//         MC-limited slope across neighbors. Only bins 0..mimax are touched; the
+//         caller is expected to size m1r/m2r/m3r at least nm long.
+//             m1r weights stopping times (Epstein: tau ~ a),
+//             m2r weights cross sections (sigma ~ a^2),
+//             m3r weights particle masses (m ~ a^3).
+KOKKOS_INLINE_FUNCTION
+void ComputeBinSizeMomentRatios(const parthenon::team_mbr_t &mbr, const int &nm1,
+                                const int &mimax, const ScratchPad1D<Real> &dustdens,
+                                const ParArray1D<Real> &mass_grid,
+                                const ParArray1D<Real> &log_widths,
+                                const ScratchPad1D<Real> &m1r,
+                                const ScratchPad1D<Real> &m2r,
+                                const ScratchPad1D<Real> &m3r) {
+  parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, mbr, 0, nm1, [&](const int i) {
+    m1r(i) = 1.0;
+    m2r(i) = 1.0;
+    m3r(i) = 1.0;
+  });
+  mbr.team_barrier();
+  parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, mbr, 0, mimax, [&](const int i) {
+    const Real rho_i = dustdens(i) * mass_grid(i);
+    const int im1 = (i == 0) ? 0 : i - 1;
+    const int ip1 = (i == nm1) ? nm1 : i + 1;
+    const Real rho_im1 = dustdens(im1) * mass_grid(im1);
+    const Real rho_ip1 = dustdens(ip1) * mass_grid(ip1);
+    const Real sigma = BinSlopeMCLimited(rho_im1, rho_i, rho_ip1);
+    const Real dx = log_widths(i);
+    if (!(rho_i > 0.0) || dx <= 0.0) {
+      m1r(i) = 1.0;
+      m2r(i) = 1.0;
+      m3r(i) = 1.0;
+      return;
+    }
+    // <a^p>/a_i^p = I0(p*dx) + (sigma/rho_i) * I1(p*dx). a_i cancels.
+    // ai = 1.0 sentinel: BinMomentLogA(1, dx, rho, sigma, p) returns the ratio.
+    m1r(i) = BinMomentLogA(1.0, dx, rho_i, sigma, 1.0);
+    m2r(i) = BinMomentLogA(1.0, dx, rho_i, sigma, 2.0);
+    m3r(i) = BinMomentLogA(1.0, dx, rho_i, sigma, 3.0);
+    // Defensive floors: keep ratios positive in case of pathological inputs.
+    if (!(m1r(i) > 0.0)) m1r(i) = 1.0;
+    if (!(m2r(i) > 0.0)) m2r(i) = 1.0;
+    if (!(m3r(i) > 0.0)) m3r(i) = 1.0;
+  });
+  mbr.team_barrier();
+}
+
+//----------------------------------------------------------------------------------------
+//----------------------------------------------------------------------------------------
+//! \fn  Real Dust::Coagulation::CoagulationRatePair
+//  \brief Scalar-input core of CoagulationRate. Computes R_{ij} for a pair of bins
+//         given explicit per-bin scalar values for the mean particle mass and
+//         stopping time. The wrapper CoagulationRate() below preserves the legacy
+//         point-bin behavior; the PLM-corrected path in BuildRateCache calls this
+//         directly with bin-averaged effective masses (m_i = mass_grid(i)*m3r(i))
+//         and stopping times (tau_i = stime(i)*m1r(i)) implied by the within-bin
+//         piecewise linear profile. mass_gride is the upper-bin mass used only for
+//         the structural "merged particle exceeds grid" cutoff and is left as the
+//         constant-bin value mass_grid(nm-1) regardless of mode.
 template <DustInteractionType DIT>
-KOKKOS_INLINE_FUNCTION Real CoagulationRate(const int &i, const int &j, const int &nm1,
-                                            const StateParams &kernel,
-                                            const ScratchPad1D<Real> &vel,
-                                            const ScratchPad1D<Real> &stime,
-                                            const ParArray1D<Real> &mass_grid,
-                                            const ParArray3D<Real> &coagR3D,
-                                            const bool &surface, const RateParams &rate) {
-  const Real &mass_gridi = mass_grid(i);
-  const Real &mass_gridj = mass_grid(j);
-  const Real &mass_gride = mass_grid(nm1);
+KOKKOS_INLINE_FUNCTION Real CoagulationRatePair(
+    const int &i, const int &j, const Real &mass_gridi, const Real &mass_gridj,
+    const Real &mass_gride, const StateParams &kernel, const ScratchPad1D<Real> &vel,
+    const Real &tau_i, const Real &tau_j, const ParArray3D<Real> &coagR3D,
+    const bool &surface, const RateParams &rate) {
   if (mass_gridi + mass_gridj >= mass_gride) return 0.0;
 
   const Real &gdens = kernel.gdens;
@@ -223,8 +364,6 @@ KOKKOS_INLINE_FUNCTION Real CoagulationRate(const int &i, const int &j, const in
   const Real &cs = kernel.cs;
   const Real &omega = kernel.omega;
   const int &nvel = kernel.nvel;
-  const Real &tau_i = stime(i);
-  const Real &tau_j = stime(j);
   const Real *vel_i = &vel(nvel * i);
   const Real *vel_j = &vel(nvel * j);
 
@@ -298,6 +437,22 @@ KOKKOS_INLINE_FUNCTION Real CoagulationRate(const int &i, const int &j, const in
   }
 
   return coagR3D(cidx::rate_coef, i, j) * dv * pf / hij;
+}
+
+//----------------------------------------------------------------------------------------
+//! \fn  Real Dust::Coagulation::CoagulationRate
+//  \brief Calculate Rij (legacy wrapper; uses bin-center mass/stopping-time values).
+template <DustInteractionType DIT>
+KOKKOS_INLINE_FUNCTION Real CoagulationRate(const int &i, const int &j, const int &nm1,
+                                            const StateParams &kernel,
+                                            const ScratchPad1D<Real> &vel,
+                                            const ScratchPad1D<Real> &stime,
+                                            const ParArray1D<Real> &mass_grid,
+                                            const ParArray3D<Real> &coagR3D,
+                                            const bool &surface, const RateParams &rate) {
+  return CoagulationRatePair<DIT>(i, j, mass_grid(i), mass_grid(j), mass_grid(nm1),
+                                  kernel, vel, stime(i), stime(j), coagR3D, surface,
+                                  rate);
 }
 
 //----------------------------------------------------------------------------------------
@@ -860,19 +1015,67 @@ void SourceNQS3(const parthenon::team_mbr_t &mbr, const int &n, const int &nm1,
 //         Rates are independent of number density so they need only be computed once
 //         per cell per implicit solve (they depend only on vel, stime, mass_grid, etc.).
 //         rcoag(i,j) = R^coag_{ij},  rfrag(i,j) = R^frag_{ij}, both stored symmetrically.
+//
+//         When bin_recon == BinRecon::PLMLogSize, all size-dependent kinematic
+//         coefficients are reconstructed from the within-bin PL profile:
+//             - mean particle mass:      m_i    -> mass_grid(i) * m3r(i)  (m ~ a^3),
+//                                                  affecting muij in the Brownian
+//                                                  velocity and bouncing threshold,
+//             - mean stopping time:      tau_i  -> stime(i)     * m1r(i)  (Epstein,
+//                                                  tau ~ a), affecting turbulent
+//                                                  v_rel and vertical settling,
+//             - geometric cross section: pi (a_i+a_j)^2 * <(a_i+a_j)^2>/(a_i+a_j)^2
+//                                        with the moment expanded as
+//                                        m2r_i a_i^2 + 2 m1r_i m1r_j a_i a_j +
+//                                        m2r_j a_j^2.
+//         The "merged particle exceeds grid" cutoff uses the constant mass_grid(nm-1)
+//         regardless of mode. Mass-redistribution outcome weights (Aij, Pij, epsij,
+//         Djk in coagR3D) are *not* PLM-corrected: they are exact mass-bookkeeping
+//         coefficients and perturbing them would break conservation of total dust
+//         mass per cell.
 template <typename RateView2D>
 KOKKOS_INLINE_FUNCTION void
 BuildRateCache(const parthenon::team_mbr_t &mbr, const int &nm1, const int &mimax,
                const ScratchPad1D<Real> &vel, const ScratchPad1D<Real> &stime,
                const StateParams &kernel, const ParArray1D<Real> &mass_grid,
                const ParArray3D<Real> &coagR3D, const bool &surface,
-               const RateParams &rate, const RateView2D &rcoag, const RateView2D &rfrag) {
+               const RateParams &rate, const RateView2D &rcoag, const RateView2D &rfrag,
+               const BinRecon bin_recon, const ParArray1D<Real> &dsize,
+               const ScratchPad1D<Real> &m1r, const ScratchPad1D<Real> &m2r,
+               const ScratchPad1D<Real> &m3r) {
+  const bool plm = (bin_recon == BinRecon::PLMLogSize);
+  const Real mass_gride = mass_grid(nm1);
   parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, mbr, 0, mimax, [&](const int i) {
     for (int j = 0; j <= i; j++) {
-      const Real rc = CoagulationRate<DustInteractionType::Coagulation>(
-          i, j, nm1, kernel, vel, stime, mass_grid, coagR3D, surface, rate);
-      const Real rf = CoagulationRate<DustInteractionType::Fragmentation>(
-          i, j, nm1, kernel, vel, stime, mass_grid, coagR3D, surface, rate);
+      Real rc, rf;
+      if (plm) {
+        const Real mi_eff = mass_grid(i) * m3r(i);
+        const Real mj_eff = mass_grid(j) * m3r(j);
+        const Real tau_i_eff = stime(i) * m1r(i);
+        const Real tau_j_eff = stime(j) * m1r(j);
+        rc = CoagulationRatePair<DustInteractionType::Coagulation>(
+            i, j, mi_eff, mj_eff, mass_gride, kernel, vel, tau_i_eff, tau_j_eff, coagR3D,
+            surface, rate);
+        rf = CoagulationRatePair<DustInteractionType::Fragmentation>(
+            i, j, mi_eff, mj_eff, mass_gride, kernel, vel, tau_i_eff, tau_j_eff, coagR3D,
+            surface, rate);
+        // Cross-section moment correction.
+        const Real ai = dsize(i);
+        const Real aj = dsize(j);
+        const Real denom = (ai + aj) * (ai + aj);
+        if (denom > 0.0) {
+          const Real num =
+              m2r(i) * ai * ai + 2.0 * m1r(i) * ai * m1r(j) * aj + m2r(j) * aj * aj;
+          const Real factor = num / denom;
+          rc *= factor;
+          rf *= factor;
+        }
+      } else {
+        rc = CoagulationRate<DustInteractionType::Coagulation>(
+            i, j, nm1, kernel, vel, stime, mass_grid, coagR3D, surface, rate);
+        rf = CoagulationRate<DustInteractionType::Fragmentation>(
+            i, j, nm1, kernel, vel, stime, mass_grid, coagR3D, surface, rate);
+      }
       rcoag(i, j) = rc;
       rcoag(j, i) = rc;
       rfrag(i, j) = rf;
@@ -1077,7 +1280,8 @@ KOKKOS_INLINE_FUNCTION int CoagulationOneCellImplicit(
     const ScratchPad1D<Real> &source, const ScratchPad1D<Real> &n_new,
     const ScratchPad1D<Real> & /*n_trial*/, const ScratchPad1D<Real> & /*src_pert*/,
     const ScratchPad1D<Real> &n_old, const ResidView2D &residual, const JacView2D &jac,
-    const RateView2D &rcoag, const RateView2D &rfrag) {
+    const RateView2D &rcoag, const RateView2D &rfrag, const ScratchPad1D<Real> &m1r,
+    const ScratchPad1D<Real> &m2r, const ScratchPad1D<Real> &m3r) {
   const int nm1 = coag.nm - 1;
   const int &pgrid = coag.pgrid;
   const Real &dfloor = coag.dfloor;
@@ -1092,6 +1296,9 @@ KOKKOS_INLINE_FUNCTION int CoagulationOneCellImplicit(
   auto &coagR3D = coag_arrays.coagR3D;
   auto &Kijk_sym_ind = coag_arrays.Kijk_sym_ind;
   auto &Kijk_sym = coag_arrays.Kijk_sym;
+  auto &log_widths = coag_arrays.log_widths;
+  auto &dsize = coag_arrays.dsize;
+  const BinRecon bin_recon = coag.bin_recon;
 
   // Convert to number densities and stash initial state.
   ConvertToNumberDensity(mbr, nm1, dustdens, mass_grid, dfloor);
@@ -1113,8 +1320,12 @@ KOKKOS_INLINE_FUNCTION int CoagulationOneCellImplicit(
     return 0;
   }
   const int nact_cache_m1 = std::min(nm1, mimax_init_raw + pgrid + pgrid_pad_extra);
+  if (bin_recon == BinRecon::PLMLogSize) {
+    ComputeBinSizeMomentRatios(mbr, nm1, nact_cache_m1, n_new, mass_grid, log_widths, m1r,
+                               m2r, m3r);
+  }
   BuildRateCache(mbr, nm1, nact_cache_m1, vel, stime, kernel, mass_grid, coagR3D, surface,
-                 rate, rcoag, rfrag);
+                 rate, rcoag, rfrag, bin_recon, dsize, m1r, m2r, m3r);
 
   int iter = 0;
   Real last_res_norm = 0.0;
@@ -1284,7 +1495,8 @@ KOKKOS_INLINE_FUNCTION int CoagulationOneCell(
     const ScratchPad1D<Real> &Q, const ScratchPad1D<Real> &nQs, const CoagParams &coag,
     const CoagArrays &coag_arrays, const RateParams &rate,
     const ScratchPad1D<Real> &source, const ScratchPad1D<Real> &Q2,
-    const RateView2D &rcoag, const RateView2D &rfrag) {
+    const RateView2D &rcoag, const RateView2D &rfrag, const ScratchPad1D<Real> &m1r,
+    const ScratchPad1D<Real> &m2r, const ScratchPad1D<Real> &m3r) {
   // Params
   const int nm1 = coag.nm - 1;
   const Real &cfl = coag.cfl;
@@ -1309,6 +1521,9 @@ KOKKOS_INLINE_FUNCTION int CoagulationOneCell(
   auto &coagR3D = coag_arrays.coagR3D;
   auto &Kijk_sym_ind = coag_arrays.Kijk_sym_ind;
   auto &Kijk_sym = coag_arrays.Kijk_sym;
+  auto &log_widths = coag_arrays.log_widths;
+  auto &dsize = coag_arrays.dsize;
+  const BinRecon bin_recon = coag.bin_recon;
 
   // Timestepping
   int ncall = 0;
@@ -1324,8 +1539,12 @@ KOKKOS_INLINE_FUNCTION int CoagulationOneCell(
   while (std::abs(time_dummy - time_goal) > 1e-6 * dt) {
     // Set source using cached rates (BuildRateCache once per step, then SourceFromCache).
     const int mimax = FindMIMax(mbr, nm1, dustdens, mass_grid, dfloor);
+    if (bin_recon == BinRecon::PLMLogSize) {
+      ComputeBinSizeMomentRatios(mbr, nm1, mimax, dustdens, mass_grid, log_widths, m1r,
+                                 m2r, m3r);
+    }
     BuildRateCache(mbr, nm1, mimax, vel, stime, kernel, mass_grid, coagR3D, surface, rate,
-                   rcoag, rfrag);
+                   rcoag, rfrag, bin_recon, dsize, m1r, m2r, m3r);
     SourceFromCache(mbr, nm1, mimax, pgrid, source, dustdens, idx_largest, mass_grid,
                     coagR3D, Kijk_sym_ind, Kijk_sym, rcoag, rfrag);
 

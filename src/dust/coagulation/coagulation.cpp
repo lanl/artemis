@@ -67,6 +67,19 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin, Params &gas_par
   dcpars.newton_verbose =
       pin->GetOrAddBoolean("dust/coagulation", "coag_newton_verbose", false);
   dcpars.newton_jac_lag = pin->GetOrAddInteger("dust/coagulation", "coag_jac_lag", 4);
+  // Within-bin size reconstruction (Phase 2 opt-in). Default preserves existing behavior.
+  {
+    const std::string br =
+        pin->GetOrAddString("dust/coagulation", "coag_bin_recon", "constant");
+    if (br == "constant") {
+      dcpars.bin_recon = Dust::Coagulation::BinRecon::Constant;
+    } else if (br == "plm_logsize") {
+      dcpars.bin_recon = Dust::Coagulation::BinRecon::PLMLogSize;
+    } else {
+      PARTHENON_FAIL(
+          "dust/coagulation/coag_bin_recon must be 'constant' or 'plm_logsize'");
+    }
+  }
   dcpars.const_omega =
       pin->GetOrAddBoolean("dust/coagulation", "const_coag_omega", false);
   dcpars.err_eps = pin->GetOrAddReal("dust/coagulation", "err_eps", 0.1);
@@ -139,9 +152,13 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin, Params &gas_par
   dcarrs.coagR3D = ParArray3D<Real>("coagReal3D", 6, dcpars.nm, dcpars.nm);
   dcarrs.Kijk_sym_ind = ParArray3D<int>("Kijk_sym_ind", dcpars.nm, dcpars.nm, 4);
   dcarrs.Kijk_sym = ParArray3D<Real>("Kijk_sym", dcpars.nm, dcpars.nm, 4);
+  dcarrs.log_centers = ParArray1D<Real>("coag_log_centers", dcpars.nm);
+  dcarrs.log_widths = ParArray1D<Real>("coag_log_widths", dcpars.nm);
+  dcarrs.dsize = dust_size;
   InitializeArray(dcpars.nm, dcpars.pgrid, dcpars.rho_p, dcpars.chi, a, dust_size,
                   dcarrs.idx_largest, dcarrs.mass_grid, dcarrs.coagR3D,
-                  dcarrs.Kijk_sym_ind, dcarrs.Kijk_sym);
+                  dcarrs.Kijk_sym_ind, dcarrs.Kijk_sym, dcarrs.log_centers,
+                  dcarrs.log_widths);
 
   // Stash CoagParams
   params.Add("coag_pars", dcpars);
@@ -295,8 +312,13 @@ TaskStatus CoagulationStep(MeshData<Real> *md, const Real time, const Real dt) {
   const size_t implicit_extra =
       use_implicit ? (4 * static_cast<size_t>(nspecies) + static_cast<size_t>(nspecies))
                    : 0;
-  size_t isize =
-      (5 + nvel + (coag.integrator == 3 && coag.mom_coag)) * nspecies + implicit_extra;
+  // Within-bin reconstruction needs two per-cell scratch slots for the moment
+  // ratios <a>/a_i and <a^2>/a_i^2. Allocate only when the option is enabled
+  // so the default path keeps the legacy scratch footprint.
+  const bool use_bin_recon = (coag.bin_recon != Coagulation::BinRecon::Constant);
+  const size_t bin_recon_extra = use_bin_recon ? (2 * static_cast<size_t>(nspecies)) : 0;
+  size_t isize = (5 + nvel + (coag.integrator == 3 && coag.mom_coag)) * nspecies +
+                 implicit_extra + bin_recon_extra;
   size_t scr_size = ScratchPad1D<Real>::shmem_size(isize);
 
   // Token-backed dense Jacobian pool: one (nspecies x nspecies) slot per concurrent
@@ -345,6 +367,11 @@ TaskStatus CoagulationStep(MeshData<Real> *md, const Real time, const Real dt) {
         ScratchPad1D<Real> n_old(mbr.team_scratch(scr_level), impl_n);
         ScratchPad2D<Real> residual(mbr.team_scratch(scr_level), impl_n,
                                     impl_n > 0 ? 1 : 0);
+        // Bin-reconstruction scratch (zero-sized when bin_recon == Constant).
+        const int br_n = use_bin_recon ? nspecies : 0;
+        ScratchPad1D<Real> m1r(mbr.team_scratch(scr_level), br_n);
+        ScratchPad1D<Real> m2r(mbr.team_scratch(scr_level), br_n);
+        ScratchPad1D<Real> m3r(mbr.team_scratch(scr_level), br_n);
 
         // Actual npecies this block reported by SparsePack
         const int nm = vmesh.GetSize(b, dust::prim::density());
@@ -407,12 +434,12 @@ TaskStatus CoagulationStep(MeshData<Real> *md, const Real time, const Real dt) {
             ncall = Coagulation::CoagulationOneCellImplicit<true>(
                 mbr, surface, time1, dt_sync, kernel, rhod, stime, vel, nvel, Q, nQs,
                 coag, coag_arrays, rate, source, n_new, n_trial, src_pert, n_old,
-                residual, jac, rcoag, rfrag);
+                residual, jac, rcoag, rfrag, m1r, m2r, m3r);
           } else {
             ncall = Coagulation::CoagulationOneCellImplicit<false>(
                 mbr, surface, time1, dt_sync, kernel, rhod, stime, vel, nvel, Q, nQs,
                 coag, coag_arrays, rate, source, n_new, n_trial, src_pert, n_old,
-                residual, jac, rcoag, rfrag);
+                residual, jac, rcoag, rfrag, m1r, m2r, m3r);
           }
           Kokkos::single(Kokkos::PerTeam(mbr), [&]() { token.release(tid); });
         } else {
@@ -426,7 +453,7 @@ TaskStatus CoagulationStep(MeshData<Real> *md, const Real time, const Real dt) {
               Kokkos::subview(rfrag_pool, tid_ex, Kokkos::ALL(), Kokkos::ALL());
           ncall = Coagulation::CoagulationOneCell(
               mbr, surface, time1, dt_sync, kernel, rhod, stime, vel, nvel, Q, nQs, coag,
-              coag_arrays, rate, source, Q2, rcoag_ex, rfrag_ex);
+              coag_arrays, rate, source, Q2, rcoag_ex, rfrag_ex, m1r, m2r, m3r);
           Kokkos::single(Kokkos::PerTeam(mbr), [&]() { token.release(tid_ex); });
         }
 
@@ -550,7 +577,8 @@ void InitializeArray(const int nm, int &pgrid, const Real &rho_p, const Real &ch
                      const Real &la, const ParArray1D<Real> dsize,
                      ParArray2D<int> idx_largest, ParArray1D<Real> mass_grid,
                      ParArray3D<Real> coag3d, ParArray3D<int> Kijk_sym_ind,
-                     ParArray3D<Real> Kijk_sym) {
+                     ParArray3D<Real> Kijk_sym, ParArray1D<Real> log_centers,
+                     ParArray1D<Real> log_widths) {
   parthenon::par_for(
       parthenon::loop_pattern_flatrange_tag, "initializeCoag1", parthenon::DevExecSpace(),
       0, nm - 1, KOKKOS_LAMBDA(const int i) {
@@ -559,6 +587,24 @@ void InitializeArray(const int nm, int &pgrid, const Real &rho_p, const Real &ch
           Real tmp1 = (1.0 - 0.5 * (i == j));
           coag3d(cidx::rate_coef, i, j) = M_PI * SQR(dsize(i) + dsize(j)) * tmp1;
         }
+      });
+
+  // Within-bin size geometry: log-size centers and widths between geometric-mean
+  // edges. For uniformly log-spaced grids these widths are constant; computing
+  // them per-bin keeps the helpers correct if the size grid is ever generalised.
+  parthenon::par_for(
+      parthenon::loop_pattern_flatrange_tag, "initializeCoagBinGeom",
+      parthenon::DevExecSpace(), 0, nm - 1, KOKKOS_LAMBDA(const int i) {
+        log_centers(i) = std::log(dsize(i));
+        const Real ln_left =
+            (i == 0)
+                ? std::log(dsize(0)) - 0.5 * (std::log(dsize(1)) - std::log(dsize(0)))
+                : 0.5 * (std::log(dsize(i - 1)) + std::log(dsize(i)));
+        const Real ln_right =
+            (i == nm - 1) ? std::log(dsize(nm - 1)) +
+                                0.5 * (std::log(dsize(nm - 1)) - std::log(dsize(nm - 2)))
+                          : 0.5 * (std::log(dsize(i)) + std::log(dsize(i + 1)));
+        log_widths(i) = ln_right - ln_left;
       });
 
   const Real a = std::pow(10.0, la);

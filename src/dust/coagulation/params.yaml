@@ -42,6 +42,17 @@ coagulation:
     _default: 4
     _description: "Number of Newton iterations to reuse a factored Jacobian before rebuilding. 1 = rebuild every iteration (no lagging). Larger values reduce the cost of Jacobian assembly at the price of slower Newton convergence per rebuild.  Only used when coag_implicit=true."
 
+  coag_bin_recon:
+    _type: string
+    _default: constant
+    _description: "Within-bin reconstruction model used by the coagulation microphysics (and Stokes drag when enabled). 'constant' treats each size bin as a delta function at its representative size (existing behavior). 'plm_logsize' reconstructs a slope-limited piecewise linear mass-per-ln(a) profile inside each bin using neighboring bin-averaged values. The evolved state is unchanged; only microphysical source coefficients differ."
+    constant:
+      _type: opt
+      _description: "Constant within-bin distribution (existing behavior)."
+    plm_logsize:
+      _type: opt
+      _description: "Piecewise linear in log(size), slope-limited from neighbors."
+
   coag_use_adaptive_step:
     _type: bool
     _default: "true"

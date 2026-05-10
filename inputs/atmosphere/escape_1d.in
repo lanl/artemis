@@ -5,38 +5,25 @@
 # under point-mass gravity.  Chapman-Cowling (hard-sphere) drag couples them.
 # Species 0 (H) is light enough to escape; species 1 (O) is gravitationally
 # bound but gets entrained by species 0 through drag.
-#
-# Grid: 1D spherical, r in [r0, 10*r0] with 512 uniform cells.
-#
-# Units: SCALEFREE (artemis/physical_units defaults to scalefree, so
-# G = kB = m_u = 1 in code units).  We further pick GM = r0 = 1, so:
-#   v_esc^2     = 2 GM/r0       = 2
-#   t_dyn       = r0 / v_esc    = 1/sqrt(2) ~ 0.71
-#   c_s,iso^2   = kB T / (mu m_u) = T0 / mu   (T "in code units", NOT Kelvin)
-#   escape par  lambda_n        = GM mu_n / (kB T0 r0 / m_u) = mu_n / T0
-#
-# Choosing T0 = 0.2 gives:
-#   lambda_H = 5   (Parker wind, sonic point r_c = GM/(2 c_s^2) = 2.5)
-#   lambda_O = 80  (heavy species strongly bound, dragged out by H wind)
-# =============================================================================
 
 <artemis>
   problem    = escape_1d
   coordinates = spherical
+  radial_spacing = logarithmic
   
 <parthenon/job>
-  problem_id = escape_1d
+  problem_id = drag
 
 <parthenon/time>
   nlim      = -1
-  tlim      = 10.0        # ~14 t_dyn (t_dyn = r0/v_esc = 1/sqrt(2))
+  tlim      = 50.0        # ~14 t_dyn (t_dyn = r0/v_esc = 1/sqrt(2))
   integrator = rk2
   ncycle_out = 1
 
 <parthenon/mesh>
   nx1     = 512
-  x1min   = 1.0           # inner radius r0
-  x1max   = 10.0          # outer radius
+  x1min   = 0.0          # inner radius r0
+  x1max   = 2.302585092994046          # outer radius
   ix1_bc  = hydrostatic          # custom inner BC (hydrostatic inflow)
   ox1_bc  = outflow         # custom outer BC (outflow)
 
@@ -75,9 +62,14 @@
   siefloor = 1.0e-12
 
 # Gravity: point mass at origin
-<gravity>
-  type = point
-  gm   = 1.0                # G*M in code units
+<gravity/point>
+  mass   = 1.0                # G*M in code units
+
+
+<physics>
+  gas = true
+  gravity = true
+  drag = true
 
 # Drag: full Chapman-Cowling coupling
 <drag>

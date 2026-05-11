@@ -26,6 +26,7 @@
 #include "constant.hpp"
 #include "crooked_pipe.hpp"
 #include "disk.hpp"
+#include "field.hpp"
 #include "gaussian_bump.hpp"
 #include "geometry/geometry.hpp"
 #include "grav_slab.hpp"
@@ -76,6 +77,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
     kh::ProblemGenerator<T>(pmb, pin);
   } else if (name == "rt") {
     rt::ProblemGenerator<T>(pmb, pin);
+  } else if (name == "field") {
+    field::ProblemGenerator<T>(pmb, pin);
   } else if (name == "shock") {
     shock::ProblemGenerator<T>(pmb, pin);
   } else if (name == "strat") {
@@ -105,6 +108,8 @@ void InitMeshBlockData(MeshBlock *pmb, ParameterInput *pin) {
     cond::InitCondParams(pmb, pin);
   } else if (name == "disk") {
     disk::InitDiskParams(pmb, pin);
+  } else if (name == "field") {
+    field::InitFieldParams(pmb, pin);
   } else if (name == "shock") {
     shock::InitShockParams(pmb, pin);
   } else if (name == "strat") {

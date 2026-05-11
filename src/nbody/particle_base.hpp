@@ -88,7 +88,7 @@ class Particle {
     radius = pars.radius;
     rs = pars.rs;
     cq = 1.5 * pars.J2 * GM * SQR(radius);
-    cd = 0.5 * pars.Cd * M_PI * SQR(radius);
+    cd = pars.Cd;
     rdrag = pars.rdrag;
     spin[0] = pars.spin[0];
     spin[1] = pars.spin[1];

@@ -191,12 +191,12 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         for (int n = 0; n < 3; n++) {
           xcart[n] -= xc[n];
         }
-        coords.bnds.x1[0] -= xc[0];
-        coords.bnds.x1[1] -= xc[0];
-        coords.bnds.x2[0] -= xc[1];
-        coords.bnds.x2[1] -= xc[1];
-        coords.bnds.x3[0] -= xc[2];
-        coords.bnds.x3[1] -= xc[2];
+        coords.bnds.x1[0] -= pars.x0[0];
+        coords.bnds.x1[1] -= pars.x0[0];
+        coords.bnds.x2[0] -= pars.x0[1];
+        coords.bnds.x2[1] -= pars.x0[1];
+        coords.bnds.x3[0] -= pars.x0[2];
+        coords.bnds.x3[1] -= pars.x0[2];
 
         if (pars.type == 1) { // spherical
           // Intersection volume

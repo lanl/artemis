@@ -187,9 +187,9 @@ KOKKOS_INLINE_FUNCTION std::array<Real, 3> RotationVelocity(const std::array<Rea
 template <Coordinates GEOM>
 struct OrbitalAdvection {
   Real gm, omega_f, qshear, scdt, dwdt;
-  static constexpr bool phi_is_x2 =
-      (GEOM == Coordinates::cartesian || GEOM == Coordinates::cylindrical);
-  static constexpr int phi_idx = phi_is_x2 ? 1 : 2;
+
+  static constexpr int phi_idx =
+      ((GEOM == Coordinates::cartesian) || (GEOM == Coordinates::cylindrical)) ? 1 : 2;
 
   KOKKOS_FORCEINLINE_FUNCTION Real OmegaKep(const Real R) const {
     return std::sqrt(gm / (R * R * R));
@@ -329,15 +329,15 @@ struct OrbitalAdvection {
 };
 
 //----------------------------------------------------------------------------------------
-//! \fn  RemapUpdate
+//! \fn  RemapUpdateX2
 //! \brief Conservative intersection-remap update using OrbitalAdvection struct.
 //! Only interior cells (js <= j/jp <= je in the sweep direction) are updated.
 template <Coordinates GEOM, typename V1>
 KOKKOS_INLINE_FUNCTION void
-RemapUpdate(const OrbitalAdvection<GEOM> &oa, const V1 &v0, const ReconInfo &rp,
-            const ReconInfo &r, const Real vb, const int three_d, const int b,
-            const int n, const int k, const int j, const int jp, const int i,
-            const int js, const int je) {
+RemapUpdateX2(const OrbitalAdvection<GEOM> &oa, const V1 &v0, const ReconInfo &rp,
+              const ReconInfo &r, const Real vb, const int three_d, const int b,
+              const int n, const int k, const int j, const int jp, const int i,
+              const int js, const int je) {
   const Real flip = (vb < 0.0) ? -1.0 : 1.0;
   const Real I0 = oa.ComputeI0(r, flip);
   const auto I1 = oa.ComputeI1(r, flip, vb, I0, three_d);
@@ -348,15 +348,32 @@ RemapUpdate(const OrbitalAdvection<GEOM> &oa, const V1 &v0, const ReconInfo &rp,
 }
 
 //----------------------------------------------------------------------------------------
-//! \fn  RemapCons
+//! \fn  RemapUpdateX3
+//! \brief Conservative intersection-remap update using OrbitalAdvection struct.
+//! Only interior cells (ks <= k/kp <= ke in the sweep direction) are updated.
+template <Coordinates GEOM, typename V1>
+KOKKOS_INLINE_FUNCTION void
+RemapUpdateX3(const OrbitalAdvection<GEOM> &oa, const V1 &v0, const ReconInfo &rp,
+              const ReconInfo &r, const Real vb, const int three_d, const int b,
+              const int n, const int k, const int kp, const int j, const int i,
+              const int ks, const int ke) {
+  const Real flip = (vb < 0.0) ? -1.0 : 1.0;
+  const Real I0 = oa.ComputeI0(r, flip);
+  const auto I1 = oa.ComputeI1(r, flip, vb, I0, three_d);
+  const Real dq =
+      (rp.q - ArtemisUtils::VDot(rp.grad, rp.xc)) * I0 + ArtemisUtils::VDot(rp.grad, I1);
+  if (k >= ks && k <= ke) v0(b, n, k, j, i) += dq / r.vol;
+  if (kp >= ks && kp <= ke) v0(b, n, kp, j, i) -= dq / rp.vol;
+}
+
+//----------------------------------------------------------------------------------------
+//! \fn  RemapConsX2
 //! \brief Reconstruction and remap sweep along the advection direction.
 template <Coordinates GEOM, Upwind UDIR, ReconstructionMethod R, typename V1, typename V2>
 KOKKOS_INLINE_FUNCTION void
-RemapCons(const OrbitalAdvection<GEOM> &oa, const geometry::CoordParams &cpars,
-          const V1 &v0, const V2 &vg, const int multi_d, const int three_d, const int b,
-          const int k, IndexRange jb, const int i) {
-
-  constexpr bool phi_is_x2 = OrbitalAdvection<GEOM>::phi_is_x2;
+RemapConsX2(const OrbitalAdvection<GEOM> &oa, const geometry::CoordParams &cpars,
+            const V1 &v0, const V2 &vg, const int multi_d, const int three_d, const int b,
+            const int k, IndexRange jb, const int i) {
 
   // Extract coordinates at the start of the sweep range for vb computation
   geometry::Coords<GEOM> coords(cpars, v0.GetCoordinates(b), k, jb.s, i);
@@ -383,19 +400,11 @@ RemapCons(const OrbitalAdvection<GEOM> &oa, const geometry::CoordParams &cpars,
 
   // Helper to fill ReconInfo with the correct index permutation
   auto fill_ri = [&](ReconInfo &ri, int n, int jsweep) {
-    if constexpr (phi_is_x2) {
-      ri.template fill<GEOM>(cpars, v0, vg, b, n, k, jsweep, i);
-    } else {
-      ri.template fill<GEOM>(cpars, v0, vg, b, n, jsweep, k, i);
-    }
+    ri.template fill<GEOM>(cpars, v0, vg, b, n, k, jsweep, i);
   };
 
   auto get_recon = [&](const ReconInfo &ri, int n, int jsweep) -> std::array<Real, 3> {
-    if constexpr (phi_is_x2) {
-      return recon(cpars, v0, ri.dx, multi_d, three_d, b, n, k, jsweep, i);
-    } else {
-      return recon(cpars, v0, ri.dx, multi_d, three_d, b, n, jsweep, k, i);
-    }
+    return recon(cpars, v0, ri.dx, multi_d, three_d, b, n, k, jsweep, i);
   };
 
   for (int n = v0.GetLowerBound(b); n <= v0.GetUpperBound(b); ++n) {
@@ -417,13 +426,77 @@ RemapCons(const OrbitalAdvection<GEOM> &oa, const geometry::CoordParams &cpars,
         rd.grad = get_recon(rd, n, jd);
         oa.ApplyGradSkew(rd);
       }
-      if constexpr (phi_is_x2) {
-        RemapUpdate<GEOM>(oa, v0, ru, rc, vb, three_d, b, n, k, j, j + joff, i, jb.s,
+      RemapUpdateX2<GEOM>(oa, v0, ru, rc, vb, three_d, b, n, k, j, j + joff, i, jb.s,
                           jb.e);
-      } else {
-        RemapUpdate<GEOM>(oa, v0, ru, rc, vb, three_d, b, n, j, k, j + joff, i, jb.s,
-                          jb.e);
+      ru = rc;
+      rc = rd;
+    }
+  }
+}
+
+//----------------------------------------------------------------------------------------
+//! \fn  RemapConsX3
+//! \brief Reconstruction and remap sweep along the advection direction.
+template <Coordinates GEOM, Upwind UDIR, ReconstructionMethod R, typename V1, typename V2>
+KOKKOS_INLINE_FUNCTION void
+RemapConsX3(const OrbitalAdvection<GEOM> &oa, const geometry::CoordParams &cpars,
+            const V1 &v0, const V2 &vg, const int multi_d, const int three_d, const int b,
+            IndexRange kb, const int j, const int i) {
+
+  // Extract coordinates at the start of the sweep range for vb computation
+  geometry::Coords<GEOM> coords(cpars, v0.GetCoordinates(b), kb.s, j, i);
+  const auto xc0 = coords.GetCellCenter(vg, b, kb.s, j, i);
+
+  // Compute the signed background velocity at this radial position for sweep direction
+  const Real vb = oa.DeltaPhi(xc0);
+
+  // Integer gymnastics for sweep direction
+  int koff = 1;
+  int kstart = kb.e;
+  int kend = kb.s - koff;
+  if constexpr (UDIR == Upwind::l) {
+    koff = -1;
+    kstart = kb.s;
+    kend = kb.e - koff;
+  }
+
+  const auto compare = (UDIR == Upwind::r) ? [](int k, int end) { return k >= end; }
+                                           : [](int k, int end) { return k <= end; };
+
+  ArtemisUtils::ReconGradient<GEOM, R> recon;
+  ReconInfo rd, rc, ru;
+
+  // Helper to fill ReconInfo with the correct index permutation
+  auto fill_ri = [&](ReconInfo &ri, int n, int ksweep) {
+    ri.template fill<GEOM>(cpars, v0, vg, b, n, ksweep, j, i);
+  };
+
+  auto get_recon = [&](const ReconInfo &ri, int n, int ksweep) -> std::array<Real, 3> {
+    return recon(cpars, v0, ri.dx, multi_d, three_d, b, n, ksweep, j, i);
+  };
+
+  for (int n = v0.GetLowerBound(b); n <= v0.GetUpperBound(b); ++n) {
+    fill_ri(ru, n, kstart + koff);
+    fill_ri(rc, n, kstart);
+    oa.ApplySkew(ru);
+    oa.ApplySkew(rc);
+    ru.grad = get_recon(ru, n, kstart + koff);
+    rc.grad = get_recon(rc, n, kstart);
+    oa.ApplyGradSkew(ru);
+    oa.ApplyGradSkew(rc);
+
+    // Execute remapping "sweep"
+    for (int k = kstart; compare(k, kend); k -= koff) {
+      const int kd = k - koff;
+      if (compare(kd, kend)) {
+        fill_ri(rd, n, kd);
+        oa.ApplySkew(rd);
+        rd.grad = get_recon(rd, n, kd);
+        oa.ApplyGradSkew(rd);
       }
+      RemapUpdateX3<GEOM>(oa, v0, ru, rc, vb, three_d, b, n, k, k + koff, j, i, kb.s,
+                          kb.e);
+
       ru = rc;
       rc = rd;
     }
@@ -460,11 +533,11 @@ TaskStatus LagrangeRemapImpl(MeshData<Real> *u0, const V1 &v0, const V2 &vg,
           const auto xc0 = coords.GetCellCenter(vg, b, k, jb.s, i);
           const Real vb = oa.DeltaPhi(xc0);
           if (vb < 0.0) {
-            RemapCons<GEOM, Upwind::r, R>(oa, cpars, v0, vg, multi_d, three_d, b, k, jb,
-                                          i);
+            RemapConsX2<GEOM, Upwind::r, R>(oa, cpars, v0, vg, multi_d, three_d, b, k, jb,
+                                            i);
           } else if (vb > 0.0) {
-            RemapCons<GEOM, Upwind::l, R>(oa, cpars, v0, vg, multi_d, three_d, b, k, jb,
-                                          i);
+            RemapConsX2<GEOM, Upwind::l, R>(oa, cpars, v0, vg, multi_d, three_d, b, k, jb,
+                                            i);
           }
         });
   } else if constexpr (GEOM == Coordinates::spherical3D) {
@@ -477,11 +550,11 @@ TaskStatus LagrangeRemapImpl(MeshData<Real> *u0, const V1 &v0, const V2 &vg,
           const auto xc0 = coords.GetCellCenter(vg, b, kb.s, j, i);
           const Real vb = oa.DeltaPhi(xc0);
           if (vb < 0.0) {
-            RemapCons<GEOM, Upwind::r, R>(oa, cpars, v0, vg, multi_d, three_d, b, j, kb,
-                                          i);
+            RemapConsX3<GEOM, Upwind::r, R>(oa, cpars, v0, vg, multi_d, three_d, b, kb, j,
+                                            i);
           } else if (vb > 0.0) {
-            RemapCons<GEOM, Upwind::l, R>(oa, cpars, v0, vg, multi_d, three_d, b, j, kb,
-                                          i);
+            RemapConsX3<GEOM, Upwind::l, R>(oa, cpars, v0, vg, multi_d, three_d, b, kb, j,
+                                            i);
           }
         });
   } else {

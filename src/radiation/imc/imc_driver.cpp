@@ -37,16 +37,16 @@ TaskListStatus JaybenneIMC(Mesh *pmesh, const SimTime &tm, const Real dt) {
     return TaskListStatus::complete;
   } else if (active == ArtemisUtils::PackageControl::shutdown) {
     if (Globals::my_rank == 0) {
-      printf("Turning off iMC radiation at t=%.8e...\n", tm.time);
+      printf("Turning off IMC radiation at t=%.8e...\n", tm.time);
     }
     return TaskListStatus::complete;
   } else if (active == ArtemisUtils::PackageControl::initial) {
     if (Globals::my_rank == 0) {
       printf("Turning on IMC radiation at t=%.8e...\n", tm.time);
     }
-    // What to call here to set the field?
-    // Need a pmesh version of this
-    // jaybenne::InitializeRadiation(md.get(), true)
+    for (auto &mbd : pmesh->mesh_data.Get()->GetAllBlockData()) {
+      jaybenne::InitializeRadiation(mbd.get(), true);
+    }
   }
   auto status = Radiation::UpdateRadiationFields(pmesh).Execute();
   if (status != TaskListStatus::complete) return status;

@@ -401,9 +401,9 @@ void InitMesh(parthenon::Mesh *pmesh) {
             (pmesh->resolved_packages).get());
     auto vmesh = desc.GetPack(md);
 
-    IndexRange ib = md->GetBoundsI(IndexDomain::interior);
-    IndexRange jb = md->GetBoundsJ(IndexDomain::interior);
-    IndexRange kb = md->GetBoundsK(IndexDomain::interior);
+    IndexRange ib = md->GetBoundsI(IndexDomain::entire);
+    IndexRange jb = md->GetBoundsJ(IndexDomain::entire);
+    IndexRange kb = md->GetBoundsK(IndexDomain::entire);
     const auto ndim = pmesh->ndim;
     const auto &cpars =
         pmesh->packages.Get("artemis")->template Param<geometry::CoordParams>(

@@ -144,11 +144,47 @@ void gr_force(struct reb_simulation *const rsim) {
 }
 } // namespace PNForce
 
+namespace J2Force {
+void j2_force(struct reb_simulation *const rsim) {
+  // Apply the J2 correction to all particles
+  struct reb_particle *const part = rsim->particles;
+  const int N = rsim->N;
+  // Note that this is optimized for the case where the first particle only has J2
+  for (int i = 0; i < N; i++) {
+    const Real ci = RebAttrs::J2vals[i];
+    for (int j = i + 1; j < N; j++) {
+      const Real cj = RebAttrs::J2vals[j];
+      if (ci == 0.0 && cj == 0.0) continue;
+      const Real dx = part[j].x - part[i].x;
+      const Real dy = part[j].y - part[i].y;
+      const Real dz = part[j].z - part[i].z;
+      const Real dr2 = SQR(dx) + SQR(dy) + SQR(dz);
+      const Real idr2 = 1.0 / dr2;
+      const Real idr3 = idr2 / std::sqrt(dr2);
+      const Real idr5 = idr3 * idr2;
+      const Real zfac = 5.0 * SQR(dz) * idr2;
+      // Note that ci is 1.5*J2 * R^2 * GM
+      const Real GMQ = part[i].m * part[j].m * (ci / part[i].m + cj / part[j].m);
+      const Real fx = GMQ * dx * idr5 * (zfac - 1.0);
+      const Real fy = GMQ * dy * idr5 * (zfac - 1.0);
+      const Real fz = GMQ * dz * idr5 * (zfac - 3.0);
+      part[j].ax += fx / part[j].m;
+      part[j].ay += fy / part[j].m;
+      part[j].az += fz / part[j].m;
+      part[i].ax -= fx / part[i].m;
+      part[i].ay -= fy / part[i].m;
+      part[i].az -= fz / part[i].m;
+    }
+  }
+}
+} // namespace J2Force
+
 //----------------------------------------------------------------------------------------
 //! \fn  void NBody::reb_extra_forces
 //! \brief Supplies additional forcings to rebound particles
 void reb_extra_forces(struct reb_simulation *r) {
   if (RebAttrs::PN > 0) PNForce::gr_force(r);
+  if (RebAttrs::J2) J2Force::j2_force(r);
 }
 
 //----------------------------------------------------------------------------------------

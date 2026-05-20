@@ -36,6 +36,11 @@ Real PN;
 Real c;
 int include_pn2;
 bool extras;
+bool J2;
+Real *J2vals;
+Real *sx;
+Real *sy;
+Real *sz;
 bool merge_on_collision;
 } // namespace RebAttrs
 
@@ -108,10 +113,25 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   params.Add("gm", G * mtot);
   // Copy into our final particle array and check that every particle was initialized
   int count = 0;
+  RebAttrs::J2 = false;
   for (auto const &[id, p] : parts) {
     particle_id.push_back(count);
     particles_v.push_back(Particle(p, G, Rf, Vf));
+    RebAttrs::J2 = RebAttrs::J2 || (p.J2 != 0.0);
     count++;
+  }
+
+  if (RebAttrs::J2 && (count > 0)) {
+    RebAttrs::J2vals = (Real *)malloc(count * sizeof(Real));
+    RebAttrs::sx = (Real *)malloc(count * sizeof(Real));
+    RebAttrs::sy = (Real *)malloc(count * sizeof(Real));
+    RebAttrs::sz = (Real *)malloc(count * sizeof(Real));
+    for (int i = 0; i < count; i++) {
+      RebAttrs::J2vals[i] = particles_v[i].cq;
+      RebAttrs::sx[i] = particles_v[i].spin[0];
+      RebAttrs::sy[i] = particles_v[i].spin[1];
+      RebAttrs::sz[i] = particles_v[i].spin[2];
+    }
   }
 
   const int npart = static_cast<int>(particles_v.size());
@@ -389,6 +409,18 @@ void InitializeFromRestart(Mesh *pm) {
   // Send restarted rebound particles to all nodes
   auto reb_sim_rst = nbody_pkg->Param<RebSim>("reb_sim");
   SyncWithRebound(reb_sim_rst, particle_id, particles);
+}
+
+//----------------------------------------------------------------------------------------
+//! \fn void NBody::Finalize
+//! \brief Free any memory that might have been allocated
+void Finalize() {
+  if (RebAttrs::J2) {
+    free(RebAttrs::J2vals);
+    free(RebAttrs::sx);
+    free(RebAttrs::sy);
+    free(RebAttrs::sz);
+  }
 }
 
 //----------------------------------------------------------------------------------------

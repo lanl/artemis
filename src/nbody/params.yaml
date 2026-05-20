@@ -91,6 +91,31 @@ nbody:
       _type: Real
       _default: 0.0
       _description: "Tag zones that within this distance to the particle for refinement."
+    j2:
+      _type: Real
+      _default: 0.0
+      _description: "The J2 moment of the particle."
+    spin_x:
+      _type: Real
+      _default: 0.0
+      _description: "The X component of the particle's spin vector."
+    spin_y:
+      _type: Real
+      _default: 0.0
+      _description: "The Y component of the particle's spin vector."
+    spin_z:
+      _type: Real
+      _default: 1.0
+      _description: "The Z component of the particle's spin vector."
+    drag:
+      _type: node
+      _description: "Block controlling particle drag"
+      radius:
+        _type: Real
+        _description: "Radius around the particle within which drag is applied"
+      cd:
+        _type: Real
+        _description: "The aerodynamic drag coefficient for the particle."
     soft:
       _type: node
       _description: "Block controllling the particle softening"

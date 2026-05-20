@@ -65,6 +65,11 @@ void PrintParticle(const int id, const ParticleParams &part) {
             << "Sink: " << part.racc << "\n"
             << "gamma: " << part.gamma << "\n"
             << "beta: " << part.beta << "\n"
+            << "J2: " << part.J2 << "\n"
+            << "spin=(" << part.spin[0] << "," << part.spin[1] << "," << part.spin[2]
+            << ")\n"
+            << "Drag Radius: " << part.rdrag << "\n"
+            << "Cd: " << part.Cd << "\n"
             << "couple: " << part.couple << "\n"
             << "target_rad: " << part.target_rad << "\n"
             << "live: " << part.live << "\n"
@@ -153,6 +158,9 @@ ParticleParams CreateNewParticle(Real m, Real radius, Real rs, std::string stype
   part.live = live;
   part.live_after = live_after;
   part.radius = radius;
+  part.spin[0] = 0.0;
+  part.spin[1] = 0.0;
+  part.spin[2] = 1.0;
   return part;
 }
 
@@ -166,6 +174,10 @@ void ReadParticleBlock(ParameterInput *pin, parthenon::InputBlock *pib,
     // <nbody/particle1>
     part.m = pin->GetReal(pib->block_name, "mass");
     part.radius = pin->GetOrAddReal(pib->block_name, "radius", 0.0);
+    part.J2 = pin->GetOrAddReal(pib->block_name, "j2", 0.0);
+    part.spin[0] = pin->GetOrAddReal(pib->block_name, "spin_x", 0.0);
+    part.spin[1] = pin->GetOrAddReal(pib->block_name, "spin_y", 0.0);
+    part.spin[2] = pin->GetOrAddReal(pib->block_name, "spin_z", 1.0);
     part.couple = pin->GetOrAddInteger(pib->block_name, "couple", 1);
     part.live = pin->GetOrAddInteger(pib->block_name, "live", 0);
     part.live_after = pin->GetOrAddReal(pib->block_name, "live_after", 0.0);
@@ -193,6 +205,10 @@ void ReadParticleBlock(ParameterInput *pin, parthenon::InputBlock *pib,
       part.racc = pin->GetReal(pib->block_name, "radius");
       part.gamma = pin->GetReal(pib->block_name, "gamma");
       part.beta = pin->GetOrAddReal(pib->block_name, "beta", 0.0);
+    } else if (subs[2] == "drag") {
+      // <nbody/particle1/drag>
+      part.rdrag = pin->GetReal(pib->block_name, "radius");
+      part.Cd = pin->GetReal(pib->block_name, "cd");
     } else if (subs[2] == "initialize") {
       // <nbody/particle1/init>
       part.x = pin->GetOrAddReal(pib->block_name, "x", 0.0);
@@ -495,7 +511,7 @@ int ReadTripleBlock(ParameterInput *pin, parthenon::InputBlock *pib,
 //! \fn  int NBody::ReadNBodySystemBlock
 //! \brief Initializes a generic N-body system from a file
 //! The input file should read:
-//! # mass  x  y  z  vx   vy   vz   sft  gamma  beta target_rad
+//! # mass  x  y  z  vx   vy   vz   sft  gamma  beta target_rad rdrag Cd J2 spin
 int ReadNBodySystemBlock(ParameterInput *pin, parthenon::InputBlock *pib,
                          std::map<int, ParticleParams> &parts) {
   const int couple = pin->GetOrAddInteger(pib->block_name, "couple", 1);
@@ -541,6 +557,13 @@ int ReadNBodySystemBlock(ParameterInput *pin, parthenon::InputBlock *pib,
     if (len > ++icol) p.beta = (row[icol]);
     if (len > ++icol) p.target_rad = (row[icol]);
     if (len > ++icol) p.radius = (row[icol]);
+    if (len > ++icol) p.rdrag = (row[icol]);
+    if (len > ++icol) p.Cd = (row[icol]);
+    if (len > ++icol) p.J2 = (row[icol]);
+    if (len > ++icol) p.spin[0] = (row[icol]);
+    if (len > ++icol) p.spin[1] = (row[icol]);
+    if (len > ++icol) p.spin[2] = (row[icol]);
+
     p.init = 1;
     parts[id] = p;
     count++;
@@ -556,7 +579,7 @@ int ReadNBodySystemBlock(ParameterInput *pin, parthenon::InputBlock *pib,
 //! Initialize a planetary system from a file
 //!
 //! The input file should read:
-//! # q  a   e   i  f omega   bigOm   sft gamma  beta  target_rad radius
+//! # q  a   e   i  f omega   bigOm   sft gamma  beta  target_rad radius rdrag Cd J2 spin
 //!
 //! User must add the central object with a separate particle / binary / system block
 int ReadPlanetarySystemBlock(ParameterInput *pin, parthenon::InputBlock *pib,
@@ -604,6 +627,12 @@ int ReadPlanetarySystemBlock(ParameterInput *pin, parthenon::InputBlock *pib,
     if (len > ++icol) p.beta = row[icol];
     if (len > ++icol) p.target_rad = row[icol];
     if (len > ++icol) p.radius = row[icol];
+    if (len > ++icol) p.rdrag = row[icol];
+    if (len > ++icol) p.Cd = (row[icol]);
+    if (len > ++icol) p.J2 = (row[icol]);
+    if (len > ++icol) p.spin[0] = (row[icol]);
+    if (len > ++icol) p.spin[1] = (row[icol]);
+    if (len > ++icol) p.spin[2] = (row[icol]);
     Real rb[3] = {Null<Real>()}, vb[3] = {Null<Real>()};
     init_orbit(1.0, orb, rb, vb);
     p.m = q;
@@ -712,12 +741,6 @@ std::map<int, ParticleParams> NBodySetup(ParameterInput *pin, const Real G, Real
     parts[id].vy = p.vy - V[1];
     parts[id].vz = p.vz - V[2];
   }
-  // if (parthenon::Globals::my_rank == 0) {
-  //  std::cout << npart << " Initial Particles: " << std::endl;
-  //  for (auto const &[id, p] : parts) {
-  //    PrintParticle(id, p);
-  //  }
-  //}
 
   return parts;
 }

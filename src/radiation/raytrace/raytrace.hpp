@@ -24,7 +24,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
                                             ArtemisUtils::Units &units,
                                             ArtemisUtils::Constants &constants);
 
-TaskListStatus RaytraceDriver(Mesh *pmesh);
+TaskListStatus RaytraceDriver(Mesh *pmesh, const Real time);
 
 struct ParticleWeights {
   Real dx2 = 1.0;

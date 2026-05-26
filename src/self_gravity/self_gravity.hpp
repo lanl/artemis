@@ -32,7 +32,7 @@ void FillPoissonRHS(MeshData<Real> *md);
 template <Coordinates GEOM>
 TaskStatus SelfGravity(MeshData<Real> *md, const Real time, const Real dt);
 
-void SolvePoisson(TaskCollection &tc, Mesh *pmesh);
+void SolvePoisson(TaskCollection &tc, Mesh *pmesh, const Real time, const int stage);
 
 } // namespace SelfGravity
 

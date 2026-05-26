@@ -16,6 +16,7 @@
 #include "derived/fill_derived.hpp"
 #include "radiation/imc/imc.hpp"
 #include "radiation/radiation.hpp"
+#include "utils/artemis_utils.hpp"
 
 // Jaybenne includes
 #include "jaybenne.hpp"
@@ -30,6 +31,23 @@ namespace IMC {
 template <Coordinates GEOM>
 TaskListStatus JaybenneIMC(Mesh *pmesh, const SimTime &tm, const Real dt) {
   PARTHENON_INSTRUMENT
+  auto &pkg = pmesh->packages.Get("radiation");
+  const auto active = ArtemisUtils::CheckPackageStatus(pkg, tm.time);
+  if (active == ArtemisUtils::PackageControl::inactive) {
+    return TaskListStatus::complete;
+  } else if (active == ArtemisUtils::PackageControl::shutdown) {
+    if (Globals::my_rank == 0) {
+      printf("Turning off IMC radiation at t=%.8e...\n", tm.time);
+    }
+    return TaskListStatus::complete;
+  } else if (active == ArtemisUtils::PackageControl::initial) {
+    if (Globals::my_rank == 0) {
+      printf("Turning on IMC radiation at t=%.8e...\n", tm.time);
+    }
+    for (auto &mbd : pmesh->mesh_data.Get()->GetAllBlockData()) {
+      jaybenne::InitializeRadiation(mbd.get(), true);
+    }
+  }
   auto status = Radiation::UpdateRadiationFields(pmesh).Execute();
   if (status != TaskListStatus::complete) return status;
   status = jaybenne::RadiationStep(pmesh, tm, dt).Execute();

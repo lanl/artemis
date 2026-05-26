@@ -128,7 +128,7 @@ TaskListStatus ArtemisDriver<GEOM>::Step() {
   TaskListStatus status = TaskListStatus::complete;
   // Execute explicit, unsplit physics
   if (do_raytrace) {
-    status = RT::RaytraceDriver(pmesh);
+    status = RT::RaytraceDriver(pmesh, tm.time);
     if (status != TaskListStatus::complete) return status;
   }
 
@@ -147,7 +147,7 @@ TaskListStatus ArtemisDriver<GEOM>::Step() {
     if (status != TaskListStatus::complete) return status;
   }
 
-  // Operator split, moments subcyling (M1 or P1)
+  // Operator split, moments subcycling (M1 or P1)
   if (do_moment) {
     status = Moments::MomentsDriver<GEOM>(pmesh, tm, rad_integrator.get());
     if (status != TaskListStatus::complete) return status;
@@ -238,7 +238,7 @@ TaskCollection ArtemisDriver<GEOM>::StepTasks() {
     const Real bdt = integrator->beta[stage - 1] * integrator->dt;
 
     // Compute gravitational potential
-    if (do_self_gravity) SelfGravity::SolvePoisson(tc, pmesh);
+    if (do_self_gravity) SelfGravity::SolvePoisson(tc, pmesh, time, stage);
 
     TaskRegion &tr = tc.AddRegion(num_partitions);
     for (int i = 0; i < num_partitions; i++) {
@@ -330,8 +330,8 @@ TaskCollection ArtemisDriver<GEOM>::StepTasks() {
       // NOTE(@pdmullen): RK integrated, operator split cooling (RHS computed from U)
       TaskID cooling_src = drag_src;
       if (do_cooling) {
-        cooling_src =
-            tl.AddTask(drag_src, Gas::Cooling::CoolingSource<GEOM>, u0.get(), time, bdt);
+        cooling_src = tl.AddTask(drag_src, Gas::Cooling::CoolingSource<GEOM>, u0.get(),
+                                 time, bdt, stage);
       }
 
       // Set auxillary fields

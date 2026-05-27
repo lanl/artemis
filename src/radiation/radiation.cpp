@@ -74,6 +74,9 @@ Initialize(ParameterInput *pin, ArtemisUtils::Constants &constants, const bool d
     radiation->AddField<rad::opac::scattering>(m);
   }
 
+  // Enroll in tstart/tstop machinery
+  ArtemisUtils::AddPackageTimeParams(
+      params, (do_imc) ? "radiation/imc" : "radiation/moment", pin);
   return radiation;
 }
 

@@ -13,7 +13,7 @@ rotating_frame:
   gm:
     _type: Real
     _default: 0.0
-    _description: "GM of central point mass for orbital advection. If zero, attempts to source from gravity package."
+    _description: "GM of central point mass for orbital advection. Used to compute the Keplerian rotation rate."
   reconstruct:
     _type: string
     _default: plm

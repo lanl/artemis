@@ -707,7 +707,11 @@ TaskStatus MomentumFluxImpl(MeshData<Real> *md, DiffCoeffParams dp, PKG &pkg,
                                                         multi_d, three_d, qshear, om0,
                                                         gm_bg, vprim, vg, flx);
 
-              // 2. Viscosity values. No barrier
+              // 2. Compute div(u) on this pencil
+              VelocityDivergence<GEOM, FLUID_TYPE>(mbr, cpars, b, n, k, j, il, iu,
+                                                   multi_d, three_d, vprim, vg, divu_jm1);
+
+              // 3. Viscosity values. No barrier
               DiffusionCoeff<DIFF, GEOM, FLUID_TYPE> diffcoeff;
               diffcoeff.evaluate(dp, mbr, b, n, k, j, il, iu, vprim, eos_d, mu_jm1);
 

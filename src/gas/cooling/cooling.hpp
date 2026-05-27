@@ -62,7 +62,8 @@ template <Coordinates GEOM, TempRefType T>
 TaskStatus BetaCooling(MeshData<Real> *md, const Real time, const Real dt);
 
 template <Coordinates GEOM>
-TaskStatus CoolingSource(MeshData<Real> *md, const Real time, const Real dt);
+TaskStatus CoolingSource(MeshData<Real> *md, const Real time, const Real dt,
+                         const int stage);
 
 } // namespace Cooling
 } // namespace Gas

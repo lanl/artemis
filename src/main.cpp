@@ -49,7 +49,7 @@ parthenon::DriverStatus LaunchWorkFlow(parthenon::ParthenonManager &pman,
         artemis::InitMeshBlockData<Coordinates::cartesian>;
     ProblemModifier<Coordinates::cartesian>(&pman);
     pman.app_input->ProblemGenerator = ProblemGenerator<Coordinates::cartesian>;
-    pman.app_input->PostInitialization =
+    pman.app_input->PostProblemGenerator =
         ArtemisDerived::PostInitialization<Coordinates::cartesian>;
     pman.ParthenonInitPackagesAndMesh();
     ArtemisDriver<Coordinates::cartesian> driver(pin, pman.app_input.get(),
@@ -61,7 +61,7 @@ parthenon::DriverStatus LaunchWorkFlow(parthenon::ParthenonManager &pman,
           artemis::InitMeshBlockData<Coordinates::spherical1D>;
       ProblemModifier<Coordinates::spherical1D>(&pman);
       pman.app_input->ProblemGenerator = ProblemGenerator<Coordinates::spherical1D>;
-      pman.app_input->PostInitialization =
+      pman.app_input->PostProblemGenerator =
           ArtemisDerived::PostInitialization<Coordinates::spherical1D>;
       pman.ParthenonInitPackagesAndMesh();
       ArtemisDriver<Coordinates::spherical1D> driver(
@@ -72,7 +72,7 @@ parthenon::DriverStatus LaunchWorkFlow(parthenon::ParthenonManager &pman,
           artemis::InitMeshBlockData<Coordinates::spherical2D>;
       ProblemModifier<Coordinates::spherical2D>(&pman);
       pman.app_input->ProblemGenerator = ProblemGenerator<Coordinates::spherical2D>;
-      pman.app_input->PostInitialization =
+      pman.app_input->PostProblemGenerator =
           ArtemisDerived::PostInitialization<Coordinates::spherical2D>;
       pman.ParthenonInitPackagesAndMesh();
       ArtemisDriver<Coordinates::spherical2D> driver(
@@ -83,7 +83,7 @@ parthenon::DriverStatus LaunchWorkFlow(parthenon::ParthenonManager &pman,
           artemis::InitMeshBlockData<Coordinates::spherical3D>;
       ProblemModifier<Coordinates::spherical3D>(&pman);
       pman.app_input->ProblemGenerator = ProblemGenerator<Coordinates::spherical3D>;
-      pman.app_input->PostInitialization =
+      pman.app_input->PostProblemGenerator =
           ArtemisDerived::PostInitialization<Coordinates::spherical3D>;
       pman.ParthenonInitPackagesAndMesh();
       ArtemisDriver<Coordinates::spherical3D> driver(
@@ -99,7 +99,7 @@ parthenon::DriverStatus LaunchWorkFlow(parthenon::ParthenonManager &pman,
         artemis::InitMeshBlockData<Coordinates::cylindrical>;
     ProblemModifier<Coordinates::cylindrical>(&pman);
     pman.app_input->ProblemGenerator = ProblemGenerator<Coordinates::cylindrical>;
-    pman.app_input->PostInitialization =
+    pman.app_input->PostProblemGenerator =
         ArtemisDerived::PostInitialization<Coordinates::cylindrical>;
     pman.ParthenonInitPackagesAndMesh();
     ArtemisDriver<Coordinates::cylindrical> driver(pin, pman.app_input.get(),
@@ -112,7 +112,7 @@ parthenon::DriverStatus LaunchWorkFlow(parthenon::ParthenonManager &pman,
         artemis::InitMeshBlockData<Coordinates::axisymmetric>;
     ProblemModifier<Coordinates::axisymmetric>(&pman);
     pman.app_input->ProblemGenerator = ProblemGenerator<Coordinates::axisymmetric>;
-    pman.app_input->PostInitialization =
+    pman.app_input->PostProblemGenerator =
         ArtemisDerived::PostInitialization<Coordinates::axisymmetric>;
     pman.ParthenonInitPackagesAndMesh();
     ArtemisDriver<Coordinates::axisymmetric> driver(

@@ -78,6 +78,10 @@ physics:
     _type: "bool"
     _default: "false"
     _description: "Turn on gravity"
+  self_gravity:
+    _type: "bool"
+    _default: "false"
+    _description: "Turn on self-gravity"
   rotating_frame:
     _type: "bool"
     _default: "false"

@@ -18,6 +18,7 @@ coords/blast_mpi
 disk/disk_mpi
 nbody/nbody_mpi
 hydro/linwave_mpi
+self_gravity/grav_slab_mpi
 ssheet/ssheet_mpi
 diffusion/viscous_diffusion_mpi
 diffusion/alpha_disk_mpi

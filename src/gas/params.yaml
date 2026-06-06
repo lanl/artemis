@@ -60,6 +60,12 @@ gas:
     ppm:
       _type: opt
       _description: "Piecewise Parabolic"
+    wenoz:
+      _type: opt
+      _description: "Weighted Essentially Non Oscillatory (Z)"
+    wenomz:
+      _type: opt
+      _description: "Weighted Essentially Non Oscillatory (MZ)"
   riemann:
     _type: string
     _default: hllc-general
@@ -367,6 +373,11 @@ cooling:
     _type: Real
     _default: "0.0"
     _description: "Power law index for spherical power law"
-
-
-
+  tstart:
+    _type: Real
+    _description: "Turn on cooling at this time"
+    _default: "0.0"
+  tstop:
+    _type: Real
+    _description: "Turn off cooling at this time"
+    _default: "1e99"

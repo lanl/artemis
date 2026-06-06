@@ -1,0 +1,34 @@
+---
+self_gravity:
+  _description: "Self Gravity"
+  units_override:
+    _type: bool
+    _description: "Override artemis unit system and manually set 4piG."
+    _default: "false"
+  four_pi_G:
+    _type: Real
+    _description: "Sets 4piG constant.  Only applicable when units_override=true"
+    _default: "1.0"
+  use_swindle:
+    _type: bool
+    _description: "Invoke Jeans swindle.  Required when fully periodic."
+  print_per_step:
+    _type: bool
+    _description: "Reports (when true) the iteration residual history for Poisson solver"
+    _default: "false"
+  max_iterations:
+    _type: int
+    _description: "Maximum number of iterations for Poisson solver"
+    _default: 1000
+  residual_tolerance:
+    _type: Real
+    _description: "Residual tolerance for Poisson solver"
+    _default: 1.0e-12
+  tstart:
+    _type: Real
+    _description: "Turn on self-gravity at this time"
+    _default: "0.0"
+  tstop:
+    _type: Real
+    _description: "Turn off self-gravity at this time"
+    _default: "1e99"

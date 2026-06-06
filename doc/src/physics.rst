@@ -10,7 +10,7 @@
 .. license in this material to reproduce, prepare derivative works, distribute copies to
 .. the public, perform publicly and display publicly, and to permit others to do so.
 .. =======================================================================================
-
+.. This file was created in part or in whole by one of OpenAI's generative AI models
 .. _physics:
 
 Physics Modules
@@ -28,6 +28,7 @@ In general, to activate a physics capability, it must be set in the ``<physics>`
    conduction = false
    cooling = false
    gravity = false
+   self_gravity = false
    nbody = false
    rotating_frame = false
    radiation = false
@@ -55,7 +56,7 @@ An example input block for a gas could read
   <gas>
   cfl = 0.3
   riemann = hllc     # llf, hlle, hllc Riemann solvers
-  reconstruct = plm  # pcm, plm, ppm reconstructions
+  reconstruct = plm  # pcm, plm, ppm, wenoz, wenomz reconstructions
   
   <gas/eos/ideal>
   gamma = 1.4
@@ -302,7 +303,7 @@ An example dust input block reads:
    cfl = 0.3
    nspecies = 3
    riemann = hlle       # llf, hlle
-   reconstruct = plm    # pcm, plm, ppm
+   reconstruct = plm    # pcm, plm, ppm, wenoz, wenomz
    grain_density = 1.7  # g/cc
    sizes = 1e-4, 1e-2, 1e-1  # cm
 
@@ -749,6 +750,46 @@ Available options are:
    <gravity/nbody>
 
 See `N-Body Dynamics`_ for a description of how to set up the N-body system.
+
+Self Gravity
+------------
+
+The ``<self_gravity>`` node enables self-consistent gravitational forces for fluid components by solving the Poisson equation
+
+.. math::
+
+   \nabla^2 \phi = 4 \pi G \rho_{\mathrm{total}},
+
+where :math:`\rho_{\mathrm{total}}` is the sum of the mass densities of all fluids and :math:`G` is the gravitational constant in code units. The right-hand side is assembled from all registered fluid densities, and the gravitational potential :math:`\phi` is then used to compute gravitational forces in the hydrodynamic update.
+
+The self-gravity module currently supports Cartesian geometries only.
+
+The parameter stored internally is ``four_pi_G = 4 \pi G``. By default, :math:`G` is taken from the code constants and converted to code units. This behavior can be overridden by setting
+
+.. code-block:: ini
+
+   <self_gravity>
+   units_override = true
+   four_pi_G = 1.0
+
+When ``units_override`` is enabled, the supplied value of ``four_pi_G`` is used instead of the value derived from the code constants.
+
+The gravitational potential currently supports periodic and zero (Dirichlet) boundary conditions. For fully periodic domains, the Poisson equation is solvable only if the mean density is removed. This is handled using the Jeans swindle, which subtracts the domain-averaged density before solving. If all mesh boundaries are periodic, ``use_swindle`` is automatically required and the code will abort if it is disabled. If ``use_swindle`` is enabled in a configuration that is not fully periodic, a warning is issued.
+
+Zero Dirichlet boundary conditions for :math:`\phi` may be specified per face in the ``<self_gravity>`` block, e.g.,
+
+.. code-block:: ini
+
+   <self_gravity>
+   ix1_bc = zero
+   ox1_bc = zero
+
+Only faces explicitly set to ``zero`` enroll a zero-potential boundary function; otherwise, the mesh-level boundary configuration (e.g., periodic) applies.
+
+The self-gravity package provides two primary fields: the gravitational potential ``grav::phi`` and the Poisson right-hand side ``grav::rhs``.  ``grav::rhs`` corresponds to :math:`4 \pi G \sum_i \rho_i` and is constructed in the package’s ``FillDerivedMesh`` routine, including application of the Jeans swindle when enabled.
+
+The Poisson equation is registered through Parthenon’s linear solver framework. The solver consists of a BiCGSTAB Krylov method preconditioned by a multigrid (MG) solver.
+
 
 Rotating Frame
 --------------

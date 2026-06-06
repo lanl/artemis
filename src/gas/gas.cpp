@@ -107,11 +107,13 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
     params.Add("kb", constants.GetKBCode());
     params.Add("amu", constants.GetAMUCode());
     params.Add("Rgas", constants.GetKBCode() / (constants.GetAMUCode() * mu));
+
+    // Build EOS
     EOS eos_host = singularity::UnitSystem<singularity::IdealGas>(
         singularity::IdealGas(gamma - 1., cv * units.GetSpecificHeatCodeToPhysical()),
-        singularity::eos_units_init::LengthTimeUnitsInit(), units.GetTimeCodeToPhysical(),
-        units.GetMassCodeToPhysical(), units.GetLengthCodeToPhysical(),
-        units.GetTemperatureCodeToPhysical());
+        singularity::eos_units_init::LengthTimeUnitsInit(), units.GetTimePhysicalToCode(),
+        units.GetMassPhysicalToCode(), units.GetLengthPhysicalToCode(),
+        units.GetTemperaturePhysicalToCode());
     EOS eos_device = eos_host.GetOnDevice();
     params.Add("eos_h", eos_host);
     params.Add("eos_d", eos_device);
@@ -127,8 +129,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
       EOS eos_host = singularity::UnitSystem<ArtemisEOS::IdealHHe>(
           ArtemisEOS::IdealHHe(filename),
           singularity::eos_units_init::LengthTimeUnitsInit(),
-          units.GetTimeCodeToPhysical(), units.GetMassCodeToPhysical(),
-          units.GetLengthCodeToPhysical(), units.GetTemperatureCodeToPhysical());
+          units.GetTimePhysicalToCode(), units.GetMassPhysicalToCode(),
+          units.GetLengthPhysicalToCode(), units.GetTemperaturePhysicalToCode());
       EOS eos_device = eos_host.GetOnDevice();
       params.Add("mu", pin->GetOrAddReal(block_name, "mu", 1.));
       params.Add("eos_h", eos_host);
@@ -150,8 +152,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
 
       EOS eos_host = singularity::UnitSystem<ArtemisEOS::IdealHHe>(
           std::move(eos_base), singularity::eos_units_init::LengthTimeUnitsInit(),
-          units.GetTimeCodeToPhysical(), units.GetMassCodeToPhysical(),
-          units.GetLengthCodeToPhysical(), units.GetTemperatureCodeToPhysical());
+          units.GetTimePhysicalToCode(), units.GetMassPhysicalToCode(),
+          units.GetLengthPhysicalToCode(), units.GetTemperaturePhysicalToCode());
       EOS eos_device = eos_host.GetOnDevice();
       params.Add("mu", pin->GetOrAddReal(block_name, "mu", 1.));
       params.Add("eos_h", eos_host);
@@ -165,9 +167,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
     std::string filename = pin->GetString(block_name, "eos_file");
     EOS eos_host = singularity::UnitSystem<singularity::SpinerEOSDependsRhoSie>(
         singularity::SpinerEOSDependsRhoSie(filename, "gas"),
-        singularity::eos_units_init::LengthTimeUnitsInit(), units.GetTimeCodeToPhysical(),
-        units.GetMassCodeToPhysical(), units.GetLengthCodeToPhysical(),
-        units.GetTemperatureCodeToPhysical());
+        singularity::eos_units_init::LengthTimeUnitsInit(), units.GetTimePhysicalToCode(),
+        units.GetMassPhysicalToCode(), units.GetLengthPhysicalToCode(),
+        units.GetTemperaturePhysicalToCode());
     EOS eos_device = eos_host.GetOnDevice();
     params.Add("eos_h", eos_host);
     params.Add("eos_d", eos_device);
@@ -178,9 +180,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
     std::string filename = pin->GetString(block_name, "eos_file");
     EOS eos_host = singularity::UnitSystem<singularity::SpinerEOSDependsRhoT>(
         singularity::SpinerEOSDependsRhoT(filename, "gas"),
-        singularity::eos_units_init::LengthTimeUnitsInit(), units.GetTimeCodeToPhysical(),
-        units.GetMassCodeToPhysical(), units.GetLengthCodeToPhysical(),
-        units.GetTemperatureCodeToPhysical());
+        singularity::eos_units_init::LengthTimeUnitsInit(), units.GetTimePhysicalToCode(),
+        units.GetMassPhysicalToCode(), units.GetLengthPhysicalToCode(),
+        units.GetTemperaturePhysicalToCode());
     EOS eos_device = eos_host.GetOnDevice();
     params.Add("eos_h", eos_host);
     params.Add("eos_d", eos_device);

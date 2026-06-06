@@ -87,7 +87,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
              pin->GetOrAddBoolean("radiation/moment", "fatal_if_unconverged", true));
 
   // how to handle the matter coupling:
-  // full_coupling = false only does a loop over energy couopling
+  // full_coupling = false only does a loop over energy coupling
   // full_coupling = true also does an outer loop over momentum coupling
   params.Add("full_coupling",
              pin->GetOrAddBoolean("radiation/moment", "full_coupling", true));
@@ -107,6 +107,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
 
   const Real tfloor = pin->GetOrAddReal("radiation/moment", "tfloor_cgs", 10.); // K
   params.Add("tfloor", tfloor * units.GetTemperaturePhysicalToCode());
+
+  params.Add("use_opac",
+             pin->GetOrAddBoolean("radiation/moments", "init_with_opac", true));
 
   // Number of radiation species
   const int nspecies = pin->GetOrAddInteger("radiation/moment", "nspecies", 1);
@@ -378,6 +381,80 @@ TaskStatus MatterCoupling(MeshData<Real> *u0, const Real dt) {
   return TaskStatus::complete;
 }
 
+template <Coordinates GEOM>
+void InitMesh(parthenon::Mesh *pmesh) {
+  PARTHENON_INSTRUMENT
+  auto &moments_pkg = pmesh->packages.Get("moments");
+  auto &gas_pkg = pmesh->packages.Get("gas");
+
+  const Real arad = moments_pkg->Param<Real>("arad");
+  const bool use_opac = moments_pkg->Param<bool>("use_opac");
+  const auto &eos_d = gas_pkg->Param<EOS>("eos_d");
+
+  for (int partition = 0; partition < pmesh->DefaultNumPartitions(); partition++) {
+    auto md = pmesh->mesh_data.GetOrAdd("u0c", partition).get();
+
+    // Packing and Indexing
+    static auto desc =
+        MakePackDescriptor<gas::prim::density, gas::prim::sie, rad::cons::energy,
+                           rad::prim::energy, rad::cons::flux, rad::prim::flux>(
+            (pmesh->resolved_packages).get());
+    auto vmesh = desc.GetPack(md);
+
+    IndexRange ib = md->GetBoundsI(IndexDomain::entire);
+    IndexRange jb = md->GetBoundsJ(IndexDomain::entire);
+    IndexRange kb = md->GetBoundsK(IndexDomain::entire);
+    const auto ndim = pmesh->ndim;
+    const auto &cpars =
+        pmesh->packages.Get("artemis")->template Param<geometry::CoordParams>(
+            "coord_params");
+
+    if (use_opac) {
+      const auto &opac_d = gas_pkg->Param<MeanOpacity>("opacity_d");
+      const bool multi_d = pmesh->ndim >= 2;
+      const bool three_d = pmesh->ndim == 3;
+      parthenon::par_for(
+          DEFAULT_LOOP_PATTERN, "Moments::InitMesh", DevExecSpace(), 0,
+          md->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+          KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+            geometry::Coords<GEOM> coords(cpars, vmesh.GetCoordinates(b), k, j, i);
+            const auto &dx = coords.GetCellWidths();
+            const Real &rho = vmesh(b, gas::prim::density(0), k, j, i);
+            const Real &sie = vmesh(b, gas::prim::sie(0), k, j, i);
+            const Real T = eos_d.TemperatureFromDensityInternalEnergy(rho, sie);
+            Real dx_min = dx[0];
+            if (multi_d) dx_min = std::min(dx_min, dx[1]);
+            if (three_d) dx_min = std::min(dx_min, dx[2]);
+            const Real tau =
+                std::min(1.0, dx_min * opac_d.RosselandMeanAbsorptionCoefficient(rho, T));
+            const Real Erad = tau * arad * SQR(SQR(T));
+            vmesh(b, rad::cons::energy(0), k, j, i) = Erad;
+            vmesh(b, rad::prim::energy(0), k, j, i) = Erad;
+            for (int d = 0; d < 3; d++) {
+              vmesh(b, rad::cons::flux(d), k, j, i) = 0.0;
+              vmesh(b, rad::prim::flux(d), k, j, i) = 0.0;
+            }
+          });
+    } else {
+      parthenon::par_for(
+          DEFAULT_LOOP_PATTERN, "Moments::InitMesh", DevExecSpace(), 0,
+          md->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+          KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+            const Real &rho = vmesh(b, gas::prim::density(0), k, j, i);
+            const Real &sie = vmesh(b, gas::prim::sie(0), k, j, i);
+            const Real T = eos_d.TemperatureFromDensityInternalEnergy(rho, sie);
+            const Real Erad = arad * SQR(SQR(T));
+            vmesh(b, rad::cons::energy(0), k, j, i) = Erad;
+            vmesh(b, rad::prim::energy(0), k, j, i) = Erad;
+            for (int d = 0; d < 3; d++) {
+              vmesh(b, rad::cons::flux(d), k, j, i) = 0.0;
+              vmesh(b, rad::prim::flux(d), k, j, i) = 0.0;
+            }
+          });
+    }
+  }
+}
+
 //----------------------------------------------------------------------------------------
 //! template instantiations
 typedef Coordinates G;
@@ -388,5 +465,12 @@ template TaskStatus MatterCoupling<G::axisymmetric>(MD *u0, const Real dt);
 template TaskStatus MatterCoupling<G::spherical1D>(MD *u0, const Real dt);
 template TaskStatus MatterCoupling<G::spherical2D>(MD *u0, const Real dt);
 template TaskStatus MatterCoupling<G::spherical3D>(MD *u0, const Real dt);
+
+template void InitMesh<G::cartesian>(parthenon::Mesh *pmesh);
+template void InitMesh<G::cylindrical>(parthenon::Mesh *pmesh);
+template void InitMesh<G::axisymmetric>(parthenon::Mesh *pmesh);
+template void InitMesh<G::spherical1D>(parthenon::Mesh *pmesh);
+template void InitMesh<G::spherical2D>(parthenon::Mesh *pmesh);
+template void InitMesh<G::spherical3D>(parthenon::Mesh *pmesh);
 
 } // namespace Moments

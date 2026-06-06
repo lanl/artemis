@@ -1,5 +1,5 @@
 //========================================================================================
-// (C) (or copyright) 2023-2025. Triad National Security, LLC. All rights reserved.
+// (C) (or copyright) 2023-2026. Triad National Security, LLC. All rights reserved.
 //
 // This program was produced under U.S. Government contract 89233218CNA000001 for Los
 // Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -29,115 +29,112 @@ using namespace parthenon::driver::prelude;
 using namespace parthenon::package::prelude;
 
 // Create variable types to be used by Artemis
-#define ARTEMIS_VARIABLE(ns, varname)                                                    \
-  struct varname : public parthenon::variable_names::base_t<false> {                     \
-    template <class... Ts>                                                               \
-    KOKKOS_INLINE_FUNCTION varname(Ts &&...args)                                         \
-        : parthenon::variable_names::base_t<false>(std::forward<Ts>(args)...) {}         \
-    static std::string name() { return #ns "." #varname; }                               \
-  }
+
 namespace gas {
 namespace cons {
-ARTEMIS_VARIABLE(gas.cons, density);
-ARTEMIS_VARIABLE(gas.cons, total_energy);
-ARTEMIS_VARIABLE(gas.cons, internal_energy);
-ARTEMIS_VARIABLE(gas.cons, momentum);
+PAR_VAR(gas.cons, density);
+PAR_VAR(gas.cons, total_energy);
+PAR_VAR(gas.cons, internal_energy);
+PAR_VAR(gas.cons, momentum);
 } // namespace cons
 namespace prim {
-ARTEMIS_VARIABLE(gas.prim, density);
-ARTEMIS_VARIABLE(gas.prim, pressure);
-ARTEMIS_VARIABLE(gas.prim, temperature);
-ARTEMIS_VARIABLE(gas.prim, velocity);
-ARTEMIS_VARIABLE(gas.prim, sie);
-ARTEMIS_VARIABLE(gas.prim, bmod);
+PAR_VAR(gas.prim, density);
+PAR_VAR(gas.prim, pressure);
+PAR_VAR(gas.prim, temperature);
+PAR_VAR(gas.prim, velocity);
+PAR_VAR(gas.prim, sie);
+PAR_VAR(gas.prim, bmod);
 } // namespace prim
 namespace diff {
-ARTEMIS_VARIABLE(gas.diff, momentum);
-ARTEMIS_VARIABLE(gas.diff, energy);
+PAR_VAR(gas.diff, momentum);
+PAR_VAR(gas.diff, energy);
 } // namespace diff
 namespace face {
-ARTEMIS_VARIABLE(gas.face, velocity);
+PAR_VAR(gas.face, velocity);
 } // namespace face
 namespace src {
-ARTEMIS_VARIABLE(gas.src, energy);
+PAR_VAR(gas.src, energy);
 }
 } // namespace gas
 
 namespace dust {
 namespace cons {
-ARTEMIS_VARIABLE(dust.cons, density);
-ARTEMIS_VARIABLE(dust.cons, momentum);
+PAR_VAR(dust.cons, density);
+PAR_VAR(dust.cons, momentum);
 } // namespace cons
 namespace prim {
-ARTEMIS_VARIABLE(dust.prim, density);
-ARTEMIS_VARIABLE(dust.prim, velocity);
+PAR_VAR(dust.prim, density);
+PAR_VAR(dust.prim, velocity);
 } // namespace prim
 } // namespace dust
 
 namespace rad {
 namespace cons {
-ARTEMIS_VARIABLE(rad.cons, energy);
-ARTEMIS_VARIABLE(rad.cons, flux);
+PAR_VAR(rad.cons, energy);
+PAR_VAR(rad.cons, flux);
 } // namespace cons
 namespace prim {
-ARTEMIS_VARIABLE(rad.prim, energy);
-ARTEMIS_VARIABLE(rad.prim, pressure);
-ARTEMIS_VARIABLE(rad.prim, flux);
+PAR_VAR(rad.prim, energy);
+PAR_VAR(rad.prim, pressure);
+PAR_VAR(rad.prim, flux);
 } // namespace prim
 namespace opac {
-ARTEMIS_VARIABLE(rad.opac, absorption);
-ARTEMIS_VARIABLE(rad.opac, scattering);
+PAR_VAR(rad.opac, absorption);
+PAR_VAR(rad.opac, scattering);
 } // namespace opac
 namespace star {
-ARTEMIS_VARIABLE(rad.star, absorption);
-SWARM_VARIABLE(Real, rad.star, flux);
-SWARM_VARIABLE(Real, rad.star, v);
-SWARM_VARIABLE(Real, rad.star, x);
-SWARM_VARIABLE(int, rad.star, ijk);
+PAR_VAR(rad.star, absorption);
+PAR_SWARMVAR(Real, rad.star, flux);
+PAR_SWARMVAR(Real, rad.star, v);
+PAR_SWARMVAR(Real, rad.star, x);
+PAR_SWARMVAR(int, rad.star, ijk);
 } // namespace star
 } // namespace rad
 
-namespace geom {
-ARTEMIS_VARIABLE(geom, x1v);
-ARTEMIS_VARIABLE(geom, x2v);
-ARTEMIS_VARIABLE(geom, x3v);
-ARTEMIS_VARIABLE(geom, hx1v);
-ARTEMIS_VARIABLE(geom, hx2v);
-ARTEMIS_VARIABLE(geom, hx3v);
-ARTEMIS_VARIABLE(geom, hx1f1);
-ARTEMIS_VARIABLE(geom, hx2f1);
-ARTEMIS_VARIABLE(geom, hx3f1);
-ARTEMIS_VARIABLE(geom, hx1f2);
-ARTEMIS_VARIABLE(geom, hx2f2);
-ARTEMIS_VARIABLE(geom, hx3f2);
-ARTEMIS_VARIABLE(geom, hx1f3);
-ARTEMIS_VARIABLE(geom, hx2f3);
-ARTEMIS_VARIABLE(geom, hx3f3);
-ARTEMIS_VARIABLE(geom, dx1);
-ARTEMIS_VARIABLE(geom, dx2);
-ARTEMIS_VARIABLE(geom, dx3);
-ARTEMIS_VARIABLE(geom, vol);
-ARTEMIS_VARIABLE(geom, ax1);
-ARTEMIS_VARIABLE(geom, ax2);
-ARTEMIS_VARIABLE(geom, ax3);
-ARTEMIS_VARIABLE(geom, dh1dx1);
-ARTEMIS_VARIABLE(geom, dh2dx1);
-ARTEMIS_VARIABLE(geom, dh3dx1);
-ARTEMIS_VARIABLE(geom, dh1dx2);
-ARTEMIS_VARIABLE(geom, dh2dx2);
-ARTEMIS_VARIABLE(geom, dh3dx2);
-ARTEMIS_VARIABLE(geom, dh1dx3);
-ARTEMIS_VARIABLE(geom, dh2dx3);
-ARTEMIS_VARIABLE(geom, dh3dx3);
-ARTEMIS_VARIABLE(geom, rfw1m);
-ARTEMIS_VARIABLE(geom, rfw1p);
-ARTEMIS_VARIABLE(geom, rfw2m);
-ARTEMIS_VARIABLE(geom, rfw2p);
-ARTEMIS_VARIABLE(geom, rfw3m);
-ARTEMIS_VARIABLE(geom, rfw3p);
-} // namespace geom
+namespace grav {
+PAR_VAR(grav, phi);
+PAR_VAR(grav, rhs);
+} // namespace grav
 
-#undef ARTEMIS_VARIABLE
+namespace geom {
+PAR_VAR(geom, x1v);
+PAR_VAR(geom, x2v);
+PAR_VAR(geom, x3v);
+PAR_VAR(geom, hx1v);
+PAR_VAR(geom, hx2v);
+PAR_VAR(geom, hx3v);
+PAR_VAR(geom, hx1f1);
+PAR_VAR(geom, hx2f1);
+PAR_VAR(geom, hx3f1);
+PAR_VAR(geom, hx1f2);
+PAR_VAR(geom, hx2f2);
+PAR_VAR(geom, hx3f2);
+PAR_VAR(geom, hx1f3);
+PAR_VAR(geom, hx2f3);
+PAR_VAR(geom, hx3f3);
+PAR_VAR(geom, dx1);
+PAR_VAR(geom, dx2);
+PAR_VAR(geom, dx3);
+PAR_VAR(geom, vol);
+PAR_VAR(geom, ax1);
+PAR_VAR(geom, ax2);
+PAR_VAR(geom, ax3);
+PAR_VAR(geom, dh1dx1);
+PAR_VAR(geom, dh2dx1);
+PAR_VAR(geom, dh3dx1);
+PAR_VAR(geom, dh1dx2);
+PAR_VAR(geom, dh2dx2);
+PAR_VAR(geom, dh3dx2);
+PAR_VAR(geom, dh1dx3);
+PAR_VAR(geom, dh2dx3);
+PAR_VAR(geom, dh3dx3);
+PAR_VAR(geom, rfw1m);
+PAR_VAR(geom, rfw1p);
+PAR_VAR(geom, rfw2m);
+PAR_VAR(geom, rfw2p);
+PAR_VAR(geom, rfw3m);
+PAR_VAR(geom, rfw3p);
+} // namespace geom
 
 // Restart options (see Parthenon #1231)
 #ifdef PORTABLE_RESTART
@@ -166,7 +163,7 @@ enum class RSolver { hllc_general, hlle, llf, hllc_gamma, null };
 // ... Upwinding (left vs right state)
 enum class Upwind { l, r, null };
 // ...Reconstruction algorithms
-enum class ReconstructionMethod { pcm, plm, ppm, null };
+enum class ReconstructionMethod { pcm, plm, ppm, wenoz, wenomz, null };
 // ...Fluid types
 enum class Fluid { gas, dust, radiation, null };
 // ...Closure types

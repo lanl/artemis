@@ -14,7 +14,7 @@
 # Boiler plate
 cmake_minimum_required(VERSION 3.13)
 project(artemis LANGUAGES C CXX)
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_EXPORT_COMPILE_COMMANDS On)
 
 # Options
@@ -80,7 +80,6 @@ if(ARTEMIS_ENABLE_CUDA)
   set(Kokkos_ENABLE_SERIAL ON CACHE BOOL "" FORCE)
   set(Kokkos_ENABLE_CUDA_LAMBDA ON CACHE BOOL "" FORCE)
   set(Kokkos_ENABLE_CUDA_RELOCATABLE_DEVICE_CODE ON CACHE BOOL "" FORCE)
-  set(Kokkos_ENABLE_CUDA_LAMBDA ON CACHE BOOL "" FORCE)
 endif()
 
 # HIP
@@ -89,7 +88,8 @@ if(ARTEMIS_ENABLE_HIP)
   set(JAYBENNE_ENABLE_HIP ON CACHE BOOL "" FORCE)
   set(Kokkos_ENABLE_HIP ON CACHE BOOL "" FORCE)
   set(Kokkos_ENABLE_SERIAL ON CACHE BOOL "" FORCE)
-  set(Kokkos_ENABLE_HIP_RELOCATABLE_DEVICE_CODE ON CACHE BOOL "" FORCE)
+  set(Kokkos_ENABLE_HIP_RELOCATABLE_DEVICE_CODE OFF CACHE BOOL "" FORCE)
+  set(Kokkos_ENABLE_IMPL_HIP_MALLOC_ASYNC OFF CACHE BOOL "" FORCE)
 endif()
 # HDF5
 if(ARTEMIS_ENABLE_HDF5)
@@ -200,7 +200,7 @@ file(GLOB rebound_src
      "${REBOUND_BUILD_DIR}/src/*.c"
      "${REBOUND_BUILD_DIR}/src/*.h")
 add_custom_command(OUTPUT ${REBOUND_BUILD_DIR}/librebound.so
-                   COMMAND make
+                   COMMAND make CC=${CMAKE_C_COMPILER}
                    WORKING_DIRECTORY ${REBOUND_BUILD_DIR}
                    DEPENDS ${rebound_src})
 add_custom_target(rebound ALL DEPENDS ${REBOUND_BUILD_DIR}/librebound.so)

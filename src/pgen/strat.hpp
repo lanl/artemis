@@ -228,7 +228,6 @@ inline void ExtrapInnerX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
   using parthenon::MakePackDescriptor;
   using TE = parthenon::TopologicalElement;
   auto pmb = mbd->GetBlockPointer();
-  if (coarse && !ArtemisUtils::CoarseNeighbor(pmb)) return;
 
   // Packing
   static auto descriptors = ArtemisUtils::GetBoundaryPackDescriptorMap<
@@ -322,7 +321,6 @@ inline void ExtrapOuterX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
   using parthenon::MakePackDescriptor;
   using TE = parthenon::TopologicalElement;
   auto pmb = mbd->GetBlockPointer();
-  if (coarse && !ArtemisUtils::CoarseNeighbor(pmb)) return;
 
   // Packing
   static auto descriptors = ArtemisUtils::GetBoundaryPackDescriptorMap<
@@ -431,7 +429,6 @@ inline void ShearInnerX2(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse)
   using parthenon::MakePackDescriptor;
   using TE = parthenon::TopologicalElement;
   auto pmb = mbd->GetBlockPointer();
-  if (coarse && !ArtemisUtils::CoarseNeighbor(pmb)) return;
 
   // Packing
   static auto descriptors = ArtemisUtils::GetBoundaryPackDescriptorMap<
@@ -555,7 +552,6 @@ inline void ShearOuterX2(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse)
   using parthenon::MakePackDescriptor;
   using TE = parthenon::TopologicalElement;
   auto pmb = mbd->GetBlockPointer();
-  if (coarse && !ArtemisUtils::CoarseNeighbor(pmb)) return;
 
   // Packing
   static auto descriptors = ArtemisUtils::GetBoundaryPackDescriptorMap<
@@ -666,7 +662,6 @@ inline void ExtrapInnerX3(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
   using parthenon::MakePackDescriptor;
   using TE = parthenon::TopologicalElement;
   auto pmb = mbd->GetBlockPointer();
-  if (coarse && !ArtemisUtils::CoarseNeighbor(pmb)) return;
 
   // Packing
   static auto descriptors = ArtemisUtils::GetBoundaryPackDescriptorMap<
@@ -769,7 +764,6 @@ inline void ExtrapOuterX3(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
   using parthenon::MakePackDescriptor;
   using TE = parthenon::TopologicalElement;
   auto pmb = mbd->GetBlockPointer();
-  if (coarse && !ArtemisUtils::CoarseNeighbor(pmb)) return;
 
   // Packing
   static auto descriptors = ArtemisUtils::GetBoundaryPackDescriptorMap<

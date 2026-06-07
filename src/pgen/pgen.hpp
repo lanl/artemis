@@ -1,5 +1,5 @@
 //========================================================================================
-// (C) (or copyright) 2023-2024. Triad National Security, LLC. All rights reserved.
+// (C) (or copyright) 2023-2026. Triad National Security, LLC. All rights reserved.
 //
 // This program was produced under U.S. Government contract 89233218CNA000001 for Los
 // Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -29,9 +29,11 @@
 #include "escape_1d.hpp"
 #include "gaussian_bump.hpp"
 #include "geometry/geometry.hpp"
+#include "grav_slab.hpp"
 #include "kh.hpp"
 #include "linear_wave.hpp"
 #include "lw.hpp"
+#include "polytrope.hpp"
 #include "rt.hpp"
 #include "shock.hpp"
 #include "strat.hpp"
@@ -63,10 +65,14 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
     disk::ProblemGenerator<T>(pmb, pin);
   } else if (name == "gaussian_bump") {
     gaussian_bump::ProblemGenerator<T>(pmb, pin);
+  } else if (name == "grav_slab") {
+    grav_slab::ProblemGenerator<T>(pmb, pin);
   } else if (name == "linear_wave") {
     linear_wave::ProblemGenerator<T>(pmb, pin);
   } else if (name == "lw") {
     lw::ProblemGenerator<T>(pmb, pin);
+  } else if (name == "polytrope") {
+    polytrope::ProblemGenerator<T>(pmb, pin);
   } else if (name == "kh") {
     kh::ProblemGenerator<T>(pmb, pin);
   } else if (name == "rt") {

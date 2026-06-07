@@ -140,7 +140,6 @@ inline void ShockInnerX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse)
   using parthenon::MakePackDescriptor;
   using TE = parthenon::TopologicalElement;
   auto pmb = mbd->GetBlockPointer();
-  if (coarse && !ArtemisUtils::CoarseNeighbor(pmb)) return;
 
   auto artemis_pkg = pmb->packages.Get("artemis");
   const bool do_moment = artemis_pkg->Param<bool>("do_moment");
@@ -193,7 +192,6 @@ inline void ShockOuterX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse)
   using parthenon::MakePackDescriptor;
   using TE = parthenon::TopologicalElement;
   auto pmb = mbd->GetBlockPointer();
-  if (coarse && !ArtemisUtils::CoarseNeighbor(pmb)) return;
 
   auto artemis_pkg = pmb->packages.Get("artemis");
   const bool do_moment = artemis_pkg->Param<bool>("do_moment");

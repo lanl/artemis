@@ -20,6 +20,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   auto rt = std::make_shared<StateDescriptor>("raytrace");
   Params &params = rt->AllParams();
 
+  ArtemisUtils::AddPackageTimeParams(params, "radiation/raytrace", pin);
+
   // Opacity models
   const Real time = units.GetTimeCodeToPhysical();
   const Real mass = units.GetMassCodeToPhysical();
@@ -350,13 +352,26 @@ TaskCollection RaytraceDriverTasks(Mesh *pmesh, const ParticleWeights &pwght) {
 //----------------------------------------------------------------------------------------
 //! \fn  StateDescriptor RT::RaytraceDriver
 //! \brief Pepare to call the TaskCollection for raytracing
-TaskListStatus RaytraceDriver(Mesh *pmesh) {
+TaskListStatus RaytraceDriver(Mesh *pmesh, const Real time) {
   PARTHENON_INSTRUMENT
+  auto &rt_pkg = pmesh->packages.Get("raytrace");
+  const auto active = ArtemisUtils::CheckPackageStatus(rt_pkg, time);
+  if (active == ArtemisUtils::PackageControl::inactive) {
+    return TaskListStatus::complete;
+  } else if (active == ArtemisUtils::PackageControl::shutdown) {
+    if (Globals::my_rank == 0) {
+      printf("Turning off raytrace at t=%.8e...\n", time);
+    }
+    return TaskListStatus::complete;
+  } else if (active == ArtemisUtils::PackageControl::initial) {
+    if (Globals::my_rank == 0) {
+      printf("Turning on raytrace at t=%.8e...\n", time);
+    }
+  }
+
   auto &artemis_pkg = pmesh->packages.Get("artemis");
   auto geom = artemis_pkg->Param<Coordinates>("coords");
   // What is the minimum dtheta, dphi
-  auto &rt_pkg = pmesh->packages.Get("raytrace");
-
   const auto x2min = rt_pkg->Param<Real>("x2min");
   const auto x2max = rt_pkg->Param<Real>("x2max");
   const auto nx2 = rt_pkg->Param<int>("nx2");

@@ -1,5 +1,5 @@
 # ========================================================================================
-#  (C) (or copyright) 2023-2025. Triad National Security, LLC. All rights reserved.
+#  (C) (or copyright) 2023-2026. Triad National Security, LLC. All rights reserved.
 #
 #  This program was produced under U.S. Government contract 89233218CNA000001 for Los
 #  Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -43,10 +43,10 @@ set (SRC_LIST
 
   gravity/binary_mass.cpp
   gravity/gravity.cpp
+  gravity/gravity.hpp
   gravity/nbody_gravity.hpp
   gravity/point_mass.cpp
   gravity/uniform.cpp
-  gravity/gravity.hpp
 
   nbody/nbody.cpp
   nbody/nbody.hpp
@@ -65,9 +65,11 @@ set (SRC_LIST
   pgen/constant.hpp
   pgen/disk.hpp
   pgen/gaussian_bump.hpp
+  pgen/grav_slab.hpp
   pgen/kh.hpp
   pgen/linear_wave.hpp
   pgen/lw.hpp
+  pgen/polytrope.hpp
   pgen/pgen.hpp
   pgen/problem_modifier.hpp
   pgen/rt.hpp
@@ -91,6 +93,12 @@ set (SRC_LIST
   rotating_frame/rotating_frame_impl.hpp
   rotating_frame/rotating_frame.hpp
 
+  self_gravity/self_gravity.cpp
+  self_gravity/self_gravity.hpp
+  self_gravity/poisson_driver.cpp
+  self_gravity/poisson_equation.hpp
+  self_gravity/self_gravity.cpp
+
   utils/artemis_utils.cpp
   utils/artemis_utils.hpp
   utils/history.hpp
@@ -107,6 +115,8 @@ set (SRC_LIST
   utils/fluxes/reconstruction/pcm.hpp
   utils/fluxes/reconstruction/plm.hpp
   utils/fluxes/reconstruction/ppm.hpp
+  utils/fluxes/reconstruction/wenoz.hpp
+  utils/fluxes/reconstruction/wenomz.hpp
   utils/fluxes/riemann/hllc.hpp
   utils/fluxes/riemann/hlle.hpp
   utils/fluxes/riemann/llf.hpp

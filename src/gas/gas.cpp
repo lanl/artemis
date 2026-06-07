@@ -151,15 +151,6 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
           units.GetLengthCodeToPhysical(), units.GetTemperatureCodeToPhysical());
       eos_device(n) = eos_host(n).GetOnDevice();
     }
-
-    // Build EOS
-    EOS eos_host = singularity::UnitSystem<singularity::IdealGas>(
-        singularity::IdealGas(gamma - 1., cv * units.GetSpecificHeatCodeToPhysical()),
-        singularity::eos_units_init::LengthTimeUnitsInit(), units.GetTimePhysicalToCode(),
-        units.GetMassPhysicalToCode(), units.GetLengthPhysicalToCode(),
-        units.GetTemperaturePhysicalToCode());
-    EOS eos_device = eos_host.GetOnDevice();
->>>>>>> origin/develop
     params.Add("eos_h", eos_host);
     params.Add("eos_d", eos_device);
     // TODO This needs to be removed when we convert everything to EOS calls

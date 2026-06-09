@@ -15,13 +15,13 @@
   problem_id = drag
 
 <parthenon/time>
-  nlim      = -1
+  nlim      = 1
   tlim      = 50.0        # ~14 t_dyn (t_dyn = r0/v_esc = 1/sqrt(2))
   integrator = rk2
   ncycle_out = 1
 
 <parthenon/mesh>
-  nx1     = 512
+  nx1     = 64
   x1min   = 0.0          # inner radius r0
   x1max   = 2.302585092994046          # outer radius
   ix1_bc  = hydrostatic          # custom inner BC (hydrostatic inflow)
@@ -40,7 +40,7 @@
   ox3_bc = outflow
 
 <parthenon/meshblock>
-  nx1 = 512
+  nx1 = 64
   nx2 = 1
   nx3 = 1
 
@@ -77,16 +77,17 @@
 
 <drag/full>
   collision_model = hard_sphere
-  # mu [AMU], sigma [code length = r0], dof (H: 5 for diatomic, O: 3 monatomic)
+  # mu [AMU], sigma [code length = r0], dof (H/O treated here as monatomic)
   mu    = 1.0 , 16.0
   sigma = 1.0e-3,  1.0e-3   # collision diameters ~1e-3 r0 (calibrate for your scenario)
-  dof   = 5.0,  3.0
+  dof   = 3.0,  3.0
 
 # Problem parameters
 <problem>
-  # Isothermal temperature in CODE units (scalefree: kB = m_u = 1, so the
-  # natural temperature scale is GM m_u/(kB r0) = 1).
-  # T0 = 0.2 yields lambda_H = mu_H/T0 = 5 (Parker wind, r_c = 2.5).
+  # Isothermal temperature in EOS/code temperature units for this scalefree deck.
+  # T0 = 0.2 yields lambda_H = mu_H/T0 = 5. The inner BC maintains hydrostatic
+  # density/SIE and extrapolates outward radial velocity; it does not impose a
+  # Parker-wind velocity at r0.
   T0    = 0.2     # code units (NOT Kelvin)
   r0    = 1.0      # inner radius [code length]
   gm    = 1.0      # G*M [code units]

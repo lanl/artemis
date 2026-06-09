@@ -23,6 +23,8 @@ set (SRC_LIST
 
   drag/drag.cpp
   drag/drag.hpp
+  drag/drag_impl.hpp
+  drag/collision_integrals.hpp
 
   dust/dust.cpp
   dust/dust.hpp

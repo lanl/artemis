@@ -118,18 +118,6 @@ Real IsothermalDens(const Escape1DParams &ep, const int n, const Real r) {
   return ep.rho0[n] * std::exp(exponent);
 }
 
-// Isothermal specific internal energy = cv * T = (kbmu / (gamma-1)) * T
-// Since we use ideal gas with shared gamma, we read the cv from EOS on host.
-// On device we just store sie = kbmu/(gamma-1) * T0 per species.
-// For the pgen, all species share the same T0 so sie = kbmu_n * T0 / (gamma - 1).
-KOKKOS_FORCEINLINE_FUNCTION
-Real IsothermalSIE(const Escape1DParams &ep, const int n, const EOS &eos,
-                   const Real rho) {
-  // Use EOS to get cv and compute sie = cv * T0
-  const Real cv = eos.SpecificHeatFromDensityTemperature(rho, ep.T0);
-  return cv * ep.T0;
-}
-
 //----------------------------------------------------------------------------------------
 //! \fn void ProblemGenerator<GEOM>
 //! \brief Sets initial conditions for the atmospheric escape problem.
@@ -177,7 +165,8 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         const Real r = coords.x1v();
         for (int n = 0; n < ns; ++n) {
           const Real rho = std::max(IsothermalDens(ep, n, r), ep.dfloor);
-          const Real sie = std::max(IsothermalSIE(ep, n, eos_d(n), rho), ep.siefloor);
+          const Real sie = std::max(
+              eos_d(n).InternalEnergyFromDensityTemperature(rho, ep.T0), ep.siefloor);
           v(0, gas::prim::density(n), k, j, i) = rho;
           // Initialize at rest; the Parker wind will develop from the inner BC
           for (int d = 0; d < 3; ++d)
@@ -230,7 +219,8 @@ void Escape1DInnerX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) {
 
         for (int n = 0; n < ns; ++n) {
           const Real rho = std::max(IsothermalDens(ep, n, r), ep.dfloor);
-          const Real sie = std::max(IsothermalSIE(ep, n, eos_d(n), rho), ep.siefloor);
+          const Real sie = std::max(
+              eos_d(n).InternalEnergyFromDensityTemperature(rho, ep.T0), ep.siefloor);
 
           // Velocity: extrapolate from interior (allow Parker wind to develop)
           const Real rho_int = v(0, gas::cons::density(n), k, j, isafe);

@@ -78,7 +78,13 @@ TaskCollection LinearAdvectionStep(Mesh *pmesh, const SimTime &tm, const Real sc
     auto &u0 = pmesh->mesh_data.GetOrAdd("u0", i);
 
     auto start_recv = tl.AddTask(none, parthenon::StartReceiveBoundBufs<any>, u0);
-    auto update = tl.AddTask(start_recv, LagrangeRemap<GEOM>, u0.get(), scdt);
+    auto start_flx_recv = tl.AddTask(none, parthenon::StartReceiveFluxCorrections, u0);
+    auto remap = tl.AddTask(start_recv, LagrangeRemap<GEOM>, u0.get(), scdt);
+    auto send_flx = tl.AddTask(remap, parthenon::LoadAndSendFluxCorrections, u0);
+    auto recv_flx = tl.AddTask(start_flx_recv, parthenon::ReceiveFluxCorrections, u0);
+    auto set_flx = tl.AddTask(recv_flx, parthenon::SetFluxCorrections, u0);
+    auto update = tl.AddTask(remap | set_flx, ArtemisUtils::ApplyUpdate<GEOM>, u0.get(),
+                             u0.get(), 1.0, 0.0, scdt);
     auto set_aux = tl.AddTask(update, ArtemisDerived::SetAuxillaryFields<GEOM>, u0.get());
     auto c2p = tl.AddTask(set_aux, PreCommFillDerived<MeshData<Real>>, u0.get());
     auto bcs = parthenon::AddBoundaryExchangeTasks(c2p, tl, u0, pmesh->multilevel);
@@ -117,7 +123,8 @@ TaskStatus LagrangeRemap(MeshData<Real> *u0, const Real scdt) {
   static auto desc =
       MakePackDescriptor<gas::cons::density, gas::cons::momentum, gas::cons::total_energy,
                          gas::cons::internal_energy, dust::cons::density,
-                         dust::cons::momentum>(resolved_pkgs.get());
+                         dust::cons::momentum>(resolved_pkgs.get(), {},
+                                               {parthenon::PDOpt::WithFluxes});
   auto v0 = desc.GetPack(u0);
   static auto desc_g =
       MakePackDescriptor<geom::vol, geom::x1v, geom::x2v, geom::x3v, geom::dx1, geom::dx2,

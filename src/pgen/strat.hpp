@@ -99,7 +99,7 @@ inline void InitStratParams(MeshBlock *pmb, ParameterInput *pin) {
     strat_params.do_imc = params.Get<bool>("do_imc");
     strat_params.do_moment = params.Get<bool>("do_moment");
     strat_params.ar = constants.GetARCode();
-    strat_params.dvdx = strat_params.do_oa ? 0.0 : -pars.q * pars.Om0;
+    strat_params.dvdx = strat_params.do_oa ? 0.0 : -strat_params.q * strat_params.Om0;
     params.Add("strat_params", strat_params);
   }
 }

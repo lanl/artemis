@@ -56,7 +56,8 @@ struct StratParams {
   Real kbmu;
   bool three_d;
   Real ar;
-  bool do_dust, do_moment, do_imc;
+  Real dvdx;
+  bool do_oa, do_dust, do_moment, do_imc;
   int npoints;
 };
 
@@ -74,6 +75,8 @@ inline void InitStratParams(MeshBlock *pmb, ParameterInput *pin) {
     strat_params.three_d = pin->GetInteger("parthenon/mesh", "nx3") > 1;
     strat_params.q = pmb->packages.Get("rotating_frame")->Param<Real>("qshear");
     strat_params.Om0 = pmb->packages.Get("rotating_frame")->Param<Real>("omega");
+    strat_params.do_oa =
+        pmb->packages.Get("rotating_frame")->Param<bool>("do_orbital_advection");
     strat_params.h = pin->GetOrAddReal("problem", "h", 1.0);
     strat_params.rho0 = pin->GetOrAddReal("problem", "rho0", 1.0);
     strat_params.r0 = pin->GetOrAddReal("problem", "r0", 1.0);
@@ -96,6 +99,7 @@ inline void InitStratParams(MeshBlock *pmb, ParameterInput *pin) {
     strat_params.do_imc = params.Get<bool>("do_imc");
     strat_params.do_moment = params.Get<bool>("do_moment");
     strat_params.ar = constants.GetARCode();
+    strat_params.dvdx = strat_params.do_oa ? 0.0 : -pars.q * pars.Om0;
     params.Add("strat_params", strat_params);
   }
 }
@@ -181,8 +185,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         const Real z = coords.x3v();
 
         const Real vx1 = 0.0;
-        // const Real vx2 = -pars.q * pars.Om0 * x;
-        const Real dvx2 = 0.0; // residual eq evolution
+        const Real vx2 = pars.dvdx * x;
         const Real vx3 = 0.0;
         const Real temp = pars.temp0;
         const Real dens =
@@ -192,7 +195,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
         v(0, gas::prim::density(0), k, j, i) = dens;
         v(0, gas::prim::velocity(0), k, j, i) = vx1;
-        v(0, gas::prim::velocity(1), k, j, i) = dvx2;
+        v(0, gas::prim::velocity(1), k, j, i) = vx2;
         v(0, gas::prim::velocity(2), k, j, i) = vx3;
         v(0, gas::prim::sie(0), k, j, i) = sie;
         if (pars.do_dust) {
@@ -200,7 +203,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           for (int n = 0; n < v.GetSize(0, dust::prim::density()); ++n) {
             v(0, dust::prim::density(n), k, j, i) = ddens;
             v(0, dust::prim::velocity(VI(n, 0)), k, j, i) = vx1;
-            v(0, dust::prim::velocity(VI(n, 1)), k, j, i) = dvx2;
+            v(0, dust::prim::velocity(VI(n, 1)), k, j, i) = vx2;
             v(0, dust::prim::velocity(VI(n, 2)), k, j, i) = vx3;
           }
         }
@@ -463,8 +466,7 @@ inline void ShearInnerX2(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse)
         const Real x = coords.x1v();
         const Real xf = coords.bnds.x1[0];
 
-        // const Real vy0 = -pars.q * pars.Om0 * x;
-        const Real dvy0 = 0.0; // residual eq evolution
+        const Real vy0 = pars.dvdx * x;
         const bool outflow = (xf >= 0.0);
 
         Real gdsum = 0.0;
@@ -473,7 +475,7 @@ inline void ShearInnerX2(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse)
           const Real gv2 = v(0, gas::prim::velocity(VI(n, 1)), k, js, i);
           const Real gv3 = v(0, gas::prim::velocity(VI(n, 2)), k, js, i);
           const Real vx1g = outflow ? gv1 : 0.0;
-          const Real vx2g = outflow ? ((gv2 > 0.) ? 0.0 : gv2) : dvy0;
+          const Real vx2g = outflow ? ((gv2 > 0.) ? 0.0 : gv2) : vy0;
           const Real vx3g = outflow ? gv3 : 0.0;
           const Real densg =
               outflow ? v(0, gas::prim::density(n), k, js, i) : InitialDensity(pars, z);
@@ -495,7 +497,7 @@ inline void ShearInnerX2(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse)
             const Real dv2 = v(0, dust::prim::velocity(VI(n, 1)), k, js, i);
             const Real dv3 = v(0, dust::prim::velocity(VI(n, 2)), k, js, i);
             const Real vx1d = dv1;
-            const Real vx2d = outflow ? ((dv2 > 0.) ? 0.0 : dv2) : dvy0;
+            const Real vx2d = outflow ? ((dv2 > 0.) ? 0.0 : dv2) : vy0;
             const Real vx3d = dv3;
             const Real densd =
                 outflow ? v(0, dust::prim::density(n), k, js, i) : gdsum * pars.d2g;
@@ -585,8 +587,7 @@ inline void ShearOuterX2(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse)
         const Real x = coords.x1v();
         const Real xf = coords.bnds.x1[0];
 
-        // const Real vy0 = -pars.q * pars.Om0 * x;
-        const Real dvy0 = 0.0; // residual eq evolution
+        const Real vy0 = pars.dvdx * x;
         const bool outflow = (xf < 0.0);
 
         Real gdsum = 0.0;
@@ -595,7 +596,7 @@ inline void ShearOuterX2(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse)
           const Real gv2 = v(0, gas::prim::velocity(VI(n, 1)), k, je, i);
           const Real gv3 = v(0, gas::prim::velocity(VI(n, 2)), k, je, i);
           const Real vx1g = outflow ? gv1 : 0.0;
-          const Real vx2g = outflow ? ((gv2 < 0.0) ? 0.0 : gv2) : dvy0;
+          const Real vx2g = outflow ? ((gv2 < 0.0) ? 0.0 : gv2) : vy0;
           const Real vx3g = outflow ? gv3 : 0.0;
           const Real densg =
               outflow ? v(0, gas::prim::density(n), k, je, i) : InitialDensity(pars, z);
@@ -617,7 +618,7 @@ inline void ShearOuterX2(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse)
             const Real dv2 = v(0, dust::prim::velocity(VI(n, 1)), k, je, i);
             const Real dv3 = v(0, dust::prim::velocity(VI(n, 2)), k, je, i);
             const Real vx1d = dv1;
-            const Real vx2d = outflow ? ((dv2 < 0.0) ? 0.0 : dv2) : dvy0;
+            const Real vx2d = outflow ? ((dv2 < 0.0) ? 0.0 : dv2) : vy0;
             const Real vx3d = dv3;
             const Real densd =
                 outflow ? v(0, dust::prim::density(n), k, je, i) : gdsum * pars.d2g;

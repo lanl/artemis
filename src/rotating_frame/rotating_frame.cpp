@@ -129,7 +129,7 @@ TaskStatus RotatingFrameForce(MeshData<Real> *md, const Real time, const Real dt
 
   // Switch for the different implementations based on coordinate system
   if (coords == Coordinates::cartesian) {
-    return ShearingBoxImpl(md, om0, qshear, do_gas, do_dust, dt);
+    return ShearingBoxImpl(md, om0, qshear, do_oa, do_gas, do_dust, dt);
   } else if (coords == Coordinates::axisymmetric) {
     return RotatingFrameImpl<Coordinates::axisymmetric>(md, om0, do_oa, gm, do_gas,
                                                         do_dust, dt);

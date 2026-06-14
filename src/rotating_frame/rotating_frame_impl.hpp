@@ -28,7 +28,8 @@ namespace RotatingFrame {
 //! \fn  TaskStatus ShearingBoxImpl
 //! \brief Calculate the shearing box frame body forces
 TaskStatus ShearingBoxImpl(MeshData<Real> *md, const Real om0, const Real qshear,
-                           const bool do_gas, const bool do_dust, const Real dt) {
+                           const bool do_oa, const bool do_gas, const bool do_dust,
+                           const Real dt) {
   PARTHENON_INSTRUMENT
   auto pm = md->GetParentPointer();
   auto &resolved_pkgs = pm->resolved_packages;
@@ -50,6 +51,7 @@ TaskStatus ShearingBoxImpl(MeshData<Real> *md, const Real om0, const Real qshear
   const Real qom = qshear * om0;
   const Real two_om = 2.0 * om0;
   const Real qm2_om = qom - two_om;
+  const Real two_q_om2 = 2.0 * qshear * SQR(om0);
   const Real g3_over_x3 = (three_d) * (-SQR(om0));
 
   const auto &cpars =
@@ -62,7 +64,9 @@ TaskStatus ShearingBoxImpl(MeshData<Real> *md, const Real om0, const Real qshear
         // Evaluate vertical gravity
         geometry::Coords<Coordinates::cartesian> coords(cpars, vmesh.GetCoordinates(b), k,
                                                         j, i);
+        const Real x1 = coords.x1v();
         const Real g3 = g3_over_x3 * coords.x3v();
+        const Real gx1 = two_q_om2 * x1;
 
         if (do_gas) {
           for (int n = 0; n < vmesh.GetSize(b, gas::prim::density()); ++n) {
@@ -71,11 +75,13 @@ TaskStatus ShearingBoxImpl(MeshData<Real> *md, const Real om0, const Real qshear
             const Real &v2 = vmesh(b, gas::prim::velocity(VI(n, 1)), k, j, i);
             const Real &v3 = vmesh(b, gas::prim::velocity(VI(n, 2)), k, j, i);
             const Real rdt = dd * dt;
-            vmesh(b, gas::cons::momentum(VI(n, 0)), k, j, i) += rdt * two_om * v2;
-            vmesh(b, gas::cons::momentum(VI(n, 1)), k, j, i) += rdt * qm2_om * v1;
+            const Real src1 = do_oa ? (two_om * v2) : (two_om * v2 + gx1);
+            const Real src2 = do_oa ? (qm2_om * v1) : (-two_om * v1);
+            const Real src_e = do_oa ? (qom * v1 * v2 + v3 * g3) : (v1 * gx1 + v3 * g3);
+            vmesh(b, gas::cons::momentum(VI(n, 0)), k, j, i) += rdt * src1;
+            vmesh(b, gas::cons::momentum(VI(n, 1)), k, j, i) += rdt * src2;
             vmesh(b, gas::cons::momentum(VI(n, 2)), k, j, i) += rdt * g3;
-            vmesh(b, gas::cons::total_energy(n), k, j, i) +=
-                rdt * (qom * v1 * v2 + v3 * g3);
+            vmesh(b, gas::cons::total_energy(n), k, j, i) += rdt * src_e;
           }
         }
 
@@ -85,8 +91,10 @@ TaskStatus ShearingBoxImpl(MeshData<Real> *md, const Real om0, const Real qshear
             const Real &v1 = vmesh(b, dust::prim::velocity(VI(n, 0)), k, j, i);
             const Real &v2 = vmesh(b, dust::prim::velocity(VI(n, 1)), k, j, i);
             const Real rdt = dd * dt;
-            vmesh(b, dust::cons::momentum(VI(n, 0)), k, j, i) += rdt * two_om * v2;
-            vmesh(b, dust::cons::momentum(VI(n, 1)), k, j, i) += rdt * qm2_om * v1;
+            const Real src1 = do_oa ? (two_om * v2) : (two_om * v2 + gx1);
+            const Real src2 = do_oa ? (qm2_om * v1) : (-two_om * v1);
+            vmesh(b, dust::cons::momentum(VI(n, 0)), k, j, i) += rdt * src1;
+            vmesh(b, dust::cons::momentum(VI(n, 1)), k, j, i) += rdt * src2;
             vmesh(b, dust::cons::momentum(VI(n, 2)), k, j, i) += rdt * g3;
           }
         }

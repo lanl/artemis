@@ -235,23 +235,26 @@ struct OrbitalAdvection {
 
   KOKKOS_INLINE_FUNCTION void ApplyGradSkew(ReconInfo &ri) const {
     if constexpr (GEOM == Coordinates::cartesian) {
-      ri.grad[0] += dwdt * ri.grad[phi_idx];
+      ri.grad[phi_idx] += dwdt * ri.grad[0];
     } else if constexpr (GEOM == Coordinates::cylindrical) {
       const Real Rc = ri.xc[0];
       const Real dOdR = -1.5 * OmegaKep(Rc) / Rc;
-      ri.grad[0] += dOdR * ri.grad[phi_idx] * scdt;
+      ri.grad[phi_idx] += dOdR * ri.grad[0] * scdt;
     } else {
       const Real rc = ri.xc[0];
       const Real dOdr = -1.5 * OmegaKep(rc) / rc;
-      ri.grad[0] += dOdr * ri.grad[phi_idx] * scdt;
+      ri.grad[phi_idx] += dOdr * ri.grad[0] * scdt;
     }
   }
 
   KOKKOS_INLINE_FUNCTION bool RootInInterval(const Real x1m, const Real x1p,
                                              Real &xroot) const {
     if constexpr (GEOM == Coordinates::cartesian) {
+      xroot = 0.0;
       return x1m * x1p < 0.0;
     } else {
+      if (omega_f <= 0.0 || gm <= 0.0) return false;
+      xroot = std::cbrt(gm / (omega_f * omega_f));
       return (OmegaKep(x1m) - omega_f) * (OmegaKep(x1p) - omega_f) < 0.0;
     }
   }

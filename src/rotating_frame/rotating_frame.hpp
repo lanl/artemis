@@ -412,41 +412,64 @@ BuildFluxLineX2(const OrbitalAdvection<GEOM> &oa, const geometry::CoordParams &c
     oa.ApplyGradSkew(ri);
   };
 
-  const auto sgn = [](const Real x) { return (x > 0.0) ? 1 : ((x < 0.0) ? -1 : 0); };
-  const int sign_full = sgn(oa.DeltaPhi(0.5 * (x1m + x1p)));
-  const int sign_lo = split ? sgn(oa.DeltaPhi(0.5 * (x1m + xroot))) : sign_full;
-  const int sign_hi = split ? sgn(oa.DeltaPhi(0.5 * (xroot + x1p))) : sign_full;
+  const int sign_full = ArtemisUtils::sgn(oa.DeltaPhi(0.5 * (x1m + x1p)));
+  const int sign_lo =
+      split ? ArtemisUtils::sgn(oa.DeltaPhi(0.5 * (x1m + xroot))) : sign_full;
+  const int sign_hi =
+      split ? ArtemisUtils::sgn(oa.DeltaPhi(0.5 * (xroot + x1p))) : sign_full;
 
-  for (int n = v0.GetLowerBound(b); n <= v0.GetUpperBound(b); ++n) {
-    ReconInfo rl, rr;
-    fill_ri(rl, n, jb.s - 1);
-    fill_ri(rr, n, jb.s);
-    for (int jf = jb.s; jf <= jb.e + 1; ++jf) {
-      Real dq = 0.0;
-      if (split) {
-        if (sign_lo > 0) {
-          dq += ComputeTransferredAmount(oa, rl, rr, sign_lo, x1m, xroot, three_d);
-        } else if (sign_lo < 0) {
-          dq += sign_lo *
-                ComputeTransferredAmount(oa, rr, rl, sign_lo, x1m, xroot, three_d);
+  if (split) {
+    for (int n = v0.GetLowerBound(b); n <= v0.GetUpperBound(b); ++n) {
+      ReconInfo rl, rr;
+      fill_ri(rl, n, jb.s - 1);
+      fill_ri(rr, n, jb.s);
+      for (int jf = jb.s; jf <= jb.e + 1; ++jf) {
+        Real dq = 0.0;
+        if (sign_lo != 0) {
+          dq += sign_lo * ComputeTransferredAmount(oa, (sign_lo > 0) ? rl : rr,
+                                                   (sign_lo > 0) ? rr : rl, sign_lo, x1m,
+                                                   xroot, three_d);
         }
-        if (sign_hi > 0) {
-          dq += ComputeTransferredAmount(oa, rl, rr, sign_hi, xroot, x1p, three_d);
-        } else if (sign_hi < 0) {
-          dq += sign_hi *
-                ComputeTransferredAmount(oa, rr, rl, sign_hi, xroot, x1p, three_d);
+        if (sign_hi != 0) {
+          dq += sign_hi * ComputeTransferredAmount(oa, (sign_hi > 0) ? rl : rr,
+                                                   (sign_hi > 0) ? rr : rl, sign_hi,
+                                                   xroot, x1p, three_d);
         }
-      } else if (sign_full > 0) {
-        dq = ComputeTransferredAmount(oa, rl, rr, sign_full, x1m, x1p, three_d);
-      } else if (sign_full < 0) {
-        dq = sign_full *
-             ComputeTransferredAmount(oa, rr, rl, sign_full, x1m, x1p, three_d);
+        v0.flux(b, X2DIR, n, k, jf, i) = dq / (rr.aface[0] * oa.scdt);
+        if (jf <= jb.e) {
+          rl = rr;
+          fill_ri(rr, n, jf + 1);
+        }
       }
-      // Construct a flux from the amount exchanged
-      v0.flux(b, X2DIR, n, k, jf, i) = dq / (rr.aface[0] * oa.scdt);
-      if (jf <= jb.e) {
-        rl = rr;
-        fill_ri(rr, n, jf + 1);
+    }
+  } else if (sign_full > 0) {
+    for (int n = v0.GetLowerBound(b); n <= v0.GetUpperBound(b); ++n) {
+      ReconInfo rl, rr;
+      fill_ri(rl, n, jb.s - 1);
+      fill_ri(rr, n, jb.s);
+      for (int jf = jb.s; jf <= jb.e + 1; ++jf) {
+        const Real dq =
+            ComputeTransferredAmount(oa, rl, rr, sign_full, x1m, x1p, three_d);
+        v0.flux(b, X2DIR, n, k, jf, i) = dq / (rr.aface[0] * oa.scdt);
+        if (jf <= jb.e) {
+          rl = rr;
+          fill_ri(rr, n, jf + 1);
+        }
+      }
+    }
+  } else if (sign_full < 0) {
+    for (int n = v0.GetLowerBound(b); n <= v0.GetUpperBound(b); ++n) {
+      ReconInfo rl, rr;
+      fill_ri(rl, n, jb.s - 1);
+      fill_ri(rr, n, jb.s);
+      for (int jf = jb.s; jf <= jb.e + 1; ++jf) {
+        const Real dq = sign_full * ComputeTransferredAmount(oa, rr, rl, sign_full, x1m,
+                                                             x1p, three_d);
+        v0.flux(b, X2DIR, n, k, jf, i) = dq / (rr.aface[0] * oa.scdt);
+        if (jf <= jb.e) {
+          rl = rr;
+          fill_ri(rr, n, jf + 1);
+        }
       }
     }
   }
@@ -471,41 +494,64 @@ BuildFluxLineX3(const OrbitalAdvection<GEOM> &oa, const geometry::CoordParams &c
     oa.ApplyGradSkew(ri);
   };
 
-  const auto sgn = [](const Real x) { return (x > 0.0) ? 1 : ((x < 0.0) ? -1 : 0); };
-  const int sign_full = sgn(oa.DeltaPhi(0.5 * (x1m + x1p)));
-  const int sign_lo = split ? sgn(oa.DeltaPhi(0.5 * (x1m + xroot))) : sign_full;
-  const int sign_hi = split ? sgn(oa.DeltaPhi(0.5 * (xroot + x1p))) : sign_full;
+  const int sign_full = ArtemisUtils::sgn(oa.DeltaPhi(0.5 * (x1m + x1p)));
+  const int sign_lo =
+      split ? ArtemisUtils::sgn(oa.DeltaPhi(0.5 * (x1m + xroot))) : sign_full;
+  const int sign_hi =
+      split ? ArtemisUtils::sgn(oa.DeltaPhi(0.5 * (xroot + x1p))) : sign_full;
 
-  for (int n = v0.GetLowerBound(b); n <= v0.GetUpperBound(b); ++n) {
-    ReconInfo rl, rr;
-    fill_ri(rl, n, kb.s - 1);
-    fill_ri(rr, n, kb.s);
-    for (int kf = kb.s; kf <= kb.e + 1; ++kf) {
-      Real dq = 0.0;
-      if (split) {
-        if (sign_lo > 0) {
-          dq += ComputeTransferredAmount(oa, rl, rr, sign_lo, x1m, xroot, three_d);
-        } else if (sign_lo < 0) {
-          dq += sign_lo *
-                ComputeTransferredAmount(oa, rr, rl, sign_lo, x1m, xroot, three_d);
+  if (split) {
+    for (int n = v0.GetLowerBound(b); n <= v0.GetUpperBound(b); ++n) {
+      ReconInfo rl, rr;
+      fill_ri(rl, n, kb.s - 1);
+      fill_ri(rr, n, kb.s);
+      for (int kf = kb.s; kf <= kb.e + 1; ++kf) {
+        Real dq = 0.0;
+        if (sign_lo != 0) {
+          dq += sign_lo * ComputeTransferredAmount(oa, (sign_lo > 0) ? rl : rr,
+                                                   (sign_lo > 0) ? rr : rl, sign_lo, x1m,
+                                                   xroot, three_d);
         }
-        if (sign_hi > 0) {
-          dq += ComputeTransferredAmount(oa, rl, rr, sign_hi, xroot, x1p, three_d);
-        } else if (sign_hi < 0) {
-          dq += sign_hi *
-                ComputeTransferredAmount(oa, rr, rl, sign_hi, xroot, x1p, three_d);
+        if (sign_hi != 0) {
+          dq += sign_hi * ComputeTransferredAmount(oa, (sign_hi > 0) ? rl : rr,
+                                                   (sign_hi > 0) ? rr : rl, sign_hi,
+                                                   xroot, x1p, three_d);
         }
-      } else if (sign_full > 0) {
-        dq = ComputeTransferredAmount(oa, rl, rr, sign_full, x1m, x1p, three_d);
-      } else if (sign_full < 0) {
-        dq = sign_full *
-             ComputeTransferredAmount(oa, rr, rl, sign_full, x1m, x1p, three_d);
+        v0.flux(b, X3DIR, n, kf, j, i) = dq / (rr.aface[0] * oa.scdt);
+        if (kf <= kb.e) {
+          rl = rr;
+          fill_ri(rr, n, kf + 1);
+        }
       }
-      // Construct a flux from the amount exchanged
-      v0.flux(b, X3DIR, n, kf, j, i) = dq / (rr.aface[0] * oa.scdt);
-      if (kf <= kb.e) {
-        rl = rr;
-        fill_ri(rr, n, kf + 1);
+    }
+  } else if (sign_full > 0) {
+    for (int n = v0.GetLowerBound(b); n <= v0.GetUpperBound(b); ++n) {
+      ReconInfo rl, rr;
+      fill_ri(rl, n, kb.s - 1);
+      fill_ri(rr, n, kb.s);
+      for (int kf = kb.s; kf <= kb.e + 1; ++kf) {
+        const Real dq =
+            ComputeTransferredAmount(oa, rl, rr, sign_full, x1m, x1p, three_d);
+        v0.flux(b, X3DIR, n, kf, j, i) = dq / (rr.aface[0] * oa.scdt);
+        if (kf <= kb.e) {
+          rl = rr;
+          fill_ri(rr, n, kf + 1);
+        }
+      }
+    }
+  } else if (sign_full < 0) {
+    for (int n = v0.GetLowerBound(b); n <= v0.GetUpperBound(b); ++n) {
+      ReconInfo rl, rr;
+      fill_ri(rl, n, kb.s - 1);
+      fill_ri(rr, n, kb.s);
+      for (int kf = kb.s; kf <= kb.e + 1; ++kf) {
+        const Real dq = sign_full * ComputeTransferredAmount(oa, rr, rl, sign_full, x1m,
+                                                             x1p, three_d);
+        v0.flux(b, X3DIR, n, kf, j, i) = dq / (rr.aface[0] * oa.scdt);
+        if (kf <= kb.e) {
+          rl = rr;
+          fill_ri(rr, n, kf + 1);
+        }
       }
     }
   }

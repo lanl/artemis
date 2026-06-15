@@ -28,6 +28,14 @@ KOKKOS_FORCEINLINE_FUNCTION
 static int VI(const int n, const int d) { return n * 3 + d; }
 
 //----------------------------------------------------------------------------------------
+//! \fn int ArtemisUtils::sgn
+//! \brief Returns the sign (-1,0,1) of the value
+template <typename T>
+KOKKOS_FORCEINLINE_FUNCTION int sgn(const T x) {
+  return (x > T{0}) ? 1 : ((x < T{0}) ? -1 : 0);
+}
+
+//----------------------------------------------------------------------------------------
 //! \fn Real ArtemisUtils::VDot(const Real a[3], const Real b[3])
 //! \brief Returns dot product of input vectors a and b
 template <typename V1, typename V2>

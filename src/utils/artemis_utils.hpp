@@ -103,7 +103,8 @@ struct array_type {
   }
 
   KOKKOS_FORCEINLINE_FUNCTION // initialize myArray to 0
-      void init() {
+      void
+      init() {
     for (int i = 0; i < N; i++) {
       myArray[i] = 0;
     }
@@ -168,6 +169,8 @@ struct SumMyArray {
 //! Defined in artemis_utils.cpp
 //! NOTE(@pdmullen): We should likely move everything above to implementation file too...
 void PrintArtemisConfiguration(Packages_t &packages);
+void PreStepDiagnosticsRemeshDivB(SimTime const &simtime, MeshData<Real> *rc);
+void PostStepDiagnosticsRemeshDivB(SimTime const &simtime, MeshData<Real> *rc);
 void EnrollArtemisRefinementOps(parthenon::Metadata &m, Coordinates coords,
                                 const bool log, const bool use_minmod_slope = true);
 void EnrollArtemisFaceRefinementOps(parthenon::Metadata &m, Coordinates coords,

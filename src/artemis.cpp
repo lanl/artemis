@@ -207,6 +207,11 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   if (do_raytrace) packages.Add(RT::Initialize(pin.get(), units, constants));
   if (do_mhd) packages.Add(MHD::Initialize(pin.get(), units, constants, packages));
 
+  if (do_mhd && pin->GetOrAddBoolean("mhd", "monitor_divb", false)) {
+    artemis->PreStepDiagnosticsMesh = ArtemisUtils::PreStepDiagnosticsRemeshDivB;
+    artemis->PostStepDiagnosticsMesh = ArtemisUtils::PostStepDiagnosticsRemeshDivB;
+  }
+
   // Assign geometry-specific FillDerived functions
   if (do_gas || do_dust) {
     typedef Coordinates G;

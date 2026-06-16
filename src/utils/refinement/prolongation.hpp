@@ -32,6 +32,39 @@
 #include "geometry/geometry.hpp"
 
 namespace ArtemisUtils {
+template <Coordinates C, TopologicalElement EL>
+KOKKOS_FORCEINLINE_FUNCTION Real
+GetElementAverageWeight(const geometry::Coords<C> &coords) {
+  if constexpr (EL == TE::CC) {
+    return coords.Volume();
+  } else if constexpr (EL == TE::F1) {
+    return coords.template GetFaceArea<X1DIR>();
+  } else if constexpr (EL == TE::F2) {
+    return coords.template GetFaceArea<X2DIR>();
+  } else if constexpr (EL == TE::F3) {
+    return coords.template GetFaceArea<X3DIR>();
+  } else if constexpr (EL == TE::E1) {
+    return coords.GetEdgeLengthX1();
+  } else if constexpr (EL == TE::E2) {
+    return coords.GetEdgeLengthX2();
+  } else if constexpr (EL == TE::E3) {
+    return coords.GetEdgeLengthX3();
+  }
+  PARTHENON_FAIL("Unsupported topological element for geometric averaging weight!");
+  return 0.0;
+}
+
+template <Coordinates C>
+KOKKOS_FORCEINLINE_FUNCTION Real GetFaceAverageWeight(const geometry::Coords<C> &coords,
+                                                      const int face_idx) {
+  if (face_idx == 0) {
+    return coords.template GetFaceArea<X1DIR>();
+  } else if (face_idx == 1) {
+    return coords.template GetFaceArea<X2DIR>();
+  }
+  return coords.template GetFaceArea<X3DIR>();
+}
+
 template <Coordinates C, int DIM, TopologicalElement EL>
 KOKKOS_FORCEINLINE_FUNCTION Real GetCoordinate(const geometry::Coords<C> &coords) {
   static_assert(DIM >= 1 && DIM <= 3, "Invalid dimension!");
@@ -136,6 +169,9 @@ struct ProlongateShared {
         (DIM > 2) && (el == TE::CC || el == TE::F1 || el == TE::F2);
 
     const Real fc = coarse(element_idx, l, m, n, k, j, i);
+    geometry::Coords<GEOM> cc(log, coarse_coords, k, j, i);
+    const Real wc = 1.0;
+    const Real qc = wc * fc;
 
     Real dx1fm = 0;
     [[maybe_unused]] Real dx1fp = 0;
@@ -145,9 +181,13 @@ struct ProlongateShared {
       ArtemisUtils::GetGridSpacings<GEOM, 1, el>(coords, coarse_coords, log, k, j, i, fk,
                                                  fj, fi, &dx1m, &dx1p, &dx1fm, &dx1fp);
 
-      Real gx1c = ArtemisUtils::GradMinMod(fc, coarse(element_idx, l, m, n, k, j, i - 1),
-                                           coarse(element_idx, l, m, n, k, j, i + 1),
-                                           dx1m, dx1p, gx1m, gx1p);
+      geometry::Coords<GEOM> cm(log, coarse_coords, k, j, i - 1);
+      geometry::Coords<GEOM> cp(log, coarse_coords, k, j, i + 1);
+      const Real fm = coarse(element_idx, l, m, n, k, j, i - 1);
+      const Real fp = coarse(element_idx, l, m, n, k, j, i + 1);
+      const Real qm = fm;
+      const Real qp = fp;
+      Real gx1c = ArtemisUtils::GradMinMod(qc, qm, qp, dx1m, dx1p, gx1m, gx1p);
       if constexpr (use_minmod_slope) {
         gx1m = gx1c;
         gx1p = gx1c;
@@ -161,9 +201,13 @@ struct ProlongateShared {
       Real dx2m, dx2p;
       ArtemisUtils::GetGridSpacings<GEOM, 2, el>(coords, coarse_coords, log, k, j, i, fk,
                                                  fj, fi, &dx2m, &dx2p, &dx2fm, &dx2fp);
-      Real gx2c = ArtemisUtils::GradMinMod(fc, coarse(element_idx, l, m, n, k, j - 1, i),
-                                           coarse(element_idx, l, m, n, k, j + 1, i),
-                                           dx2m, dx2p, gx2m, gx2p);
+      geometry::Coords<GEOM> cm(log, coarse_coords, k, j - 1, i);
+      geometry::Coords<GEOM> cp(log, coarse_coords, k, j + 1, i);
+      const Real fm = coarse(element_idx, l, m, n, k, j - 1, i);
+      const Real fp = coarse(element_idx, l, m, n, k, j + 1, i);
+      const Real qm = fm;
+      const Real qp = fp;
+      Real gx2c = ArtemisUtils::GradMinMod(qc, qm, qp, dx2m, dx2p, gx2m, gx2p);
       if constexpr (use_minmod_slope) {
         gx2m = gx2c;
         gx2p = gx2c;
@@ -177,53 +221,91 @@ struct ProlongateShared {
       Real dx3m, dx3p;
       ArtemisUtils::GetGridSpacings<GEOM, 3, el>(coords, coarse_coords, log, k, j, i, fk,
                                                  fj, fi, &dx3m, &dx3p, &dx3fm, &dx3fp);
-      Real gx3c = ArtemisUtils::GradMinMod(fc, coarse(element_idx, l, m, n, k - 1, j, i),
-                                           coarse(element_idx, l, m, n, k + 1, j, i),
-                                           dx3m, dx3p, gx3m, gx3p);
+      geometry::Coords<GEOM> cm(log, coarse_coords, k - 1, j, i);
+      geometry::Coords<GEOM> cp(log, coarse_coords, k + 1, j, i);
+      const Real fm = coarse(element_idx, l, m, n, k - 1, j, i);
+      const Real fp = coarse(element_idx, l, m, n, k + 1, j, i);
+      const Real qm = fm;
+      const Real qp = fp;
+      Real gx3c = ArtemisUtils::GradMinMod(qc, qm, qp, dx3m, dx3p, gx3m, gx3p);
       if constexpr (use_minmod_slope) {
         gx3m = gx3c;
         gx3p = gx3c;
       }
     }
 
-    // KGF: add the off-centered quantities first to preserve FP symmetry
-    // JMM: Extraneous quantities are zero
-    fine(element_idx, l, m, n, fk, fj, fi) =
-        fc - (gx1m * dx1fm + gx2m * dx2fm + gx3m * dx3fm);
+    Real qfine[2][2][2] = {{{0.0}}};
+    bool active[2][2][2] = {{{false}}};
+    auto stage_fine_value = [&](const int ok, const int oj, const int oi, const Real qf) {
+      qfine[ok][oj][oi] = qf;
+      active[ok][oj][oi] = true;
+    };
+
+    stage_fine_value(0, 0, 0, qc - (gx1m * dx1fm + gx2m * dx2fm + gx3m * dx3fm));
     if constexpr (INCLUDE_X1)
-      fine(element_idx, l, m, n, fk, fj, fi + 1) =
-          fc + (gx1p * dx1fp - gx2m * dx2fm - gx3m * dx3fm);
+      stage_fine_value(0, 0, 1, qc + (gx1p * dx1fp - gx2m * dx2fm - gx3m * dx3fm));
     if constexpr (INCLUDE_X2)
-      fine(element_idx, l, m, n, fk, fj + 1, fi) =
-          fc - (gx1m * dx1fm - gx2p * dx2fp + gx3m * dx3fm);
+      stage_fine_value(0, 1, 0, qc - (gx1m * dx1fm - gx2p * dx2fp + gx3m * dx3fm));
     if constexpr (INCLUDE_X2 && INCLUDE_X1)
-      fine(element_idx, l, m, n, fk, fj + 1, fi + 1) =
-          fc + (gx1p * dx1fp + gx2p * dx2fp - gx3m * dx3fm);
+      stage_fine_value(0, 1, 1, qc + (gx1p * dx1fp + gx2p * dx2fp - gx3m * dx3fm));
     if constexpr (INCLUDE_X3)
-      fine(element_idx, l, m, n, fk + 1, fj, fi) =
-          fc - (gx1m * dx1fm + gx2m * dx2fm - gx3p * dx3fp);
+      stage_fine_value(1, 0, 0, qc - (gx1m * dx1fm + gx2m * dx2fm - gx3p * dx3fp));
     if constexpr (INCLUDE_X3 && INCLUDE_X1)
-      fine(element_idx, l, m, n, fk + 1, fj, fi + 1) =
-          fc + (gx1p * dx1fp - gx2m * dx2fm + gx3p * dx3fp);
+      stage_fine_value(1, 0, 1, qc + (gx1p * dx1fp - gx2m * dx2fm + gx3p * dx3fp));
     if constexpr (INCLUDE_X3 && INCLUDE_X2)
-      fine(element_idx, l, m, n, fk + 1, fj + 1, fi) =
-          fc - (gx1m * dx1fm - gx2p * dx2fp - gx3p * dx3fp);
+      stage_fine_value(1, 1, 0, qc - (gx1m * dx1fm - gx2p * dx2fp - gx3p * dx3fp));
     if constexpr (INCLUDE_X3 && INCLUDE_X2 && INCLUDE_X1)
-      fine(element_idx, l, m, n, fk + 1, fj + 1, fi + 1) =
-          fc + (gx1p * dx1fp + gx2p * dx2fp + gx3p * dx3fp);
+      stage_fine_value(1, 1, 1, qc + (gx1p * dx1fp + gx2p * dx2fp + gx3p * dx3fp));
+
+    if constexpr (el == TE::F1 || el == TE::F2 || el == TE::F3) {
+      const Real coarse_flux = GetElementAverageWeight<GEOM, el>(cc) * fc;
+      Real fine_flux = 0.0;
+      Real fine_area = 0.0;
+      for (int ok = 0; ok < 2; ++ok) {
+        for (int oj = 0; oj < 2; ++oj) {
+          for (int oi = 0; oi < 2; ++oi) {
+            if (!active[ok][oj][oi]) continue;
+            geometry::Coords<GEOM> cf(log, coords, fk + ok, fj + oj, fi + oi);
+            const Real area = GetElementAverageWeight<GEOM, el>(cf);
+            fine_flux += area * qfine[ok][oj][oi];
+            fine_area += area;
+          }
+        }
+      }
+      const Real delta = (coarse_flux - fine_flux) / (fine_area + Fuzz<Real>());
+      for (int ok = 0; ok < 2; ++ok) {
+        for (int oj = 0; oj < 2; ++oj) {
+          for (int oi = 0; oi < 2; ++oi) {
+            if (active[ok][oj][oi]) qfine[ok][oj][oi] += delta;
+          }
+        }
+      }
+    }
+
+    for (int ok = 0; ok < 2; ++ok) {
+      for (int oj = 0; oj < 2; ++oj) {
+        for (int oi = 0; oi < 2; ++oi) {
+          if (active[ok][oj][oi]) {
+            fine(element_idx, l, m, n, fk + ok, fj + oj, fi + oi) = qfine[ok][oj][oi];
+          }
+        }
+      }
+    }
   }
 };
 
-//----------------------------------------------------------------------------------------
-//! \struct  ArtemisUtils::ProlongateInternalTothAndRoe
-//! \brief Geometry-aware, divergence-preserving prolongation to internal faces.
 template <Coordinates GEOM, bool log>
-struct ProlongateInternalTothAndRoe {
+struct ProlongateTothAndRoe {
   static constexpr bool OperationRequired(TopologicalElement fel,
                                           TopologicalElement cel) {
-    return (cel == TE::CC) && (fel == TE::F1 || fel == TE::F2 || fel == TE::F3);
+    return (cel == TE::CC) && (GetTopologicalType(fel) == TopologicalType::Face);
   }
-
+  // Here, fel is the topological element on which the field is defined and
+  // cel is the topological element on which we are filling the internal values
+  // of the field. So, for instance, we could fill the fine cell values of an
+  // x-face field within the volume of a coarse cell. This is assumes that the
+  // values of the fine cells on the elements corresponding with the coarse cell
+  // have been filled.
   template <int DIM, TopologicalElement fel = TopologicalElement::CC,
             TopologicalElement cel = TopologicalElement::CC>
   KOKKOS_FORCEINLINE_FUNCTION static void
@@ -233,64 +315,261 @@ struct ProlongateInternalTothAndRoe {
      const Coordinates_t &coords, const Coordinates_t &coarse_coords,
      const ParArrayND<Real, VariableState> *,
      const ParArrayND<Real, VariableState> *pfine) {
-    if constexpr (!(cel == TE::CC && (fel == TE::F1 || fel == TE::F2 || fel == TE::F3))) {
+    if constexpr (!IsSubmanifold(fel, cel)) {
       return;
     } else {
-      const int fi = (DIM > 0) ? (i - cib.s) * 2 + ib.s : ib.s;
-      const int fj = (DIM > 1) ? (j - cjb.s) * 2 + jb.s : jb.s;
-      const int fk = (DIM > 2) ? (k - ckb.s) * 2 + kb.s : kb.s;
+      if constexpr (!(fel == TE::F1)) {
+        return;
+      } else {
+        const int fi = (DIM > 0) ? (i - cib.s) * 2 + ib.s : ib.s;
+        const int fj = (DIM > 1) ? (j - cjb.s) * 2 + jb.s : jb.s;
+        const int fk = (DIM > 2) ? (k - ckb.s) * 2 + kb.s : kb.s;
+        auto &fine = *pfine;
+        constexpr int g3 = (DIM > 2) ? 1 : 0;
+        constexpr int g2 = (DIM > 1) ? 1 : 0;
+        constexpr int ny = (DIM > 1) ? 2 : 1;
+        constexpr int nz = (DIM > 2) ? 2 : 1;
+        constexpr int ncell = (DIM == 1 ? 2 : (DIM == 2 ? 4 : 8));
+        constexpr int neq = ncell - 1;
+        constexpr int nf1 = ny * nz;
+        constexpr int nf2 = (DIM > 1) ? (2 * nz) : 0;
+        constexpr int nf3 = (DIM > 2) ? 4 : 0;
+        constexpr int nunk = nf1 + nf2 + nf3;
+        constexpr int max_eq = 7;
+        constexpr int max_unk = 12;
 
-      constexpr int element_idx = static_cast<int>(fel) % 3;
-      auto &fine = *pfine;
+        auto get_indices = [&](const int comp, const int sx, const int sy, const int sz) {
+          return std::array<int, 3>{fk + sz * g3, fj + sy * g2, fi + sx};
+        };
 
-      auto get_fine_permuted = [&](int eidx, int ok, int oj, int oi) -> Real & {
-        eidx = (element_idx + eidx) % 3;
-        constexpr int g3 = (DIM > 2);
-        constexpr int g2 = (DIM > 1);
-        if constexpr (fel == TE::F1) {
-          return fine(eidx, l, m, n, fk + ok * g3, fj + oj * g2, fi + oi);
-        } else if constexpr (fel == TE::F2) {
-          return fine(eidx, l, m, n, fk + oj * g3, fj + oi * g2, fi + ok);
+        auto get_face_value = [&](const int comp, const int sx, const int sy,
+                                  const int sz) -> Real & {
+          const auto idx = get_indices(comp, sx, sy, sz);
+          return fine(comp, l, m, n, idx[0], idx[1], idx[2]);
+        };
+
+        auto get_face_area = [&](const int comp, const int sx, const int sy,
+                                 const int sz) {
+          const auto idx = get_indices(comp, sx, sy, sz);
+          geometry::Coords<GEOM> cf(log, coords, idx[0], idx[1], idx[2]);
+          return ArtemisUtils::GetFaceAverageWeight(cf, comp);
+        };
+
+        auto get_face_flux = [&](const int comp, const int sx, const int sy,
+                                 const int sz) {
+          return get_face_area(comp, sx, sy, sz) * get_face_value(comp, sx, sy, sz);
+        };
+
+        auto set_face_flux = [&](const int comp, const int sx, const int sy, const int sz,
+                                 const Real qf) {
+          const Real wf = get_face_area(comp, sx, sy, sz);
+          get_face_value(comp, sx, sy, sz) = qf / (wf + Fuzz<Real>());
+        };
+
+        auto get_face_normal_pos = [&](const int comp, const int sx, const int sy,
+                                       const int sz) {
+          const auto idx = get_indices(comp, sx, sy, sz);
+          geometry::Coords<GEOM> cf(log, coords, idx[0], idx[1], idx[2]);
+          if (comp == 0) {
+            return ArtemisUtils::GetCoordinate<GEOM, 1, TE::F1>(cf);
+          } else if (comp == 1) {
+            return ArtemisUtils::GetCoordinate<GEOM, 2, TE::F2>(cf);
+          }
+          return ArtemisUtils::GetCoordinate<GEOM, 3, TE::F3>(cf);
+        };
+
+        auto idx_f1 = [&](const int sy, const int sz) { return sz * ny + sy; };
+        auto idx_f2 = [&](const int sx, const int sz) { return nf1 + sz * 2 + sx; };
+        auto idx_f3 = [&](const int sx, const int sy) { return nf1 + nf2 + sy * 2 + sx; };
+
+        if constexpr (DIM == 1) {
+          const Real q0 = get_face_flux(0, 0, 0, 0);
+          const Real q2 = get_face_flux(0, 2, 0, 0);
+          const Real x0 = get_face_normal_pos(0, 0, 0, 0);
+          const Real x1 = get_face_normal_pos(0, 1, 0, 0);
+          const Real x2 = get_face_normal_pos(0, 2, 0, 0);
+          const Real alpha = (x1 - x0) / (x2 - x0 + Fuzz<Real>());
+          set_face_flux(0, 1, 0, 0, q0 + alpha * (q2 - q0));
+          return;
         }
-        return fine(eidx, l, m, n, fk + oi * g3, fj + ok * g2, fi + oj);
-      };
 
-      auto sg = [](const int offset) -> Real { return offset == 0 ? -1.0 : 1.0; };
-      Real Uxx{0.0};
-      Real Vxyz{0.0};
-      Real Wxyz{0.0};
-      for (int v = 0; v <= 1; v++) {
-        for (int u = 0; u <= 2; u += 2) {
-          for (int t = 0; t <= 1; t++) {
-            const auto fine2 = get_fine_permuted(1, v, u, t);
-            const auto fine3 = get_fine_permuted(2, u, v, t);
-            Uxx += sg(t) * sg(u) * (fine2 + fine3);
-            Vxyz += sg(t) * sg(u) * sg(v) * fine2;
-            Wxyz += sg(t) * sg(u) * sg(v) * fine3;
+        Real u0[max_unk] = {0.0};
+        Real w[max_unk] = {0.0};
+        Real D[max_eq][max_unk] = {{0.0}};
+        Real rhs[max_eq] = {0.0};
+
+        for (int sz = 0; sz < nz; ++sz) {
+          for (int sy = 0; sy < ny; ++sy) {
+            const int idx = idx_f1(sy, sz);
+            const Real q0 = get_face_flux(0, 0, sy, sz);
+            const Real q2 = get_face_flux(0, 2, sy, sz);
+            const Real x0 = get_face_normal_pos(0, 0, sy, sz);
+            const Real x1 = get_face_normal_pos(0, 1, sy, sz);
+            const Real x2 = get_face_normal_pos(0, 2, sy, sz);
+            const Real alpha = (x1 - x0) / (x2 - x0 + Fuzz<Real>());
+            u0[idx] = q0 + alpha * (q2 - q0);
+            w[idx] = get_face_area(0, 1, sy, sz);
           }
         }
-      }
-      Uxx *= 0.125;
+        if constexpr (DIM > 1) {
+          for (int sz = 0; sz < nz; ++sz) {
+            for (int sx = 0; sx < 2; ++sx) {
+              const int idx = idx_f2(sx, sz);
+              const Real q0 = get_face_flux(1, sx, 0, sz);
+              const Real q2 = get_face_flux(1, sx, 2, sz);
+              const Real x0 = get_face_normal_pos(1, sx, 0, sz);
+              const Real x1 = get_face_normal_pos(1, sx, 1, sz);
+              const Real x2 = get_face_normal_pos(1, sx, 2, sz);
+              const Real alpha = (x1 - x0) / (x2 - x0 + Fuzz<Real>());
+              u0[idx] = q0 + alpha * (q2 - q0);
+              w[idx] = get_face_area(1, sx, 1, sz);
+            }
+          }
+        }
+        if constexpr (DIM > 2) {
+          for (int sy = 0; sy < 2; ++sy) {
+            for (int sx = 0; sx < 2; ++sx) {
+              const int idx = idx_f3(sx, sy);
+              const Real q0 = get_face_flux(2, sx, sy, 0);
+              const Real q2 = get_face_flux(2, sx, sy, 2);
+              const Real x0 = get_face_normal_pos(2, sx, sy, 0);
+              const Real x1 = get_face_normal_pos(2, sx, sy, 1);
+              const Real x2 = get_face_normal_pos(2, sx, sy, 2);
+              const Real alpha = (x1 - x0) / (x2 - x0 + Fuzz<Real>());
+              u0[idx] = q0 + alpha * (q2 - q0);
+              w[idx] = get_face_area(2, sx, sy, 1);
+            }
+          }
+        }
 
-      geometry::Coords<GEOM> cc(log, coarse_coords, k, j, i);
-      const Real dl1 = cc.Distance(cc.FaceCenX1(geometry::CellFace::lower),
-                                   cc.FaceCenX1(geometry::CellFace::upper));
-      const Real dl2 = cc.Distance(cc.FaceCenX2(geometry::CellFace::lower),
-                                   cc.FaceCenX2(geometry::CellFace::upper));
-      const Real dl3 = cc.Distance(cc.FaceCenX3(geometry::CellFace::lower),
-                                   cc.FaceCenX3(geometry::CellFace::upper));
-      const std::array<Real, 3> dl{dl1, dl2, dl3};
-      const Real dx2 = SQR(dl[element_idx]);
-      const Real dy2 = SQR(dl[(element_idx + 1) % 3]);
-      const Real dz2 = SQR(dl[(element_idx + 2) % 3]);
-      Vxyz *= 0.125 * dz2 / (dx2 + dz2 + Fuzz<Real>());
-      Wxyz *= 0.125 * dy2 / (dx2 + dy2 + Fuzz<Real>());
+        int row = 0;
+        for (int sz = 0; sz < nz; ++sz) {
+          for (int sy = 0; sy < ny; ++sy) {
+            for (int sx = 0; sx < 2; ++sx) {
+              if (sx == 1 && sy == ny - 1 && sz == nz - 1) continue;
 
-      for (int ok = 0; ok <= 1; ok++) {
-        for (int oj = 0; oj <= 1; oj++) {
-          get_fine_permuted(0, ok, oj, 1) =
-              0.5 * (get_fine_permuted(0, ok, oj, 0) + get_fine_permuted(0, ok, oj, 2)) +
-              Uxx + sg(ok) * Vxyz + sg(oj) * Wxyz;
+              if (sx == 0) {
+                D[row][idx_f1(sy, sz)] += 1.0;
+                rhs[row] += get_face_flux(0, 0, sy, sz);
+              } else {
+                D[row][idx_f1(sy, sz)] -= 1.0;
+                rhs[row] -= get_face_flux(0, 2, sy, sz);
+              }
+
+              if constexpr (DIM > 1) {
+                if (sy == 0) {
+                  D[row][idx_f2(sx, sz)] += 1.0;
+                  rhs[row] += get_face_flux(1, sx, 0, sz);
+                } else {
+                  D[row][idx_f2(sx, sz)] -= 1.0;
+                  rhs[row] -= get_face_flux(1, sx, 2, sz);
+                }
+              }
+
+              if constexpr (DIM > 2) {
+                if (sz == 0) {
+                  D[row][idx_f3(sx, sy)] += 1.0;
+                  rhs[row] += get_face_flux(2, sx, sy, 0);
+                } else {
+                  D[row][idx_f3(sx, sy)] -= 1.0;
+                  rhs[row] -= get_face_flux(2, sx, sy, 2);
+                }
+              }
+
+              ++row;
+            }
+          }
+        }
+
+        Real M[max_eq][max_eq] = {{0.0}};
+        Real residual[max_eq] = {0.0};
+        for (int r = 0; r < neq; ++r) {
+          Real du = 0.0;
+          for (int u = 0; u < nunk; ++u) {
+            du += D[r][u] * u0[u];
+          }
+          residual[r] = du - rhs[r];
+          for (int c = 0; c < neq; ++c) {
+            Real sum = 0.0;
+            for (int u = 0; u < nunk; ++u) {
+              sum += D[r][u] * w[u] * D[c][u];
+            }
+            M[r][c] = sum;
+          }
+        }
+
+        Real A[max_eq][max_eq + 1] = {{0.0}};
+        for (int r = 0; r < neq; ++r) {
+          for (int c = 0; c < neq; ++c) {
+            A[r][c] = M[r][c];
+          }
+          A[r][neq] = residual[r];
+        }
+
+        for (int p = 0; p < neq; ++p) {
+          int piv = p;
+          Real max_abs = std::abs(A[p][p]);
+          for (int r = p + 1; r < neq; ++r) {
+            const Real cand = std::abs(A[r][p]);
+            if (cand > max_abs) {
+              max_abs = cand;
+              piv = r;
+            }
+          }
+          if (piv != p) {
+            for (int c = p; c <= neq; ++c) {
+              const Real tmp = A[p][c];
+              A[piv][c] = A[p][c];
+              A[p][c] = tmp;
+            }
+          }
+          const Real pivot = A[p][p];
+          if (std::abs(pivot) <= Fuzz<Real>()) continue;
+          for (int r = p + 1; r < neq; ++r) {
+            const Real fac = A[r][p] / pivot;
+            for (int c = p; c <= neq; ++c) {
+              A[r][c] -= fac * A[p][c];
+            }
+          }
+        }
+
+        Real lambda[max_eq] = {0.0};
+        for (int r = neq - 1; r >= 0; --r) {
+          Real sum = A[r][neq];
+          for (int c = r + 1; c < neq; ++c) {
+            sum -= A[r][c] * lambda[c];
+          }
+          const Real pivot = A[r][r];
+          lambda[r] = (std::abs(pivot) > Fuzz<Real>()) ? (sum / pivot) : 0.0;
+        }
+
+        Real u[max_unk] = {0.0};
+        for (int idx = 0; idx < nunk; ++idx) {
+          Real corr = 0.0;
+          for (int r = 0; r < neq; ++r) {
+            corr += D[r][idx] * lambda[r];
+          }
+          u[idx] = u0[idx] - w[idx] * corr;
+        }
+
+        for (int sz = 0; sz < nz; ++sz) {
+          for (int sy = 0; sy < ny; ++sy) {
+            set_face_flux(0, 1, sy, sz, u[idx_f1(sy, sz)]);
+          }
+        }
+        if constexpr (DIM > 1) {
+          for (int sz = 0; sz < nz; ++sz) {
+            for (int sx = 0; sx < 2; ++sx) {
+              set_face_flux(1, sx, 1, sz, u[idx_f2(sx, sz)]);
+            }
+          }
+        }
+        if constexpr (DIM > 2) {
+          for (int sy = 0; sy < 2; ++sy) {
+            for (int sx = 0; sx < 2; ++sx) {
+              set_face_flux(2, sx, sy, 1, u[idx_f3(sx, sy)]);
+            }
+          }
         }
       }
     }

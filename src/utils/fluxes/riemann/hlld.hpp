@@ -185,10 +185,10 @@ struct RiemannSolver<RSolver::hlld, FLUID_TYPE, CTYPE,
               hlle_qc * ((wl_ivx - hlle_qb) * wl_idn * wl_ivz - bxi_n * wl_ibz_n -
                          ((wr_ivx - hlle_qa) * wr_idn * wr_ivz - bxi_n * wr_ibz_n));
           const Real hlle_fe =
-              0.5 * (el * (wl_ivx - hlle_qb) + ptl * wl_ivx - bxi * vdotBl +
-                     er * (wr_ivx - hlle_qa) + ptr * wr_ivx - bxi * vdotBr) +
-              hlle_qc * (el * (wl_ivx - hlle_qb) + ptl * wl_ivx - bxi * vdotBl -
-                         (er * (wr_ivx - hlle_qa) + ptr * wr_ivx - bxi * vdotBr));
+              0.5 * (el * (wl_ivx - hlle_qb) + ptl * wl_ivx - bxi_n * vdotBl +
+                     er * (wr_ivx - hlle_qa) + ptr * wr_ivx - bxi_n * vdotBr) +
+              hlle_qc * (el * (wl_ivx - hlle_qb) + ptl * wl_ivx - bxi_n * vdotBl -
+                         (er * (wr_ivx - hlle_qa) + ptr * wr_ivx - bxi_n * vdotBr));
           const Real hlle_fby =
               0.5 * (fl_by - hlle_qb * wl_iby + fr_by - hlle_qa * wr_iby) +
               hlle_qc * ((fl_by - hlle_qb * wl_iby) - (fr_by - hlle_qa * wr_iby));

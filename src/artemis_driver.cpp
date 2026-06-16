@@ -293,7 +293,8 @@ TaskCollection ArtemisDriver<GEOM>::StepTasks() {
 
       // Apply "coordinate source terms"
       TaskID gas_coord_src = update | update_mhd, dust_coord_src = update;
-      if (do_gas) gas_coord_src = tl.AddTask(update, Gas::FluxSource, u0.get(), bdt);
+      if (do_gas)
+        gas_coord_src = tl.AddTask(update | update_mhd, Gas::FluxSource, u0.get(), bdt);
       if (do_dust) dust_coord_src = tl.AddTask(update, Dust::FluxSource, u0.get(), bdt);
 
       // Apply (gas) diffusion sources

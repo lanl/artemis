@@ -35,8 +35,8 @@ KOKKOS_INLINE_FUNCTION void
 StrainTensorFace(parthenon::team_mbr_t const &member, const geometry::CoordParams &cpars,
                  const int b, const int n, const int k, const int j, const int il,
                  const int iu, const int multi_d, const int three_d, const Real qshear,
-                 const Real om0, const SparsePack &vprim, const SparsePackGeom &vg,
-                 const parthenon::ScratchPad2D<Real> &flx) {
+                 const Real om0, const Real gm_bg, const SparsePack &vprim,
+                 const SparsePackGeom &vg, const parthenon::ScratchPad2D<Real> &flx) {
   // Fill the flx array with the strain tensor on the specified face
   //
   //
@@ -352,7 +352,7 @@ StrainTensorFace(parthenon::team_mbr_t const &member, const geometry::CoordParam
 
     // Add any strain rate due to the background shear velocity.
     // Uses the analytic expression at the face center
-    const auto Eb = RotatingFrame::StrainRate<GEOM, XDIR>(qshear, om0, xf);
+    const auto Eb = RotatingFrame::StrainRate<GEOM, XDIR>(qshear, om0, gm_bg, xf);
     flx(0, i) += Eb[0];
     flx(1, i) += Eb[1];
     flx(2, i) += Eb[2];
@@ -602,12 +602,16 @@ TaskStatus MomentumFluxImpl(MeshData<Real> *md, DiffCoeffParams dp, PKG &pkg,
   auto pm = md->GetParentPointer();
   auto eos_d = pkg->template Param<EOS>("eos_d");
 
-  Real qshear = 0.0, om0 = 0.0;
-  const bool do_shear = pm->packages.Get("artemis")->template Param<bool>("do_shear");
-  if (do_shear) {
+  Real qshear = 0.0, om0 = 0.0, gm_bg = 0.0;
+  const bool do_oa =
+      pm->packages.Get("artemis")->template Param<bool>("do_orbital_advection");
+  const bool do_rf =
+      pm->packages.Get("artemis")->template Param<bool>("do_rotating_frame");
+  if (do_oa || do_rf) {
     auto &rframe_pkg = pm->packages.Get("rotating_frame");
     qshear = rframe_pkg->template Param<Real>("qshear");
-    om0 = rframe_pkg->template Param<Real>("omega");
+    om0 = do_rf ? rframe_pkg->template Param<Real>("omega") : 0.0;
+    gm_bg = rframe_pkg->template Param<Real>("gm");
   }
   const auto &cpars =
       pm->packages.Get("artemis")->template Param<geometry::CoordParams>("coord_params");
@@ -648,8 +652,8 @@ TaskStatus MomentumFluxImpl(MeshData<Real> *md, DiffCoeffParams dp, PKG &pkg,
 
           // 1. Compute the strain tensor at i-1/2
           StrainTensorFace<GEOM, FLUID_TYPE, X1DIR>(mbr, cpars, b, n, k, j, il, iu,
-                                                    multi_d, three_d, qshear, om0, vprim,
-                                                    vg, flx);
+                                                    multi_d, three_d, qshear, om0, gm_bg,
+                                                    vprim, vg, flx);
 
           // 2. Compute div(u) on this pencil
           VelocityDivergence<GEOM, FLUID_TYPE>(mbr, cpars, b, n, k, j, il - 1, iu,
@@ -701,12 +705,13 @@ TaskStatus MomentumFluxImpl(MeshData<Real> *md, DiffCoeffParams dp, PKG &pkg,
               // 1. Compute the momentum fluxes at j+1/2
               StrainTensorFace<GEOM, FLUID_TYPE, X2DIR>(mbr, cpars, b, n, k, j, il, iu,
                                                         multi_d, three_d, qshear, om0,
-                                                        vprim, vg, flx);
+                                                        gm_bg, vprim, vg, flx);
+
               // 2. Compute div(u) on this pencil
               VelocityDivergence<GEOM, FLUID_TYPE>(mbr, cpars, b, n, k, j, il, iu,
                                                    multi_d, three_d, vprim, vg, divu_jm1);
 
-              // 2. Viscosity values. No barrier
+              // 3. Viscosity values. No barrier
               DiffusionCoeff<DIFF, GEOM, FLUID_TYPE> diffcoeff;
               diffcoeff.evaluate(dp, mbr, b, n, k, j, il, iu, vprim, eos_d, mu_jm1);
 
@@ -755,7 +760,7 @@ TaskStatus MomentumFluxImpl(MeshData<Real> *md, DiffCoeffParams dp, PKG &pkg,
               // 1. Compute the momentum fluxes at k-1/2
               StrainTensorFace<GEOM, FLUID_TYPE, X3DIR>(mbr, cpars, b, n, k, j, il, iu,
                                                         multi_d, three_d, qshear, om0,
-                                                        vprim, vg, flx);
+                                                        gm_bg, vprim, vg, flx);
               // 2. Compute div(u) on this pencil
               VelocityDivergence<GEOM, FLUID_TYPE>(mbr, cpars, b, n, k, j, il, iu,
                                                    multi_d, three_d, vprim, vg, divu_km1);

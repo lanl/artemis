@@ -39,41 +39,52 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
 template <Coordinates GEOM>
 Real EstimateTimestepMesh(MeshData<Real> *md);
 
+template <Coordinates GEOM>
 Real EstimateTimestep(parthenon::Mesh *pmesh, const Real dt_ratio);
 
 TaskStatus RotatingFrameForce(MeshData<Real> *md, const Real time, const Real dt);
 
+template <Coordinates GEOM>
 TaskListStatus Advect(Mesh *pmesh, const SimTime &tm);
 
+template <Coordinates GEOM>
 TaskCollection LinearAdvectionStep(Mesh *pmesh, const SimTime &tm, const Real scdt);
 
+template <Coordinates GEOM>
 TaskStatus LagrangeRemap(MeshData<Real> *u0, const Real scdt);
 
 struct ReconInfo {
   std::array<Real, 3> grad;
   std::array<Real, 3> xc;
   std::array<Real, 3> dx;
+  std::array<Real, 2> aface;
   geometry::BBox bnds;
   Real q;
   Real vol;
 
   ReconInfo() = default;
-  template <typename V1, typename V2>
+  template <Coordinates GEOM, typename V1, typename V2>
   KOKKOS_INLINE_FUNCTION ReconInfo(const geometry::CoordParams &cpar, const V1 &v0,
                                    const V2 &vg, const int b, const int n, const int k,
                                    const int j, const int i) {
-    fill(cpar, v0, vg, b, n, k, j, i);
+    fill<GEOM>(cpar, v0, vg, b, n, k, j, i);
   }
 
-  template <typename V1, typename V2>
+  template <Coordinates GEOM, typename V1, typename V2>
   KOKKOS_INLINE_FUNCTION void fill(const geometry::CoordParams &cpar, const V1 &v0,
                                    const V2 &vg, const int b, const int n, const int k,
                                    const int j, const int i) {
-    geometry::Coords<Coordinates::cartesian> coords(cpar, v0.GetCoordinates(b), k, j, i);
+    geometry::Coords<GEOM> coords(cpar, v0.GetCoordinates(b), k, j, i);
     dx = coords.GetCellWidths(vg, b, k, j, i);
     xc = coords.GetCellCenter(vg, b, k, j, i);
     vol = coords.GetVolume(vg, b, k, j, i);
     bnds = coords.bnds;
+    if constexpr ((GEOM == Coordinates::cartesian) ||
+                  (GEOM == Coordinates::cylindrical)) {
+      aface = {coords.AreaX2(bnds.x2[0]), coords.AreaX2(bnds.x2[1])};
+    } else {
+      aface = {coords.AreaX3(bnds.x3[0]), coords.AreaX3(bnds.x3[1])};
+    }
 
     q = v0(b, n, k, j, i);
     grad = {0.};
@@ -81,13 +92,34 @@ struct ReconInfo {
 };
 
 //----------------------------------------------------------------------------------------
+//! \fn  Real RotatingFrame::OmegaKep
+//! \brief Returns Keplerian angular velocity at spherical radius R
+KOKKOS_FORCEINLINE_FUNCTION Real OmegaKep(const Real gm, const Real R) {
+  return std::sqrt(gm / (R * R * R));
+}
+
+//----------------------------------------------------------------------------------------
 //! \fn std::array<Real, 3> RotatingFrame::BackgroundVelocity
-//! \brief Returns signed shear velocity
+//! \brief Returns the background velocity in coordinate basis.
 template <Coordinates GEOM>
 KOKKOS_INLINE_FUNCTION std::array<Real, 3>
-BackgroundVelocity(const Real qshear, const Real omega, const Real x1v) {
+BackgroundVelocity(const Real qshear, const Real omega, const Real gm,
+                   const std::array<Real, 3> &xv) {
   if constexpr (GEOM == Coordinates::cartesian) {
-    return {0.0, -qshear * omega * x1v, 0.0};
+    return {0.0, -qshear * omega * xv[0], 0.0};
+  } else if constexpr (GEOM == Coordinates::cylindrical) {
+    const Real R = xv[0];
+    const Real vphi = R * (OmegaKep(gm, R) - omega);
+    return {0.0, vphi, 0.0};
+  } else if constexpr (GEOM == Coordinates::spherical3D ||
+                       GEOM == Coordinates::spherical2D) {
+    const Real R = xv[0] * std::sin(xv[1]);
+    const Real vphi = R * (OmegaKep(gm, xv[0]) - omega);
+    return {0.0, 0.0, vphi};
+  } else if constexpr (GEOM == Coordinates::axisymmetric) {
+    const Real R = xv[0];
+    const Real vphi = R * (OmegaKep(gm, R) - omega);
+    return {0.0, 0.0, vphi};
   }
   return {0.0, 0.0, 0.0};
 }
@@ -95,10 +127,11 @@ BackgroundVelocity(const Real qshear, const Real omega, const Real x1v) {
 //----------------------------------------------------------------------------------------
 //! \fn std::array<Real, 3> RotatingFrame::StrainRate
 //! \brief Returns the strain rate in a given direction associated with the background
+//!        shear/orbital velocity. Computes (grad(v) + grad(v)^T) (no div(v) term).
 template <Coordinates GEOM, parthenon::CoordinateDirection XDIR>
 KOKKOS_INLINE_FUNCTION std::array<Real, 3> StrainRate(const Real qshear, const Real omega,
+                                                      const Real gm,
                                                       const std::array<Real, 3> &xf) {
-  // We are computing (grad(v) + grad(v)^T) (no div(v) term)
   if constexpr (GEOM == Coordinates::cartesian) {
     if constexpr (XDIR == X1DIR) {
       // { T_1^1 , T_2^1 , T_3^1 }
@@ -106,6 +139,31 @@ KOKKOS_INLINE_FUNCTION std::array<Real, 3> StrainRate(const Real qshear, const R
     } else if constexpr (XDIR == X2DIR) {
       // { T_1^2 , T_2^2 , T_3^2 }
       return {-qshear * omega, 0.0, 0.0};
+    }
+  } else if constexpr (GEOM == Coordinates::cylindrical) {
+    const Real R = xf[0];
+    const Real rdOdR = -1.5 * OmegaKep(gm, R);
+    if constexpr (XDIR == X1DIR) {
+      return {0.0, rdOdR, 0.0}; // {T_R^R, T_φ^R, T_z^R}
+    } else if constexpr (XDIR == X2DIR) {
+      return {rdOdR, 0.0, 0.0}; // {T_R^φ, T_φ^φ, T_z^φ}
+    }
+  } else if constexpr (GEOM == Coordinates::axisymmetric) {
+    const Real R = xf[0];
+    const Real rdOdR = -1.5 * OmegaKep(gm, R);
+    if constexpr (XDIR == X1DIR) {
+      return {0.0, 0.0, rdOdR}; // {T_R^R, T_z^R, T_φ^R}
+    } else if constexpr (XDIR == X3DIR) {
+      return {rdOdR, 0.0, 0.0}; // {T_R^φ, T_z^φ, T_φ^φ}
+    }
+  } else if constexpr (GEOM == Coordinates::spherical3D ||
+                       GEOM == Coordinates::spherical2D) {
+    const Real r = xf[0];
+    const Real rdOdr = -1.5 * OmegaKep(gm, r);
+    if constexpr (XDIR == X1DIR) {
+      return {0.0, 0.0, rdOdr}; // T_φ^r; φ is x3
+    } else if constexpr (XDIR == X3DIR) {
+      return {rdOdr, 0.0, 0.0}; // T_r^φ
     }
   }
   return {0.0, 0.0, 0.0};
@@ -129,105 +187,385 @@ KOKKOS_INLINE_FUNCTION std::array<Real, 3> RotationVelocity(const std::array<Rea
 }
 
 //----------------------------------------------------------------------------------------
-//! \fn  RemapUpdate
-//! \brief
-template <typename V1>
-KOKKOS_INLINE_FUNCTION void
-RemapUpdate(const V1 &v0, const ReconInfo &rp, const ReconInfo &r, const Real vb,
-            const Real dwdt, const int three_d, const int b, const int n, const int k,
-            const int j, const int jp, const int i) {
-  // Upwind::r is vb < 0
-  const Real fac = dwdt;
-  const Real flip = (vb < 0.0) ? -1 : 1;
-  const Real y0 = r.bnds.x2[(vb < 0.0)];
+//! \struct OrbitalAdvection
+//! \brief Bundles orbital advection parameters and geometry-dispatched methods.
+template <Coordinates GEOM>
+struct OrbitalAdvection {
+  Real gm, omega_f, qshear, scdt, dwdt;
 
-  const Real dz = r.dx[2];
-  const Real I0 = flip * dwdt * r.xc[0] * r.dx[0] * dz;
-  const Real dxcub =
-      r.dx[0] / 3. *
-      (SQR(r.bnds.x1[0]) + r.bnds.x1[0] * r.bnds.x1[1] + SQR(r.bnds.x1[1]));
+  static constexpr int phi_idx =
+      ((GEOM == Coordinates::cartesian) || (GEOM == Coordinates::cylindrical)) ? 1 : 2;
 
-  const std::array<Real, 3> I1{
-      flip * fac * dxcub * dz,
-      flip * (0.5 * SQR(fac) * dxcub * dz + y0 * dwdt * r.xc[0] * r.dx[0] * dz),
-      three_d * r.xc[2] * I0};
-
-  const Real dq =
-      (rp.q - ArtemisUtils::VDot(rp.grad, rp.xc)) * I0 + ArtemisUtils::VDot(rp.grad, I1);
-  v0(b, n, k, j, i) += dq / r.vol;
-  v0(b, n, k, jp, i) -= dq / rp.vol;
-}
-
-//----------------------------------------------------------------------------------------
-//! \fn  RemapCons
-//! \brief
-template <Upwind UDIR, ReconstructionMethod R, typename V1, typename V2>
-KOKKOS_INLINE_FUNCTION void RemapCons(const geometry::CoordParams &cpars, const V1 &v0,
-                                      const V2 &vg, const int multi_d, const int three_d,
-                                      const Real dwdt, const int b, const int k,
-                                      IndexRange jb, const int i) {
-  // Extract coordinates
-  const geometry::Coords<Coordinates::cartesian> coords(cpars, v0.GetCoordinates(b), k,
-                                                        jb.s, i);
-  const Real vb = dwdt * (coords.bnds.x1[0] + coords.bnds.x1[1]) * 0.5;
-
-  // Integer gymnastics
-  int joff = 1;
-  int jstart = jb.e;
-  int jend = jb.s - joff;
-  if constexpr (UDIR == Upwind::l) {
-    joff = -1;
-    jstart = jb.s;
-    jend = jb.e - joff;
+  KOKKOS_FORCEINLINE_FUNCTION Real OmegaKep(const Real R) const {
+    return std::sqrt(gm / (R * R * R));
   }
 
-  // Reconstruct and advance
-  // NOTE(@adempsey): This reconstructs the conservatives. An alternative is to hold the
-  // density in a separate register and divide the mass-weighted conservatives.
-  const auto compare = (UDIR == Upwind::r) ? [](int j, int end) { return j >= end; }
-                                           : [](int j, int end) { return j <= end; };
+  KOKKOS_INLINE_FUNCTION std::array<Real, 3>
+  BackgroundVelocity(const std::array<Real, 3> &xv) const {
+    if constexpr (GEOM == Coordinates::cartesian) {
+      return {0.0, -qshear * omega_f * xv[0], 0.0};
+    } else if constexpr (GEOM == Coordinates::cylindrical) {
+      const Real R = xv[0];
+      const Real vphi = R * (OmegaKep(R) - omega_f);
+      return {0.0, vphi, 0.0};
+    } else if constexpr (GEOM == Coordinates::spherical3D ||
+                         GEOM == Coordinates::spherical2D) {
+      const Real R = xv[0] * std::sin(xv[1]);
+      const Real vphi = R * (OmegaKep(xv[0]) - omega_f);
+      return {0.0, 0.0, vphi};
+    } else if constexpr (GEOM == Coordinates::axisymmetric) {
+      const Real R = xv[0];
+      const Real vphi = R * (OmegaKep(R) - omega_f);
+      return {0.0, 0.0, vphi};
+    }
+    return {0.0, 0.0, 0.0};
+  }
 
-  ArtemisUtils::ReconGradient<Coordinates::cartesian, R> recon;
-  ReconInfo rd, rc, ru;
-  for (int n = v0.GetLowerBound(b); n <= v0.GetUpperBound(b); ++n) {
-    ru.fill(cpars, v0, vg, b, n, k, jstart + joff, i);
-    rc.fill(cpars, v0, vg, b, n, k, jstart, i);
-    // Correct the centroid of the cell due to the motion
-    ru.xc[1] += dwdt * ru.xc[0];
-    rc.xc[1] += dwdt * rc.xc[0];
-    ru.grad = recon(cpars, v0, ru.dx, multi_d, three_d, b, n, k, jstart + joff, i);
-    const auto qu = v0(b, n, k, jstart + joff, i);
-    rc.grad = recon(cpars, v0, rc.dx, multi_d, three_d, b, n, k, jstart, i);
-    const auto qc = v0(b, n, k, jstart, i);
-    // Correct the gradients due to the skew
-    ru.grad[1] += dwdt * ru.grad[0];
-    rc.grad[1] += dwdt * rc.grad[0];
+  KOKKOS_INLINE_FUNCTION Real DeltaPhi(const Real &x1) const {
+    if constexpr (GEOM == Coordinates::cartesian) {
+      return dwdt * x1;
+    } else {
+      return (OmegaKep(x1) - omega_f) * scdt;
+    }
+  }
 
-    // Execute remapping "sweep"
-    for (int j = jstart; compare(j, jend); j -= joff) {
-      const int jd = j - joff;
-      if (compare(jd, jend)) {
-        rd.fill(cpars, v0, vg, b, n, k, jd, i);
-        rd.xc[1] += dwdt * rd.xc[0];
-        rd.grad = recon(cpars, v0, rd.dx, multi_d, three_d, b, n, k, jd, i);
-        rd.grad[1] += dwdt * rd.grad[0];
+  KOKKOS_INLINE_FUNCTION void ApplySkew(ReconInfo &ri) const {
+    ri.xc[phi_idx] += DeltaPhi(ri.xc[0]);
+  }
+
+  KOKKOS_INLINE_FUNCTION void ApplyGradSkew(ReconInfo &ri) const {
+    if constexpr (GEOM == Coordinates::cartesian) {
+      ri.grad[phi_idx] += dwdt * ri.grad[0];
+    } else if constexpr (GEOM == Coordinates::cylindrical) {
+      const Real Rc = ri.xc[0];
+      const Real dOdR = -1.5 * OmegaKep(Rc) / Rc;
+      ri.grad[phi_idx] += dOdR * ri.grad[0] * scdt;
+    } else {
+      const Real rc = ri.xc[0];
+      const Real dOdr = -1.5 * OmegaKep(rc) / rc;
+      ri.grad[phi_idx] += dOdr * ri.grad[0] * scdt;
+    }
+  }
+
+  KOKKOS_INLINE_FUNCTION bool RootInInterval(const Real x1m, const Real x1p,
+                                             Real &xroot) const {
+    if constexpr (GEOM == Coordinates::cartesian) {
+      xroot = 0.0;
+      return x1m * x1p < 0.0;
+    } else {
+      if (omega_f <= 0.0 || gm <= 0.0) return false;
+      xroot = std::cbrt(gm / (omega_f * omega_f));
+      return (OmegaKep(x1m) - omega_f) * (OmegaKep(x1p) - omega_f) < 0.0;
+    }
+  }
+
+  KOKKOS_FORCEINLINE_FUNCTION Real PowerInt(const Real lo, const Real hi,
+                                            const Real n) const {
+    return (std::pow(hi, n + 1.0) - std::pow(lo, n + 1.0)) / (n + 1.0);
+  }
+  KOKKOS_INLINE_FUNCTION Real ComputeI0(const ReconInfo &r, const Real flip) const {
+    if constexpr (GEOM == Coordinates::cartesian) {
+      return flip * dwdt * r.xc[0] * r.dx[0] * r.dx[2];
+    } else if constexpr (GEOM == Coordinates::cylindrical) {
+      const Real alpha = std::sqrt(gm) * scdt;
+      const Real omf_dt = omega_f * scdt;
+      const Real Rm = r.bnds.x1[0], Rp = r.bnds.x1[1];
+      const Real Q0 = r.bnds.x3[1] - r.bnds.x3[0];
+      return flip * Q0 *
+             (alpha * PowerInt(Rm, Rp, -0.5) - omf_dt * PowerInt(Rm, Rp, 1.0));
+    } else {
+      const Real alpha = std::sqrt(gm) * scdt;
+      const Real omf_dt = omega_f * scdt;
+      const Real rm = r.bnds.x1[0], rp = r.bnds.x1[1];
+      const Real thm = r.bnds.x2[0], thp = r.bnds.x2[1];
+      const Real Sth = std::cos(thm) - std::cos(thp);
+      return flip * Sth *
+             (alpha * PowerInt(rm, rp, 0.5) - omf_dt * PowerInt(rm, rp, 2.0));
+    }
+  }
+
+  KOKKOS_INLINE_FUNCTION std::array<Real, 3> ComputeI1(const ReconInfo &r,
+                                                       const Real flip, const Real vb,
+                                                       const Real I0,
+                                                       const int three_d) const {
+    if constexpr (GEOM == Coordinates::cartesian) {
+      const Real dz = r.dx[2];
+      const Real dxcub =
+          r.dx[0] / 3.0 *
+          (SQR(r.bnds.x1[0]) + r.bnds.x1[0] * r.bnds.x1[1] + SQR(r.bnds.x1[1]));
+      const Real y0 = r.bnds.x2[(vb < 0.0)];
+      return {flip * dwdt * dxcub * dz,
+              flip * (0.5 * SQR(dwdt) * dxcub * dz + y0 * dwdt * r.xc[0] * r.dx[0] * dz),
+              three_d * r.xc[2] * I0};
+    } else if constexpr (GEOM == Coordinates::cylindrical) {
+      const Real alpha = std::sqrt(gm) * scdt;
+      const Real omf_dt = omega_f * scdt;
+      const Real Rm = r.bnds.x1[0], Rp = r.bnds.x1[1];
+      const Real zm = r.bnds.x3[0], zp = r.bnds.x3[1];
+      const Real Q0 = zp - zm;
+      const Real Q1 = 0.5 * (SQR(zp) - SQR(zm));
+
+      const Real R05 = PowerInt(Rm, Rp, -0.5);
+      const Real R10 = PowerInt(Rm, Rp, 1.0);
+
+      const Real I1R =
+          flip * Q0 * (alpha * PowerInt(Rm, Rp, 0.5) - omf_dt * PowerInt(Rm, Rp, 2.0));
+      const Real phi0 = r.bnds.x2[(vb < 0.0)];
+      const Real dphi2_int = 0.5 * flip * Q0 *
+                             (SQR(alpha) * PowerInt(Rm, Rp, -2.0) -
+                              2.0 * alpha * omf_dt * R05 + SQR(omf_dt) * R10);
+      const Real I1phi = phi0 * I0 + dphi2_int;
+      const Real I1z = flip * (alpha * R05 * Q1 - omf_dt * R10 * Q1);
+      return {I1R, I1phi, I1z};
+    } else {
+      const Real alpha = std::sqrt(gm) * scdt;
+      const Real omf_dt = omega_f * scdt;
+      const Real rm = r.bnds.x1[0], rp = r.bnds.x1[1];
+      const Real thm = r.bnds.x2[0], thp = r.bnds.x2[1];
+      const Real cthm = std::cos(thm);
+      const Real cthp = std::cos(thp);
+      const Real sthm = std::sin(thm);
+      const Real sthp = std::sin(thp);
+      const Real Sth = cthm - cthp;
+      const Real Tth = (sthp - thp * cthp) - (sthm - thm * cthm);
+
+      const Real I1r =
+          flip * Sth * (alpha * PowerInt(rm, rp, 1.5) - omf_dt * PowerInt(rm, rp, 3.0));
+      const Real I1th = (Sth != 0.0) ? (Tth / Sth) * I0 : r.xc[1] * I0;
+      const Real phi0 = r.bnds.x3[(vb < 0.0)];
+      const Real dphi2_int =
+          0.5 * flip * Sth *
+          (SQR(alpha) * std::log(rp / rm) - 2.0 * alpha * omf_dt * PowerInt(rm, rp, 0.5) +
+           SQR(omf_dt) * PowerInt(rm, rp, 2.0));
+      const Real I1phi = phi0 * I0 + dphi2_int;
+      return {I1r, I1th, I1phi};
+    }
+  }
+};
+
+//----------------------------------------------------------------------------------------
+//! Build a geometric slice of a reconstruction cell over a radial sub-interval.
+template <Coordinates GEOM>
+KOKKOS_INLINE_FUNCTION ReconInfo SliceReconInfo(const ReconInfo &r, const Real x1m,
+                                                const Real x1p) {
+  ReconInfo rs = r;
+  rs.bnds.x1[0] = x1m;
+  rs.bnds.x1[1] = x1p;
+  rs.dx[0] = x1p - x1m;
+  if constexpr (GEOM == Coordinates::cartesian) {
+    const Real dx2 = r.bnds.x2[1] - r.bnds.x2[0];
+    const Real dx3 = r.bnds.x3[1] - r.bnds.x3[0];
+    rs.xc[0] = 0.5 * (x1m + x1p);
+    rs.vol = (x1p - x1m) * dx2 * dx3;
+    rs.aface = {(x1p - x1m) * dx3, (x1p - x1m) * dx3};
+  } else if constexpr (GEOM == Coordinates::cylindrical) {
+    const Real dphi = r.bnds.x2[1] - r.bnds.x2[0];
+    const Real dz = r.bnds.x3[1] - r.bnds.x3[0];
+    rs.xc[0] = 2.0 / 3.0 * (SQR(x1m) + x1m * x1p + SQR(x1p)) / (x1m + x1p);
+    rs.vol = 0.5 * (x1m + x1p) * (x1p - x1m) * dphi * dz;
+    rs.aface = {0.5 * (x1m + x1p) * (x1p - x1m) * dz,
+                0.5 * (x1m + x1p) * (x1p - x1m) * dz};
+  } else {
+    const Real dphi = r.bnds.x3[1] - r.bnds.x3[0];
+    const Real sth = std::abs(std::cos(r.bnds.x2[0]) - std::cos(r.bnds.x2[1]));
+    const Real dx2 = r.bnds.x2[1] - r.bnds.x2[0];
+    const Real dr2 = SQR(x1m) + SQR(x1p);
+    rs.xc[0] = 0.75 * (x1m + x1p) * dr2 / (dr2 + x1m * x1p);
+    rs.vol = (SQR(x1m) + x1m * x1p + SQR(x1p)) / 3.0 * (x1p - x1m) * sth * dphi;
+    rs.aface = {0.5 * (x1m + x1p) * (x1p - x1m) * dx2,
+                0.5 * (x1m + x1p) * (x1p - x1m) * dx2};
+  }
+  return rs;
+}
+
+template <Coordinates GEOM>
+KOKKOS_INLINE_FUNCTION Real ComputeTransferredAmount(const OrbitalAdvection<GEOM> &oa,
+                                                     const ReconInfo &donor,
+                                                     const ReconInfo &receiver,
+                                                     const int sign, const Real x1m,
+                                                     const Real x1p, const int three_d) {
+  if (x1p <= x1m) return 0.0;
+  const auto rs = SliceReconInfo<GEOM>(receiver, x1m, x1p);
+  const Real flip = (sign < 0) ? -1.0 : 1.0;
+  const Real I0 = oa.ComputeI0(rs, flip);
+  const auto I1 = oa.ComputeI1(rs, flip, static_cast<Real>(sign), I0, three_d);
+  return (donor.q - ArtemisUtils::VDot(donor.grad, donor.xc)) * I0 +
+         ArtemisUtils::VDot(donor.grad, I1);
+}
+
+template <Coordinates GEOM, ReconstructionMethod R, typename V1, typename V2>
+KOKKOS_INLINE_FUNCTION void
+BuildFluxLineX2(const OrbitalAdvection<GEOM> &oa, const geometry::CoordParams &cpars,
+                const V1 &v0, const V2 &vg, const int multi_d, const int three_d,
+                const int b, const int k, IndexRange jb, const int i) {
+  geometry::Coords<GEOM> coords(cpars, v0.GetCoordinates(b), k, jb.s, i);
+  const Real x1m = coords.bnds.x1[0];
+  const Real x1p = coords.bnds.x1[1];
+  Real xroot = 0.0;
+  const bool split = oa.RootInInterval(x1m, x1p, xroot);
+
+  ArtemisUtils::ReconGradient<GEOM, R> recon;
+  auto fill_ri = [&](ReconInfo &ri, int n, int jsweep) {
+    ri.template fill<GEOM>(cpars, v0, vg, b, n, k, jsweep, i);
+    oa.ApplySkew(ri);
+    ri.grad = recon(cpars, v0, ri.dx, multi_d, three_d, b, n, k, jsweep, i);
+    oa.ApplyGradSkew(ri);
+  };
+
+  const int sign_full = ArtemisUtils::sgn(oa.DeltaPhi(0.5 * (x1m + x1p)));
+  const int sign_lo =
+      split ? ArtemisUtils::sgn(oa.DeltaPhi(0.5 * (x1m + xroot))) : sign_full;
+  const int sign_hi =
+      split ? ArtemisUtils::sgn(oa.DeltaPhi(0.5 * (xroot + x1p))) : sign_full;
+
+  if (split) {
+    for (int n = v0.GetLowerBound(b); n <= v0.GetUpperBound(b); ++n) {
+      ReconInfo rl, rr;
+      fill_ri(rl, n, jb.s - 1);
+      fill_ri(rr, n, jb.s);
+      for (int jf = jb.s; jf <= jb.e + 1; ++jf) {
+        Real dq = 0.0;
+        if (sign_lo != 0) {
+          dq += sign_lo * ComputeTransferredAmount(oa, (sign_lo > 0) ? rl : rr,
+                                                   (sign_lo > 0) ? rr : rl, sign_lo, x1m,
+                                                   xroot, three_d);
+        }
+        if (sign_hi != 0) {
+          dq += sign_hi * ComputeTransferredAmount(oa, (sign_hi > 0) ? rl : rr,
+                                                   (sign_hi > 0) ? rr : rl, sign_hi,
+                                                   xroot, x1p, three_d);
+        }
+        v0.flux(b, X2DIR, n, k, jf, i) = dq / (rr.aface[0] * oa.scdt);
+        if (jf <= jb.e) {
+          rl = rr;
+          fill_ri(rr, n, jf + 1);
+        }
       }
-      RemapUpdate(v0, ru, rc, vb, dwdt, three_d, b, n, k, j, j + joff, i);
-      ru = rc;
-      rc = rd;
+    }
+  } else if (sign_full > 0) {
+    for (int n = v0.GetLowerBound(b); n <= v0.GetUpperBound(b); ++n) {
+      ReconInfo rl, rr;
+      fill_ri(rl, n, jb.s - 1);
+      fill_ri(rr, n, jb.s);
+      for (int jf = jb.s; jf <= jb.e + 1; ++jf) {
+        const Real dq =
+            ComputeTransferredAmount(oa, rl, rr, sign_full, x1m, x1p, three_d);
+        v0.flux(b, X2DIR, n, k, jf, i) = dq / (rr.aface[0] * oa.scdt);
+        if (jf <= jb.e) {
+          rl = rr;
+          fill_ri(rr, n, jf + 1);
+        }
+      }
+    }
+  } else if (sign_full < 0) {
+    for (int n = v0.GetLowerBound(b); n <= v0.GetUpperBound(b); ++n) {
+      ReconInfo rl, rr;
+      fill_ri(rl, n, jb.s - 1);
+      fill_ri(rr, n, jb.s);
+      for (int jf = jb.s; jf <= jb.e + 1; ++jf) {
+        const Real dq = sign_full * ComputeTransferredAmount(oa, rr, rl, sign_full, x1m,
+                                                             x1p, three_d);
+        v0.flux(b, X2DIR, n, k, jf, i) = dq / (rr.aface[0] * oa.scdt);
+        if (jf <= jb.e) {
+          rl = rr;
+          fill_ri(rr, n, jf + 1);
+        }
+      }
+    }
+  }
+}
+
+template <Coordinates GEOM, ReconstructionMethod R, typename V1, typename V2>
+KOKKOS_INLINE_FUNCTION void
+BuildFluxLineX3(const OrbitalAdvection<GEOM> &oa, const geometry::CoordParams &cpars,
+                const V1 &v0, const V2 &vg, const int multi_d, const int three_d,
+                const int b, IndexRange kb, const int j, const int i) {
+  geometry::Coords<GEOM> coords(cpars, v0.GetCoordinates(b), kb.s, j, i);
+  const Real x1m = coords.bnds.x1[0];
+  const Real x1p = coords.bnds.x1[1];
+  Real xroot = 0.0;
+  const bool split = oa.RootInInterval(x1m, x1p, xroot);
+
+  ArtemisUtils::ReconGradient<GEOM, R> recon;
+  auto fill_ri = [&](ReconInfo &ri, int n, int ksweep) {
+    ri.template fill<GEOM>(cpars, v0, vg, b, n, ksweep, j, i);
+    oa.ApplySkew(ri);
+    ri.grad = recon(cpars, v0, ri.dx, multi_d, three_d, b, n, ksweep, j, i);
+    oa.ApplyGradSkew(ri);
+  };
+
+  const int sign_full = ArtemisUtils::sgn(oa.DeltaPhi(0.5 * (x1m + x1p)));
+  const int sign_lo =
+      split ? ArtemisUtils::sgn(oa.DeltaPhi(0.5 * (x1m + xroot))) : sign_full;
+  const int sign_hi =
+      split ? ArtemisUtils::sgn(oa.DeltaPhi(0.5 * (xroot + x1p))) : sign_full;
+
+  if (split) {
+    for (int n = v0.GetLowerBound(b); n <= v0.GetUpperBound(b); ++n) {
+      ReconInfo rl, rr;
+      fill_ri(rl, n, kb.s - 1);
+      fill_ri(rr, n, kb.s);
+      for (int kf = kb.s; kf <= kb.e + 1; ++kf) {
+        Real dq = 0.0;
+        if (sign_lo != 0) {
+          dq += sign_lo * ComputeTransferredAmount(oa, (sign_lo > 0) ? rl : rr,
+                                                   (sign_lo > 0) ? rr : rl, sign_lo, x1m,
+                                                   xroot, three_d);
+        }
+        if (sign_hi != 0) {
+          dq += sign_hi * ComputeTransferredAmount(oa, (sign_hi > 0) ? rl : rr,
+                                                   (sign_hi > 0) ? rr : rl, sign_hi,
+                                                   xroot, x1p, three_d);
+        }
+        v0.flux(b, X3DIR, n, kf, j, i) = dq / (rr.aface[0] * oa.scdt);
+        if (kf <= kb.e) {
+          rl = rr;
+          fill_ri(rr, n, kf + 1);
+        }
+      }
+    }
+  } else if (sign_full > 0) {
+    for (int n = v0.GetLowerBound(b); n <= v0.GetUpperBound(b); ++n) {
+      ReconInfo rl, rr;
+      fill_ri(rl, n, kb.s - 1);
+      fill_ri(rr, n, kb.s);
+      for (int kf = kb.s; kf <= kb.e + 1; ++kf) {
+        const Real dq =
+            ComputeTransferredAmount(oa, rl, rr, sign_full, x1m, x1p, three_d);
+        v0.flux(b, X3DIR, n, kf, j, i) = dq / (rr.aface[0] * oa.scdt);
+        if (kf <= kb.e) {
+          rl = rr;
+          fill_ri(rr, n, kf + 1);
+        }
+      }
+    }
+  } else if (sign_full < 0) {
+    for (int n = v0.GetLowerBound(b); n <= v0.GetUpperBound(b); ++n) {
+      ReconInfo rl, rr;
+      fill_ri(rl, n, kb.s - 1);
+      fill_ri(rr, n, kb.s);
+      for (int kf = kb.s; kf <= kb.e + 1; ++kf) {
+        const Real dq = sign_full * ComputeTransferredAmount(oa, rr, rl, sign_full, x1m,
+                                                             x1p, three_d);
+        v0.flux(b, X3DIR, n, kf, j, i) = dq / (rr.aface[0] * oa.scdt);
+        if (kf <= kb.e) {
+          rl = rr;
+          fill_ri(rr, n, kf + 1);
+        }
+      }
     }
   }
 }
 
 //----------------------------------------------------------------------------------------
 //! \fn  LagrangeRemapImpl
-//! \brief
-template <ReconstructionMethod R, typename V1, typename V2>
+//! \brief Main par_for kernel for the Lagrange remap step.
+template <Coordinates GEOM, ReconstructionMethod R, typename V1, typename V2>
 TaskStatus LagrangeRemapImpl(MeshData<Real> *u0, const V1 &v0, const V2 &vg,
-                             const Real dwdt) {
+                             const Real dwdt, const Real gm, const Real omega_f,
+                             const Real scdt) {
   PARTHENON_INSTRUMENT
   const int multi_d = u0->GetNDim() >= 2;
-  PARTHENON_REQUIRE(multi_d, "Linear advection does not work in 1D");
   const int three_d = u0->GetNDim() == 3;
 
   const auto &cpars = u0->GetParentPointer()
@@ -236,19 +574,53 @@ TaskStatus LagrangeRemapImpl(MeshData<Real> *u0, const V1 &v0, const V2 &vg,
   IndexRange ib = u0->GetBoundsI(IndexDomain::interior);
   IndexRange jb = u0->GetBoundsJ(IndexDomain::interior);
   IndexRange kb = u0->GetBoundsK(IndexDomain::interior);
+
+  const OrbitalAdvection<GEOM> oa{gm, omega_f, 0.0, scdt, dwdt};
+
   parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "LagrangeRemap", parthenon::DevExecSpace(), 0,
-      u0->NumBlocks() - 1, kb.s, kb.e, ib.s, ib.e,
-      KOKKOS_LAMBDA(const int &b, const int &k, const int &i) {
-        geometry::Coords<Coordinates::cartesian> coords(cpars, v0.GetCoordinates(b), k,
-                                                        jb.s, i);
-        const Real vb = dwdt * 0.5 * (coords.bnds.x1[0] + coords.bnds.x1[1]);
-        if (vb < 0.0) {
-          RemapCons<Upwind::r, R>(cpars, v0, vg, multi_d, three_d, dwdt, b, k, jb, i);
-        } else if (vb > 0.0) {
-          RemapCons<Upwind::l, R>(cpars, v0, vg, multi_d, three_d, dwdt, b, k, jb, i);
+      DEFAULT_LOOP_PATTERN, "ZeroOAFluxX1", DevExecSpace(), 0, u0->NumBlocks() - 1, kb.s,
+      kb.e, jb.s, jb.e, ib.s, ib.e + 1,
+      KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
+        for (int n = v0.GetLowerBound(b); n <= v0.GetUpperBound(b); ++n) {
+          v0.flux(b, X1DIR, n, k, j, i) = 0.0;
         }
       });
+  if (multi_d) {
+    parthenon::par_for(
+        DEFAULT_LOOP_PATTERN, "ZeroOAFluxX2", DevExecSpace(), 0, u0->NumBlocks() - 1,
+        kb.s, kb.e, jb.s, jb.e + 1, ib.s, ib.e,
+        KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
+          for (int n = v0.GetLowerBound(b); n <= v0.GetUpperBound(b); ++n) {
+            v0.flux(b, X2DIR, n, k, j, i) = 0.0;
+          }
+        });
+  }
+  if (three_d) {
+    parthenon::par_for(
+        DEFAULT_LOOP_PATTERN, "ZeroOAFluxX3", DevExecSpace(), 0, u0->NumBlocks() - 1,
+        kb.s, kb.e + 1, jb.s, jb.e, ib.s, ib.e,
+        KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
+          for (int n = v0.GetLowerBound(b); n <= v0.GetUpperBound(b); ++n) {
+            v0.flux(b, X3DIR, n, k, j, i) = 0.0;
+          }
+        });
+  }
+
+  if constexpr ((GEOM == Coordinates::cartesian || GEOM == Coordinates::cylindrical)) {
+    parthenon::par_for(
+        DEFAULT_LOOP_PATTERN, "OARemapFluxX2", DevExecSpace(), 0, u0->NumBlocks() - 1,
+        kb.s, kb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int &b, const int &k, const int &i) {
+          BuildFluxLineX2<GEOM, R>(oa, cpars, v0, vg, multi_d, three_d, b, k, jb, i);
+        });
+  } else if constexpr (GEOM == Coordinates::spherical3D) {
+    parthenon::par_for(
+        DEFAULT_LOOP_PATTERN, "OARemapFluxX3", DevExecSpace(), 0, u0->NumBlocks() - 1,
+        jb.s, jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int &b, const int &j, const int &i) {
+          BuildFluxLineX3<GEOM, R>(oa, cpars, v0, vg, multi_d, three_d, b, kb, j, i);
+        });
+  } else {
+    PARTHENON_FAIL("Unsupported geometry in LagrangeRemapImpl");
+  }
   return TaskStatus::complete;
 }
 } // namespace RotatingFrame

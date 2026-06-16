@@ -64,7 +64,7 @@ ArtemisDriver<GEOM>::ArtemisDriver(ParameterInput *pin, ApplicationInput *app_in
   do_gravity = artemis_pkg->template Param<bool>("do_gravity");
   do_self_gravity = artemis_pkg->template Param<bool>("do_self_gravity");
   do_rotating_frame = artemis_pkg->template Param<bool>("do_rotating_frame");
-  do_shear = artemis_pkg->template Param<bool>("do_shear");
+  do_orbital_advection = artemis_pkg->template Param<bool>("do_orbital_advection");
   do_cooling = artemis_pkg->template Param<bool>("do_cooling");
   do_drag = artemis_pkg->template Param<bool>("do_drag");
   do_viscosity = artemis_pkg->template Param<bool>("do_viscosity");
@@ -80,6 +80,8 @@ ArtemisDriver<GEOM>::ArtemisDriver(ParameterInput *pin, ApplicationInput *app_in
   // Update fluxes option--gas fields are needed for radiation temperature updates but for
   // rad-only test problems turn off advection
   update_fluxes = artemis_pkg->template Param<bool>("update_fluxes");
+
+  ndim = pm->ndim;
 
   // Moments integrator
   if (do_moment) {
@@ -136,10 +138,13 @@ TaskListStatus ArtemisDriver<GEOM>::Step() {
   status = StepTasks().Execute();
   if (status != TaskListStatus::complete) return status;
 
-  // Operator split, background linear advection (for shearing box)
-  if (do_shear) {
-    status = RotatingFrame::Advect(pmesh, tm);
-    if (status != TaskListStatus::complete) return status;
+  // Operator split, background linear advection
+  if (do_orbital_advection && (ndim > 1)) {
+    // only if the advection direction is included
+    if constexpr (!geometry::is_axisymmetric<GEOM>()) {
+      status = RotatingFrame::Advect<GEOM>(pmesh, tm);
+      if (status != TaskListStatus::complete) return status;
+    }
   }
 
   // Operator split, IMC/DDMC radiation with Jaybenne
@@ -326,7 +331,7 @@ TaskCollection ArtemisDriver<GEOM>::StepTasks() {
 
       // Apply rotating frame source term
       TaskID rframe_src = rt_src;
-      if (do_rotating_frame) {
+      if (do_rotating_frame || do_orbital_advection) {
         rframe_src =
             tl.AddTask(rt_src, RotatingFrame::RotatingFrameForce, u0.get(), time, bdt);
       }

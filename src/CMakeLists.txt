@@ -68,6 +68,7 @@ set (SRC_LIST
   pgen/constant.hpp
   pgen/disk.hpp
   pgen/gaussian_bump.hpp
+  pgen/grav_slab.hpp
   pgen/kh.hpp
   pgen/linear_wave.hpp
   pgen/lw.hpp
@@ -117,6 +118,8 @@ set (SRC_LIST
   utils/fluxes/reconstruction/pcm.hpp
   utils/fluxes/reconstruction/plm.hpp
   utils/fluxes/reconstruction/ppm.hpp
+  utils/fluxes/reconstruction/wenoz.hpp
+  utils/fluxes/reconstruction/wenomz.hpp
   utils/fluxes/riemann/hllc.hpp
   utils/fluxes/riemann/hlle.hpp
   utils/fluxes/riemann/llf.hpp

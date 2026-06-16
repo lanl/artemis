@@ -131,5 +131,7 @@ post_recon(const EOS &eos, const Real dfloor, const Real siefloor, const bool do
 #include "pcm.hpp"
 #include "plm.hpp"
 #include "ppm.hpp"
+#include "wenomz.hpp"
+#include "wenoz.hpp"
 
 #endif // ARTEMIS_UTILS_FLUXES_RECONSTRUCTION_RECONSTRUCTION_HPP_

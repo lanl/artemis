@@ -256,6 +256,44 @@ Real CutCell2D(const std::array<Real, 4> &x, const std::array<Real, 4> &y,
   return vol_inside / vol;
 }
 
+enum class PackageControl { inactive = -1, shutdown = 0, active = 1, initial = 2 };
+
+template <class PKG>
+inline PackageControl CheckPackageStatus(PKG &pkg, const Real time) {
+  // if t >= tstart, turn the package on
+  // if t >= tstop, turn the package off
+
+  auto *active = pkg->template MutableParam<bool>("active");
+  if (*active) {
+    if (time >= pkg->template Param<Real>("tstop")) {
+      *active = false;
+      return PackageControl::shutdown; // turn off
+    }
+    return PackageControl::active; // keep going
+  } else {
+    if ((time >= pkg->template Param<Real>("tstart")) &&
+        (time < pkg->template Param<Real>("tstop"))) {
+      *active = true;
+      return PackageControl::initial; // first time active
+    }
+  }
+  return PackageControl::inactive; // already off
+}
+
+template <class PARS>
+inline void AddPackageTimeParams(PARS &params, const std::string block_name,
+                                 ParameterInput *pin) {
+  // if t >= tstart, turn the package on
+  // if t >= tstop, turn the package off
+
+  const Real tstart = pin->GetOrAddReal(block_name, "tstart", 0.0);
+  params.Add("tstart", tstart);
+  params.Add("tstop", pin->GetOrAddReal(block_name, "tstop", 1e99));
+  params.Add("active", pin->GetOrAddBoolean(block_name, "active", tstart == 0.0),
+             Params::Mutability::Restart);
+  return;
+}
+
 } // namespace ArtemisUtils
 
 #endif // UTILS_ARTEMIS_UTILS_HPP_

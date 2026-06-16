@@ -1,5 +1,5 @@
 //========================================================================================
-// (C) (or copyright) 2023-2024. Triad National Security, LLC. All rights reserved.
+// (C) (or copyright) 2023-2026. Triad National Security, LLC. All rights reserved.
 //
 // This program was produced under U.S. Government contract 89233218CNA000001 for Los
 // Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -202,6 +202,12 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         for (int n = 0; n < 3; n++) {
           xcart[n] -= xc[n];
         }
+        coords.bnds.x1[0] -= pars.x0[0];
+        coords.bnds.x1[1] -= pars.x0[0];
+        coords.bnds.x2[0] -= pars.x0[1];
+        coords.bnds.x2[1] -= pars.x0[1];
+        coords.bnds.x3[0] -= pars.x0[2];
+        coords.bnds.x3[1] -= pars.x0[2];
 
         if (pars.type == 1) { // spherical
           // Intersection volume

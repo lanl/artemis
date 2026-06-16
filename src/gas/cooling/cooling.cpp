@@ -15,6 +15,7 @@
 #include "gas/cooling/cooling.hpp"
 #include "artemis.hpp"
 #include "geometry/geometry.hpp"
+#include "utils/artemis_utils.hpp"
 
 using namespace parthenon::package::prelude;
 
@@ -82,6 +83,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("ttype", ttype);
   params.Add("tpars", tpars);
 
+  // Enroll in tstart/tstop machinery
+  ArtemisUtils::AddPackageTimeParams(params, "cooling", pin);
+
   return cooling;
 }
 
@@ -89,10 +93,26 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 //! \fn  TaskStatus Cooling::CoolingSource
 //! \brief Wrapper function for external cooling options
 template <Coordinates GEOM>
-TaskStatus CoolingSource(MeshData<Real> *md, const Real time, const Real dt) {
+TaskStatus CoolingSource(MeshData<Real> *md, const Real time, const Real dt,
+                         const int stage) {
   PARTHENON_INSTRUMENT
   auto pm = md->GetParentPointer();
   auto &pkg = pm->packages.Get("cooling");
+
+  const auto active = ArtemisUtils::CheckPackageStatus(pkg, time);
+  if (active == ArtemisUtils::PackageControl::inactive) {
+    return TaskStatus::complete;
+  } else if (active == ArtemisUtils::PackageControl::shutdown) {
+    if ((Globals::my_rank == 0) && (stage == 1)) {
+      printf("Turning off cooling at t=%.8e...\n", time);
+    }
+    return TaskStatus::complete;
+  } else if (active == ArtemisUtils::PackageControl::initial) {
+    if ((Globals::my_rank == 0) && (stage == 1)) {
+      printf("Turning on cooling at t=%.8e...\n", time);
+    }
+  }
+
   CoolingType ctype = pkg->template Param<CoolingType>("type");
   TempRefType ttype = pkg->template Param<TempRefType>("ttype");
   if (ctype == CoolingType::beta) {
@@ -109,12 +129,18 @@ TaskStatus CoolingSource(MeshData<Real> *md, const Real time, const Real dt) {
 //! template instantiations
 typedef Coordinates G;
 typedef MeshData<Real> MD;
-template TaskStatus CoolingSource<G::cartesian>(MD *md, const Real t, const Real d);
-template TaskStatus CoolingSource<G::cylindrical>(MD *md, const Real t, const Real d);
-template TaskStatus CoolingSource<G::spherical3D>(MD *md, const Real t, const Real d);
-template TaskStatus CoolingSource<G::spherical1D>(MD *md, const Real t, const Real d);
-template TaskStatus CoolingSource<G::spherical2D>(MD *md, const Real t, const Real d);
-template TaskStatus CoolingSource<G::axisymmetric>(MD *md, const Real t, const Real d);
+template TaskStatus CoolingSource<G::cartesian>(MD *md, const Real t, const Real d,
+                                                const int s);
+template TaskStatus CoolingSource<G::cylindrical>(MD *md, const Real t, const Real d,
+                                                  const int s);
+template TaskStatus CoolingSource<G::spherical3D>(MD *md, const Real t, const Real d,
+                                                  const int s);
+template TaskStatus CoolingSource<G::spherical1D>(MD *md, const Real t, const Real d,
+                                                  const int s);
+template TaskStatus CoolingSource<G::spherical2D>(MD *md, const Real t, const Real d,
+                                                  const int s);
+template TaskStatus CoolingSource<G::axisymmetric>(MD *md, const Real t, const Real d,
+                                                   const int s);
 
 } // namespace Cooling
 } // namespace Gas

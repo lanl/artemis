@@ -513,6 +513,10 @@ TaskStatus CalculateFluxesReconSelect(MeshData<Real> *md, PKG &pkg, PRIM vp, FLU
     return CalculateFluxesImpl<G, F, C, R, S::plm>(md, pkg, vp, vflx, vface, vg);
   } else if (recon_method == S::ppm) {
     return CalculateFluxesImpl<G, F, C, R, S::ppm>(md, pkg, vp, vflx, vface, vg);
+  } else if (recon_method == S::wenoz) {
+    return CalculateFluxesImpl<G, F, C, R, S::wenoz>(md, pkg, vp, vflx, vface, vg);
+  } else if (recon_method == S::wenomz) {
+    return CalculateFluxesImpl<G, F, C, R, S::wenomz>(md, pkg, vp, vflx, vface, vg);
   } else {
     PARTHENON_FAIL("Reconstruction method not recognized!");
   }

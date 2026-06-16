@@ -56,7 +56,7 @@ An example input block for a gas could read
   <gas>
   cfl = 0.3
   riemann = hllc     # llf, hlle, hllc Riemann solvers
-  reconstruct = plm  # pcm, plm, ppm reconstructions
+  reconstruct = plm  # pcm, plm, ppm, wenoz, wenomz reconstructions
   
   <gas/eos/ideal>
   gamma = 1.4
@@ -360,7 +360,7 @@ An example dust input block reads:
    cfl = 0.3
    nspecies = 3
    riemann = hlle       # llf, hlle
-   reconstruct = plm    # pcm, plm, ppm
+   reconstruct = plm    # pcm, plm, ppm, wenoz, wenomz
    grain_density = 1.7  # g/cc
    sizes = 1e-4, 1e-2, 1e-1  # cm
 

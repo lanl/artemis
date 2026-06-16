@@ -25,6 +25,12 @@ radiation:
       ppm:
         _type: opt
         _description: "Piecewise Parabolic"
+      wenoz:
+        _type: opt
+        _description: "Weighted Essentially Non Oscillatory (Z)"
+      wenomz:
+        _type: opt
+        _description: "Weighted Essentially Non Oscillatory (MZ)"
     riemann:
       _type: string
       _description: "Riemann solver"
@@ -98,6 +104,18 @@ radiation:
       _type: bool
       _description: "Crash the code if the matter-coupling step does not converge."
       _default: true
+    tstart:
+      _type: Real
+      _description: "Turn on moments at this time"
+      _default: "0.0"
+    tstop:
+      _type: Real
+      _description: "Turn off moments at this time"
+      _default: "1e99"
+    init_with_opac:
+      _type: bool
+      _description: "When dynamically initializing the radiation field, scale a T^4 by min(1, tau), where tau is the optical depth of the cell"
+      _default: "true"
   imc:
     _description: "IMC radiation model from the Jaybenne library"
     _type: node
@@ -158,6 +176,14 @@ radiation:
       _type: bool
       _description: "Radiation affects host fluid fields."
       _default: true
+    tstart:
+      _type: Real
+      _description: "Turn on IMC at this time"
+      _default: "0.0"
+    tstop:
+      _type: Real
+      _description: "Turn off IMC at this time"
+      _default: "1e99"
   raytrace:
       _description: "Raytraced radiation model. This is currently designed for raytracing the stellar light from the center of a spherical grid."
       _type: node
@@ -179,4 +205,12 @@ radiation:
         _type: Real
         _description: "Radiation enrgy density floor"
         _default: 1e-10
+      tstart:
+        _type: Real
+        _description: "Turn on raytrace at this time"
+        _default: "0.0"
+      tstop:
+        _type: Real
+        _description: "Turn off raytrace at this time"
+        _default: "1e99"
       

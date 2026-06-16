@@ -113,14 +113,12 @@ post_recon(const EOS &eos, const Real dfloor, const Real siefloor, const bool do
       const int n = nspecies * 7 + dir - 1;
       // or maybe TE fd = TE::F1 + (dir-1)?
       TE fd = (dir == 1) ? TE::F1 : ((dir == 2) ? TE::F2 : TE::F3);
-      parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, member, il, iu,
-                               [&](const int i) {
-                                 const int ipl = i + (dir == 1);
-                                 ql(n, ipl) =
-                                     qc(b, fd, field::face::B(), k + (dir == 3),
-                                        j + (dir == 2), ipl);
-                                 qr(n, i) = qc(b, fd, field::face::B(), k, j, i);
-                               });
+      parthenon::par_for_inner(
+          DEFAULT_INNER_LOOP_PATTERN, member, il, iu, [&](const int i) {
+            const int ipl = i + (dir == 1);
+            ql(n, ipl) = qc(b, fd, field::face::B(), k + (dir == 3), j + (dir == 2), ipl);
+            qr(n, i) = qc(b, fd, field::face::B(), k, j, i);
+          });
     }
   }
 }

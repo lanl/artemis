@@ -63,10 +63,19 @@ def analyze():
     os.makedirs(artemis.get_fig_dir(), exist_ok=True)
     analyze_status = True
 
-    time, r, phi, z, [d, u, v, w, T], _ = analysis.load_level(
+    time, x, phi, z, [d, u, v, w, T], logx = analysis.load_level(
         "final", base="{}.out1".format(_file_id), dir=artemis.get_data_dir()
     )
-    rc = 0.5 * (r[1:] + r[:-1])
+    if logx:
+        r = np.exp(x)
+    else:
+        r = x
+
+    rc = (2.0 / 3.0) * (r[1:] ** 3 - r[:-1] ** 3) / (r[1:] ** 2 - r[:-1] ** 2)
+    if logx:
+        xc = np.log(rc)
+    else:
+        xc = rc
     pc = 0.5 * (phi[1:] + phi[:-1])
 
     h = 0.05
@@ -87,8 +96,12 @@ def analyze():
     axes[0].set_ylim(np.pi - 0.8, np.pi + 0.8)
 
     # Indices for the inner and outer evalulation rings
-    ii = np.argwhere(rc >= 1 - 0.1)[0][0]
-    io = np.argwhere(rc >= 1 + 0.1)[0][0]
+    if logx:
+        ii = np.argwhere(xc >= np.log(1 - 0.1))[0][0]
+        io = np.argwhere(xc >= np.log(1 + 0.1))[0][0]
+    else:
+        ii = np.argwhere(rc >= 1 - 0.1)[0][0]
+        io = np.argwhere(rc >= 1 + 0.1)[0][0]
 
     # the azimuthal locations of the spirals approximated as
     # where the max occurs

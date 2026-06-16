@@ -98,12 +98,12 @@ PAR_VAR(grav, rhs);
 
 namespace field {
 namespace face {
-ARTEMIS_VARIABLE(field.face, B);
+PAR_VAR(field.face, B);
 } // namespace face
 namespace cell {
-ARTEMIS_VARIABLE(field.cell, B);
-ARTEMIS_VARIABLE(field.cell, energy);
-ARTEMIS_VARIABLE(field.cell, divB);
+PAR_VAR(field.cell, B);
+PAR_VAR(field.cell, energy);
+PAR_VAR(field.cell, divB);
 } // namespace cell
 } // namespace field
 

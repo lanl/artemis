@@ -248,11 +248,11 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         if (do_mhd) {
           v(0, TE::F1, field::face::B(), k, j, i) = bx1;
           if (i == ib.e) v(0, TE::F1, field::face::B(), k, j, ib.e + 1) = bx1;
-          if (multid) {
+          if (multid || bx2 != 0.0) {
             v(0, TE::F2, field::face::B(), k, j, i) = bx2;
             if (j == jb.e) v(0, TE::F2, field::face::B(), k, jb.e + multid, i) = bx2;
           }
-          if (threed) {
+          if (threed || bx3 != 0.0) {
             v(0, TE::F3, field::face::B(), k, j, i) = bx3;
             if (k == kb.e) v(0, TE::F3, field::face::B(), kb.e + threed, j, i) = bx3;
           }

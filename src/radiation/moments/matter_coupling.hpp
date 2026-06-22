@@ -52,6 +52,7 @@ TaskStatus MatterCouplingSimpleImpl(MeshData<Real> *u0, const Real dt) {
   const auto chat = moments_pkg->template Param<Real>("chat");
   const auto c = moments_pkg->template Param<Real>("c");
   const auto arad = moments_pkg->template Param<Real>("arad");
+  const auto rad_efloor = moments_pkg->template Param<Real>("efloor");
   const auto tfloor = moments_pkg->template Param<Real>("tfloor");
   const auto Bfloor = arad * SQR(SQR(tfloor));
   const auto efloor = Bfloor;
@@ -221,11 +222,13 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
   const auto chat = moments_pkg->template Param<Real>("chat");
   const auto c = moments_pkg->template Param<Real>("c");
   const auto arad = moments_pkg->template Param<Real>("arad");
+  const auto rad_efloor = moments_pkg->template Param<Real>("efloor");
   const auto tfloor = moments_pkg->template Param<Real>("tfloor");
   const auto outer_max = moments_pkg->template Param<int>("outer_iteration_max");
   const auto inner_max = moments_pkg->template Param<int>("inner_iteration_max");
   const auto outer_tol = moments_pkg->template Param<Real>("outer_iteration_tol");
   const auto inner_tol = moments_pkg->template Param<Real>("inner_iteration_tol");
+  const Real inner_practical_tol = std::max(inner_tol, 1.0e-8);
   const auto fatal_if_unconverged =
       moments_pkg->template Param<bool>("fatal_if_unconverged");
 
@@ -269,9 +272,17 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
         // y = U^(0) + dt S(y)
 
         // U^(0) values
-        const Real &dens = v0(b, gas::cons::density(), k, j, i);
+        const Real dens = std::max(v0(b, gas::cons::density(), k, j, i), dflr);
+        // The full energy+momentum solve is not robust or physically useful in
+        // floor-adjacent cells. Treat them as pure local heating updates.
+        constexpr Real coupling_dfloor_factor = 100.0;
         Real Q = 0.0;
         if (do_raytrace) Q = dt * v0(b, gas::src::energy(), k, j, i);
+        if (dens <= coupling_dfloor_factor * dflr) {
+          v0(b, gas::cons::internal_energy(), k, j, i) += Q;
+          v0(b, gas::cons::total_energy(), k, j, i) += Q;
+          return;
+        }
 
         // Note(AMD): There is some floating point difference between the internal energy
         // used to compute the temperature and the internal energy obtained from that
@@ -282,10 +293,13 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
         // expected. Thus, we recalculate the internal and total energies from the
         // temperature. This does not affect energy conservation because at the end of the
         // step we update the energy with an increment.
-        Real T = eos_d.TemperatureFromDensityInternalEnergy(
-            dens, v0(b, gas::cons::internal_energy(), k, j, i) / dens);
+        const Real Bfloor_phys = arad * SQR(SQR(tfloor));
+        const Real eint0 =
+            std::max(v0(b, gas::cons::internal_energy(), k, j, i) / dens, 0.0);
+        Real T =
+            std::max(tfloor, eos_d.TemperatureFromDensityInternalEnergy(dens, eint0));
         Real eg0 = dens * eos_d.InternalEnergyFromDensityTemperature(dens, T);
-        Real B = arad * SQR(SQR(T));
+        Real B = std::max(Bfloor_phys, arad * SQR(SQR(T)));
 
         const auto vb = RotatingFrame::BackgroundVelocity<GEOM>(
             qshear, om0, gm_bg, coords.GetCellCenter(vg, b, k, j, i));
@@ -294,25 +308,33 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
             vb[1] * dens + v0(b, gas::cons::momentum(1), k, j, i) / hx[1],
             vb[2] * dens + v0(b, gas::cons::momentum(2), k, j, i) / hx[2]};
 
-        Real E0 = v0(b, rad::cons::energy(), k, j, i);
+        Real E0 = std::max(v0(b, rad::cons::energy(), k, j, i), rad_efloor);
         // choose the ref scale
 
-        Real eref = std::sqrt(E0 * B);
-        if (eref == 0.0) eref = 0.5 * (E0 + B);
+        Real eref = std::max(std::sqrt(E0 * B), 0.5 * (E0 + B));
+        eref = std::max(eref, std::max(rad_efloor, Bfloor_phys));
         const Real fref = c * eref;
-        const Real efloor = SQR(SQR(tfloor)) * arad / eref;
-        const Real Bfloor = efloor;
+        const Real efloor = rad_efloor / eref;
+        const Real Bfloor = Bfloor_phys / eref;
 
         Q /= eref;
         E0 /= eref;
         eg0 /= eref;
         B /= eref;
 
-        const std::array<Real, 3> Fr0{v0(b, rad::cons::flux(0), k, j, i) / hx[0] / fref,
-                                      v0(b, rad::cons::flux(1), k, j, i) / hx[1] / fref,
-                                      v0(b, rad::cons::flux(2), k, j, i) / hx[2] / fref};
+        std::array<Real, 3> Fr0 =
+            ProjectFlux({v0(b, rad::cons::flux(0), k, j, i) / hx[0] / fref,
+                         v0(b, rad::cons::flux(1), k, j, i) / hx[1] / fref,
+                         v0(b, rad::cons::flux(2), k, j, i) / hx[2] / fref},
+                        E0);
 
         std::array<Real, 3> v{p0[0] / dens, p0[1] / dens, p0[2] / dens};
+        const Real beta20 = SQR(v[0] / c) + SQR(v[1] / c) + SQR(v[2] / c);
+        if (!(IsFinite(beta20)) || beta20 >= 1.0 - 1.0e-12) {
+          v0(b, gas::cons::internal_energy(), k, j, i) += Q;
+          v0(b, gas::cons::total_energy(), k, j, i) += Q;
+          return;
+        }
         const Real ke0 = 0.5 * dens * (SQR(v[0]) + SQR(v[1]) + SQR(v[2])) / eref;
         const Real et0 = ke0 + eg0;
 
@@ -332,19 +354,58 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
         Real dEg = 0.0;
         Real dEr = 0.0;
         const Real icc = 1. / (c * chat * dens);
-        Real escale = et0 + c / chat * E;
+        Real escale = std::max(et0 + c / chat * E + std::abs(Q), efloor + Bfloor);
+        bool inner_converged = false;
+        bool outer_converged = false;
+        bool solver_valid = IsFinite(escale);
+        bool have_good_state = false;
+        std::array<Real, 3> best_dF{0., 0., 0.};
+        std::array<Real, 3> best_dv{0., 0., 0.};
+        Real best_dEg = 0.0;
+        Real best_dEk = 0.0;
+        Real best_dEr = 0.0;
+
+        if (!(IsFinite(eref) && IsFinite(E0) && IsFinite(B) && IsFinite(eg0) &&
+              IsFinite(ke0) && IsFinite(escale) && eref > 0.0 && escale > 0.0)) {
+          solver_valid = false;
+        }
 
         for (outer_iter = 1; outer_iter <= outer_max; outer_iter++) {
+          if (!solver_valid) break;
+          inner_converged = false;
 
           // Set some v and F quantities
+          F = ProjectFlux(F, std::max(E, efloor));
+          const Real E_prev = E;
+          const Real B_prev = B;
+          const auto F_prev = F;
           Real ke = 0.5 * dens * (SQR(v[0]) + SQR(v[1]) + SQR(v[2])) / eref;
           std::array<Real, 3> beta{v[0] / c, v[1] / c, v[2] / c};
-          const Real beta2 = SQR(beta[0]) + SQR(beta[1]) + SQR(beta[2]);
+          Real beta2 = SQR(beta[0]) + SQR(beta[1]) + SQR(beta[2]);
+          constexpr Real beta2_max = 1.0 - 1.0e-12;
+          if (!(IsFinite(beta2))) {
+            solver_valid = false;
+            break;
+          }
+          if (beta2 >= beta2_max) {
+            const Real fac = std::sqrt(beta2_max / std::max(beta2, Fuzz<Real>()));
+            for (int d = 0; d < 3; ++d) {
+              beta[d] *= fac;
+              v[d] = beta[d] * c;
+            }
+            beta2 = SQR(beta[0]) + SQR(beta[1]) + SQR(beta[2]);
+          }
           const Real g2 = 1. / (1. - beta2);
           const Real g = std::sqrt(g2);
+          if (!(IsFinite(g2) && IsFinite(g))) {
+            solver_valid = false;
+            break;
+          }
 
           auto fedd =
-              EddingtonTensor<CLOSURE>({F[0] / (c * E), F[1] / (c * E), F[2] / (c * E)});
+              EddingtonTensor<CLOSURE>({F[0] / (std::max(E, efloor) + Fuzz<Real>()),
+                                        F[1] / (std::max(E, efloor) + Fuzz<Real>()),
+                                        F[2] / (std::max(E, efloor) + Fuzz<Real>())});
 
           std::array<Real, 3> bdp{
               beta[0] * fedd[TensIdx::X11] + beta[1] * fedd[TensIdx::X12] +
@@ -358,7 +419,8 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
 
           // start inner iteration for (B,E)
           for (inner_iter = 1; inner_iter <= inner_max; inner_iter++) {
-            T = std::pow(eref * B / arad, 0.25);
+            T = std::pow(std::max(eref * B / arad, 0.0), 0.25);
+            T = std::max(T, tfloor);
             Real eint = dens * eos_d.InternalEnergyFromDensityTemperature(dens, T) / eref;
             Real et = ke + eint;
             const Real Cv = dens * eos_d.SpecificHeatFromDensityTemperature(dens, T);
@@ -376,34 +438,93 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
             const Real G0 = ca * E - cb * B + cd;
             const Real Fi = (et - et0) - c / chat * G0 - Q;
             const Real Fr = (E - E0) + G0;
+            inner_err =
+                std::max((std::abs(Fi) / escale), (c / chat * std::abs(Fr) / escale));
+            if (!(IsFinite(inner_err) && IsFinite(Fi) && IsFinite(Fr) && IsFinite(G0) &&
+                  IsFinite(Cv) && IsFinite(fleck) && Cv > 0.0)) {
+              solver_valid = false;
+              break;
+            }
+            if (inner_err <= inner_tol) {
+              inner_converged = true;
+              break;
+            }
 
             // not converged yet
             const Real dfac = 1. + c / chat * fleck * cb;
-            Real dE = dfac / (dfac + ca) * (-Fr) + fleck / (dfac + ca) * (-Fi * cb);
-            Real dB = c / chat * fleck / (dfac + ca) * (-ca * Fr) +
-                      (1. + ca) * fleck / (dfac + ca) * (-Fi);
-            Real Enew = E + dE;
-            E = (Enew < efloor) ? efloor : Enew;
-            Real Bnew = B + dB;
-            B = (Bnew < Bfloor) ? Bfloor : Bnew;
+            const Real denom = dfac + ca;
+            if (!(IsFinite(denom)) || std::abs(denom) <= Fuzz<Real>()) {
+              solver_valid = false;
+              break;
+            }
+            const Real dE = dfac / denom * (-Fr) + fleck / denom * (-Fi * cb);
+            const Real dB =
+                c / chat * fleck / denom * (-ca * Fr) + (1. + ca) * fleck / denom * (-Fi);
 
-            inner_err =
-                std::max((std::abs(Fi) / escale), (c / chat * std::abs(Fr) / escale));
-            if (inner_err <= inner_tol) {
-              // converged, so don't compute new E and B;
+            bool accepted = false;
+            Real Etrial = E;
+            Real Btrial = B;
+            for (int ls = 0; ls < 8; ++ls) {
+              const Real alpha = std::ldexp(1.0, -ls);
+              Etrial = std::max(efloor, E + alpha * dE);
+              Btrial = std::max(Bfloor, B + alpha * dB);
+              const Real Ttrial =
+                  std::max(tfloor, std::pow(std::max(eref * Btrial / arad, 0.0), 0.25));
+              const Real eint_trial =
+                  dens * eos_d.InternalEnergyFromDensityTemperature(dens, Ttrial) / eref;
+              const Real et_trial = ke + eint_trial;
+              const Real Cv_trial =
+                  dens * eos_d.SpecificHeatFromDensityTemperature(dens, Ttrial);
+              if (!(IsFinite(Cv_trial)) || Cv_trial <= 0.0) continue;
+              const Real fleck_trial = FleckFactor(arad, Ttrial, Cv_trial);
+              const Real sigp_trial =
+                  chat * dt * opac_d.PlanckMeanAbsorptionCoefficient(dens, Ttrial);
+              const Real sigs_trial =
+                  chat * dt *
+                  scat_d.RosselandMeanTotalScatteringCoefficient(dens, Ttrial);
+              const Real sigf_trial = sigp_trial + sigs_trial;
+              const Real ca_trial = g * (sigf_trial - g2 * sigs_trial * (1. + bdbdp));
+              const Real cb_trial = g * sigp_trial;
+              const Real cd_trial = -g * bdf * (sigf_trial - 2. * g2 * sigs_trial);
+              const Real G0_trial = ca_trial * Etrial - cb_trial * Btrial + cd_trial;
+              const Real Fi_trial = (et_trial - et0) - c / chat * G0_trial - Q;
+              const Real Fr_trial = (Etrial - E0) + G0_trial;
+              const Real err_trial = std::max(std::abs(Fi_trial) / escale,
+                                              c / chat * std::abs(Fr_trial) / escale);
+              if (IsFinite(err_trial) && err_trial < inner_err) {
+                E = Etrial;
+                B = Btrial;
+                accepted = true;
+                break;
+              }
+            }
+            if (!accepted) {
+              solver_valid = false;
               break;
             }
 
           } // inner_iter
-          if ((inner_iter > inner_max) && (fatal_if_unconverged)) {
-            printf("(%d,%d,%d,%d)  %lg > %lg after %d iterations\n", b, k, j, i,
-                   inner_err, inner_tol, inner_max);
-            PARTHENON_FAIL("Inner not converged");
+          if (!solver_valid) break;
+          if (!inner_converged && inner_err <= inner_practical_tol) {
+            inner_converged = true;
+          }
+          if (!inner_converged) {
+            if (fatal_if_unconverged) {
+              printf("MatterCoupling inner fail (%d,%d,%d,%d): err=%lg tol=%lg "
+                     "practical_tol=%lg E=%lg B=%lg |F|/E=%lg Q=%lg dens=%lg after %d "
+                     "iterations\n",
+                     b, k, j, i, inner_err, inner_tol, inner_practical_tol, E, B,
+                     std::sqrt(SQR(F[0]) + SQR(F[1]) + SQR(F[2])) /
+                         (std::max(E, efloor) + Fuzz<Real>()),
+                     Q, dens, inner_iter - 1);
+              PARTHENON_FAIL("Inner not converged");
+            }
+            break;
           }
 
           // Have new E and T
 
-          T = std::pow(eref * B / arad, 0.25);
+          T = std::max(tfloor, std::pow(std::max(eref * B / arad, 0.0), 0.25));
           Real eg = dens * eos_d.InternalEnergyFromDensityTemperature(dens, T) / eref;
           dEg = eg - eg0;
 
@@ -422,6 +543,7 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
                                         Fr0[2] + d1 * beta[2] + d2 * bdp[2]};
 
           F = SolveRadFlux(1. + a, b, beta, rhs);
+          F = ProjectFlux(F, std::max(E, efloor));
 
           for (int d = 0; d < 3; d++) {
             dF[d] = F[d] - Fr0[d];
@@ -434,20 +556,50 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
                 (dv[0] * (v[0] + p0[0] / dens) + dv[1] * (v[1] + p0[1] / dens) +
                  dv[2] * (v[2] + p0[2] / dens)) /
                 eref;
-          dEr = -chat / c * (dEg + dEk);
-          E = E0 + dEr;
-
-          // This needs to be something else related to the change from the last iteration
-          outer_err = std::abs(dEk - dEk_prev) / escale;
+          E = std::max(efloor, E0 - chat / c * (dEg + dEk));
+          dEr = E - E0;
+          F = ProjectFlux(F, std::max(E, efloor));
+          for (int d = 0; d < 3; ++d)
+            dF[d] = F[d] - Fr0[d];
+          escale = std::max(et0 + c / chat * E + std::abs(Q), efloor + Bfloor);
+          const Real dFmag = std::sqrt(SQR(F[0] - F_prev[0]) + SQR(F[1] - F_prev[1]) +
+                                       SQR(F[2] - F_prev[2]));
+          outer_err = std::max(std::abs(E - E_prev),
+                               std::max(std::abs(B - B_prev),
+                                        std::max(std::abs(dEk - dEk_prev), dFmag))) /
+                      escale;
+          solver_valid =
+              IsFinite(outer_err) && IsFinite(dEg) && IsFinite(dEk) && IsFinite(dEr);
+          if (!solver_valid) break;
+          have_good_state = true;
+          best_dEg = dEg;
+          best_dEk = dEk;
+          best_dEr = dEr;
+          best_dF = dF;
+          best_dv = dv;
           if (outer_err <= outer_tol) {
+            outer_converged = true;
             break;
           }
 
         } // outer_iter
-        if ((outer_iter > outer_max) && (fatal_if_unconverged)) {
-          printf("(%d,%d,%d,%d)  %lg > %lg after %d iterations\n", b, k, j, i, outer_err,
-                 outer_tol, outer_max);
-          PARTHENON_FAIL("Outer not converged");
+        if (!outer_converged) {
+          if (have_good_state) {
+            dEg = best_dEg;
+            dEk = best_dEk;
+            dEr = best_dEr;
+            dF = best_dF;
+            dv = best_dv;
+          } else {
+            // No valid outer iterate was ever accepted. Fall back to a purely local
+            // heating update rather than aborting on a floor-adjacent or otherwise
+            // ill-conditioned cell.
+            dEg = Q;
+            dEk = 0.0;
+            dEr = 0.0;
+            dF = {0.0, 0.0, 0.0};
+            dv = {0.0, 0.0, 0.0};
+          }
         }
 
         // Update state vector (both gas and radiation)

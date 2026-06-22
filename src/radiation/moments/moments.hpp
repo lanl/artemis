@@ -185,6 +185,28 @@ std::array<Real, 3> NormalizeFlux(const Real fx1, const Real fx2, const Real fx3
 }
 
 //----------------------------------------------------------------------------------------
+//! \fn bool IsFinite
+//! \brief Check whether a scalar is finite on host or device
+KOKKOS_INLINE_FUNCTION
+bool IsFinite(const Real x) {
+  return std::isfinite(x);
+}
+
+//----------------------------------------------------------------------------------------
+//! \fn std::array<Real, 3> ProjectFlux
+//! \brief Project reduced radiation flux onto the realizable set |F| <= E
+KOKKOS_INLINE_FUNCTION
+std::array<Real, 3> ProjectFlux(const std::array<Real, 3> &F, const Real E) {
+  if (!(IsFinite(E)) || E <= 0.0) return {0.0, 0.0, 0.0};
+  const Real fmag = std::sqrt(SQR(F[0]) + SQR(F[1]) + SQR(F[2]));
+  if (!(IsFinite(fmag)) || fmag == 0.0) return {0.0, 0.0, 0.0};
+  const Real fmax = std::max(0.0, (1.0 - 10.0 * Fuzz<Real>()) * E);
+  if (fmag <= fmax) return F;
+  const Real fac = fmax / fmag;
+  return {F[0] * fac, F[1] * fac, F[2] * fac};
+}
+
+//----------------------------------------------------------------------------------------
 //! \fn Real Moments::FleckFactor
 //! \brief Returns Fleck factor dB/dE
 KOKKOS_INLINE_FUNCTION

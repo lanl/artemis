@@ -14,6 +14,7 @@
 // Artemis includes
 #include "radiation.hpp"
 #include "artemis.hpp"
+#include "gas_opacity.hpp"
 #include "geometry/geometry.hpp"
 #include "utils/artemis_utils.hpp"
 #include "utils/eos/eos.hpp"
@@ -29,8 +30,10 @@ namespace Radiation {
 //! \fn  StateDescriptor Radiation::Initialize
 //! \brief Adds intialization function for radiation package
 //! NOTE(@pdmullen): ...to become a top-level package for radiation utils commmon to impl
-std::shared_ptr<StateDescriptor>
-Initialize(ParameterInput *pin, ArtemisUtils::Constants &constants, const bool do_imc) {
+std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
+                                            ArtemisUtils::Units &units,
+                                            ArtemisUtils::Constants &constants,
+                                            const bool do_imc) {
   auto radiation = std::make_shared<StateDescriptor>("radiation");
   Params &params = radiation->AllParams();
 
@@ -55,8 +58,20 @@ Initialize(ParameterInput *pin, ArtemisUtils::Constants &constants, const bool d
     params.Add("chat", light);
   }
 
+  // frequency type (determined below)
+  FrequencyType frequency_type;
+
   // Add derived radiation fields expected by Jaybenne
   if (do_imc) {
+    // Get multigroup indicator
+    std::string frequency_type_name = pin->GetString("radiation/imc", "frequency_type");
+    if (frequency_type_name == "gray") {
+      frequency_type = FrequencyType::gray;
+    } else if (frequency_type_name == "multigroup") {
+      frequency_type = FrequencyType::multigroup;
+    } else {
+      PARTHENON_FAIL("\"mcblock/frequency_type\" not recognized!");
+    }
     // Number of radiation species (i.e., groups)
     const int nspecies = pin->GetOrAddInteger("radiation/imc", "nspecies", 1);
     params.Add("nspecies", nspecies);
@@ -72,7 +87,16 @@ Initialize(ParameterInput *pin, ArtemisUtils::Constants &constants, const bool d
                            MetadataRadiation, MetadataOperatorSplit});
     radiation->AddField<rad::opac::absorption>(m);
     radiation->AddField<rad::opac::scattering>(m);
+  } else {
+    // TODO: extend MG frequency_type option to moments
+    frequency_type = FrequencyType::gray;
   }
+
+  // incorporate frequency type for gas opacity initialization
+  params.Add("frequency_type", frequency_type);
+
+  // Initialize gas opacity
+  Gas::InitGasOpacity(pin, units, params);
 
   // Enroll in tstart/tstop machinery
   ArtemisUtils::AddPackageTimeParams(

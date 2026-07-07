@@ -30,6 +30,7 @@ using Opacity = singularity::photons::impl::Variant<
 // Reduced scattering variant for this codebase
 using Scattering = singularity::photons::impl::S_Variant<
     singularity::photons::NonCGSUnitsS<singularity::photons::GrayS>,
+    singularity::photons::NonCGSUnitsS<singularity::photons::PowerLawS>,
     singularity::photons::NonCGSUnitsS<singularity::photons::ThomsonS>>;
 
 // Reduced variant for mean absorption opacities

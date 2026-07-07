@@ -185,7 +185,7 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   // Operator split radiation
   if (do_radiation) {
     // Top-level radiation package
-    packages.Add(Radiation::Initialize(pin.get(), constants, do_imc));
+    packages.Add(Radiation::Initialize(pin.get(), units, constants, do_imc));
     // Select between Jaybenne IMC or Moments
     if (do_imc) {
       auto eos_h = packages.Get("gas")->Param<EOS>("eos_h");

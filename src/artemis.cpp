@@ -189,10 +189,23 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
     // Select between Jaybenne IMC or Moments
     if (do_imc) {
       auto eos_h = packages.Get("gas")->Param<EOS>("eos_h");
-      auto opacity_h = packages.Get("gas")->Param<MeanOpacity>("opacity_h");
-      auto scattering_h = packages.Get("gas")->Param<MeanScattering>("scattering_h");
-      packages.Add(jaybenne::Initialize(pin.get(), opacity_h, scattering_h, eos_h,
-                                        "radiation/imc"));
+      const auto frequency_type =
+          packages.Get("artemis")->Param<FrequencyType>("frequency_type");
+      if (frequency_type == FrequencyType::gray) {
+        auto opacity_h = packages.Get("radiation")->Param<MeanOpacity>("opacity_h");
+        auto scattering_h =
+            packages.Get("radiation")->Param<MeanScattering>("scattering_h");
+        packages.Add(jaybenne::Initialize(pin.get(), opacity_h, scattering_h, eos_h,
+                                          "radiation/imc"));
+      } else {
+        PARTHENON_REQUIRE(frequency_type == FrequencyType::multigroup,
+                          "Invalid frequency_type!");
+        auto opacity_h = packages.Get("radiation")->Param<Opacity>("mg_opacity_h");
+        auto scattering_h =
+            packages.Get("radiation")->Param<Scattering>("mg_scattering_h");
+        packages.Add(jaybenne::Initialize(pin.get(), opacity_h, scattering_h, eos_h,
+                                          "radiation/imc"));
+      }
       PARTHENON_REQUIRE(coords == Coordinates::cartesian,
                         "Jaybenne currently supports only Cartesian coordinates!");
     } else if (do_moment) {

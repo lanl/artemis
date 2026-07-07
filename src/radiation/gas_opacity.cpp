@@ -14,14 +14,9 @@
 #include "utils/opacity/opacity.hpp"
 
 namespace Gas {
-void InitGasOpacity(ParameterInput *pin,
-                    const ArtemisUtils::Units &units,
+void InitGasOpacity(ParameterInput *pin, const ArtemisUtils::Units &units,
                     Params &params) {
   using namespace singularity::photons;
-
-  // // get the gas state here
-  // auto gas = std::make_shared<StateDescriptor>("gas");
-  // Params &params = gas->AllParams();
 
   // Opacity models
   const Real time = units.GetTimeCodeToPhysical();
@@ -29,13 +24,19 @@ void InitGasOpacity(ParameterInput *pin,
   const Real length = units.GetLengthCodeToPhysical();
   const Real temp = units.GetTemperatureCodeToPhysical();
 
+  // Get frequency type (it should already be set in radiation Initialization)
+  const auto frequency_type = params.Get<FrequencyType>("frequency_type");
+
   // Absorption opacity model
   std::string opacity_model_name =
       pin->GetOrAddString("gas/opacity/absorption", "opacity_model", "constant");
 
   // Mean absorption opacity (either read from table or uses model
+  ArtemisUtils::Opacity mg_opacity;
   ArtemisUtils::MeanOpacity opacity;
   if (opacity_model_name == "table") {
+    PARTHENON_REQUIRE(frequency_type == FrequencyType::gray,
+                      "Only gray table opacity permitted, for now.");
     std::string table_filename =
         pin->GetString("gas/opacity/absorption", "opacity_table");
     opacity =
@@ -58,6 +59,10 @@ void InitGasOpacity(ParameterInput *pin,
               singularity::photons::MeanOpacityBase(model, lRhoMin_a, lRhoMax_a, NRho_a,
                                                     lTMin_a, lTMax_a, NT_a),
               time, mass, length, temp);
+      if (frequency_type == FrequencyType::multigroup) {
+        mg_opacity = singularity::photons::NonCGSUnits<singularity::photons::Gray>(
+            std::move(model), time, mass, length, temp);
+      }
     } else if (opacity_model_name == "constant") {
       const Real kappa_a = pin->GetOrAddReal("gas/opacity/absorption", "kappa_a", 0.0);
       auto model = Gray(kappa_a);
@@ -66,6 +71,10 @@ void InitGasOpacity(ParameterInput *pin,
               singularity::photons::MeanOpacityBase(model, lRhoMin_a, lRhoMax_a, NRho_a,
                                                     lTMin_a, lTMax_a, NT_a),
               time, mass, length, temp);
+      if (frequency_type == FrequencyType::multigroup) {
+        mg_opacity = singularity::photons::NonCGSUnits<singularity::photons::Gray>(
+            std::move(model), time, mass, length, temp);
+      }
     } else if (opacity_model_name == "powerlaw") {
       const Real coef_kappa_a =
           pin->GetOrAddReal("gas/opacity/absorption", "coef_kappa_a", 0.0);
@@ -77,12 +86,21 @@ void InitGasOpacity(ParameterInput *pin,
               singularity::photons::MeanOpacityBase(model, lRhoMin_a, lRhoMax_a, NRho_a,
                                                     lTMin_a, lTMax_a, NT_a),
               time, mass, length, temp);
+      if (frequency_type == FrequencyType::multigroup) {
+        mg_opacity = singularity::photons::NonCGSUnits<singularity::photons::PowerLaw>(
+            std::move(model), time, mass, length, temp);
+      }
     } else {
       PARTHENON_FAIL("Opacity model not recognized!");
     }
   }
+
   params.Add("opacity_h", opacity);
   params.Add("opacity_d", opacity.GetOnDevice());
+  if (frequency_type == FrequencyType::multigroup) {
+    params.Add("mg_opacity_h", mg_opacity);
+    params.Add("mg_opacity_d", mg_opacity.GetOnDevice());
+  }
 
   // Scattering opacity model
   std::string scattering_model_name =
@@ -96,6 +114,7 @@ void InitGasOpacity(ParameterInput *pin,
   const Real lTMax_s = pin->GetOrAddReal("gas/opacity/scattering", "lTMax", 1.0);
   const int NT_s = pin->GetOrAddInteger("gas/opacity/scattering", "NT", 2);
 
+  ArtemisUtils::Scattering mg_scattering;
   ArtemisUtils::MeanScattering scattering;
   if (scattering_model_name == "none") {
     auto smodel = GrayS(0.0, 1.0);
@@ -104,6 +123,10 @@ void InitGasOpacity(ParameterInput *pin,
             singularity::photons::MeanSOpacityCGS(smodel, lRhoMin_s, lRhoMax_s, NRho_s,
                                                   lTMin_s, lTMax_s, NT_s),
             time, mass, length, temp);
+    if (frequency_type == FrequencyType::multigroup) {
+      mg_scattering = singularity::photons::NonCGSUnitsS<singularity::photons::GrayS>(
+          std::move(smodel), time, mass, length, temp);
+    }
   } else if (scattering_model_name == "constant") {
     const Real kappa_s = pin->GetOrAddReal("gas/opacity/scattering", "kappa_s", 0.0);
     auto smodel = GrayS(kappa_s, 1.0);
@@ -112,12 +135,20 @@ void InitGasOpacity(ParameterInput *pin,
             singularity::photons::MeanSOpacityCGS(smodel, lRhoMin_s, lRhoMax_s, NRho_s,
                                                   lTMin_s, lTMax_s, NT_s),
             time, mass, length, temp);
+    if (frequency_type == FrequencyType::multigroup) {
+      mg_scattering = singularity::photons::NonCGSUnitsS<singularity::photons::GrayS>(
+          std::move(smodel), time, mass, length, temp);
+    }
   } else {
     PARTHENON_FAIL("Scattering model not recognized!");
   }
 
   params.Add("scattering_h", scattering);
   params.Add("scattering_d", scattering.GetOnDevice());
+  if (frequency_type == FrequencyType::multigroup) {
+    params.Add("mg_scattering_h", mg_scattering);
+    params.Add("mg_scattering_d", mg_scattering.GetOnDevice());
+  }
 }
 
 } // namespace Gas

@@ -58,19 +58,18 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
     params.Add("chat", light);
   }
 
-  // frequency type (determined below)
-  FrequencyType frequency_type;
+  // frequency type (assume gray unless set below)
+  FrequencyType frequency_type = FrequencyType::gray;
 
   // Add derived radiation fields expected by Jaybenne
   if (do_imc) {
     // Get multigroup indicator
     std::string frequency_type_name = pin->GetString("radiation/imc", "frequency_type");
-    if (frequency_type_name == "gray") {
-      frequency_type = FrequencyType::gray;
-    } else if (frequency_type_name == "multigroup") {
+    if (frequency_type_name == "multigroup") {
       frequency_type = FrequencyType::multigroup;
     } else {
-      PARTHENON_FAIL("\"mcblock/frequency_type\" not recognized!");
+      PARTHENON_REQUIRE(frequency_type_name == "gray",
+                        "Supported frequency_type are gray or multigroup!");
     }
     // Number of radiation species (i.e., groups)
     const int nspecies = pin->GetOrAddInteger("radiation/imc", "nspecies", 1);

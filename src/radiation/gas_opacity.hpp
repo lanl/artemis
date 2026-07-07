@@ -21,8 +21,7 @@
 #include <parthenon/package.hpp>
 
 namespace Gas {
-void InitGasOpacity(ParameterInput *pin,
-                    const ArtemisUtils::Units &units,
+void InitGasOpacity(ParameterInput *pin, const ArtemisUtils::Units &units,
                     Params &params);
 } // namespace Gas
 

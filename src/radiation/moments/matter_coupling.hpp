@@ -41,9 +41,10 @@ TaskStatus MatterCouplingSimpleImpl(MeshData<Real> *u0, const Real dt) {
 
   // Extract gas package and params
   auto &gas_pkg = pm->packages.Get("gas");
+  auto &rad_pkg = pm->packages.Get("radiation");
   auto eos_d = gas_pkg->template Param<EOS>("eos_d");
-  auto opac_d = gas_pkg->template Param<MeanOpacity>("opacity_d");
-  auto scat_d = gas_pkg->template Param<MeanScattering>("scattering_d");
+  auto opac_d = rad_pkg->template Param<MeanOpacity>("opacity_d");
+  auto scat_d = rad_pkg->template Param<MeanScattering>("scattering_d");
   auto dflr = gas_pkg->template Param<Real>("dfloor");
   auto de_switch = gas_pkg->template Param<Real>("de_switch");
 
@@ -210,9 +211,10 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
 
   // Extract gas package and params
   auto &gas_pkg = pm->packages.Get("gas");
+  auto &rad_pkg = pm->packages.Get("radiation");
   auto eos_d = gas_pkg->template Param<EOS>("eos_d");
-  auto opac_d = gas_pkg->template Param<MeanOpacity>("opacity_d");
-  auto scat_d = gas_pkg->template Param<MeanScattering>("scattering_d");
+  auto opac_d = rad_pkg->template Param<MeanOpacity>("opacity_d");
+  auto scat_d = rad_pkg->template Param<MeanScattering>("scattering_d");
   auto dflr = gas_pkg->template Param<Real>("dfloor");
   auto de_switch = gas_pkg->template Param<Real>("de_switch");
 

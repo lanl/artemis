@@ -63,8 +63,8 @@ TaskStatus ZeroDiffusionImpl(MeshData<Real> *md, SparsePackFlux vf) {
 //! \brief Computes diffusion limited timestep
 template <Coordinates GEOM, Fluid FLUID_TYPE, DiffType DIFF, typename PKG,
           typename SparsePackPrim>
-Real EstimateTimestep(MeshData<Real> *md, DiffCoeffParams &dp, PKG &pkg, const EOS &eos,
-                      SparsePackPrim vprim) {
+Real EstimateTimestep(MeshData<Real> *md, DiffCoeffParams &dp, PKG &pkg,
+                      const ParArray1D<EOS> &eos, SparsePackPrim vprim) {
   PARTHENON_INSTRUMENT
   using parthenon::MakePackDescriptor;
   auto pm = md->GetParentPointer();
@@ -99,9 +99,9 @@ Real EstimateTimestep(MeshData<Real> *md, DiffCoeffParams &dp, PKG &pkg, const E
 
           // Get the maximum diffusion coefficient (if there's more than one)
           DiffusionCoeff<DIFF, GEOM, FLUID_TYPE> diffcoeff;
-          Real mu = diffcoeff.Get(dp, coords, xv, dens, sie, eos);
+          Real mu = diffcoeff.Get(dp, coords, xv, dens, sie, eos(n));
           if constexpr (DIFF == DiffType::conductivity_plaw) {
-            mu /= (dens * eos.SpecificHeatFromDensityInternalEnergy(dens, sie));
+            mu /= (dens * eos(n).SpecificHeatFromDensityInternalEnergy(dens, sie));
           } else if constexpr ((DIFF == DiffType::viscosity_plaw) ||
                                (DIFF == DiffType::viscosity_alpha)) {
             mu *= (1.0 + (dp.eta > 1.0) * (dp.eta - 1.0)) / dens;

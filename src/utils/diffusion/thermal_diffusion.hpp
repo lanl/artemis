@@ -44,7 +44,7 @@ TaskStatus ThermalFluxImpl(MeshData<Real> *md, DiffCoeffParams dp, PKG &pkg,
                     "thermal diffusion only works with a gas fluid");
 
   auto pm = md->GetParentPointer();
-  auto eos_d = pkg->template Param<EOS>("eos_d");
+  const auto &eos_d = pkg->template Param<ParArray1D<EOS>>("eos_d");
 
   static auto desc_g =
       MakePackDescriptor<geom::x1v, geom::x2v, geom::x3v>((pm->resolved_packages).get());
@@ -81,7 +81,7 @@ TaskStatus ThermalFluxImpl(MeshData<Real> *md, DiffCoeffParams dp, PKG &pkg,
 
           // this returns conductivity not thermal diffusivity
           DiffusionCoeff<DIFF, GEOM, FLUID_TYPE> diffcoeff;
-          diffcoeff.evaluate(dp, mbr, b, n, k, j, il - 1, iu, vprim, eos_d, kappa);
+          diffcoeff.evaluate(dp, mbr, b, n, k, j, il - 1, iu, vprim, eos_d(n), kappa);
 
           mbr.team_barrier();
 
@@ -93,11 +93,11 @@ TaskStatus ThermalFluxImpl(MeshData<Real> *md, DiffCoeffParams dp, PKG &pkg,
                 const auto &xv_m = coords.GetCellCenter(vg, b, k, j, i - 1);
                 const Real dx1 = coords.Distance(xv, xv_m);
 
-                const Real T = eos_d.TemperatureFromDensityInternalEnergy(
+                const Real T = eos_d(n).TemperatureFromDensityInternalEnergy(
                     vprim(b, gas::prim::density(n), k, j, i),
                     vprim(b, gas::prim::sie(n), k, j, i));
 
-                const Real Tm = eos_d.TemperatureFromDensityInternalEnergy(
+                const Real Tm = eos_d(n).TemperatureFromDensityInternalEnergy(
                     vprim(b, gas::prim::density(n), k, j, i - 1),
                     vprim(b, gas::prim::sie(n), k, j, i - 1));
 
@@ -135,7 +135,7 @@ TaskStatus ThermalFluxImpl(MeshData<Real> *md, DiffCoeffParams dp, PKG &pkg,
               }
 
               DiffusionCoeff<DIFF, GEOM, FLUID_TYPE> diffcoeff;
-              diffcoeff.evaluate(dp, mbr, b, n, k, j, il, iu, vprim, eos_d, kappa);
+              diffcoeff.evaluate(dp, mbr, b, n, k, j, il, iu, vprim, eos_d(n), kappa);
 
               mbr.team_barrier();
               if (j > jl) {
@@ -147,11 +147,11 @@ TaskStatus ThermalFluxImpl(MeshData<Real> *md, DiffCoeffParams dp, PKG &pkg,
                       const auto &xv_m = coords.GetCellCenter(vg, b, k, j - 1, i);
                       const Real dx2 = coords.Distance(xv, xv_m);
 
-                      const Real T = eos_d.TemperatureFromDensityInternalEnergy(
+                      const Real T = eos_d(n).TemperatureFromDensityInternalEnergy(
                           vprim(b, gas::prim::density(n), k, j, i),
                           vprim(b, gas::prim::sie(n), k, j, i));
 
-                      const Real Tm = eos_d.TemperatureFromDensityInternalEnergy(
+                      const Real Tm = eos_d(n).TemperatureFromDensityInternalEnergy(
                           vprim(b, gas::prim::density(n), k, j - 1, i),
                           vprim(b, gas::prim::sie(n), k, j - 1, i));
 
@@ -194,7 +194,7 @@ TaskStatus ThermalFluxImpl(MeshData<Real> *md, DiffCoeffParams dp, PKG &pkg,
 
               // 2. Viscosity values. No barrier
               DiffusionCoeff<DIFF, GEOM, FLUID_TYPE> diffcoeff;
-              diffcoeff.evaluate(dp, mbr, b, n, k, j, il, iu, vprim, eos_d, kappa_km1);
+              diffcoeff.evaluate(dp, mbr, b, n, k, j, il, iu, vprim, eos_d(n), kappa_km1);
 
               mbr.team_barrier();
               if (k > kl) {
@@ -206,11 +206,11 @@ TaskStatus ThermalFluxImpl(MeshData<Real> *md, DiffCoeffParams dp, PKG &pkg,
                       const auto &xv_m = coords.GetCellCenter(vg, b, k - 1, j, i);
                       const Real dx3 = coords.Distance(xv, xv_m);
 
-                      const Real T = eos_d.TemperatureFromDensityInternalEnergy(
+                      const Real T = eos_d(n).TemperatureFromDensityInternalEnergy(
                           vprim(b, gas::prim::density(n), k, j, i),
                           vprim(b, gas::prim::sie(n), k, j, i));
 
-                      const Real Tm = eos_d.TemperatureFromDensityInternalEnergy(
+                      const Real Tm = eos_d(n).TemperatureFromDensityInternalEnergy(
                           vprim(b, gas::prim::density(n), k - 1, j, i),
                           vprim(b, gas::prim::sie(n), k - 1, j, i));
 

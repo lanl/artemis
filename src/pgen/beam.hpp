@@ -67,7 +67,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const bool do_rad = artemis_pkg->Param<bool>("do_moment");
   auto rad_pkg = pmb->packages.Get("moments");
   auto gas_pkg = pmb->packages.Get("gas");
-  const auto eos = gas_pkg->Param<EOS>("eos_d");
+  const auto eos = gas_pkg->Param<ParArray1D<EOS>>("eos_d");
   const Real ar = rad_pkg->Param<Real>("arad");
 
   // packing and capture variables for kernel
@@ -106,7 +106,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           v(0, gas::prim::velocity(1), k, j, i) = 0.0;
           v(0, gas::prim::velocity(2), k, j, i) = 0.0;
           v(0, gas::prim::sie(0), k, j, i) =
-              eos.InternalEnergyFromDensityTemperature(dens, pars.tg);
+              eos(0).InternalEnergyFromDensityTemperature(dens, pars.tg);
         }
         if (do_rad) {
           v(0, rad::prim::energy(0), k, j, i) = ar * SQR(SQR(pars.tg));

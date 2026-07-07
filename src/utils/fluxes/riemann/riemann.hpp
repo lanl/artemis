@@ -26,7 +26,7 @@ template <RSolver R, Fluid FLUID_TYPE, Closure CTYPE, typename Enable = void>
 struct RiemannSolver {
   template <typename V1, typename V2>
   KOKKOS_INLINE_FUNCTION void
-  operator()(const EOS &eos, const Real c, const Real chat,
+  operator()(const ParArray1D<EOS> &eos, const Real c, const Real chat,
              parthenon::team_mbr_t const &member, const int b, const int k, const int j,
              const int il, const int iu, const int dir,
              const parthenon::ScratchPad2D<Real> &wl,

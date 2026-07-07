@@ -47,7 +47,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   PARTHENON_REQUIRE(do_gas, "Thermalization problem requires gas!");
   PARTHENON_REQUIRE(!(do_dust), "Thermalization problem does not permit dust!");
   auto gas_pkg = pmb->packages.Get("gas");
-  const auto eos = gas_pkg->Param<EOS>("eos_d");
+  const auto eos = gas_pkg->Param<ParArray1D<EOS>>("eos_d");
   Real ar = Null<Real>();
   if (do_moment) {
     auto rad_pkg = pmb->packages.Get("moments");
@@ -83,7 +83,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         KOKKOS_LAMBDA(const int k, const int j, const int i) {
           v(0, gas::prim::density(), k, j, i) = rho;
           v(0, gas::prim::sie(), k, j, i) =
-              eos.InternalEnergyFromDensityTemperature(rho, trad);
+              eos(0).InternalEnergyFromDensityTemperature(rho, trad);
         });
     jaybenne::InitializeRadiation(md.get(), true);
   }
@@ -97,7 +97,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         v(0, gas::prim::velocity(1), k, j, i) = 0.0;
         v(0, gas::prim::velocity(2), k, j, i) = 0.0;
         v(0, gas::prim::sie(), k, j, i) =
-            eos.InternalEnergyFromDensityTemperature(rho, tgas);
+            eos(0).InternalEnergyFromDensityTemperature(rho, tgas);
 
         if (do_moment) {
           v(0, rad::prim::energy(), k, j, i) = ar * SQR(SQR(trad));

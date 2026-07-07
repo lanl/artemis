@@ -91,7 +91,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   dcv.rho0 = pin->GetOrAddReal("problem", "rho0", 1.0);
 
   auto gas_pkg = pmb->packages.Get("gas");
-  auto eos_d = gas_pkg->template Param<EOS>("eos_d");
+  const auto &eos_d = gas_pkg->template Param<ParArray1D<EOS>>("eos_d");
 
   // Extract adiabatic index and H0
   dcv.gamma = gas_pkg->Param<Real>("adiabatic_index");
@@ -104,8 +104,8 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const auto &constants = artemis_pkg->Param<ArtemisUtils::Constants>("constants");
   const Real kbmu = constants.GetKBCode() / (mu * constants.GetAMUCode());
   const Real gtemp = SQR(dcv.h0) / kbmu / dcv.gamma;
-  const Real gsie = eos_d.InternalEnergyFromDensityTemperature(gdens, gtemp);
-  const Real pres = eos_d.PressureFromDensityTemperature(gdens, gtemp);
+  const Real gsie = eos_d(0).InternalEnergyFromDensityTemperature(gdens, gtemp);
+  const Real pres = eos_d(0).PressureFromDensityTemperature(gdens, gtemp);
   if (pmb->gid == 0) {
     std::cout << "gamma, h0, pres=" << dcv.gamma << " " << dcv.h0 << " "
               << dcv.gm1 * gdens * gsie << " " << pres << std::endl;

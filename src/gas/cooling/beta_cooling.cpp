@@ -47,7 +47,7 @@ TaskStatus BetaCooling(MeshData<Real> *md, const Real time, const Real dt) {
 
   // Extract gas package and params
   auto &gas_pkg = pm->packages.Get("gas");
-  const auto &eos_d = gas_pkg->template Param<EOS>("eos_d");
+  const auto &eos_d = gas_pkg->template Param<ParArray1D<EOS>>("eos_d");
   const auto de_switch = gas_pkg->template Param<Real>("de_switch");
   const auto dflr_gas = gas_pkg->template Param<Real>("dfloor");
   const auto sieflr_gas = gas_pkg->template Param<Real>("siefloor");
@@ -131,8 +131,8 @@ TaskStatus BetaCooling(MeshData<Real> *md, const Real time, const Real dt) {
           sie = (efloor)*sie + (!efloor) * sieflr_gas;
 
           // Compute the energy change from the temperature change
-          const Real cv = eos_d.SpecificHeatFromDensityInternalEnergy(dens, sie);
-          const Real Tn = eos_d.TemperatureFromDensityInternalEnergy(dens, sie);
+          const Real cv = eos_d(n).SpecificHeatFromDensityInternalEnergy(dens, sie);
+          const Real Tn = eos_d(n).TemperatureFromDensityInternalEnergy(dens, sie);
           const Real dE = -dens * cv * omdt / (beta + omdt) * (Tn - T0);
 
           // Add this energy change to the conserved fields

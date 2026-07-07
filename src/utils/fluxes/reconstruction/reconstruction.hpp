@@ -49,7 +49,7 @@ struct ReconGradient {
 //! fluxes when near ~round-off
 template <Fluid F, typename V>
 KOKKOS_INLINE_FUNCTION void
-post_recon(const EOS &eos, const Real dfloor, const Real siefloor,
+post_recon(const ParArray1D<EOS> &eos, const Real dfloor, const Real siefloor,
            parthenon::team_mbr_t const &member, const int dir, const int b, const int k,
            const int j, const int il, const int iu, const V &q,
            parthenon::ScratchPad2D<Real> &ql, parthenon::ScratchPad2D<Real> &qr) {
@@ -78,34 +78,34 @@ post_recon(const EOS &eos, const Real dfloor, const Real siefloor,
       const int IPR = nspecies * 4 + n;
       const int ISE = nspecies * 5 + n;
       const int IBL = nspecies * 6 + n;
-      parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, member, il, iu,
-                               [&](const int i) {
-                                 const int ipl = i + (dir == 1);
-                                 Real &dL = ql(IDN, ipl);
-                                 Real &pL = ql(IPR, ipl);
-                                 Real &eL = ql(ISE, ipl);
-                                 Real &bL = qr(IBL, ipl);
-                                 Real &dR = qr(IDN, i);
-                                 Real &pR = qr(IPR, i);
-                                 Real &eR = qr(ISE, i);
-                                 Real &bR = qr(IBL, i);
+      parthenon::par_for_inner(
+          DEFAULT_INNER_LOOP_PATTERN, member, il, iu, [&](const int i) {
+            const int ipl = i + (dir == 1);
+            Real &dL = ql(IDN, ipl);
+            Real &pL = ql(IPR, ipl);
+            Real &eL = ql(ISE, ipl);
+            Real &bL = qr(IBL, ipl);
+            Real &dR = qr(IDN, i);
+            Real &pR = qr(IPR, i);
+            Real &eR = qr(ISE, i);
+            Real &bR = qr(IBL, i);
 
-                                 // Floor everything
-                                 dL = std::max(dL, dfloor);
-                                 dR = std::max(dR, dfloor);
-                                 eL = std::max(eL, siefloor);
-                                 eR = std::max(eR, siefloor);
+            // Floor everything
+            dL = std::max(dL, dfloor);
+            dR = std::max(dR, dfloor);
+            eL = std::max(eL, siefloor);
+            eR = std::max(eR, siefloor);
 
-                                 // Only correct these if something is wrong
-                                 if ((pL <= 0.0) || (bL <= 0.0)) {
-                                   pL = eos.PressureFromDensityInternalEnergy(dL, eL);
-                                   bL = eos.BulkModulusFromDensityInternalEnergy(dL, eL);
-                                 }
-                                 if ((pR <= 0.0) || (bR <= 0.0)) {
-                                   pR = eos.PressureFromDensityInternalEnergy(dR, eR);
-                                   bR = eos.BulkModulusFromDensityInternalEnergy(dR, eR);
-                                 }
-                               });
+            // Only correct these if something is wrong
+            if ((pL <= 0.0) || (bL <= 0.0)) {
+              pL = eos(n).PressureFromDensityInternalEnergy(dL, eL);
+              bL = eos(n).BulkModulusFromDensityInternalEnergy(dL, eL);
+            }
+            if ((pR <= 0.0) || (bR <= 0.0)) {
+              pR = eos(n).PressureFromDensityInternalEnergy(dR, eR);
+              bR = eos(n).BulkModulusFromDensityInternalEnergy(dR, eR);
+            }
+          });
     }
   }
 }

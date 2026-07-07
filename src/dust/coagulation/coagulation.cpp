@@ -222,7 +222,7 @@ TaskStatus CoagulationStep(MeshData<Real> *md, const Real time, const Real dt) {
 
   // Extract EOS
   auto &gas_pkg = pm->packages.Get("gas");
-  auto eos_d = gas_pkg->template Param<EOS>("eos_d");
+  const auto &eos_d = gas_pkg->template Param<ParArray1D<EOS>>("eos_d");
 
   // Extract dust params
   auto &dust_pkg = pm->packages.Get("dust");
@@ -306,8 +306,8 @@ TaskStatus CoagulationStep(MeshData<Real> *md, const Real time, const Real dt) {
         // Extract gas state vector
         const Real &gdens = vmesh(b, gas::prim::density(0), k, j, i);
         const Real &gsie = vmesh(b, gas::prim::sie(0), k, j, i);
-        const Real kT = eos_d.TemperatureFromDensityInternalEnergy(gdens, gsie);
-        const Real &gbulk = eos_d.BulkModulusFromDensityInternalEnergy(gdens, gsie);
+        const Real kT = eos_d(0).TemperatureFromDensityInternalEnergy(gdens, gsie);
+        const Real &gbulk = eos_d(0).BulkModulusFromDensityInternalEnergy(gdens, gsie);
         const Real cs1 = std::sqrt(gbulk / gdens) * vel0;
         const Real gdens1 = gdens * rho0;
         const Real kT1 = kT * kT0;

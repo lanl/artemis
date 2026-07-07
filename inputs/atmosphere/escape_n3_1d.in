@@ -1,0 +1,106 @@
+# =============================================================================
+# Artemis input deck: 1D spherical planetary atmospheric escape
+#
+# Two species (H, mu=1 and O, mu=16) in a 1D spherically-symmetric atmosphere
+# under point-mass gravity.  Chapman-Cowling (hard-sphere) drag couples them.
+# Species 0 (H) is light enough to escape; species 1 (O) is gravitationally
+# bound but gets entrained by species 0 through drag.
+
+<artemis>
+  problem    = escape_1d
+  coordinates = spherical
+  radial_spacing = logarithmic
+  
+<parthenon/sparse>
+  enable_sparse = true
+  dealloc_count = 1
+  alloc_threshold = 1e-8
+  dealloc_threshold = 1e-10
+
+<parthenon/job>
+  problem_id = drag
+
+<parthenon/time>
+  nlim      = 100
+  tlim      = 50.0        # ~14 t_dyn (t_dyn = r0/v_esc = 1/sqrt(2))
+  integrator = rk2
+  ncycle_out = 1
+
+<parthenon/mesh>
+  nx1     = 512
+  x1min   = 0.0          # inner radius r0
+  x1max   = 2.302585092994046          # outer radius
+  ix1_bc  = hydrostatic          # custom inner BC (hydrostatic inflow)
+  ox1_bc  = outflow         # custom outer BC (outflow)
+
+  nx2 = 1
+  x2min = 0.0
+  x2max = 3.14159265358979
+  ix2_bc = outflow
+  ox2_bc = outflow
+
+  nx3 = 1
+  x3min = -0.5 
+  x3max = 0.5 
+  ix3_bc = outflow
+  ox3_bc = outflow
+
+<parthenon/meshblock>
+  nx1 = 8
+  nx2 = 1
+  nx3 = 1
+
+<parthenon/output0>
+  file_type  = hdf5
+#  dt         = 0.1
+  dn = 1
+  variables  = gas.prim.density, gas.prim.velocity, gas.prim.sie, gas.prim.temperature, gas.prim.pressure
+  use_final_label = no
+
+<parthenon/output1>
+  file_type  = hst
+  dt         = 0.01
+
+<gas>
+  nspecies = 3
+  gamma    = 1.6666666667, 1.6666666667, 1.6666666667
+  mu = 1.0, 4.0026, 16.0     # H, He, O [AMU]
+  dfloor   = 1.0e-12
+  siefloor = 1.0e-12
+  scr_level = 1
+  density_allocation_threshold = 1e-8
+  density_deallocation_threshold = 1e-10
+
+# Gravity: point mass at origin
+<gravity/point>
+  mass   = 1.0                # G*M in code units
+
+
+<physics>
+  gas = true
+  gravity = true
+  drag = true
+
+# Drag: full Chapman-Cowling coupling
+<drag>
+  type = full
+
+<drag/full>
+  collision_model = hard_sphere
+  # mu [AMU], sigma [code length = r0], dof (H/O treated here as monatomic)
+  mu    = 1.0 , 4.0026, 16.0
+  sigma = 1.0e-3, 1e-3, 1.0e-3   # collision diameters ~1e-3 r0 (calibrate for your scenario)
+  dof   = 3.0, 3.0, 3.0
+
+# Problem parameters
+<problem>
+  # Isothermal temperature in EOS/code temperature units for this scalefree deck.
+  # T0 = 0.2 yields lambda_H = mu_H/T0 = 5. The inner BC maintains hydrostatic
+  # density/SIE and extrapolates outward radial velocity; it does not impose a
+  # Parker-wind velocity at r0.
+  T0    = 0.2     # code units (NOT Kelvin)
+  r0    = 1.0      # inner radius [code length]
+  gm    = 1.0      # G*M [code units]
+  rho0_0 = 1.0e-4  # base density species 0 (H) at r0
+  rho0_1 = 3.0e-4  # base density species 1 (He) at r0
+  rho0_2 = 1.0e-3  # base density species 1 (O) at r0  (heavier, higher abundance)

@@ -173,7 +173,7 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   if (do_dust) packages.Add(Dust::Initialize(pin.get(), units));
   if (do_rotating_frame) packages.Add(RotatingFrame::Initialize(pin.get()));
   if (do_cooling) packages.Add(Gas::Cooling::Initialize(pin.get()));
-  if (do_drag) packages.Add(Drag::Initialize(pin.get()));
+  if (do_drag) packages.Add(Drag::Initialize(pin.get(), constants, packages));
 
   // Operator split dust coagulation
   if (do_coagulation) {
@@ -189,10 +189,11 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
     packages.Add(Radiation::Initialize(pin.get(), constants, do_imc));
     // Select between Jaybenne IMC or Moments
     if (do_imc) {
-      auto eos_h = packages.Get("gas")->Param<EOS>("eos_h");
+      auto eos_h_arr =
+          packages.Get("gas")->Param<parthenon::ParArray1D<ArtemisUtils::EOS>>("eos_h");
       auto opacity_h = packages.Get("gas")->Param<MeanOpacity>("opacity_h");
       auto scattering_h = packages.Get("gas")->Param<MeanScattering>("scattering_h");
-      packages.Add(jaybenne::Initialize(pin.get(), opacity_h, scattering_h, eos_h,
+      packages.Add(jaybenne::Initialize(pin.get(), opacity_h, scattering_h, eos_h_arr(0),
                                         "radiation/imc"));
       PARTHENON_REQUIRE(coords == Coordinates::cartesian,
                         "Jaybenne currently supports only Cartesian coordinates!");

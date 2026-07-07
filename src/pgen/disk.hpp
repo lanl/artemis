@@ -259,7 +259,8 @@ inline void InitDiskParams(MeshBlock *pmb, ParameterInput *pin) {
     disk_params.temp_soft2 = pin->GetOrAddReal("problem", "temp_soft", 0.0);
     const auto mu = gas_pkg->Param<Real>("mu");
     auto &constants = artemis_pkg->Param<ArtemisUtils::Constants>("constants");
-    const auto &eos = gas_pkg->Param<ArtemisUtils::EOS>("eos_h");
+    const auto &eos_arr = gas_pkg->Param<ParArray1D<ArtemisUtils::EOS>>("eos_h");
+    const auto &eos = eos_arr(0);
     disk_params.kbmu = constants.GetKBCode() / (mu * constants.GetAMUCode());
     disk_params.pres_min =
         eos.PressureFromDensityInternalEnergy(disk_params.dens_min, disk_params.sie_min);
@@ -391,7 +392,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   // Extract gas package and params
   auto &gas_pkg = pmb->packages.Get("gas");
-  const auto &eos_d = gas_pkg->template Param<EOS>("eos_d");
+  const auto &eos_d = gas_pkg->template Param<ParArray1D<EOS>>("eos_d");
 
   // Disk parameters
   auto disk_params = artemis_pkg->Param<DiskParams>("disk_params");
@@ -424,9 +425,8 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   pmb->par_for(
       "disk", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        DiskICImpl<GEOM>(v, 0, k, j, i, pco, eos_d, dp, particles, npart);
+        DiskICImpl<GEOM>(v, 0, k, j, i, pco, eos_d(0), dp, particles, npart);
       });
-  if (dp.do_imc) jaybenne::InitializeRadiation(md.get(), true);
 }
 
 //----------------------------------------------------------------------------------------
@@ -452,7 +452,7 @@ void DiskBoundaryVisc(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) {
 
   // Extract gas package and params
   auto &gas_pkg = pmb->packages.Get("gas");
-  auto eos_d = gas_pkg->template Param<EOS>("eos_d");
+  const auto &eos_d = gas_pkg->template Param<ParArray1D<EOS>>("eos_d");
 
   // Packing
   static auto descriptors = ArtemisUtils::GetBoundaryPackDescriptorMap<
@@ -523,8 +523,8 @@ void DiskBoundaryVisc(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) {
         const Real dx = std::log(xvp1[ix1] / xvm1[ix1]);
         const Real xmadx = xma / dx;
 
-        const Real nua = ViscosityProfile(dp, eos_d, xcyla[0], xcyla[2]);
-        const Real nug = ViscosityProfile(dp, eos_d, xcyl[0], xcyl[2]);
+        const Real nua = ViscosityProfile(dp, eos_d(0), xcyla[0], xcyla[2]);
+        const Real nug = ViscosityProfile(dp, eos_d(0), xcyl[0], xcyl[2]);
 
         // Viscous BC for gas
         if (do_gas) {
@@ -643,7 +643,7 @@ void DiskBoundaryIC(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) {
   auto disk_params = artemis_pkg->Param<DiskParams>("disk_params");
 
   auto &gas_pkg = pmb->packages.Get("gas");
-  auto eos_d = gas_pkg->template Param<EOS>("eos_d");
+  const auto &eos_d = gas_pkg->template Param<ParArray1D<EOS>>("eos_d");
 
   static auto descriptors = ArtemisUtils::GetBoundaryPackDescriptorMap<
       gas::prim::density, gas::prim::velocity, gas::prim::sie, dust::prim::density,
@@ -667,7 +667,7 @@ void DiskBoundaryIC(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) {
   pmb->par_for_bndry(
       "DiskInnerX1", nb, BDY, parthenon::TopologicalElement::CC, coarse, fine,
       KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
-        DiskICImpl<GEOM>(v, 0, k, j, i, pco, eos_d, dp, particles, npart);
+        DiskICImpl<GEOM>(v, 0, k, j, i, pco, eos_d(0), dp, particles, npart);
       });
 }
 
@@ -689,7 +689,7 @@ void DiskBoundaryExtrap(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) 
 
   // Extract gas parameters
   auto &gas_pkg = pmb->packages.Get("gas");
-  auto eos_d = gas_pkg->template Param<EOS>("eos_d");
+  const auto &eos_d = gas_pkg->template Param<ParArray1D<EOS>>("eos_d");
 
   auto disk_params = artemis_pkg->Param<DiskParams>("disk_params");
   auto &dp = disk_params;

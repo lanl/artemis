@@ -47,7 +47,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   // Extract parameters from packages
   auto artemis_pkg = pmb->packages.Get("artemis");
   auto gas_pkg = pmb->packages.Get("gas");
-  const auto &eos = gas_pkg->Param<ArtemisUtils::EOS>("eos_d");
+  const auto &eos = gas_pkg->template Param<ParArray1D<ArtemisUtils::EOS>>("eos_d");
   const bool do_gas = artemis_pkg->Param<bool>("do_gas");
 
   KH_params.y1 = pin->GetOrAddReal("problem", "y1", 0.5);
@@ -101,7 +101,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
                          std::exp(-SQR((zc - pars.y2) / pars.sigma)));
 
         v(0, gas::prim::density(0), k, j, i) = dens;
-        v(0, gas::prim::sie(0), k, j, i) = ArtemisUtils::EofPR(eos, pars.pres0, dens);
+        v(0, gas::prim::sie(0), k, j, i) = ArtemisUtils::EofPR(eos(0), pars.pres0, dens);
         v(0, gas::prim::velocity(0), k, j, i) = vx;
         v(0, gas::prim::velocity(1), k, j, i) = (!three_d) * vz;
         v(0, gas::prim::velocity(2), k, j, i) = three_d * vz;

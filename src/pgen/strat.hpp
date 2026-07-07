@@ -83,7 +83,8 @@ inline void InitStratParams(MeshBlock *pmb, ParameterInput *pin) {
 
     auto &gas_pkg = pmb->packages.Get("gas");
     const auto mu = gas_pkg->Param<Real>("mu");
-    const auto eos = gas_pkg->Param<EOS>("eos_h");
+    const auto eos_arr = gas_pkg->Param<ParArray1D<EOS>>("eos_h");
+    const EOS &eos = eos_arr(0);
     auto &constants = artemis_pkg->Param<ArtemisUtils::Constants>("constants");
     strat_params.kbmu = constants.GetKBCode() / (mu * constants.GetAMUCode());
     strat_params.dfloor = gas_pkg->Param<Real>("dfloor");
@@ -148,7 +149,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto strat_params = artemis_pkg->Param<StratParams>("strat_params");
 
   auto &gas_pkg = pmb->packages.Get("gas");
-  auto eos_d = gas_pkg->template Param<EOS>("eos_d");
+  const auto &eos_d = gas_pkg->template Param<ParArray1D<EOS>>("eos_d");
   const bool is_ideal = (gas_pkg->template Param<std::string>("eos_type") == "ideal");
 
   // Dimensionality
@@ -186,9 +187,9 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         const Real vx3 = 0.0;
         const Real temp = pars.temp0;
         const Real dens =
-            is_ideal ? InitialDensity(pars, z) : InitialDensity(eos_d, pars, z);
-        const Real sie = std::max(pars.siefloor,
-                                  eos_d.InternalEnergyFromDensityTemperature(dens, temp));
+            is_ideal ? InitialDensity(pars, z) : InitialDensity(eos_d(0), pars, z);
+        const Real sie = std::max(
+            pars.siefloor, eos_d(0).InternalEnergyFromDensityTemperature(dens, temp));
 
         v(0, gas::prim::density(0), k, j, i) = dens;
         v(0, gas::prim::velocity(0), k, j, i) = vx1;
@@ -442,7 +443,7 @@ inline void ShearInnerX2(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse)
 
   // Extract gas package and params
   auto &gas_pkg = pmb->packages.Get("gas");
-  auto eos_d = gas_pkg->template Param<EOS>("eos_d");
+  const auto &eos_d = gas_pkg->template Param<ParArray1D<EOS>>("eos_d");
 
   // Coordinates and indexing
   const auto &pco = (coarse) ? pmb->pmr->GetCoarseCoords() : pmb->coords;
@@ -477,10 +478,11 @@ inline void ShearInnerX2(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse)
           const Real vx3g = outflow ? gv3 : 0.0;
           const Real densg =
               outflow ? v(0, gas::prim::density(n), k, js, i) : InitialDensity(pars, z);
-          const Real sieg = outflow ? v(0, gas::prim::sie(n), k, js, i)
-                                    : std::max(pars.siefloor,
-                                               eos_d.InternalEnergyFromDensityTemperature(
-                                                   densg, pars.temp0));
+          const Real sieg =
+              outflow
+                  ? v(0, gas::prim::sie(n), k, js, i)
+                  : std::max(pars.siefloor, eos_d(n).InternalEnergyFromDensityTemperature(
+                                                densg, pars.temp0));
           v(0, gas::prim::velocity(VI(n, 0)), k, j, i) = vx1g;
           v(0, gas::prim::velocity(VI(n, 1)), k, j, i) = vx2g;
           v(0, gas::prim::velocity(VI(n, 2)), k, j, i) = vx3g;
@@ -564,7 +566,7 @@ inline void ShearOuterX2(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse)
 
   // Extract gas package and params
   auto &gas_pkg = pmb->packages.Get("gas");
-  auto eos_d = gas_pkg->template Param<EOS>("eos_d");
+  const auto &eos_d = gas_pkg->template Param<ParArray1D<EOS>>("eos_d");
 
   // Coordinates and indexing
   const auto &pco = (coarse) ? pmb->pmr->GetCoarseCoords() : pmb->coords;
@@ -599,10 +601,11 @@ inline void ShearOuterX2(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse)
           const Real vx3g = outflow ? gv3 : 0.0;
           const Real densg =
               outflow ? v(0, gas::prim::density(n), k, je, i) : InitialDensity(pars, z);
-          const Real sieg = outflow ? v(0, gas::prim::sie(n), k, je, i)
-                                    : std::max(pars.siefloor,
-                                               eos_d.InternalEnergyFromDensityTemperature(
-                                                   densg, pars.temp0));
+          const Real sieg =
+              outflow
+                  ? v(0, gas::prim::sie(n), k, je, i)
+                  : std::max(pars.siefloor, eos_d(n).InternalEnergyFromDensityTemperature(
+                                                densg, pars.temp0));
           v(0, gas::prim::velocity(VI(n, 0)), k, j, i) = vx1g;
           v(0, gas::prim::velocity(VI(n, 1)), k, j, i) = vx2g;
           v(0, gas::prim::velocity(VI(n, 2)), k, j, i) = vx3g;
@@ -673,7 +676,7 @@ inline void ExtrapInnerX3(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
 
   // Extract gas package and params
   auto &gas_pkg = pmb->packages.Get("gas");
-  auto eos_d = gas_pkg->template Param<EOS>("eos_d");
+  const auto &eos_d = gas_pkg->template Param<ParArray1D<EOS>>("eos_d");
 
   // Coordinates and indexing
   const auto &pco = (coarse) ? pmb->pmr->GetCoarseCoords() : pmb->coords;
@@ -704,9 +707,9 @@ inline void ExtrapInnerX3(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
           const Real vx3g = (gv3 > 0.0) ? 0.0 : gv3;
           const Real &gd = v(0, gas::prim::density(n), ks, j, i);
           const Real &gsie = v(0, gas::prim::sie(n), ks, j, i);
-          const Real Tg = eos_d.TemperatureFromDensityInternalEnergy(gd, gsie);
-          const Real pm = eos_d.PressureFromDensityTemperature(gd * (1. - 1e-6), Tg);
-          const Real pp = eos_d.PressureFromDensityTemperature(gd * (1. + 1e-6), Tg);
+          const Real Tg = eos_d(n).TemperatureFromDensityInternalEnergy(gd, gsie);
+          const Real pm = eos_d(n).PressureFromDensityTemperature(gd * (1. - 1e-6), Tg);
+          const Real pp = eos_d(n).PressureFromDensityTemperature(gd * (1. + 1e-6), Tg);
           const Real dPdrho = (pp - pm) / (gd * 1e-6);
           const Real efac = std::exp(-(SQR(z) - SQR(z0)) * SQR(pars.Om0) /
                                      (2.0 * dPdrho + Fuzz<Real>()));
@@ -717,7 +720,7 @@ inline void ExtrapInnerX3(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
           v(0, gas::prim::velocity(VI(n, 2)), k, j, i) = vx3g;
           v(0, gas::prim::density(n), k, j, i) = rhog;
           v(0, gas::prim::sie(n), k, j, i) = std::max(
-              pars.siefloor, eos_d.InternalEnergyFromDensityTemperature(rhog, Tg));
+              pars.siefloor, eos_d(n).InternalEnergyFromDensityTemperature(rhog, Tg));
         }
 
         if (pars.do_dust) {
@@ -775,7 +778,7 @@ inline void ExtrapOuterX3(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
 
   // Extract gas package and params
   auto &gas_pkg = pmb->packages.Get("gas");
-  auto eos_d = gas_pkg->template Param<EOS>("eos_d");
+  const auto &eos_d = gas_pkg->template Param<ParArray1D<EOS>>("eos_d");
 
   // Coordinates and indexing
   const auto &pco = (coarse) ? pmb->pmr->GetCoarseCoords() : pmb->coords;
@@ -806,9 +809,9 @@ inline void ExtrapOuterX3(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
           const Real vx3g = (gv3 < 0.0) ? 0.0 : gv3;
           const Real &gd = v(0, gas::prim::density(n), ke, j, i);
           const Real &gsie = v(0, gas::prim::sie(n), ke, j, i);
-          const Real Tg = eos_d.TemperatureFromDensityInternalEnergy(gd, gsie);
-          const Real pm = eos_d.PressureFromDensityTemperature(gd * (1. - 1e-6), Tg);
-          const Real pp = eos_d.PressureFromDensityTemperature(gd * (1. + 1e-6), Tg);
+          const Real Tg = eos_d(n).TemperatureFromDensityInternalEnergy(gd, gsie);
+          const Real pm = eos_d(n).PressureFromDensityTemperature(gd * (1. - 1e-6), Tg);
+          const Real pp = eos_d(n).PressureFromDensityTemperature(gd * (1. + 1e-6), Tg);
           const Real dPdrho = (pp - pm) / (gd * 1e-6);
           const Real efac = std::exp(-(SQR(z) - SQR(z0)) * SQR(pars.Om0) /
                                      (2.0 * dPdrho + Fuzz<Real>()));
@@ -819,7 +822,7 @@ inline void ExtrapOuterX3(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse
           v(0, gas::prim::velocity(VI(n, 2)), k, j, i) = vx3g;
           v(0, gas::prim::density(n), k, j, i) = rhog;
           v(0, gas::prim::sie(n), k, j, i) = std::max(
-              pars.siefloor, eos_d.InternalEnergyFromDensityTemperature(rhog, Tg));
+              pars.siefloor, eos_d(n).InternalEnergyFromDensityTemperature(rhog, Tg));
         }
 
         if (pars.do_dust) {

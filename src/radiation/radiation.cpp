@@ -112,10 +112,11 @@ TaskStatus SetOpacities(MeshData<Real> *md) {
   auto pm = md->GetParentPointer();
   auto &resolved_pkgs = pm->resolved_packages;
   auto &gas_pkg = pm->packages.Get("gas");
+  auto &rad_pkg = pm->packages.Get("radiation");
 
   EOS eos_d = gas_pkg->template Param<EOS>("eos_d");
-  MeanOpacity opacity_d = gas_pkg->template Param<MeanOpacity>("opacity_d");
-  MeanScattering scattering_d = gas_pkg->template Param<MeanScattering>("scattering_d");
+  MeanOpacity opacity_d = rad_pkg->template Param<MeanOpacity>("opacity_d");
+  MeanScattering scattering_d = rad_pkg->template Param<MeanScattering>("scattering_d");
 
   // Packing and indexing
   // TODO(): Will eventually incorporate other fluids

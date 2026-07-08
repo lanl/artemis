@@ -108,6 +108,7 @@ temp_exp = 0.0            # temp exponent for opacity powerlaw
 <radiation/imc>
 num_particles = 100000  # particle resolution
 use_ddmc = false        # use DDMC?
+frequency_type = gray
 
 <problem>
 rhol = 5.69      # density (left)

@@ -190,7 +190,7 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
     if (do_imc) {
       auto eos_h = packages.Get("gas")->Param<EOS>("eos_h");
       const auto frequency_type =
-          packages.Get("artemis")->Param<FrequencyType>("frequency_type");
+          packages.Get("radiation")->Param<FrequencyType>("frequency_type");
       if (frequency_type == FrequencyType::gray) {
         auto opacity_h = packages.Get("radiation")->Param<MeanOpacity>("opacity_h");
         auto scattering_h =

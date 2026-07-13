@@ -127,7 +127,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   params.Add("inner_iteration_tol",
              pin->GetOrAddReal("radiation/moment", "inner_iteration_tol", 1e-10));
 
-  const bool substep = pin->GetOrAddBoolean("radiation/moment", "substep", true);
+  const bool substep = pin->GetOrAddBoolean("radiation/moment", "substep", false);
   if (!substep) {
     if (coords == Coordinates::cartesian) {
       moments->EstimateTimestepMesh = EstimateTimeStepMesh<Coordinates::cartesian>;
@@ -162,27 +162,85 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   // Control field for sparse radiation fields
   std::string control_field = rad::cons::energy::name();
 
-  // Conserved Energy Density
-  Metadata m = Metadata({Metadata::Cell, Metadata::Conserved, Metadata::Independent,
+  auto mflags_cons = [&MetadataMoments, &MetadataOperatorSplit,
+                      &substep](const int size) {
+    if (size == 1) {
+      if (substep) {
+        return Metadata({Metadata::Cell, Metadata::Conserved, Metadata::Independent,
                          Metadata::WithFluxes, Metadata::Sparse, MetadataMoments,
                          MetadataOperatorSplit});
+      } else {
+
+        return Metadata({Metadata::Cell, Metadata::Conserved, Metadata::Independent,
+                         Metadata::WithFluxes, Metadata::Sparse});
+      }
+
+    } else {
+      if (substep) {
+        return Metadata({Metadata::Cell, Metadata::Vector, Metadata::Conserved,
+                         Metadata::Independent, Metadata::WithFluxes, Metadata::Sparse,
+                         MetadataMoments, MetadataOperatorSplit},
+                        std::vector<int>({size}));
+      } else {
+
+        return Metadata({Metadata::Cell, Metadata::Vector, Metadata::Conserved,
+                         Metadata::Independent, Metadata::WithFluxes, Metadata::Sparse},
+                        std::vector<int>({size}));
+      }
+    }
+  };
+
+  auto mflags_prim = [&MetadataMoments, &MetadataOperatorSplit,
+                      &substep](const int size) {
+    if (size == 1) {
+      if (substep) {
+        return Metadata({Metadata::Cell, Metadata::Derived, Metadata::Intensive,
+                         Metadata::OneCopy, Metadata::FillGhost, Metadata::Sparse,
+                         MetadataMoments, MetadataOperatorSplit});
+      } else {
+        return Metadata({Metadata::Cell, Metadata::Derived, Metadata::Intensive,
+                         Metadata::OneCopy, Metadata::FillGhost, Metadata::Sparse});
+      }
+
+    } else {
+      if (substep) {
+        return Metadata({Metadata::Cell, Metadata::Derived, Metadata::Intensive,
+                         Metadata::OneCopy, Metadata::FillGhost, Metadata::Sparse,
+                         MetadataMoments, MetadataOperatorSplit},
+                        std::vector<int>({size}));
+      } else {
+        return Metadata({Metadata::Cell, Metadata::Derived, Metadata::Intensive,
+                         Metadata::OneCopy, Metadata::FillGhost, Metadata::Sparse},
+                        std::vector<int>({size}));
+      }
+    }
+  };
+  auto mflags_prim_withflux = [&MetadataMoments, &MetadataOperatorSplit, &substep]() {
+    if (substep) {
+      return Metadata({Metadata::Cell, Metadata::Derived, Metadata::Intensive,
+                       Metadata::WithFluxes, Metadata::Sparse, MetadataMoments,
+                       MetadataOperatorSplit});
+    } else {
+      return Metadata({Metadata::Cell, Metadata::Derived, Metadata::Intensive,
+                       Metadata::WithFluxes, Metadata::Sparse});
+    }
+  };
+
+  // Conserved Energy Density
+  Metadata m = mflags_cons(1);
+
   ArtemisUtils::EnrollArtemisRefinementOps(m, coords, log);
   m.SetSparseThresholds(0.0, 0.0, 0.0);
   moments->AddSparsePool<rad::cons::energy>(m, control_field, fluidids);
 
   // Conserved Flux
-  m = Metadata({Metadata::Cell, Metadata::Vector, Metadata::Conserved,
-                Metadata::Independent, Metadata::WithFluxes, Metadata::Sparse,
-                MetadataMoments, MetadataOperatorSplit},
-               std::vector<int>({3}));
+  m = mflags_cons(3);
   ArtemisUtils::EnrollArtemisRefinementOps(m, coords, log);
   m.SetSparseThresholds(0.0, 0.0, 0.0);
   moments->AddSparsePool<rad::cons::flux>(m, control_field, fluidids);
 
   // Primitive Energy Density
-  m = Metadata({Metadata::Cell, Metadata::Derived, Metadata::Intensive, Metadata::OneCopy,
-                Metadata::FillGhost, Metadata::Sparse, MetadataMoments,
-                MetadataOperatorSplit});
+  m = mflags_prim(1);
   ArtemisUtils::EnrollArtemisRefinementOps(m, coords, log);
   m.SetSparseThresholds(0.0, 0.0, 0.0);
   moments->AddSparsePool<rad::prim::energy>(m, control_field, fluidids);
@@ -191,15 +249,14 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   m = Metadata({Metadata::Cell, Metadata::Derived, Metadata::Intensive, Metadata::OneCopy,
                 Metadata::WithFluxes, Metadata::Sparse, MetadataMoments,
                 MetadataOperatorSplit});
+  m = mflags_prim_withflux();
+
   ArtemisUtils::EnrollArtemisRefinementOps(m, coords, log);
   m.SetSparseThresholds(0.0, 0.0, 0.0);
   moments->AddSparsePool<rad::prim::pressure>(m, control_field, fluidids);
 
   // Primitive Reduced Flux
-  m = Metadata({Metadata::Cell, Metadata::Vector, Metadata::Derived, Metadata::Intensive,
-                Metadata::OneCopy, Metadata::FillGhost, Metadata::Sparse, MetadataMoments,
-                MetadataOperatorSplit},
-               std::vector<int>({3}));
+  m = mflags_prim(3);
   ArtemisUtils::EnrollArtemisRefinementOps(m, coords, log);
   m.SetSparseThresholds(0.0, 0.0, 0.0);
   moments->AddSparsePool<rad::prim::flux>(m, control_field, fluidids);

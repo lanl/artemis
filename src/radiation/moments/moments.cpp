@@ -127,7 +127,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   params.Add("inner_iteration_tol",
              pin->GetOrAddReal("radiation/moment", "inner_iteration_tol", 1e-10));
 
-  const bool substep = pin->GetOrAddReal("radiation/moment", "substep", true);
+  const bool substep = pin->GetOrAddBoolean("radiation/moment", "substep", true);
   if (!substep) {
     if (coords == Coordinates::cartesian) {
       moments->EstimateTimestepMesh = EstimateTimeStepMesh<Coordinates::cartesian>;

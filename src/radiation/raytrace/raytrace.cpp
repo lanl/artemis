@@ -39,6 +39,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   ArtemisUtils::Opacity opacity;
   if (opacity_model_name == "constant") {
     const Real kappa_a = pin->GetOrAddReal(block_name, "kappa_a", 0.0);
+    PARTHENON_REQUIRE(kappa_a >= 0.0, "Raytrace absorption opacity must be non-negative");
     opacity = NonCGSUnits<Gray>(Gray(kappa_a), time, mass, length, temp);
   } else {
     PARTHENON_FAIL("Opacity model not recognized!");
@@ -48,6 +49,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
 
   const Real stellar_temp = pin->GetReal("radiation/raytrace", "temperature_cgs");
   Real stellar_radius = pin->GetReal("radiation/raytrace", "radius_solar");
+  PARTHENON_REQUIRE(stellar_temp > 0.0, "Raytrace stellar temperature must be positive");
+  PARTHENON_REQUIRE(stellar_radius > 0.0, "Raytrace stellar radius must be positive");
   stellar_radius *= constants.GetRsolarPhysical();
   const Real sb = 0.25 * constants.GetCPhysical() * constants.GetARPhysical();
   Real luminosity_cgs = 4 * M_PI * SQR(stellar_radius) * sb * SQR(SQR(stellar_temp));
@@ -57,12 +60,18 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   params.Add("stellar_radius", stellar_radius * units.GetLengthPhysicalToCode());
 
   const Real radius_factor = pin->GetOrAddReal("radiation/raytrace", "radius_factor", 6.);
+  PARTHENON_REQUIRE(radius_factor >= 0.0,
+                    "Raytrace stellar radius factor must be non-negative");
   params.Add("radius_factor", radius_factor);
 
-  params.Add("max_iterations",
-             pin->GetOrAddInteger("radiation/raytrace", "max_iterations", 1000));
+  const int max_iterations =
+      pin->GetOrAddInteger("radiation/raytrace", "max_iterations", 1000);
+  PARTHENON_REQUIRE(max_iterations > 0, "Raytrace max_iterations must be positive");
+  params.Add("max_iterations", max_iterations);
 
-  params.Add("efloor", pin->GetOrAddReal("radiation/raytrace", "efloor", 1e-10));
+  const Real efloor = pin->GetOrAddReal("radiation/raytrace", "efloor", 1e-10);
+  PARTHENON_REQUIRE(efloor >= 0.0, "Raytrace photon energy floor must be non-negative");
+  params.Add("efloor", efloor);
 
   // Note that these pull the real x1 values, not the ones from the artemis package
   params.Add("x1min", pin->GetReal("parthenon/mesh", "x1min"));
@@ -242,6 +251,8 @@ TaskStatus CheckCompletion(MeshData<Real> *md) {
 
   auto &rt_pkg = pm->packages.Get("raytrace");
   auto x1max = rt_pkg->Param<Real>("x1max");
+  const Real x1tol =
+      32.0 * std::numeric_limits<Real>::epsilon() * std::max(1.0, std::abs(x1max));
 
   int num_unfinished = 0;
   parthenon::par_reduce(
@@ -252,9 +263,7 @@ TaskStatus CheckCompletion(MeshData<Real> *md) {
         if (swarm_d.IsActive(n)) {
           const Real &xp = ppack_r(b, swarm_position::x(), n);
           const bool alive = ppack_r(b, rad::star::flux(), n) > 0.0;
-          const bool outside =
-              (xp >= x1max) ||
-              (std::abs(xp - x1max) < 10 * std::numeric_limits<Real>::epsilon());
+          const bool outside = (xp >= x1max) || (std::abs(xp - x1max) <= x1tol);
           num_unfinished += (alive && !outside);
         }
       },
@@ -298,8 +307,9 @@ TaskStatus EvalOpac(MeshData<Real> *md) {
         // Evaluated at T*
         //%%%%%%%%%%%%%%%%
         const Real temp = eos_d.TemperatureFromDensityInternalEnergy(rho, sie);
+        const Real alpha = opacity_d.AbsorptionCoefficient(rho, temp, 1.0);
         vmesh(b, rad::star::absorption(), k, j, i) =
-            opacity_d.AbsorptionCoefficient(rho, temp, 1.0);
+            (std::isfinite(alpha) && alpha > 0.0) ? alpha : 0.0;
       });
 
   return TaskStatus::complete;

@@ -13,6 +13,9 @@
 #ifndef RADIATION_RAYTRACE_RAYTRACE_HPP_
 #define RADIATION_RAYTRACE_RAYTRACE_HPP_
 
+// C++ headers
+#include <limits>
+
 // Artemis includes
 #include "artemis.hpp"
 #include "geometry/geometry.hpp"
@@ -92,6 +95,8 @@ TaskStatus PushParticlesImpl(MeshData<Real> *md, const geometry::CoordParams &cp
   const int ngh = parthenon::Globals::nghost;
 
   const Real rmin = (LOGR) ? std::exp(x1min) : x1min;
+  const Real x1tol = 32.0 * std::numeric_limits<Real>::epsilon() *
+                     std::max(1.0, std::max(std::abs(x1min), std::abs(x1max)));
 
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "TransportPhotons", DevExecSpace(), 0, nparticles_per_pack,
@@ -109,19 +114,25 @@ TaskStatus PushParticlesImpl(MeshData<Real> *md, const geometry::CoordParams &cp
           const auto &pco = vmesh.GetCoordinates(b);
           const auto inds = GetIndices(pco, {xp, yp, zp});
           i = ib.s + inds[0] - ngh;
+          // A ray arrives exactly on a block face. Roundoff in floor() can otherwise
+          // select the last ghost cell and deposit outside the active mesh.
+          if (i == ib.s - 1 && std::abs(xp - pco.template Xf<X1DIR>(ib.s)) <= x1tol) {
+            i = ib.s;
+          }
           if (multi_d) j = jb.s + inds[1] - ngh;
           if (three_d) k = kb.s + inds[2] - ngh;
 
-          while ((i <= ib.e) && (ee > 0.0)) {
+          while ((i >= ib.s) && (i <= ib.e) && (ee > 0.0)) {
             geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
 
             // Deposit energy for this cell and decrement the photon energy
             const auto dx = coords.bnds.x1[1] - coords.bnds.x1[0];
-            Real dtau = vmesh(b, rad::star::absorption(), k, j, i);
+            Real dtau = std::max(0.0, vmesh(b, rad::star::absorption(), k, j, i));
 
             // Corrections for additional extinction inside the inner boundary
-            if (xp <= x1min + 1e-10) {
-              Real dtau_i = dtau * (rmin - zero_rad);
+            if (xp <= x1min + x1tol) {
+              const Real inner_path = std::max(0.0, rmin - zero_rad);
+              Real dtau_i = dtau * inner_path;
               const Real efac = (dtau_i > 100.) ? 0.0 : std::exp(-dtau_i);
               ee *= efac;
               if (ee < efloor) ee = 0.0;
@@ -130,9 +141,11 @@ TaskStatus PushParticlesImpl(MeshData<Real> *md, const geometry::CoordParams &cp
                 break;
               }
             }
-            dtau *= dx;
+            dtau *= std::max(0.0, dx);
             const Real efac = (dtau > 100.) ? 0.0 : std::exp(-dtau);
-            const Real reduc = (dtau <= 1e-4) ? dtau - 0.5 * SQR(dtau) : (1. - efac);
+            const Real reduc = (dtau <= 1e-4)
+                                   ? dtau - 0.5 * SQR(dtau) + dtau * SQR(dtau) / 6.0
+                                   : (1. - efac);
             Real dE = ee * reduc;
             ee *= efac;
 
@@ -148,7 +161,7 @@ TaskStatus PushParticlesImpl(MeshData<Real> *md, const geometry::CoordParams &cp
             } else {
               xp = coords.bnds.x1[1];
             }
-            if (std::abs(xp - x1max) <= 1e-10) xp = x1max;
+            if (std::abs(xp - x1max) <= x1tol) xp = x1max;
             if ((ee == 0.0) || (xp >= x1max)) {
               swarm_d.MarkParticleForRemoval(n);
               break;

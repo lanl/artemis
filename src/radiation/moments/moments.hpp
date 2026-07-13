@@ -43,6 +43,52 @@ TaskCollection MomentsTasks(Mesh *pmesh, const SimTime &tm,
 template <Coordinates GEOM>
 void InitMesh(parthenon::Mesh *pmesh);
 //----------------------------------------------------------------------------------------
+//! \fn Real Moments::EstimateTimeStepMesh
+//! \brief Not enrolled in parthenon's determination for global dt
+template <Coordinates GEOM>
+Real EstimateTimeStepMesh(MeshData<Real> *md) {
+  PARTHENON_INSTRUMENT
+  auto pm = md->GetParentPointer();
+  auto &resolved_pkgs = pm->resolved_packages;
+  auto &moments_pkg = pm->packages.Get("moments");
+  auto &params = moments_pkg->AllParams();
+
+  Real dxmin = Big<Real>();
+
+  // Packing and Indexing
+  static auto desc_g =
+      MakePackDescriptor<geom::dx1, geom::dx2, geom::dx3>(resolved_pkgs.get());
+  auto vg = desc_g.GetPack(md);
+
+  IndexRange ib = md->GetBoundsI(IndexDomain::interior);
+  IndexRange jb = md->GetBoundsJ(IndexDomain::interior);
+  IndexRange kb = md->GetBoundsK(IndexDomain::interior);
+  const auto ndim = pm->ndim;
+  const auto &cpars =
+      pm->packages.Get("artemis")->template Param<geometry::CoordParams>("coord_params");
+
+  // Compute minimum dx
+  Real min_dx = Big<Real>();
+  parthenon::par_reduce(
+      parthenon::loop_pattern_mdrange_tag, "Moments::EstimateTimestepMesh",
+      DevExecSpace(), 0, md->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, Real &ldx_m) {
+        // Extract coordinates
+        geometry::Coords<GEOM> coords(cpars, vg.GetCoordinates(b), k, j, i);
+        const auto &dx = coords.GetCellWidths(vg, b, k, j, i);
+        for (int d = 0; d < ndim; d++) {
+          ldx_m = std::min(ldx_m, dx[d]);
+        }
+      },
+      Kokkos::Min<Real>(min_dx));
+
+  dxmin = std::min(dxmin, min_dx);
+
+  const auto chat = params.template Get<Real>("chat");
+  const auto cfl = params.template Get<Real>("cfl");
+  return cfl * dxmin / chat;
+}
+//----------------------------------------------------------------------------------------
 //! \fn Real Moments::EstimateTimeStep
 //! \brief Not enrolled in parthenon's determination for global dt
 template <Coordinates GEOM>

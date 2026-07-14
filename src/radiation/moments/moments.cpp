@@ -18,7 +18,6 @@
 #include "artemis.hpp"
 #include "geometry/geometry.hpp"
 #include "matter_coupling.hpp"
-#include "matter_coupling_simple.hpp"
 #include "moments.hpp"
 #include "utils/artemis_utils.hpp"
 #include "utils/fluxes/fluid_fluxes.hpp"
@@ -86,12 +85,6 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
 
   params.Add("fatal_if_unconverged",
              pin->GetOrAddBoolean("radiation/moment", "fatal_if_unconverged", true));
-
-  // how to handle the matter coupling:
-  // full_coupling = false only does a loop over energy coupling
-  // full_coupling = true also does an outer loop over momentum coupling
-  params.Add("full_coupling",
-             pin->GetOrAddBoolean("radiation/moment", "full_coupling", true));
 
   // Radiation constants (including chat for Moments)
   // NOTE(@pdmullen): These are also stored in top level radiation package...
@@ -439,21 +432,12 @@ TaskStatus MatterCoupling(MeshData<Real> *u0, const Real dt) {
   // Extract moments package and params
   auto &moments_pkg = pm->packages.Get("moments");
   auto closure_type = moments_pkg->template Param<Closure>("closure_type");
-  auto full_coupling = moments_pkg->template Param<bool>("full_coupling");
 
   // Call MatterCoupling with appropriate GEOM, Fluid, and Closure type given coupling
   if (closure_type == Closure::m1) {
-    if (full_coupling) {
-      return MatterCouplingFullSingleImpl<GEOM, Closure::m1>(u0, dt);
-    } else {
-      //      return MatterCouplingSimpleImpl<GEOM, Closure::m1>(u0, dt);
-    }
+    return MatterCouplingFullSingleImpl<GEOM, Closure::m1>(u0, dt);
   } else if (closure_type == Closure::p1) {
-    if (full_coupling) {
-      return MatterCouplingFullSingleImpl<GEOM, Closure::p1>(u0, dt);
-    } else {
-      //     return MatterCouplingSimpleImpl<GEOM, Closure::p1>(u0, dt);
-    }
+    return MatterCouplingFullSingleImpl<GEOM, Closure::p1>(u0, dt);
   }
   return TaskStatus::complete;
 }

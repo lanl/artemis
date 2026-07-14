@@ -45,10 +45,6 @@ radiation:
       _type: Real
       _description: "CFL number for radiation"
       _default: 0.8
-    full_coupling:
-      _type: bool
-      _description: "If set to true, this will do a full outer iteration of momentum exchange with the material. If set to false, artemis will take one outer iteration of momentum coupling."
-      _default: true
     creduc:
       _type: Real
       _description: "Speed of light reduction factor, c_hat = c / creduc."

@@ -191,6 +191,10 @@ KOKKOS_FORCEINLINE_FUNCTION constexpr auto Big() {
   return std::numeric_limits<T>::max();
 }
 template <typename T = Real>
+KOKKOS_FORCEINLINE_FUNCTION constexpr auto Eps() {
+  return std::numeric_limits<T>::epsilon();
+}
+template <typename T = Real>
 KOKKOS_FORCEINLINE_FUNCTION constexpr auto Tiny() {
   return std::numeric_limits<T>::lowest();
 }

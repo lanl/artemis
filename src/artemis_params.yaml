@@ -86,6 +86,10 @@ physics:
     _type: "bool"
     _default: "false"
     _description: "Turn on the rotating frame"
+  orbital_advection:
+    _type: "bool"
+    _default: "false"
+    _description: "Turn on orbital advection"
   cooling:
     _type: "bool"
     _default: "false"

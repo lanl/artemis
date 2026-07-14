@@ -103,12 +103,12 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   const bool do_coagulation = pin->GetOrAddBoolean("physics", "coagulation", false);
   const bool do_raytrace = pin->GetOrAddBoolean("physics", "raytrace", false);
   const bool do_closure = pin->GetOrAddBoolean("physics", "closure", false);
+  const bool do_orbital_advection =
+      pin->GetOrAddBoolean("physics", "orbital_advection", false);
 
   // Determine input file specified algorithms
   const bool do_imc = do_radiation && pin->DoesBlockExist("radiation/imc");
   const bool do_moment = do_radiation && pin->DoesBlockExist("radiation/moment");
-  const bool do_shear =
-      do_rotating_frame ? (pin->GetOrAddReal("rotating_frame", "qshear", 0) > 0) : false;
   const bool update_fluxes = pin->GetOrAddBoolean("gas", "update_fluxes", true);
 
   // Check configuration selection compatibility
@@ -143,7 +143,7 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   artemis->AddParam("do_coagulation", do_coagulation);
   artemis->AddParam("do_imc", do_imc);
   artemis->AddParam("do_moment", do_moment);
-  artemis->AddParam("do_shear", do_shear);
+  artemis->AddParam("do_orbital_advection", do_orbital_advection);
   artemis->AddParam("do_raytrace", do_raytrace);
   artemis->AddParam("update_fluxes", update_fluxes);
   artemis->AddParam("do_closure", do_closure);
@@ -171,7 +171,8 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
     packages.Add(SelfGravity::Initialize(pin.get(), constants, packages));
   if (do_gas) packages.Add(Gas::Initialize(pin.get(), units, constants, packages));
   if (do_dust) packages.Add(Dust::Initialize(pin.get(), units));
-  if (do_rotating_frame) packages.Add(RotatingFrame::Initialize(pin.get()));
+  if (do_rotating_frame || do_orbital_advection)
+    packages.Add(RotatingFrame::Initialize(pin.get()));
   if (do_cooling) packages.Add(Gas::Cooling::Initialize(pin.get()));
   if (do_drag) packages.Add(Drag::Initialize(pin.get(), constants, packages));
 

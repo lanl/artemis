@@ -251,7 +251,8 @@ TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, FLUX vflx,
 template <Coordinates G, Fluid F, Closure C, typename PKG, typename PRIM, typename CONS,
           typename FACE, typename GEO>
 TaskStatus FluxSourceImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, CONS vcons, FACE vface,
-                          GEO vg, const Real omf, const Real dt) {
+                          GEO vg, const Real omf, const bool do_oa, const Real gm,
+                          const Real qshear, const Real dt) {
   PARTHENON_INSTRUMENT
   // Indexing and geometry
   const auto ib = md->GetBoundsI(IndexDomain::interior);
@@ -291,9 +292,17 @@ TaskStatus FluxSourceImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, CONS vcons, FAC
         // Get the rotational velocity
         std::array<Real, 3> rfv{0.0};
         [[maybe_unused]] Real omf_ = omf;
+        [[maybe_unused]] Real qshear_ = qshear;
+        [[maybe_unused]] Real gm_ = gm;
+        [[maybe_unused]] bool do_oa_ = do_oa;
         if constexpr (F != Fluid::radiation) {
           const auto &xv = coords.GetCellCenter(vg, b, k, j, i);
           rfv = RotatingFrame::RotationVelocity<G>(xv, omf_);
+          if (do_oa_) {
+            const auto bgv = RotatingFrame::BackgroundVelocity<G>(qshear_, omf_, gm_, xv);
+            for (int d = 0; d < 3; d++)
+              rfv[d] += bgv[d];
+          }
         }
 
         // Timestep weighted by dx
@@ -516,28 +525,44 @@ TaskStatus FluxSource(MeshData<Real> *md, PKG &pkg, PRIM vp, CONS vcons, FACE vf
                       GEO vg, const Real dt) {
   auto pm = md->GetParentPointer();
 
-  // Extract rotating frame omega
+  // Extract rotating frame and orbital advection parameters
   Real omf = 0.0;
-  if (pm->packages.Get("artemis")->template Param<bool>("do_rotating_frame")) {
+  bool do_oa = false;
+  Real gm = 0.0;
+  Real qshear = 0.0;
+  const bool do_rf =
+      pm->packages.Get("artemis")->template Param<bool>("do_rotating_frame");
+  const bool do_orbital =
+      pm->packages.Get("artemis")->template Param<bool>("do_orbital_advection");
+  if (do_rf || do_orbital) {
     auto &rf_pkg = pm->packages.Get("rotating_frame");
-    omf = rf_pkg->template Param<Real>("omega");
+    omf = do_rf ? rf_pkg->template Param<Real>("omega") : 0.0;
+    do_oa = rf_pkg->template Param<bool>("do_orbital_advection");
+    gm = rf_pkg->template Param<Real>("gm");
+    qshear = rf_pkg->template Param<Real>("qshear");
   }
 
   // Call FluxSourceImpl given
   typedef Coordinates G;
   const auto sys = pkg->template Param<Coordinates>("coords");
   if (sys == G::cartesian) {
-    return FluxSourceImpl<G::cartesian, F, C>(md, pkg, vp, vcons, vface, vg, omf, dt);
+    return FluxSourceImpl<G::cartesian, F, C>(md, pkg, vp, vcons, vface, vg, omf, do_oa,
+                                              gm, qshear, dt);
   } else if (sys == G::spherical3D) {
-    return FluxSourceImpl<G::spherical3D, F, C>(md, pkg, vp, vcons, vface, vg, omf, dt);
+    return FluxSourceImpl<G::spherical3D, F, C>(md, pkg, vp, vcons, vface, vg, omf, do_oa,
+                                                gm, qshear, dt);
   } else if (sys == G::spherical1D) {
-    return FluxSourceImpl<G::spherical1D, F, C>(md, pkg, vp, vcons, vface, vg, omf, dt);
+    return FluxSourceImpl<G::spherical1D, F, C>(md, pkg, vp, vcons, vface, vg, omf, do_oa,
+                                                gm, qshear, dt);
   } else if (sys == G::spherical2D) {
-    return FluxSourceImpl<G::spherical2D, F, C>(md, pkg, vp, vcons, vface, vg, omf, dt);
+    return FluxSourceImpl<G::spherical2D, F, C>(md, pkg, vp, vcons, vface, vg, omf, do_oa,
+                                                gm, qshear, dt);
   } else if (sys == G::cylindrical) {
-    return FluxSourceImpl<G::cylindrical, F, C>(md, pkg, vp, vcons, vface, vg, omf, dt);
+    return FluxSourceImpl<G::cylindrical, F, C>(md, pkg, vp, vcons, vface, vg, omf, do_oa,
+                                                gm, qshear, dt);
   } else if (sys == G::axisymmetric) {
-    return FluxSourceImpl<G::axisymmetric, F, C>(md, pkg, vp, vcons, vface, vg, omf, dt);
+    return FluxSourceImpl<G::axisymmetric, F, C>(md, pkg, vp, vcons, vface, vg, omf,
+                                                 do_oa, gm, qshear, dt);
   } else {
     PARTHENON_FAIL("Coordinate type not recognized!");
   }

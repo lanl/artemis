@@ -31,10 +31,11 @@ namespace RotatingFrame {
 //----------------------------------------------------------------------------------------
 //! \fn TaskListStatus RotatingFrame::Advect
 //! \brief Executes linear advection term for orbital advection
+template <Coordinates GEOM>
 TaskListStatus Advect(Mesh *pmesh, const SimTime &tm) {
   PARTHENON_INSTRUMENT
-  // Craft a series of **equal** subsetps that sum to the unsplit step
-  const Real dtlimit = EstimateTimestep(pmesh, 1.0);
+  // Craft a series of **equal** substeps that sum to the unsplit step
+  const Real dtlimit = EstimateTimestep<GEOM>(pmesh, 1.0);
   const int nsteps = static_cast<int>(std::ceil(tm.dt / dtlimit));
   const Real scdt = tm.dt / nsteps;
 
@@ -49,7 +50,7 @@ TaskListStatus Advect(Mesh *pmesh, const SimTime &tm) {
 
   // Execute LinearAdvectionStep over substeps
   for (int step = 1; step <= nsteps; step++) {
-    auto status = LinearAdvectionStep(pmesh, tm, scdt).Execute();
+    auto status = LinearAdvectionStep<GEOM>(pmesh, tm, scdt).Execute();
     if (status != TaskListStatus::complete) return status;
   }
 
@@ -58,6 +59,7 @@ TaskListStatus Advect(Mesh *pmesh, const SimTime &tm) {
 
 //----------------------------------------------------------------------------------------
 //! \fn  TaskCollection LinearAdvectionStep
+template <Coordinates GEOM>
 TaskCollection LinearAdvectionStep(Mesh *pmesh, const SimTime &tm, const Real scdt) {
   PARTHENON_INSTRUMENT
   TaskCollection tc;
@@ -76,9 +78,14 @@ TaskCollection LinearAdvectionStep(Mesh *pmesh, const SimTime &tm, const Real sc
     auto &u0 = pmesh->mesh_data.GetOrAdd("u0", i);
 
     auto start_recv = tl.AddTask(none, parthenon::StartReceiveBoundBufs<any>, u0);
-    auto update = tl.AddTask(start_recv, LagrangeRemap, u0.get(), scdt);
-    auto set_aux = tl.AddTask(
-        update, ArtemisDerived::SetAuxillaryFields<Coordinates::cartesian>, u0.get());
+    auto start_flx_recv = tl.AddTask(none, parthenon::StartReceiveFluxCorrections, u0);
+    auto remap = tl.AddTask(start_recv, LagrangeRemap<GEOM>, u0.get(), scdt);
+    auto send_flx = tl.AddTask(remap, parthenon::LoadAndSendFluxCorrections, u0);
+    auto recv_flx = tl.AddTask(start_flx_recv, parthenon::ReceiveFluxCorrections, u0);
+    auto set_flx = tl.AddTask(recv_flx, parthenon::SetFluxCorrections, u0);
+    auto update = tl.AddTask(remap | set_flx, ArtemisUtils::ApplyUpdate<GEOM>, u0.get(),
+                             u0.get(), 1.0, 0.0, scdt);
+    auto set_aux = tl.AddTask(update, ArtemisDerived::SetAuxillaryFields<GEOM>, u0.get());
     auto c2p = tl.AddTask(set_aux, PreCommFillDerived<MeshData<Real>>, u0.get());
     auto bcs = parthenon::AddBoundaryExchangeTasks(c2p, tl, u0, pmesh->multilevel);
     auto p2c = tl.AddTask(bcs, FillDerived<MeshData<Real>>, u0.get());
@@ -90,6 +97,7 @@ TaskCollection LinearAdvectionStep(Mesh *pmesh, const SimTime &tm, const Real sc
 //----------------------------------------------------------------------------------------
 //! \fn  TaskStatus RotatingFrame::LagrangeRemap
 //! \brief
+template <Coordinates GEOM>
 TaskStatus LagrangeRemap(MeshData<Real> *u0, const Real scdt) {
   PARTHENON_INSTRUMENT
   using parthenon::MakePackDescriptor;
@@ -105,16 +113,18 @@ TaskStatus LagrangeRemap(MeshData<Real> *u0, const Real scdt) {
   auto &rframe_pkg = pm->packages.Get("rotating_frame");
   const Real qshear = rframe_pkg->template Param<Real>("qshear");
   const Real om0 = rframe_pkg->template Param<Real>("omega");
+  const Real gm = rframe_pkg->template Param<Real>("gm");
   const auto recon = rframe_pkg->template Param<ReconstructionMethod>("recon");
 
-  // Extract integrator weights
-  const Real dwdt = -qshear * om0 * scdt;
+  // Shearing box displacement (Cartesian) or zero for curvilinear
+  const Real dwdt = (GEOM == Coordinates::cartesian) ? (-qshear * om0 * scdt) : 0.0;
 
   // Packing and indexing
   static auto desc =
       MakePackDescriptor<gas::cons::density, gas::cons::momentum, gas::cons::total_energy,
                          gas::cons::internal_energy, dust::cons::density,
-                         dust::cons::momentum>(resolved_pkgs.get());
+                         dust::cons::momentum>(resolved_pkgs.get(), {},
+                                               {parthenon::PDOpt::WithFluxes});
   auto v0 = desc.GetPack(u0);
   static auto desc_g =
       MakePackDescriptor<geom::vol, geom::x1v, geom::x2v, geom::x3v, geom::dx1, geom::dx2,
@@ -123,20 +133,42 @@ TaskStatus LagrangeRemap(MeshData<Real> *u0, const Real scdt) {
 
   // Call upwind advection routines with requested recon
   if (recon == ReconstructionMethod::pcm) {
-    return LagrangeRemapImpl<ReconstructionMethod::pcm>(u0, v0, vg, dwdt);
+    return LagrangeRemapImpl<GEOM, ReconstructionMethod::pcm>(u0, v0, vg, dwdt, gm, om0,
+                                                              scdt);
   } else if (recon == ReconstructionMethod::plm) {
-    return LagrangeRemapImpl<ReconstructionMethod::plm>(u0, v0, vg, dwdt);
+    return LagrangeRemapImpl<GEOM, ReconstructionMethod::plm>(u0, v0, vg, dwdt, gm, om0,
+                                                              scdt);
   } else if (recon == ReconstructionMethod::ppm) {
-    return LagrangeRemapImpl<ReconstructionMethod::ppm>(u0, v0, vg, dwdt);
+    return LagrangeRemapImpl<GEOM, ReconstructionMethod::ppm>(u0, v0, vg, dwdt, gm, om0,
+                                                              scdt);
   } else if (recon == ReconstructionMethod::wenoz) {
-    return LagrangeRemapImpl<ReconstructionMethod::wenoz>(u0, v0, vg, dwdt);
+    return LagrangeRemapImpl<GEOM, ReconstructionMethod::wenoz>(u0, v0, vg, dwdt, gm, om0,
+                                                                scdt);
   } else if (recon == ReconstructionMethod::wenomz) {
-    return LagrangeRemapImpl<ReconstructionMethod::wenomz>(u0, v0, vg, dwdt);
+    return LagrangeRemapImpl<GEOM, ReconstructionMethod::wenomz>(u0, v0, vg, dwdt, gm,
+                                                                 om0, scdt);
   } else {
     PARTHENON_FAIL("Unsupported reconstruction method in rotating_frame");
   }
 
   return TaskStatus::complete;
 }
+
+//----------------------------------------------------------------------------------------
+//! template instantiations
+template TaskListStatus Advect<Coordinates::cartesian>(Mesh *, const SimTime &);
+template TaskListStatus Advect<Coordinates::cylindrical>(Mesh *, const SimTime &);
+template TaskListStatus Advect<Coordinates::spherical3D>(Mesh *, const SimTime &);
+
+template TaskCollection
+LinearAdvectionStep<Coordinates::cartesian>(Mesh *, const SimTime &, const Real);
+template TaskCollection
+LinearAdvectionStep<Coordinates::cylindrical>(Mesh *, const SimTime &, const Real);
+template TaskCollection
+LinearAdvectionStep<Coordinates::spherical3D>(Mesh *, const SimTime &, const Real);
+
+template TaskStatus LagrangeRemap<Coordinates::cartesian>(MeshData<Real> *, const Real);
+template TaskStatus LagrangeRemap<Coordinates::cylindrical>(MeshData<Real> *, const Real);
+template TaskStatus LagrangeRemap<Coordinates::spherical3D>(MeshData<Real> *, const Real);
 
 } // namespace RotatingFrame

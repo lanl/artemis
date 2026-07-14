@@ -68,10 +68,13 @@ TaskStatus MatterCouplingSimpleImpl(MeshData<Real> *u0, const Real dt) {
   // Extract rotating frame quantities
   Real om0 = 0.0;
   Real qshear = 0.0;
-  if (pm->packages.Get("artemis")->template Param<bool>("do_rotating_frame")) {
+  Real gm_bg = 0.0;
+  if (pm->packages.Get("artemis")->template Param<bool>("do_orbital_advection") ||
+      pm->packages.Get("artemis")->template Param<bool>("do_rotating_frame")) {
     auto &rframe_pkg = pm->packages.Get("rotating_frame");
     qshear = rframe_pkg->template Param<Real>("qshear");
     om0 = rframe_pkg->template Param<Real>("omega");
+    gm_bg = rframe_pkg->template Param<Real>("gm");
   }
   const bool do_raytrace =
       pm->packages.Get("artemis")->template Param<bool>("do_raytrace");
@@ -103,7 +106,7 @@ TaskStatus MatterCouplingSimpleImpl(MeshData<Real> *u0, const Real dt) {
         if (do_raytrace) Q = dt * v0(b, gas::src::energy(), k, j, i);
         Real e0 = v0(b, gas::cons::internal_energy(), k, j, i);
         const auto vb = RotatingFrame::BackgroundVelocity<GEOM>(
-            qshear, om0, coords.GetCellCenter(vg, b, k, j, i)[0]);
+            qshear, om0, gm_bg, coords.GetCellCenter(vg, b, k, j, i));
         std::array<Real, 3> v{
             vb[0] + v0(b, gas::cons::momentum(0), k, j, i) / (hx[0] * dens),
             vb[1] + v0(b, gas::cons::momentum(1), k, j, i) / (hx[1] * dens),
@@ -230,10 +233,13 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
   // Extract rotating frame quantities
   Real om0 = 0.0;
   Real qshear = 0.0;
-  if (pm->packages.Get("artemis")->template Param<bool>("do_rotating_frame")) {
+  Real gm_bg = 0.0;
+  if (pm->packages.Get("artemis")->template Param<bool>("do_orbital_advection") ||
+      pm->packages.Get("artemis")->template Param<bool>("do_rotating_frame")) {
     auto &rframe_pkg = pm->packages.Get("rotating_frame");
     qshear = rframe_pkg->template Param<Real>("qshear");
     om0 = rframe_pkg->template Param<Real>("omega");
+    gm_bg = rframe_pkg->template Param<Real>("gm");
   }
   const auto &cpars =
       pm->packages.Get("artemis")->template Param<geometry::CoordParams>("coord_params");
@@ -284,7 +290,7 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
         Real B = arad * SQR(SQR(T));
 
         const auto vb = RotatingFrame::BackgroundVelocity<GEOM>(
-            qshear, om0, coords.GetCellCenter(vg, b, k, j, i)[0]);
+            qshear, om0, gm_bg, coords.GetCellCenter(vg, b, k, j, i));
         const std::array<Real, 3> p0{
             vb[0] * dens + v0(b, gas::cons::momentum(0), k, j, i) / hx[0],
             vb[1] * dens + v0(b, gas::cons::momentum(1), k, j, i) / hx[1],

@@ -112,6 +112,10 @@ radiation:
       _type: bool
       _description: "When dynamically initializing the radiation field, scale a T^4 by min(1, tau), where tau is the optical depth of the cell"
       _default: "true"
+    substep:
+      _type: bool
+      _description: "Enable radiation subcycling"
+      _default: false
   imc:
     _description: "IMC radiation model from the Jaybenne library"
     _type: node

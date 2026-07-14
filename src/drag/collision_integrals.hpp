@@ -15,36 +15,8 @@
 
 //! \file collision_integrals.hpp
 //! \brief Chapman-Cowling collision-integral backend for multifluid momentum and
-//!        energy coupling.
-//!
-//! ## Theory
-//! The Chapman-Enskog (Chapman-Cowling) treatment of transport in a gas mixture gives
-//! binary drag and thermal-relaxation coefficients that depend on the pair collision
-//! integral Omega^{(l,s)}_{ij}.  For rigid hard spheres (HS) all Omega^{(l,s)} reduce
-//! to simple geometric prefactors and the momentum-transfer rate coefficient is
-//!
-//!   K_{ij} = (4/3) n_i n_j mu_{ij} * pi * sigma_{ij}^2 *
-//!            sqrt(8 k_B T / (pi mu_{ij}))
-//!           = n_i n_j * K_unit
-//!
-//! where mu_{ij} = m_i m_j / (m_i + m_j) is the reduced mass (in AMU * code-mass),
-//! sigma_{ij} = (sigma_i + sigma_j)/2 is the mean collision diameter, and T is the
-//! pair temperature.
-//!
-//! The Lennard-Jones (LJ) surrogate uses the reduced temperature T* = kT/eps_{ij} to
-//! evaluate a polynomial fit to the collision integrals Omega^{(1,1)*} and Omega^{(2,2)*}
-//! (from Neufeld et al. 1972, also used in CHEMKIN).
-//!
-//! ## Units
-//! All quantities are in Artemis code units.  The caller is responsible for supplying
-//! sigma (collision diameter) in code-length units, eps (LJ well depth divided by k_B) in
-//! EOS temperature units, density in code-mass/code-length^3, and T in EOS temperature
-//! units. The returned K [mass/(vol*time)] = [code-mass / (code-length^3 * code-time)]
-//! can be multiplied by dt and divided by rho to get a dimensionless coupling strength.
-//!
-//! ## Backends
-//! - GasDragModel::hard_sphere  -- calibrated hard-sphere, no adjustable parameter
-//! - GasDragModel::lj           -- Lennard-Jones surrogate with Neufeld fits
+//!        energy coupling. These use empirical fits from Neufeld et al. 1972 and Kim &
+//!        Monroe 2014
 
 #include <cmath>
 
@@ -83,41 +55,24 @@ Real Omega22Star(const Real Tstar) {
          G * std::sin(R * Tstar - W) / std::pow(Tstar, S);
 }
 
-// Combined pair properties
 KOKKOS_FORCEINLINE_FUNCTION
 Real sigma_ij(const Real sigma_i, const Real sigma_j) {
   return 0.5 * (sigma_i + sigma_j);
 }
 
-// Lorentz-Berthelot combination rule for LJ epsilon [K]
 KOKKOS_FORCEINLINE_FUNCTION
 Real eps_ij(const Real eps_i, const Real eps_j) {
   return std::sqrt(std::max(eps_i * eps_j, 0.0));
 }
 
-// Reduced mass in same units as m_i, m_j (AMU)
 KOKKOS_FORCEINLINE_FUNCTION
-Real mu_ij(const Real m_i, const Real m_j) {
-  return m_i * m_j / (m_i + m_j + Fuzz<Real>());
-}
+Real reduc_ij(const Real m_i, const Real m_j) { return m_i * m_j / (m_i + m_j); }
+
 } // namespace detail
 
 // ---------------------------------------------------------------------------
 //! \fn DragCoeff
 //! \brief Momentum-transfer rate coefficient K_{ij} [mass/(vol*time)]
-//!
-//! \param model   collision model selector
-//! \param kb_code Boltzmann constant in code units
-//! \param m_i     molecular mass species i [code mass]
-//! \param m_j     molecular mass species j [code mass]
-//! \param sig_i   collision diameter species i [code-length]
-//! \param sig_j   collision diameter species j [code-length]
-//! \param eps_i   LJ epsilon/kB species i [EOS temperature units] (0 for hard_sphere)
-//! \param eps_j   LJ epsilon/kB species j [EOS temperature units] (0 for hard_sphere)
-//! \param rho_i   mass density species i [code-mass/code-length^3]
-//! \param rho_j   mass density species j [code-mass/code-length^3]
-//! \param T       pair temperature [EOS temperature units]
-//!
 //! \return K_{ij} such that d(rho_i v_i)/dt = -K_{ij}*(v_i - v_j)
 // ---------------------------------------------------------------------------
 KOKKOS_FORCEINLINE_FUNCTION
@@ -128,7 +83,6 @@ Real DragCoeff(const GasDragModel model, const Real kb_code, const Real m_i,
   constexpr Real pi = M_PI;
 
   const Real sij = sigma_ij(sig_i, sig_j);
-  const Real mij = mu_ij(m_i, m_j);
   Real O11 = 1.0;
   if (model == GasDragModel::lj) {
     const Real eij = eps_ij(eps_i, eps_j);
@@ -136,11 +90,9 @@ Real DragCoeff(const GasDragModel model, const Real kb_code, const Real m_i,
     O11 = Omega11Star(std::max(Tstar, 0.3));
   }
 
-  const Real v_rel =
-      std::sqrt(8.0 * kb_code * T / (pi * mij + Fuzz<Real>()));
-  const Real n_i = rho_i / (m_i + Fuzz<Real>());
-  const Real n_j = rho_j / (m_j + Fuzz<Real>());
-  const Real K = (4.0 / 3.0) * n_i * n_j * mij * pi * sij * sij * v_rel * O11;
+  const Real v_rel = std::sqrt(8.0 * kb_code * T / (M_PI * reduc_ij(m_i, m_j)));
+  const Real K =
+      (4.0 / 3.0) * rho_i * rho_j / (m_i + m_j) * M_PI * SQR(sij) * v_rel * O11;
   return std::max(K, 0.0);
 }
 
@@ -150,13 +102,6 @@ Real DragCoeff(const GasDragModel model, const Real kb_code, const Real m_i,
 //!
 //! Thermal exchange between species i and j:
 //!   dE_i/dt = H_{ij} * (T_j - T_i)
-//!
-//! In the conservative v1 closure we scale the momentum-transfer coefficient by:
-//!   omega_E = 1                      (hard spheres)
-//!           = Omega22*(T*)/Omega11*(T*)  (LJ surrogate)
-//!   chi_ij  = 2 mu_ij/(m_i+m_j) * 2 sqrt(dof_i dof_j)/(dof_i + dof_j)
-//!   cv_pair = 2 cv_i cv_j / (cv_i + cv_j)
-//! so H_{ij} = K_{ij} * omega_E * chi_ij * cv_pair.
 // ---------------------------------------------------------------------------
 KOKKOS_FORCEINLINE_FUNCTION
 Real ThermalRelaxRate(const GasDragModel model, const Real kb_code, const Real m_i,
@@ -166,8 +111,8 @@ Real ThermalRelaxRate(const GasDragModel model, const Real kb_code, const Real m
                       const Real rho_i, const Real rho_j, const Real T) {
   using namespace detail;
 
-  const Real mij = mu_ij(m_i, m_j);
-  const Real m_sum = m_i + m_j + Fuzz<Real>();
+  const Real m_sum = m_i + m_j;
+  const Real mij = m_i * m_j / m_sum;
   const Real K =
       DragCoeff(model, kb_code, m_i, m_j, sig_i, sig_j, eps_i, eps_j, rho_i, rho_j, T);
 
@@ -175,14 +120,12 @@ Real ThermalRelaxRate(const GasDragModel model, const Real kb_code, const Real m
   if (model == GasDragModel::lj) {
     const Real eij = eps_ij(eps_i, eps_j);
     const Real Tstar = (eij > 0.0) ? T / eij : 1.0;
-    omega_E = Omega22Star(std::max(Tstar, 0.3)) /
-              Omega11Star(std::max(Tstar, 0.3));
+    omega_E = Omega22Star(std::max(Tstar, 0.3)) / Omega11Star(std::max(Tstar, 0.3));
   }
 
   const Real chi =
-      (2.0 * mij / m_sum) *
-      (2.0 * std::sqrt(std::max(dof_i * dof_j, 0.0)) / (dof_i + dof_j + Fuzz<Real>()));
-  const Real cv_pair = 2.0 * cv_i * cv_j / (cv_i + cv_j + Fuzz<Real>());
+      (2.0 * mij / m_sum) * (2.0 * std::sqrt(dof_i * dof_j) / (dof_i + dof_j));
+  const Real cv_pair = 2.0 * reduc_ij(cv_i, cv_j);
   const Real H = K * omega_E * chi * cv_pair;
   return std::max(H, 0.0);
 }

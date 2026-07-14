@@ -13,6 +13,7 @@
 // the public, perform publicly and display publicly, and to permit others to do
 // so.
 //========================================================================================
+
 // This file was modified in part with the assistance of generative AI.
 #ifndef RADIATION_MOMENTS_MATTER_COUPLING_HPP_
 #define RADIATION_MOMENTS_MATTER_COUPLING_HPP_
@@ -29,18 +30,11 @@ using ArtemisUtils::EOS;
 using ArtemisUtils::MeanOpacity;
 using ArtemisUtils::MeanScattering;
 using ArtemisUtils::VI;
+using ArtemisUtils::VNorm;
 
 namespace Moments {
 
-KOKKOS_INLINE_FUNCTION Real FiniteOrZero(const Real x) {
-  return std::isfinite(x) ? x : 0.0;
-}
-
-KOKKOS_INLINE_FUNCTION Real CouplingFluxMagnitude(const std::array<Real, 3> &F) {
-  return std::sqrt(SQR(F[0]) + SQR(F[1]) + SQR(F[2]));
-}
-
-KOKKOS_INLINE_FUNCTION bool
+KOKKOS_INLINE_FUNCTION void
 ComputeCouplingEnergyCoefficients(const Real sigp, const Real sigs, const Real g,
                                   const Real g2, const Real beta2, const Real bdbdp,
                                   const Real bdf, Real &ca, Real &cb, Real &cd) {
@@ -52,7 +46,6 @@ ComputeCouplingEnergyCoefficients(const Real sigp, const Real sigs, const Real g
   ca = g * (sigp - g2 * sigs * (beta2 + bdbdp));
   cb = g * sigp;
   cd = g * bdf * (g2 * sigs * (1.0 + beta2) - sigp);
-  return std::isfinite(ca) && std::isfinite(cb) && std::isfinite(cd);
 }
 
 KOKKOS_INLINE_FUNCTION bool ComputeCouplingEquilibriumEnergy(const Real E0, const Real B,
@@ -64,17 +57,17 @@ KOKKOS_INLINE_FUNCTION bool ComputeCouplingEquilibriumEnergy(const Real E0, cons
   // the optically thick limit, where ca and cb may be O(1e10) and directly
   // evaluating ca*E - cb*B loses all useful digits near LTE.
   const Real denom = 1.0 + ca;
-  if (!std::isfinite(denom) || std::abs(denom) <= Fuzz<Real>()) return false;
+  if (std::abs(denom) <= Fuzz()) return false;
   const Real inv_denom = 1.0 / denom;
   Eeq = E0 * inv_denom + (cb * inv_denom) * B - cd * inv_denom;
-  return std::isfinite(Eeq);
+  return true;
 }
 
 KOKKOS_INLINE_FUNCTION std::array<Real, 3>
 ProjectCouplingFluxToEnergy(const std::array<Real, 3> &Fin, const Real E) {
-  const Real fmag = CouplingFluxMagnitude(Fin);
-  if (!std::isfinite(fmag) || !std::isfinite(E) || E <= 0.0) return {0.0, 0.0, 0.0};
-  if (fmag <= E || fmag <= Fuzz<Real>()) return Fin;
+  const Real fmag = VNorm(Fin);
+  if (E <= 0.0) return {0.0, 0.0, 0.0};
+  if (fmag <= E || fmag <= Fuzz()) return Fin;
   const Real scale = E / fmag;
   return {scale * Fin[0], scale * Fin[1], scale * Fin[2]};
 }
@@ -94,7 +87,7 @@ KOKKOS_INLINE_FUNCTION bool SolveCouplingDense3x3(Real A[3][3], Real rhs[3],
         pivot_abs = candidate;
       }
     }
-    if (!std::isfinite(pivot_abs) || pivot_abs <= Fuzz<Real>()) return false;
+    if (pivot_abs <= Fuzz()) return false;
     if (pivot != col) {
       for (int j = col; j < 3; ++j) {
         const Real tmp = A[col][j];
@@ -120,10 +113,8 @@ KOKKOS_INLINE_FUNCTION bool SolveCouplingDense3x3(Real A[3][3], Real rhs[3],
     Real value = rhs[row];
     for (int j = row + 1; j < 3; ++j)
       value -= A[row][j] * x[j];
-    if (!std::isfinite(A[row][row]) || std::abs(A[row][row]) <= Fuzz<Real>())
-      return false;
+    if (std::abs(A[row][row]) <= Fuzz()) return false;
     x[row] = value / A[row][row];
-    if (!std::isfinite(x[row])) return false;
   }
   return true;
 }
@@ -141,10 +132,9 @@ KOKKOS_INLINE_FUNCTION bool EvaluateCouplingMomentumEnergyResidualBeta(
   // where F is normalized by c*eref.  This relation is the source of the
   // instability in a direct Picard update when eref/(rho*c*chat) is large.
   const Real mu = eref / (dens * c * chat);
-  if (!std::isfinite(mu) || mu <= 0.0) return false;
 
   const Real beta2 = SQR(beta[0]) + SQR(beta[1]) + SQR(beta[2]);
-  if (!std::isfinite(beta2) || beta2 >= 1.0) return false;
+  if (beta2 >= 1.0) return false;
 
   std::array<Real, 3> delta_F{0.0, 0.0, 0.0};
   Real delta_F2 = 0.0;
@@ -161,15 +151,14 @@ KOKKOS_INLINE_FUNCTION bool EvaluateCouplingMomentumEnergyResidualBeta(
   //   dEk = (c/chat)[-beta0.dF + 0.5*mu*|dF|^2].
   dEk = c / chat * (-beta0_dot_delta_F + 0.5 * mu * delta_F2);
   E = E0 + chat / c * (Q - dEg - dEk);
-  const Real floor_slop = 128.0 * std::numeric_limits<Real>::epsilon() *
-                          std::max(1.0, std::max(std::abs(E0), std::abs(E)));
-  if (!std::isfinite(E) || E < efloor - floor_slop || E <= 0.0) return false;
+  const Real floor_slop =
+      128.0 * Eps() * std::max(1.0, std::max(std::abs(E0), std::abs(E)));
+  if (E < efloor - floor_slop || E <= 0.0) return false;
   E = std::max(E, efloor);
 
-  const Real fmag = CouplingFluxMagnitude(F);
-  const Real realizability_slop =
-      256.0 * std::numeric_limits<Real>::epsilon() * std::max(1.0, E);
-  if (!std::isfinite(fmag) || fmag > E + realizability_slop) return false;
+  const Real fmag = VNorm(F);
+  const Real realizability_slop = 256.0 * Eps() * std::max(1.0, E);
+  if (fmag > E + realizability_slop) return false;
 
   const Real g2 = 1.0 / (1.0 - beta2);
   const Real g = std::sqrt(g2);
@@ -192,20 +181,17 @@ KOKKOS_INLINE_FUNCTION bool EvaluateCouplingMomentumEnergyResidualBeta(
                                 Fr0[1] + d1 * beta[1] + d2 * bdp[1],
                                 Fr0[2] + d1 * beta[2] + d2 * bdp[2]};
   const auto Fsolve = SolveRadFlux(1.0 + a, bcoef, beta, rhs);
-  if (!std::isfinite(Fsolve[0]) || !std::isfinite(Fsolve[1]) || !std::isfinite(Fsolve[2]))
-    return false;
   const auto Ftarget = ProjectCouplingFluxToEnergy(Fsolve, E);
 
   const Real scale =
       std::max(energy_floor_scale,
-               std::max(E, std::max(CouplingFluxMagnitude(Fr0),
-                                    std::max(fmag, CouplingFluxMagnitude(Ftarget)))));
+               std::max(E, std::max(VNorm(Fr0), std::max(fmag, VNorm(Ftarget)))));
   residual_norm = 0.0;
   for (int d = 0; d < 3; ++d) {
     residual[d] = F[d] - Ftarget[d];
     residual_norm = std::max(residual_norm, std::abs(residual[d]) / scale);
   }
-  return std::isfinite(residual_norm);
+  return true;
 }
 
 template <Closure CLOSURE>
@@ -216,24 +202,21 @@ KOKKOS_INLINE_FUNCTION bool SolveCouplingMomentumEnergyBeta(
     const Real energy_floor_scale, const Real tolerance, std::array<Real, 3> &beta,
     std::array<Real, 3> &F, Real &E, Real &dEk, Real &momentum_error, int &iterations) {
   const Real mu = eref / (dens * c * chat);
-  if (!std::isfinite(mu) || mu <= 0.0 || !std::isfinite(sigp) || !std::isfinite(sigs) ||
-      sigp < 0.0 || sigs < 0.0)
-    return false;
 
-  const Real solve_tol = std::max(tolerance, 64.0 * std::numeric_limits<Real>::epsilon());
+  const Real solve_tol = std::max(tolerance, 64.0 * Eps());
   constexpr int max_iterations = 32;
   constexpr int max_line_search = 20;
-  const Real fd_factor = std::pow(std::numeric_limits<Real>::epsilon(), 1.0 / 3.0);
+  const Real fd_factor = std::pow(Eps(), 1.0 / 3.0);
 
   std::array<Real, 3> residual{0.0, 0.0, 0.0};
   std::array<Real, 3> best_beta = beta;
   std::array<Real, 3> best_F = F;
   Real best_E = E;
   Real best_dEk = dEk;
-  Real best_error = std::numeric_limits<Real>::max();
+  Real best_error = Big();
 
   for (iterations = 1; iterations <= max_iterations; ++iterations) {
-    Real current_error = std::numeric_limits<Real>::max();
+    Real current_error = Big();
     if (!EvaluateCouplingMomentumEnergyResidualBeta<CLOSURE>(
             beta, beta0, Fr0, E0, efloor, B, dEg, Q, dens, eref, c, chat, sigp, sigs,
             energy_floor_scale, F, E, dEk, residual, current_error))
@@ -254,8 +237,8 @@ KOKKOS_INLINE_FUNCTION bool SolveCouplingMomentumEnergyBeta(
     Real J[3][3]{{0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}};
     bool jacobian_valid = true;
     for (int col = 0; col < 3; ++col) {
-      const Real h = std::max(32.0 * std::numeric_limits<Real>::epsilon(),
-                              fd_factor * std::max(1.0e-3, std::abs(beta[col])));
+      const Real h =
+          std::max(32.0 * Eps(), fd_factor * std::max(1.0e-3, std::abs(beta[col])));
       auto beta_plus = beta;
       auto beta_minus = beta;
       beta_plus[col] += h;
@@ -308,7 +291,7 @@ KOKKOS_INLINE_FUNCTION bool SolveCouplingMomentumEnergyBeta(
     }
 
     const Real step_mag = std::sqrt(SQR(step[0]) + SQR(step[1]) + SQR(step[2]));
-    if (!std::isfinite(step_mag) || step_mag <= Fuzz<Real>()) break;
+    if (step_mag <= Fuzz()) break;
     if (step_mag > 0.25) {
       const Real scale = 0.25 / step_mag;
       for (int d = 0; d < 3; ++d)
@@ -323,7 +306,7 @@ KOKKOS_INLINE_FUNCTION bool SolveCouplingMomentumEnergyBeta(
       std::array<Real, 3> Ftrial, Rtrial;
       Real Etrial = E;
       Real dEktrial = dEk;
-      Real trial_error = std::numeric_limits<Real>::max();
+      Real trial_error = Big();
       const bool trial_valid = EvaluateCouplingMomentumEnergyResidualBeta<CLOSURE>(
           beta_trial, beta0, Fr0, E0, efloor, B, dEg, Q, dens, eref, c, chat, sigp, sigs,
           energy_floor_scale, Ftrial, Etrial, dEktrial, Rtrial, trial_error);
@@ -352,7 +335,7 @@ KOKKOS_INLINE_FUNCTION bool SolveCouplingMomentumEnergyBeta(
         std::array<Real, 3> Ftrial, Rtrial;
         Real Etrial = E;
         Real dEktrial = dEk;
-        Real trial_error = std::numeric_limits<Real>::max();
+        Real trial_error = Big();
         const bool trial_valid = EvaluateCouplingMomentumEnergyResidualBeta<CLOSURE>(
             beta_trial, beta0, Fr0, E0, efloor, B, dEg, Q, dens, eref, c, chat, sigp,
             sigs, energy_floor_scale, Ftrial, Etrial, dEktrial, Rtrial, trial_error);
@@ -392,8 +375,6 @@ KOKKOS_INLINE_FUNCTION bool EvaluateCouplingMomentumEnergyResidualFlux(
     std::array<Real, 3> &beta, Real &E, Real &dEk, std::array<Real, 3> &residual,
     Real &residual_norm) {
   const Real mu = eref / (dens * c * chat);
-  if (!std::isfinite(mu) || mu <= 0.0) return false;
-
   std::array<Real, 3> delta_F{0.0, 0.0, 0.0};
   Real delta_F2 = 0.0;
   Real beta0_dot_delta_F = 0.0;
@@ -405,21 +386,20 @@ KOKKOS_INLINE_FUNCTION bool EvaluateCouplingMomentumEnergyResidualFlux(
   }
 
   const Real beta2 = SQR(beta[0]) + SQR(beta[1]) + SQR(beta[2]);
-  if (!std::isfinite(beta2) || beta2 >= 1.0) return false;
+  if (beta2 >= 1.0) return false;
 
   // This form remains accurate even when beta-beta0 is below the resolution
   // of a stored velocity component.
   dEk = c / chat * (-beta0_dot_delta_F + 0.5 * mu * delta_F2);
   E = E0 + chat / c * (Q - dEg - dEk);
-  const Real floor_slop = 128.0 * std::numeric_limits<Real>::epsilon() *
-                          std::max(1.0, std::max(std::abs(E0), std::abs(E)));
-  if (!std::isfinite(E) || E < efloor - floor_slop || E <= 0.0) return false;
+  const Real floor_slop =
+      128.0 * Eps() * std::max(1.0, std::max(std::abs(E0), std::abs(E)));
+  if (E < efloor - floor_slop || E <= 0.0) return false;
   E = std::max(E, efloor);
 
-  const Real fmag = CouplingFluxMagnitude(F);
-  const Real realizability_slop =
-      256.0 * std::numeric_limits<Real>::epsilon() * std::max(1.0, E);
-  if (!std::isfinite(fmag) || fmag > E + realizability_slop) return false;
+  const Real fmag = VNorm(F);
+  const Real realizability_slop = 256.0 * Eps() * std::max(1.0, E);
+  if (fmag > E + realizability_slop) return false;
 
   const Real g2 = 1.0 / (1.0 - beta2);
   const Real g = std::sqrt(g2);
@@ -442,20 +422,17 @@ KOKKOS_INLINE_FUNCTION bool EvaluateCouplingMomentumEnergyResidualFlux(
                                 Fr0[1] + d1 * beta[1] + d2 * bdp[1],
                                 Fr0[2] + d1 * beta[2] + d2 * bdp[2]};
   const auto Fsolve = SolveRadFlux(1.0 + a, bcoef, beta, rhs);
-  if (!std::isfinite(Fsolve[0]) || !std::isfinite(Fsolve[1]) || !std::isfinite(Fsolve[2]))
-    return false;
   const auto Ftarget = ProjectCouplingFluxToEnergy(Fsolve, E);
 
   const Real scale =
       std::max(energy_floor_scale,
-               std::max(E, std::max(CouplingFluxMagnitude(Fr0),
-                                    std::max(fmag, CouplingFluxMagnitude(Ftarget)))));
+               std::max(E, std::max(VNorm(Fr0), std::max(fmag, VNorm(Ftarget)))));
   residual_norm = 0.0;
   for (int d = 0; d < 3; ++d) {
     residual[d] = F[d] - Ftarget[d];
     residual_norm = std::max(residual_norm, std::abs(residual[d]) / scale);
   }
-  return std::isfinite(residual_norm);
+  return true;
 }
 
 template <Closure CLOSURE>
@@ -466,24 +443,20 @@ KOKKOS_INLINE_FUNCTION bool SolveCouplingMomentumEnergyFlux(
     const Real energy_floor_scale, const Real tolerance, std::array<Real, 3> &beta,
     std::array<Real, 3> &F, Real &E, Real &dEk, Real &momentum_error, int &iterations) {
   const Real mu = eref / (dens * c * chat);
-  if (!std::isfinite(mu) || mu <= 0.0 || !std::isfinite(sigp) || !std::isfinite(sigs) ||
-      sigp < 0.0 || sigs < 0.0)
-    return false;
-
-  const Real solve_tol = std::max(tolerance, 64.0 * std::numeric_limits<Real>::epsilon());
+  const Real solve_tol = std::max(tolerance, 64.0 * Eps());
   constexpr int max_iterations = 32;
   constexpr int max_line_search = 20;
-  const Real fd_factor = std::pow(std::numeric_limits<Real>::epsilon(), 1.0 / 3.0);
+  const Real fd_factor = std::pow(Eps(), 1.0 / 3.0);
 
   std::array<Real, 3> residual{0.0, 0.0, 0.0};
   std::array<Real, 3> best_beta = beta;
   std::array<Real, 3> best_F = F;
   Real best_E = E;
   Real best_dEk = dEk;
-  Real best_error = std::numeric_limits<Real>::max();
+  Real best_error = Big();
 
   for (iterations = 1; iterations <= max_iterations; ++iterations) {
-    Real current_error = std::numeric_limits<Real>::max();
+    Real current_error = Big();
     if (!EvaluateCouplingMomentumEnergyResidualFlux<CLOSURE>(
             F, beta0, Fr0, E0, efloor, B, dEg, Q, dens, eref, c, chat, sigp, sigs,
             energy_floor_scale, beta, E, dEk, residual, current_error))
@@ -510,9 +483,7 @@ KOKKOS_INLINE_FUNCTION bool SolveCouplingMomentumEnergyFlux(
       // F is normalized by the local energy reference and can be much smaller
       // than unity. An absolute O(epsilon) perturbation would then be larger
       // than the correction implied by the requested relative residual.
-      const Real h = std::max(64.0 * std::numeric_limits<Real>::epsilon() *
-                                  variable_scale,
-                              fd_factor * variable_scale);
+      const Real h = std::max(64.0 * Eps() * variable_scale, fd_factor * variable_scale);
       auto Fplus = F;
       auto Fminus = F;
       Fplus[col] += h;
@@ -559,16 +530,12 @@ KOKKOS_INLINE_FUNCTION bool SolveCouplingMomentumEnergyFlux(
     }
 
     const Real step_mag = std::sqrt(SQR(step[0]) + SQR(step[1]) + SQR(step[2]));
-    const Real state_scale = std::max(
-        energy_floor_scale,
-        std::max(E, std::max(CouplingFluxMagnitude(F), CouplingFluxMagnitude(Fr0))));
+    const Real state_scale =
+        std::max(energy_floor_scale, std::max(E, std::max(VNorm(F), VNorm(Fr0))));
     // state_scale includes the radiation floor. Do not impose a unit-scale
     // absolute cutoff here: for E << 1 it can reject a resolvable correction
     // before the normalized momentum residual reaches its tolerance.
-    if (!std::isfinite(step_mag) || step_mag <= 64.0 *
-                                                    std::numeric_limits<Real>::epsilon() *
-                                                    state_scale)
-      break;
+    if (step_mag <= 64.0 * Eps() * state_scale) break;
     if (step_mag > 0.25 * state_scale) {
       const Real scale = 0.25 * state_scale / step_mag;
       for (int d = 0; d < 3; ++d)
@@ -583,7 +550,7 @@ KOKKOS_INLINE_FUNCTION bool SolveCouplingMomentumEnergyFlux(
       std::array<Real, 3> beta_trial, Rtrial;
       Real Etrial = E;
       Real dEktrial = dEk;
-      Real trial_error = std::numeric_limits<Real>::max();
+      Real trial_error = Big();
       const bool trial_valid = EvaluateCouplingMomentumEnergyResidualFlux<CLOSURE>(
           Ftrial, beta0, Fr0, E0, efloor, B, dEg, Q, dens, eref, c, chat, sigp, sigs,
           energy_floor_scale, beta_trial, Etrial, dEktrial, Rtrial, trial_error);
@@ -609,7 +576,7 @@ KOKKOS_INLINE_FUNCTION bool SolveCouplingMomentumEnergyFlux(
         std::array<Real, 3> beta_trial, Rtrial;
         Real Etrial = E;
         Real dEktrial = dEk;
-        Real trial_error = std::numeric_limits<Real>::max();
+        Real trial_error = Big();
         const bool trial_valid = EvaluateCouplingMomentumEnergyResidualFlux<CLOSURE>(
             Ftrial, beta0, Fr0, E0, efloor, B, dEg, Q, dens, eref, c, chat, sigp, sigs,
             energy_floor_scale, beta_trial, Etrial, dEktrial, Rtrial, trial_error);
@@ -642,11 +609,11 @@ KOKKOS_INLINE_FUNCTION bool SolveCouplingMomentumEnergy(
     const Real eref, const Real c, const Real chat, const Real sigp, const Real sigs,
     const Real energy_floor_scale, const Real tolerance, std::array<Real, 3> &beta,
     std::array<Real, 3> &F, Real &E, Real &dEk, Real &momentum_error, int &iterations) {
-  const Real mu = eref / (dens * c * chat);
   // Choose the nonlinear variable from the relative pseudo-inertia. For
   // mu <= 1 the gas velocity change can be much less resolvable than the
   // radiation-flux change, so solve in F. For mu > 1 solve in beta to avoid
   // magnifying flux perturbations into large velocity perturbations.
+  const Real mu = eref / (dens * c * chat);
   if (mu <= 1.0) {
     return SolveCouplingMomentumEnergyFlux<CLOSURE>(
         beta0, Fr0, E0, efloor, B, dEg, Q, dens, eref, c, chat, sigp, sigs,
@@ -668,9 +635,9 @@ KOKKOS_INLINE_FUNCTION bool EvaluateCouplingInnerScalarResidual(
   // Exact reduced-speed-of-light total-energy conservation at fixed velocity:
   //   dEg + dEk + (c/chat) dEr = Q.
   E = E0 + chat / c * (Q - dEk - (eg - eg0));
-  const Real floor_slop = 64.0 * std::numeric_limits<Real>::epsilon() *
-                          std::max(1.0, std::max(std::abs(E0), std::abs(E)));
-  if (!std::isfinite(E) || E < efloor - floor_slop) return false;
+  const Real floor_slop =
+      64.0 * Eps() * std::max(1.0, std::max(std::abs(E0), std::abs(E)));
+  if (E < efloor - floor_slop) return false;
   E = std::max(E, efloor);
 
   const Real eint = eg * eref / dens;
@@ -679,27 +646,18 @@ KOKKOS_INLINE_FUNCTION bool EvaluateCouplingInnerScalarResidual(
   const Real sigp = chat * dt * opacity.PlanckMeanAbsorptionCoefficient(dens, T);
   const Real sigs =
       chat * dt * scattering.RosselandMeanTotalScatteringCoefficient(dens, T);
-  if (!std::isfinite(T) || !std::isfinite(B) || !std::isfinite(sigp) ||
-      !std::isfinite(sigs) || sigp < 0.0 || sigs < 0.0)
-    return false;
-
   Real ca = 0.0;
   Real cb = 0.0;
   Real cd = 0.0;
   Real Eeq = E;
-  if (!ComputeCouplingEnergyCoefficients(sigp, sigs, g, g2, beta2, bdbdp, bdf, ca, cb,
-                                         cd) ||
-      !ComputeCouplingEquilibriumEnergy(E0, B, ca, cb, cd, Eeq))
-    return false;
+  ComputeCouplingEnergyCoefficients(sigp, sigs, g, g2, beta2, bdbdp, bdf, ca, cb, cd);
+  ComputeCouplingEquilibriumEnergy(E0, B, ca, cb, cd, Eeq);
 
   // Compare two independently constructed radiation energies:
   //   E:   exact total-energy conservation,
   //   Eeq: the implicit radiation source equation.
-  // Do not evaluate (1+ca)E - (E0+cbB-cd) here.  In an optically thick
-  // near-LTE cell that expression subtracts O(sigp) numbers and its absolute
-  // roundoff can be orders of magnitude larger than the requested tolerance.
   residual = E - Eeq;
-  return std::isfinite(residual);
+  return true;
 }
 
 KOKKOS_INLINE_FUNCTION Real CouplingInnerScalarError(const Real eg, const Real eg0,
@@ -732,8 +690,7 @@ KOKKOS_INLINE_FUNCTION bool SolveCouplingInnerScalar(
   const Real eg_floor =
       dens * eos.InternalEnergyFromDensityTemperature(dens, tfloor) / eref;
   const Real eg_ceiling = eg0 + Q - dEk + c / chat * (E0 - efloor);
-  if (!std::isfinite(eg_floor) || !std::isfinite(eg_ceiling) || eg_ceiling < eg_floor)
-    return false;
+  if (eg_ceiling < eg_floor) return false;
 
   const Real Tguess = std::max(tfloor, std::pow(std::max(eref * B / arad, 0.0), 0.25));
   Real eg_guess = dens * eos.InternalEnergyFromDensityTemperature(dens, Tguess) / eref;
@@ -752,7 +709,7 @@ KOKKOS_INLINE_FUNCTION bool SolveCouplingInnerScalar(
   Real best_error = guess_valid
                         ? CouplingInnerScalarError(eg_guess, eg0, dEk, Q, Eguess, E0,
                                                    chat, c, energy_floor_scale, Rguess)
-                        : std::numeric_limits<Real>::max();
+                        : Big();
   if (guess_valid && best_error <= tolerance) {
     E = Eguess;
     B = Bguess;
@@ -891,7 +848,7 @@ KOKKOS_INLINE_FUNCTION bool SolveCouplingInnerScalar(
       // cases.
       Real eg_trial = 0.5 * (bracket_lo + bracket_hi);
       const Real denom = bracket_Rhi - bracket_Rlo;
-      if (std::isfinite(denom) && std::abs(denom) > Fuzz<Real>()) {
+      if (std::abs(denom) > Fuzz()) {
         const Real eg_secant =
             (bracket_lo * bracket_Rhi - bracket_hi * bracket_Rlo) / denom;
         const Real width = bracket_hi - bracket_lo;
@@ -927,19 +884,15 @@ KOKKOS_INLINE_FUNCTION bool SolveCouplingInnerScalar(
 
       const Real width_scale =
           std::max(energy_floor_scale, std::abs(bracket_lo) + std::abs(bracket_hi));
-      if ((bracket_hi - bracket_lo) / width_scale <=
-          8.0 * std::numeric_limits<Real>::epsilon())
-        break;
+      if ((bracket_hi - bracket_lo) / width_scale <= 8.0 * Eps()) break;
     }
   }
 
   E = best_E;
   B = best_B;
   inner_err = best_error;
-  const Real attainable_tolerance =
-      std::max(tolerance, 32.0 * std::numeric_limits<Real>::epsilon());
-  return std::isfinite(best_eg) && std::isfinite(E) && std::isfinite(B) &&
-         std::isfinite(inner_err) && inner_err <= attainable_tolerance;
+  const Real attainable_tolerance = std::max(tolerance, 32.0 * Eps());
+  return inner_err <= attainable_tolerance;
 }
 
 template <typename EOSType, typename OpacityType>
@@ -949,14 +902,12 @@ KOKKOS_INLINE_FUNCTION bool EvaluateCouplingEnergyOnlyResidual(
     const Real chat, const Real c, const EOSType &eos, const OpacityType &opacity,
     Real &E, Real &B, Real &residual) {
   E = E0 + chat / c * (Q - (eg - eg0));
-  if (!std::isfinite(E) || E < Emin) return false;
+  if (E < Emin) return false;
 
   const Real eint = eg * eref / dens;
   const Real T = std::max(tfloor, eos.TemperatureFromDensityInternalEnergy(dens, eint));
   B = arad * SQR(SQR(T)) / eref;
   const Real sigp = chat * dt * opacity.PlanckMeanAbsorptionCoefficient(dens, T);
-  if (!std::isfinite(T) || !std::isfinite(B) || !std::isfinite(sigp) || sigp < 0.0)
-    return false;
 
   // This fallback intentionally retains only thermal absorption/emission.
   // Scattering energy exchange is work associated with the momentum source,
@@ -966,7 +917,7 @@ KOKKOS_INLINE_FUNCTION bool EvaluateCouplingEnergyOnlyResidual(
   const Real inv_denom = 1.0 / (1.0 + sigp);
   const Real Eeq = E0 * inv_denom + (sigp * inv_denom) * B;
   residual = E - Eeq;
-  return std::isfinite(Eeq) && std::isfinite(residual);
+  return true;
 }
 
 //----------------------------------------------------------------------------------------
@@ -999,7 +950,7 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
   const auto inner_max = moments_pkg->template Param<int>("inner_iteration_max");
   const auto outer_tol = moments_pkg->template Param<Real>("outer_iteration_tol");
   const auto inner_tol = moments_pkg->template Param<Real>("inner_iteration_tol");
-  const Real nonlinear_roundoff_tol = 64.0 * std::numeric_limits<Real>::epsilon();
+  const Real nonlinear_roundoff_tol = 64.0 * Eps();
   const auto fatal_if_unconverged =
       moments_pkg->template Param<bool>("fatal_if_unconverged");
 
@@ -1034,6 +985,31 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
   const auto jb = u0->GetBoundsJ(IndexDomain::interior);
   const auto kb = u0->GetBoundsK(IndexDomain::interior);
 
+  /*
+   *  This is a multi-step solve with some fallbacks. Energies and fluxes are normalized
+   * to keep numbers around unity.
+   *
+   *  If the cells are close to the density floor, we skip the full momentum solve and
+   * only do energy coupling. This prevents large accelerations.
+   *
+   *  For the outer loop we:
+   *    - Hold the current gas velocity and radiation flux estimate fixed.
+   *    - It chooses flux or velocity (beta) as the Newton variable based on mu = eref /
+   * (rho * c * chat)
+   *    - Run an inner nonlinear solve for material emission B and radiation energy E.
+   *      - It uses a damped quasi-Newton update with line search.
+   *      - If that stalls, it switches to a bracketed scalar solve in gas internal
+   * energy.
+   *      - If needed, it can use a momentum-energy predictor to seed the next outer
+   * iteration.
+   *    - With the converged thermal state, solve the coupled momentum system:
+   *
+   *  If no full iterate is available, it runs the conservative energy-only fallback:
+   *      - freeze gas momentum and radiation flux;
+   *      - bracket a thermal solution in gas internal energy;
+   *      - use it automatically for atmosphere cells and floor-constrained failures.
+   *
+   */
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "MatterCoupling", DevExecSpace(), 0, u0->NumBlocks() - 1,
       kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
@@ -1044,17 +1020,16 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
 
         // U^(0) values
         const Real dens_raw = v0(b, gas::cons::density(), k, j, i);
-        const Real dens = (std::isfinite(dens_raw) && dens_raw > dflr) ? dens_raw : dflr;
+        const Real dens = (dens_raw > dflr) ? dens_raw : dflr;
         Real Q = 0.0;
-        if (do_raytrace) Q = FiniteOrZero(dt * v0(b, gas::src::energy(), k, j, i));
+        if (do_raytrace) Q = dt * v0(b, gas::src::energy(), k, j, i);
 
         // In the numerical atmosphere, retain thermal emission/absorption but
         // suppress the momentum update. This avoids accelerating floor-density
         // gas while still allowing absorbed raytraced energy to reradiate into
         // the moment field through the conservative energy-only fallback.
         constexpr Real atmosphere_floor_factor = 100.0;
-        const bool numerical_atmosphere =
-            !std::isfinite(dens_raw) || dens_raw <= atmosphere_floor_factor * dflr;
+        const bool numerical_atmosphere = dens_raw <= atmosphere_floor_factor * dflr;
 
         // Note(AMD): There is some floating point difference between the
         // internal energy used to compute the temperature and the internal
@@ -1086,24 +1061,14 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
         // have E_r << a_r T_floor^4. Promoting E_r to Bfloor_phys here creates
         // an artificial LTE radiation bath and can make the constrained
         // matter-coupling equations inconsistent at the first timestep.
-        const Real Er_state = FiniteOrZero(v0(b, rad::cons::energy(), k, j, i));
+        const Real Er_state = v0(b, rad::cons::energy(), k, j, i);
         Real E0 = std::max(rad_efloor, Er_state);
         // Use the arithmetic mean as the reference scale. Unlike the
         // geometric mean, this keeps both normalized energies bounded when the
         // gas and radiation temperatures are initially very different.
         const Real eref_max = std::max(E0, B);
         const Real eref_min = std::min(E0, B);
-        Real eref = 0.5 * eref_max * (1.0 + eref_min / std::max(eref_max, Fuzz<Real>()));
-        if (!std::isfinite(eref) || eref <= 0.0) eref = eref_max;
-        if (!std::isfinite(eref) || eref <= 0.0) {
-          v0(b, gas::cons::internal_energy(), k, j, i) += Q;
-          v0(b, gas::cons::total_energy(), k, j, i) += Q;
-          v0(b, rad::cons::energy(), k, j, i) = rad_efloor;
-          v0(b, rad::cons::flux(0), k, j, i) = 0.0;
-          v0(b, rad::cons::flux(1), k, j, i) = 0.0;
-          v0(b, rad::cons::flux(2), k, j, i) = 0.0;
-          return;
-        }
+        Real eref = 0.5 * eref_max * (1.0 + eref_min / std::max(eref_max, Fuzz()));
         const Real fref = c * eref;
         // Keep the radiation floor independent of the material temperature
         // floor. Bfloor constrains T; efloor constrains E_r.
@@ -1115,16 +1080,16 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
         eg0 /= eref;
         B /= eref;
 
-        const auto fred0 = NormalizeFlux(
-            FiniteOrZero(v0(b, rad::cons::flux(0), k, j, i) / (hx[0] * fref * E0)),
-            FiniteOrZero(v0(b, rad::cons::flux(1), k, j, i) / (hx[1] * fref * E0)),
-            FiniteOrZero(v0(b, rad::cons::flux(2), k, j, i) / (hx[2] * fref * E0)));
+        const auto fred0 =
+            NormalizeFlux(v0(b, rad::cons::flux(0), k, j, i) / (hx[0] * fref * E0),
+                          v0(b, rad::cons::flux(1), k, j, i) / (hx[1] * fref * E0),
+                          v0(b, rad::cons::flux(2), k, j, i) / (hx[2] * fref * E0));
         const std::array<Real, 3> Fr0{E0 * fred0[0], E0 * fred0[1], E0 * fred0[2]};
 
         std::array<Real, 3> v{p0[0] / dens, p0[1] / dens, p0[2] / dens};
         const std::array<Real, 3> beta0{v[0] / c, v[1] / c, v[2] / c};
         const Real beta20 = SQR(beta0[0]) + SQR(beta0[1]) + SQR(beta0[2]);
-        if (!std::isfinite(beta20) || beta20 >= 1.0) {
+        if (beta20 >= 1.0) {
           v0(b, gas::cons::internal_energy(), k, j, i) += Q * eref;
           v0(b, gas::cons::total_energy(), k, j, i) += Q * eref;
           v0(b, rad::cons::energy(), k, j, i) = E0 * eref;
@@ -1141,22 +1106,21 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
         // Start outer iteration
         int outer_iter = 0;
         int inner_iter = 0;
-        Real outer_err = std::numeric_limits<Real>::max();
-        Real inner_err = std::numeric_limits<Real>::max();
+        Real outer_err = Big();
+        Real inner_err = Big();
 
         std::array<Real, 3> dv{0.0, 0.0, 0.0};
         Real dEk = 0.0;
         Real dEg = 0.0;
         Real dEr = 0.0;
-        const Real energy_floor_scale = std::max(efloor + Bfloor, Fuzz<Real>());
+        const Real energy_floor_scale = std::max(efloor + Bfloor, Fuzz());
         Real escale = std::max(
             energy_floor_scale,
             std::max(std::abs(eg0), std::max(std::abs(Q), c / chat * std::abs(E0))));
-        bool solve_valid = !numerical_atmosphere && std::isfinite(escale) &&
-                           std::isfinite(ke0) && escale > 0.0;
+        bool solve_valid = !numerical_atmosphere && escale > 0.0;
         bool outer_converged = false;
         bool have_complete_iterate = false;
-        Real best_outer_err = std::numeric_limits<Real>::max();
+        Real best_outer_err = Big();
         std::array<Real, 3> best_F = Fr0;
         std::array<Real, 3> best_dv{0.0, 0.0, 0.0};
         Real best_dEg = 0.0;
@@ -1165,7 +1129,7 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
         bool scalar_inner_used = false;
         int momentum_predictor_count = 0;
         int momentum_iteration_count = 0;
-        Real momentum_error = std::numeric_limits<Real>::max();
+        Real momentum_error = Big();
 
         for (outer_iter = 1; outer_iter <= outer_max; ++outer_iter) {
           if (!solve_valid) break;
@@ -1173,7 +1137,7 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
           const Real ke = 0.5 * dens * (SQR(v[0]) + SQR(v[1]) + SQR(v[2])) / eref;
           std::array<Real, 3> beta{v[0] / c, v[1] / c, v[2] / c};
           const Real beta2 = SQR(beta[0]) + SQR(beta[1]) + SQR(beta[2]);
-          if (!std::isfinite(beta2) || beta2 >= 1.0 || E <= 0.0) {
+          if (beta2 >= 1.0 || E <= 0.0) {
             solve_valid = false;
             break;
           }
@@ -1192,9 +1156,8 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
           const Real bdbdp = beta[0] * bdp[0] + beta[1] * bdp[1] + beta[2] * bdp[2];
           const Real bdf = beta[0] * F[0] + beta[1] * F[1] + beta[2] * F[2];
 
-          // Damped quasi-Newton solve for (B,E). Opacity derivatives are not
-          // available, so accept only residual-decreasing trial steps.
-          Real previous_inner_err = std::numeric_limits<Real>::max();
+          // Damped quasi-Newton solve for (B,E).
+          Real previous_inner_err = Big();
           int stalled_iterations = 0;
           bool inner_converged = false;
           for (inner_iter = 1; inner_iter <= inner_max; ++inner_iter) {
@@ -1210,12 +1173,10 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
             Real ca = 0.0;
             Real cb = 0.0;
             Real cd = 0.0;
-            const bool coeff_valid = ComputeCouplingEnergyCoefficients(
-                sigp, sigs, g, g2, beta2, bdbdp, bdf, ca, cb, cd);
+            ComputeCouplingEnergyCoefficients(sigp, sigs, g, g2, beta2, bdbdp, bdf, ca,
+                                              cb, cd);
             Real Eeq_inner = E;
-            const bool equilibrium_valid =
-                coeff_valid &&
-                ComputeCouplingEquilibriumEnergy(E0, B, ca, cb, cd, Eeq_inner);
+            ComputeCouplingEquilibriumEnergy(E0, B, ca, cb, cd, Eeq_inner);
 
             // Retain the original residuals only to form the quasi-Newton
             // search direction.  Use the conservation/equilibrium form below
@@ -1235,9 +1196,8 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
                                            std::abs(ke - ke0)))));
             inner_err = std::max(std::abs(conservation_inner) / escale_inner,
                                  c / chat * std::abs(source_inner) / escale_inner);
-            solve_valid = solve_valid && equilibrium_valid && std::isfinite(inner_err) &&
-                          std::isfinite(fleck) && std::isfinite(eint) && Cv > 0.0 &&
-                          fleck >= 0.0 && sigp >= 0.0 && sigs >= 0.0;
+            solve_valid =
+                solve_valid && Cv > 0.0 && fleck >= 0.0 && sigp >= 0.0 && sigs >= 0.0;
             if (!solve_valid) break;
             if (inner_err <= inner_tol) {
               inner_converged = true;
@@ -1253,7 +1213,7 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
 
             const Real dfac = 1.0 + c / chat * fleck * cb;
             const Real denom = dfac + ca;
-            if (!std::isfinite(denom) || std::abs(denom) <= Fuzz<Real>()) {
+            if (std::abs(denom) <= Fuzz()) {
               solve_valid = false;
               break;
             }
@@ -1281,14 +1241,11 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
               Real ca_trial = 0.0;
               Real cb_trial = 0.0;
               Real cd_trial = 0.0;
-              const bool coeff_trial_valid = ComputeCouplingEnergyCoefficients(
-                  sigp_trial, sigs_trial, g, g2, beta2, bdbdp, bdf, ca_trial, cb_trial,
-                  cd_trial);
+              ComputeCouplingEnergyCoefficients(sigp_trial, sigs_trial, g, g2, beta2,
+                                                bdbdp, bdf, ca_trial, cb_trial, cd_trial);
               Real Eeq_trial = Etrial;
-              const bool equilibrium_trial_valid =
-                  coeff_trial_valid &&
-                  ComputeCouplingEquilibriumEnergy(E0, Btrial, ca_trial, cb_trial,
-                                                   cd_trial, Eeq_trial);
+              ComputeCouplingEquilibriumEnergy(E0, Btrial, ca_trial, cb_trial, cd_trial,
+                                               Eeq_trial);
               const Real conservation_trial =
                   (ke - ke0) + (eint_trial - eg0) + c / chat * (Etrial - E0) - Q;
               const Real source_trial = Etrial - Eeq_trial;
@@ -1301,18 +1258,13 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
               const Real trial_err =
                   std::max(std::abs(conservation_trial) / escale_trial,
                            c / chat * std::abs(source_trial) / escale_trial);
-              const bool trial_valid =
-                  std::isfinite(Ttrial) && std::isfinite(eint_trial) &&
-                  std::isfinite(sigp_trial) && std::isfinite(sigs_trial) &&
-                  equilibrium_trial_valid && std::isfinite(trial_err) &&
-                  sigp_trial >= 0.0 && sigs_trial >= 0.0;
-              if (trial_valid && trial_err < best_trial_err) {
+              if (trial_err < best_trial_err) {
                 best_trial_err = trial_err;
                 best_trial_E = Etrial;
                 best_trial_B = Btrial;
               }
-              if (trial_valid && (trial_err <= inner_tol ||
-                                  trial_err <= inner_err * (1.0 - 1.0e-4 * alpha))) {
+              if ((trial_err <= inner_tol ||
+                   trial_err <= inner_err * (1.0 - 1.0e-4 * alpha))) {
                 E = Etrial;
                 B = Btrial;
                 accepted = true;
@@ -1372,7 +1324,7 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
             std::array<Real, 3> Fpred = F;
             Real Epred = E;
             Real dEkpred = dEk;
-            Real predictor_error = std::numeric_limits<Real>::max();
+            Real predictor_error = Big();
             int predictor_iterations = 0;
             const bool predictor_converged = SolveCouplingMomentumEnergy<CLOSURE>(
                 beta0, Fr0, E0, efloor, B, dEg_pred, Q, dens, eref, c, chat, sigp_pred,
@@ -1381,10 +1333,8 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
                 dEkpred, predictor_error, predictor_iterations);
             momentum_iteration_count += predictor_iterations;
             if (predictor_converged) {
-              const Real predictor_scale =
-                  std::max(energy_floor_scale,
-                           std::max(E, std::max(CouplingFluxMagnitude(F),
-                                                CouplingFluxMagnitude(Fpred))));
+              const Real predictor_scale = std::max(
+                  energy_floor_scale, std::max(E, std::max(VNorm(F), VNorm(Fpred))));
               Real predictor_change = std::abs(Epred - E) / predictor_scale;
               for (int d = 0; d < 3; ++d) {
                 predictor_change = std::max(predictor_change,
@@ -1392,7 +1342,7 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
                 predictor_change =
                     std::max(predictor_change, std::abs(beta_pred[d] - v[d] / c));
               }
-              if (predictor_change > 8.0 * std::numeric_limits<Real>::epsilon()) {
+              if (predictor_change > 8.0 * Eps()) {
                 E = Epred;
                 F = Fpred;
                 dEk = dEkpred;
@@ -1418,11 +1368,6 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
               chat * dt * opac_d.RosselandMeanAbsorptionCoefficient(dens, T);
           const Real sigs_flux =
               chat * dt * scat_d.RosselandMeanTotalScatteringCoefficient(dens, T);
-          if (!std::isfinite(sigp_flux) || !std::isfinite(sigs_flux) || sigp_flux < 0.0 ||
-              sigs_flux < 0.0) {
-            solve_valid = false;
-            break;
-          }
 
           // Solve the radiation-flux source equation together with gas
           // pseudo-momentum conservation and reduced-c total-energy
@@ -1453,7 +1398,7 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
           // the kinetic-energy correction changed little in a Keplerian flow.
           const std::array<Real, 3> beta_out{v[0] / c, v[1] / c, v[2] / c};
           const Real beta2_out = SQR(beta_out[0]) + SQR(beta_out[1]) + SQR(beta_out[2]);
-          if (!std::isfinite(beta2_out) || beta2_out >= 1.0 || E <= 0.0) {
+          if (beta2_out >= 1.0 || E <= 0.0) {
             solve_valid = false;
             break;
           }
@@ -1486,12 +1431,10 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
           Real cb_out = 0.0;
           Real cd_out = 0.0;
           Real Eeq_out = E;
-          const bool energy_coeff_valid = ComputeCouplingEnergyCoefficients(
-              sigp_energy, sigs_out, g_out, g2_out, beta2_out, bdbdp_out, bdf_out, ca_out,
-              cb_out, cd_out);
-          const bool equilibrium_valid =
-              energy_coeff_valid &&
-              ComputeCouplingEquilibriumEnergy(E0, B, ca_out, cb_out, cd_out, Eeq_out);
+          ComputeCouplingEnergyCoefficients(sigp_energy, sigs_out, g_out, g2_out,
+                                            beta2_out, bdbdp_out, bdf_out, ca_out, cb_out,
+                                            cd_out);
+          ComputeCouplingEquilibriumEnergy(E0, B, ca_out, cb_out, cd_out, Eeq_out);
           const Real conservation_residual = dEg + dEk + c / chat * dEr - Q;
           const Real source_residual = E - Eeq_out;
 
@@ -1521,16 +1464,14 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
                        c / chat * std::abs(source_residual) / escale);
           const Real flux_scale = std::max(
               energy_floor_scale,
-              std::max(E, std::max(CouplingFluxMagnitude(Fr0),
-                                   std::max(CouplingFluxMagnitude(F),
-                                            CouplingFluxMagnitude(Ftarget_out)))));
+              std::max(E, std::max(VNorm(Fr0), std::max(VNorm(F), VNorm(Ftarget_out)))));
           Real flux_residual = 0.0;
           for (int d = 0; d < 3; ++d) {
             flux_residual =
                 std::max(flux_residual, std::abs(F[d] - Ftarget_out[d]) / flux_scale);
           }
-          const Real realizability_residual = std::max(
-              0.0, (CouplingFluxMagnitude(F) - E) / std::max(E, energy_floor_scale));
+          const Real realizability_residual =
+              std::max(0.0, (VNorm(F) - E) / std::max(E, energy_floor_scale));
           // These are residuals of the coupled equations evaluated at the
           // current state. Iterate-to-iterate changes are deliberately not an
           // acceptance criterion: a converged nonlinear root need not move by
@@ -1538,10 +1479,8 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
           // resolve.
           outer_err =
               std::max(energy_residual, std::max(flux_residual, realizability_residual));
-          solve_valid = solve_valid && equilibrium_valid && std::isfinite(outer_err) &&
-                        std::isfinite(dEr) && std::isfinite(sigp_energy) &&
-                        std::isfinite(sigs_out) && std::isfinite(sigp_flux_out) &&
-                        sigp_energy >= 0.0 && sigs_out >= 0.0 && sigp_flux_out >= 0.0;
+          solve_valid = solve_valid && sigp_energy >= 0.0 && sigs_out >= 0.0 &&
+                        sigp_flux_out >= 0.0;
           if (!solve_valid) break;
 
           have_complete_iterate = true;
@@ -1566,16 +1505,16 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
         // energy-only solve below with momentum frozen, rather than repeatedly
         // applying a radiation drag whose kinetic-energy work cannot be paid by
         // either the gas or radiation field.
-        const Real floor_active_tol = 256.0 * std::numeric_limits<Real>::epsilon();
+        const Real floor_active_tol = 256.0 * Eps();
         const bool material_floor_active =
-            B <= Bfloor * (1.0 + floor_active_tol) + Fuzz<Real>();
+            B <= Bfloor * (1.0 + floor_active_tol) + Fuzz();
         const bool radiation_floor_active =
-            E <= efloor * (1.0 + floor_active_tol) + Fuzz<Real>();
+            E <= efloor * (1.0 + floor_active_tol) + Fuzz();
         const bool floor_constrained_failure =
             solve_valid && !have_complete_iterate &&
             (material_floor_active || radiation_floor_active);
         bool fallback_success = false;
-        Real fallback_error = std::numeric_limits<Real>::max();
+        Real fallback_error = Big();
 
         if (have_complete_iterate) {
           F = best_F;
@@ -1595,13 +1534,12 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
           dv = {0.0, 0.0, 0.0};
           v = {p0[0] / dens, p0[1] / dens, p0[2] / dens};
           dEk = 0.0;
-          const Real Emin = std::max(efloor, CouplingFluxMagnitude(Fr0));
+          const Real Emin = std::max(efloor, VNorm(Fr0));
           const Real eg_floor =
               dens * eos_d.InternalEnergyFromDensityTemperature(dens, tfloor) / eref;
           const Real eg_max = eg0 + Q + c / chat * (E0 - Emin);
 
-          bool fallback_valid =
-              std::isfinite(eg_floor) && std::isfinite(eg_max) && eg_max >= eg_floor;
+          bool fallback_valid = eg_max >= eg_floor;
           bool fallback_have = false;
           bool bracketed = false;
           Real bracket_lo = eg_floor;
@@ -1610,11 +1548,12 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
           Real best_eg = eg0;
           Real best_E_fallback = E0;
           Real best_B_fallback = B;
-          Real best_residual = std::numeric_limits<Real>::max();
+          Real best_residual = Big();
           Real previous_eg = eg_floor;
           Real previous_residual = 0.0;
           bool have_previous = false;
 
+          // bisection fallback #1
           if (fallback_valid) {
             constexpr int fallback_scan_points = 64;
             for (int n = 0; n <= fallback_scan_points; ++n) {
@@ -1689,9 +1628,8 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
                 energy_floor_scale,
                 std::max(std::abs(Q), std::max(std::abs(eg0) + std::abs(best_eg),
                                                c / chat * (std::abs(E0) + std::abs(E)))));
-            fallback_error =
-                c / chat * best_residual / std::max(fallback_scale, Fuzz<Real>());
-            fallback_success = std::isfinite(fallback_error);
+            fallback_error = c / chat * best_residual / std::max(fallback_scale, Fuzz());
+            fallback_success = true;
           } else {
             // Last-resort finite update. This is intentionally limited to the
             // external ray source and leaves the moment state unchanged.
@@ -1707,12 +1645,12 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
             floor_constrained_failure && fallback_success;
         if (!outer_converged && fatal_if_unconverged && !numerical_atmosphere &&
             !accepted_floor_fallback) {
+#ifndef NDEBUG
+          // printf with args is slow on device, so hide this at compile time
           const Real beta_fail = std::sqrt(SQR(v[0] / c) + SQR(v[1] / c) + SQR(v[2] / c));
-          const Real fred_fail =
-              CouplingFluxMagnitude(F) / std::max(E, energy_floor_scale);
+          const Real fred_fail = VNorm(F) / std::max(E, energy_floor_scale);
           const Real mu_fail = eref / (dens * c * chat);
-          const Real delta_f_fail =
-              CouplingFluxMagnitude({F[0] - Fr0[0], F[1] - Fr0[1], F[2] - Fr0[2]});
+          const Real delta_f_fail = VNorm({F[0] - Fr0[0], F[1] - Fr0[1], F[2] - Fr0[2]});
           printf("MatterCoupling full fail (%d,%d,%d,%d): outer=%.17e "
                  "(best=%.17e, tol=%.17e), inner=%.17e (tol=%.17e), "
                  "fallback=%.17e, E=%.17e, E0=%.17e, efloor=%.17e, "
@@ -1730,6 +1668,7 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
                  momentum_iteration_count, momentum_error, solve_valid, scalar_inner_used,
                  momentum_predictor_count, have_complete_iterate,
                  floor_constrained_failure);
+#endif
           PARTHENON_FAIL("Outer not converged");
         }
 

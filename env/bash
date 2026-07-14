@@ -21,7 +21,7 @@ export MAKE_PROGRAM=${MAKE_PROGRAM:-make}
 
 #  Identify partitions based on  SLURM_JOB_PARTITION and HOSTNAME variables
 PARTITION="unknown"
-if [[ $HOSTNAME == ch-fe*  ||  $CLUSTER == "chicoma" ]]; then
+if [[ $HOSTNAME == ch*  ||  $CLUSTER == "chicoma" ]]; then
     if [[ $SLURM_JOB_PARTITION == *gpu* ]]; then
         PARTITION="chicoma-gpu"
     else

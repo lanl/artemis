@@ -291,7 +291,6 @@ void PrimToCons(T *md) {
         const auto &hx = coords.GetScaleFactors(vg, b, k, j, i);
 
         if (do_gas) {
-          Real lambda[ArtemisUtils::lambda_max_vals] = {Null<Real>()};
           for (int n = 0; n < vmesh.GetSize(b, gas::prim::density()); ++n) {
             // Sync conserved and primitive density
             Real &w_d = vmesh(b, gas::prim::density(n), k, j, i);
@@ -320,9 +319,9 @@ void PrimToCons(T *md) {
             const bool siefloor = (w_s > sieflr_gas);
             w_s = (siefloor)*w_s + (!siefloor) * sieflr_gas;
             u_u = w_s * u_d;
-            w_p = eos_d(n).PressureFromDensityInternalEnergy(w_d, w_s, lambda);
-            w_b = eos_d(n).BulkModulusFromDensityInternalEnergy(w_d, w_s, lambda);
-            w_t = eos_d(n).TemperatureFromDensityInternalEnergy(w_d, w_s, lambda);
+            w_p = eos_d(n).PressureFromDensityInternalEnergy(w_d, w_s);
+            w_b = eos_d(n).BulkModulusFromDensityInternalEnergy(w_d, w_s);
+            w_t = eos_d(n).TemperatureFromDensityInternalEnergy(w_d, w_s);
 
             // Sync conserved total energy
             const Real ke = 0.5 * w_d * (SQR(vel1) + SQR(vel2) + SQR(vel3));

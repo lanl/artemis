@@ -23,10 +23,6 @@
 
 namespace ArtemisUtils {
 
-// Maximum size of lambda array for optional extra EOS arguments.
-// As it happens this must be >= 1 for device code.
-static constexpr int lambda_max_vals = 1;
-
 // Variant containing all EOSs to be used in Artemis.
 
 using EOS =

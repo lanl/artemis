@@ -232,19 +232,19 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
       params.Add("eos_h", eos_host);
       params.Add("eos_d", eos_device);
     }
-#ifdef WITH_SESAME
-  } else if (pin->DoesBlockExist("gas/eos/sesame_re")) {
-    eos_type = "sesame_re";
+  } else if (pin->DoesBlockExist("gas/eos/spiner_re")) {
+    eos_type = "spiner_re";
     params.Add("eos_type", eos_type);
-    const std::string block_name = "gas/eos/sesame_re";
+    const std::string block_name = "gas/eos/spiner_re";
     auto filenames = pin->GetVector<std::string>(block_name, "eos_file");
+    auto matid = pin->GetVector<int>(block_name, "matid");
     PARTHENON_REQUIRE(filenames.size() == static_cast<size_t>(nspecies),
                       "eos_file must have nspecies entries");
     ParArray1D<EOS> eos_device("eos_d", nspecies);
     auto eos_host = eos_device.GetHostMirror();
     for (int n = 0; n < nspecies; ++n) {
-      eos_host(n) = singularity::UnitSystem<singularity::SpinerEOSDependsRhoE>(
-          singularity::SpinerEOSDependsRhoE(filenames[n], "gas"),
+      eos_host(n) = singularity::UnitSystem<singularity::SpinerEOSDependsRhoSie>(
+          singularity::SpinerEOSDependsRhoSie(filenames[n], matid[n]),
           singularity::eos_units_init::LengthTimeUnitsInit(),
           units.GetTimeCodeToPhysical(), units.GetMassCodeToPhysical(),
           units.GetLengthCodeToPhysical(), units.GetTemperatureCodeToPhysical());
@@ -263,17 +263,19 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
     params.Add("mu", mu);
     params.Add("eos_h", eos_host);
     params.Add("eos_d", eos_device);
-  } else if (pin->DoesBlockExist("gas/eos/sesame_rt")) {
-    eos_type = "sesame_rt";
-    const std::string block_name = "gas/eos/sesame_rt";
+  } else if (pin->DoesBlockExist("gas/eos/spiner_rt")) {
+    eos_type = "spiner_rt";
+    const std::string block_name = "gas/eos/spiner_rt";
     auto filenames = pin->GetVector<std::string>(block_name, "eos_file");
+    auto matid = pin->GetVector<int>(block_name, "matid");
+
     PARTHENON_REQUIRE(filenames.size() == static_cast<size_t>(nspecies),
                       "eos_file must have nspecies entries");
     ParArray1D<EOS> eos_device("eos_d", nspecies);
     auto eos_host = eos_device.GetHostMirror();
     for (int n = 0; n < nspecies; ++n) {
       eos_host(n) = singularity::UnitSystem<singularity::SpinerEOSDependsRhoT>(
-          singularity::SpinerEOSDependsRhoT(filenames[n], "gas"),
+          singularity::SpinerEOSDependsRhoT(filenames[n], matid[n]),
           singularity::eos_units_init::LengthTimeUnitsInit(),
           units.GetTimeCodeToPhysical(), units.GetMassCodeToPhysical(),
           units.GetLengthCodeToPhysical(), units.GetTemperatureCodeToPhysical());
@@ -292,7 +294,6 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
     params.Add("mu", mu);
     params.Add("eos_h", eos_host);
     params.Add("eos_d", eos_device);
-#endif // WITH_SESAME
 #endif // SPINER_USE_HDF
   } else {
     PARTHENON_FAIL("Unsupported gas EOS!");

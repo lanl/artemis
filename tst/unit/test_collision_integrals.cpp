@@ -41,9 +41,7 @@ double HardSphereCoeff(const double kb_code, const double m0, const double m1,
   return (4.0 / 3.0) * nij0 * nij1 * mij * M_PI * sij * sij * vrel;
 }
 
-double KineticEnergy(const double rho, const double p) {
-  return 0.5 * p * p / rho;
-}
+double KineticEnergy(const double rho, const double p) { return 0.5 * p * p / rho; }
 
 void ApplyTwoFluidImpulse(const double K, const double dt, const double rho0,
                           const double rho1, double &p0, double &p1) {
@@ -56,8 +54,7 @@ void ApplyTwoFluidImpulse(const double K, const double dt, const double rho0,
 
 double ApplyThermalExchange(const double H, const double dt, const double C0,
                             const double C1, const double T0, const double T1) {
-  return H * dt * (T1 - T0) /
-         (1.0 + H * dt * (1.0 / C0 + 1.0 / C1));
+  return H * dt * (T1 - T0) / (1.0 + H * dt * (1.0 / C0 + 1.0 / C1));
 }
 
 } // namespace
@@ -73,15 +70,15 @@ TEST_CASE("DragCoeff hard_sphere matches Chapman-Cowling form",
   const double rho1 = 3.0e-4;
   const double T = 2.0e4;
 
-  const double K =
-      DragCoeff(GasDragModel::hard_sphere, kb_code, m0, m1, s0, s1, 0.0, 0.0, rho0,
-                rho1, T);
+  const double K = DragCoeff(GasDragModel::hard_sphere, kb_code, m0, m1, s0, s1, 0.0, 0.0,
+                             rho0, rho1, T);
   const double K_expected = HardSphereCoeff(kb_code, m0, m1, s0, s1, rho0, rho1, T);
 
   REQUIRE(K == Approx(K_expected).epsilon(1.0e-12));
 }
 
-TEST_CASE("DragCoeff remains symmetric and positive", "[collision_integrals][hard_sphere]") {
+TEST_CASE("DragCoeff remains symmetric and positive",
+          "[collision_integrals][hard_sphere]") {
   const double kb_code = 1.0;
   const double m0 = 1.0;
   const double m1 = 4.0;
@@ -91,12 +88,10 @@ TEST_CASE("DragCoeff remains symmetric and positive", "[collision_integrals][har
   const double rho1 = 2.0e-4;
   const double T = 1.0e4;
 
-  const double K01 =
-      DragCoeff(GasDragModel::hard_sphere, kb_code, m0, m1, s0, s1, 0.0, 0.0, rho0,
-                rho1, T);
-  const double K10 =
-      DragCoeff(GasDragModel::hard_sphere, kb_code, m1, m0, s1, s0, 0.0, 0.0, rho1,
-                rho0, T);
+  const double K01 = DragCoeff(GasDragModel::hard_sphere, kb_code, m0, m1, s0, s1, 0.0,
+                               0.0, rho0, rho1, T);
+  const double K10 = DragCoeff(GasDragModel::hard_sphere, kb_code, m1, m0, s1, s0, 0.0,
+                               0.0, rho1, rho0, T);
 
   REQUIRE(K01 >= 0.0);
   REQUIRE(K01 == Approx(K10).epsilon(1.0e-12));
@@ -112,15 +107,12 @@ TEST_CASE("DragCoeff hard_sphere keeps expected density sigma and temperature sc
 
   const double K_base =
       DragCoeff(GasDragModel::hard_sphere, kb_code, m, m, s, s, 0.0, 0.0, rho, rho, T);
-  const double K_rho =
-      DragCoeff(GasDragModel::hard_sphere, kb_code, m, m, s, s, 0.0, 0.0, 2.0 * rho,
-                2.0 * rho, T);
-  const double K_sigma =
-      DragCoeff(GasDragModel::hard_sphere, kb_code, m, m, 2.0 * s, 2.0 * s, 0.0, 0.0,
-                rho, rho, T);
-  const double K_temp =
-      DragCoeff(GasDragModel::hard_sphere, kb_code, m, m, s, s, 0.0, 0.0, rho, rho,
-                4.0 * T);
+  const double K_rho = DragCoeff(GasDragModel::hard_sphere, kb_code, m, m, s, s, 0.0, 0.0,
+                                 2.0 * rho, 2.0 * rho, T);
+  const double K_sigma = DragCoeff(GasDragModel::hard_sphere, kb_code, m, m, 2.0 * s,
+                                   2.0 * s, 0.0, 0.0, rho, rho, T);
+  const double K_temp = DragCoeff(GasDragModel::hard_sphere, kb_code, m, m, s, s, 0.0,
+                                  0.0, rho, rho, 4.0 * T);
 
   REQUIRE(K_rho == Approx(4.0 * K_base).epsilon(1.0e-12));
   REQUIRE(K_sigma == Approx(4.0 * K_base).epsilon(1.0e-12));
@@ -247,8 +239,9 @@ TEST_CASE("Implicit thermal exchange conserves energy and reaches weighted equil
   REQUIRE(T1_new == Approx(Teq).epsilon(1.0e-9));
 }
 
-TEST_CASE("LJ collision integrals enhance cold coupling and approach hard-sphere at high T*",
-          "[collision_integrals][lj]") {
+TEST_CASE(
+    "LJ collision integrals enhance cold coupling and approach hard-sphere at high T*",
+    "[collision_integrals][lj]") {
   const double kb_code = 1.0;
   const double m = 1.0;
   const double s = 1.0e-3;
@@ -261,21 +254,17 @@ TEST_CASE("LJ collision integrals enhance cold coupling and approach hard-sphere
 
   const double K_lj_low =
       DragCoeff(GasDragModel::lj, kb_code, m, m, s, s, eps, eps, rho, rho, T_low);
-  const double K_hs_low =
-      DragCoeff(GasDragModel::hard_sphere, kb_code, m, m, s, s, 0.0, 0.0, rho, rho,
-                T_low);
+  const double K_hs_low = DragCoeff(GasDragModel::hard_sphere, kb_code, m, m, s, s, 0.0,
+                                    0.0, rho, rho, T_low);
   const double K_lj_high =
       DragCoeff(GasDragModel::lj, kb_code, m, m, s, s, eps, eps, rho, rho, T_high);
-  const double K_hs_high =
-      DragCoeff(GasDragModel::hard_sphere, kb_code, m, m, s, s, 0.0, 0.0, rho, rho,
-                T_high);
+  const double K_hs_high = DragCoeff(GasDragModel::hard_sphere, kb_code, m, m, s, s, 0.0,
+                                     0.0, rho, rho, T_high);
 
-  const double H_lj_low =
-      ThermalRelaxRate(GasDragModel::lj, kb_code, m, m, s, s, eps, eps, dof, dof, cv,
-                       cv, rho, rho, T_low);
-  const double H_lj_high =
-      ThermalRelaxRate(GasDragModel::lj, kb_code, m, m, s, s, eps, eps, dof, dof, cv,
-                       cv, rho, rho, T_high);
+  const double H_lj_low = ThermalRelaxRate(GasDragModel::lj, kb_code, m, m, s, s, eps,
+                                           eps, dof, dof, cv, cv, rho, rho, T_low);
+  const double H_lj_high = ThermalRelaxRate(GasDragModel::lj, kb_code, m, m, s, s, eps,
+                                            eps, dof, dof, cv, cv, rho, rho, T_high);
 
   REQUIRE(K_lj_low / K_hs_low > 1.0);
   REQUIRE(K_lj_low / K_hs_low > K_lj_high / K_hs_high);

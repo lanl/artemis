@@ -307,7 +307,8 @@ TaskStatus EvalOpac(MeshData<Real> *md) {
         // Evaluated at T*
         //%%%%%%%%%%%%%%%%
         const Real temp = eos_d.TemperatureFromDensityInternalEnergy(rho, sie);
-        vmesh(b, rad::star::absorption(), k, j, i) = opacity_d.AbsorptionCoefficient(rho, temp, 1.0);
+        vmesh(b, rad::star::absorption(), k, j, i) =
+            opacity_d.AbsorptionCoefficient(rho, temp, 1.0);
       });
 
   return TaskStatus::complete;

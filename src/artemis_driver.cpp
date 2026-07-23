@@ -11,6 +11,8 @@
 // the public, perform publicly and display publicly, and to permit others to do so.
 //========================================================================================
 
+// This file was created in part by generative AI
+
 // NOTE(PDM): The following is largely borrowed from the open-source LANL phoebus
 // software, with additional extensions motivated by other downstream development.
 
@@ -324,11 +326,17 @@ TaskCollection ArtemisDriver<GEOM>::StepTasks() {
             tl.AddTask(rt_src, RotatingFrame::RotatingFrameForce, u0.get(), time, bdt);
       }
 
+      // Apply problem-generator source terms in registration order
+      TaskID user_src = rframe_src;
+      for (const auto &task : GetUserSourceTasks()) {
+        user_src = tl.AddTask(user_src, task.name, task.function, u0.get(), time, bdt);
+      }
+
       // Apply drag source term
       // NOTE(@pdmullen): RK integrated, operator split drag (RHS computed from U)
-      TaskID drag_src = rframe_src;
+      TaskID drag_src = user_src;
       if (do_drag) {
-        drag_src = tl.AddTask(rframe_src, Drag::DragSource<GEOM>, u0.get(), time, bdt);
+        drag_src = tl.AddTask(user_src, Drag::DragSource<GEOM>, u0.get(), time, bdt);
       }
 
       // Apply cooling source term

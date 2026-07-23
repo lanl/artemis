@@ -10,12 +10,16 @@
 // license in this material to reproduce, prepare derivative works, distribute copies to
 // the public, perform publicly and display publicly, and to permit others to do so.
 //========================================================================================
+
+// This file was created in part by generative AI
 #ifndef ARTEMIS_ARTEMIS_HPP_
 #define ARTEMIS_ARTEMIS_HPP_
 
 // C++ includes
+#include <functional>
 #include <limits>
 #include <string>
+#include <vector>
 
 // Parthenon includes
 #include <parthenon/driver.hpp>
@@ -235,6 +239,18 @@ inline int ProblemDimension(parthenon::ParameterInput *pin) {
 // Custom AMR criteria
 namespace artemis {
 extern std::function<AmrTag(MeshBlockData<Real> *mbd)> ProblemCheckRefinementBlock;
+
+using UserSourceTaskFn =
+    std::function<TaskStatus(MeshData<Real> *md, const Real time, const Real dt)>;
+
+struct UserSourceTask {
+  std::string name;
+  UserSourceTaskFn function;
+};
+
+void RegisterUserSourceTask(const std::string &name, UserSourceTaskFn function);
+void ClearUserSourceTasks();
+const std::vector<UserSourceTask> &GetUserSourceTasks();
 } // namespace artemis
 
 #endif // ARTEMIS_ARTEMIS_HPP_

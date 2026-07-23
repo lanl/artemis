@@ -10,6 +10,8 @@
 // license in this material to reproduce, prepare derivative works, distribute copies to
 // the public, perform publicly and display publicly, and to permit others to do so.
 //========================================================================================
+
+// This file was created in part by generative AI
 #ifndef PGEN_PROBLEM_MODIFIER_HPP_
 #define PGEN_PROBLEM_MODIFIER_HPP_
 
@@ -44,6 +46,8 @@ void ProblemModifier(parthenon::ParthenonManager *pman) {
   using BF = parthenon::BoundaryFace;
   using ID = parthenon::IndexDomain;
 
+  ClearUserSourceTasks();
+
   std::string artemis_problem =
       pman->pinput->GetOrAddString("artemis", "problem", "unset");
 
@@ -66,6 +70,9 @@ void ProblemModifier(parthenon::ParthenonManager *pman) {
   } else if (artemis_problem == "disk") {
 
     artemis::ProblemCheckRefinementBlock = disk::ProblemCheckRefinementBlock;
+    if (pman->pinput->DoesBlockExist("problem/wave_killing")) {
+      RegisterUserSourceTask("disk_wave_killing", disk::WaveKilling<G>);
+    }
 
     pman->app_input->RegisterBoundaryCondition(BF::inner_x1, "ic",
                                                disk::DiskBoundaryIC<G, ID::inner_x1>);

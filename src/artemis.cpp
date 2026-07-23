@@ -11,6 +11,11 @@
 // the public, perform publicly and display publicly, and to permit others to do so.
 //========================================================================================
 
+// This file was created in part by generative AI
+
+// C++ includes
+#include <utility>
+
 // Artemis includes
 #include "artemis.hpp"
 #include "artemis_driver.hpp"
@@ -35,6 +40,32 @@
 #include "jaybenne.hpp"
 
 namespace artemis {
+
+namespace {
+std::vector<UserSourceTask> user_source_tasks;
+} // namespace
+
+//----------------------------------------------------------------------------------------
+//! \fn void Artemis::RegisterUserSourceTask
+//! \brief Registers a named problem-generator source task in execution order
+void RegisterUserSourceTask(const std::string &name, UserSourceTaskFn function) {
+  PARTHENON_REQUIRE(!name.empty(), "User source task names cannot be empty");
+  PARTHENON_REQUIRE(function != nullptr, "Cannot register a null user source task");
+  for (const auto &task : user_source_tasks) {
+    PARTHENON_REQUIRE(task.name != name, "Duplicate user source task name: " + name);
+  }
+  user_source_tasks.push_back({name, std::move(function)});
+}
+
+//----------------------------------------------------------------------------------------
+//! \fn void Artemis::ClearUserSourceTasks
+//! \brief Clears source tasks registered by a previous problem modifier
+void ClearUserSourceTasks() { user_source_tasks.clear(); }
+
+//----------------------------------------------------------------------------------------
+//! \fn const std::vector<UserSourceTask> &Artemis::GetUserSourceTasks
+//! \brief Returns problem-generator source tasks in registration order
+const std::vector<UserSourceTask> &GetUserSourceTasks() { return user_source_tasks; }
 
 //----------------------------------------------------------------------------------------
 //! \fn  Packages_t Artemis::ProcessPackages

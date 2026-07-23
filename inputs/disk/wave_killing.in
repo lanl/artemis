@@ -1,0 +1,107 @@
+# ========================================================================================
+#  (C) (or copyright) 2026. Triad National Security, LLC. All rights reserved.
+#
+#  This program was produced under U.S. Government contract 89233218CNA000001 for Los
+#  Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
+#  for the U.S. Department of Energy/National Nuclear Security Administration. All rights
+#  in the program are reserved by Triad National Security, LLC, and the U.S. Department
+#  of Energy/National Nuclear Security Administration. The Government is granted for
+#  itself and others acting on its behalf a nonexclusive, paid-up, irrevocable worldwide
+#  license in this material to reproduce, prepare derivative works, distribute copies to
+#  the public, perform publicly and display publicly, and to permit others to do so.
+# ========================================================================================
+
+# This file was created in part by generative AI
+#
+<artemis>
+problem = disk
+coordinates = axisymmetric
+
+<parthenon/job>
+problem_id = disk_wave_killing
+
+<parthenon/output1>
+variables = gas.prim.density,  &
+            gas.prim.velocity, &
+            gas.prim.pressure, &
+            dust.prim.density, &
+            dust.prim.velocity
+file_type = hdf5
+dt = 1.0
+
+<parthenon/time>
+nlim = 3
+tlim = 1.0
+integrator = rk2
+ncycle_out = 1
+
+<parthenon/mesh>
+nx1 = 32
+x1min = 0.5
+x1max = 2.0
+ix1_bc = ic
+ox1_bc = ic
+
+nx2 = 16
+x2min = -0.2
+x2max = 0.2
+ix2_bc = ic
+ox2_bc = ic
+
+nx3 = 1
+x3min = -0.5
+x3max = 0.5
+ix3_bc = periodic
+ox3_bc = periodic
+
+<parthenon/meshblock>
+nx1 = 8
+nx2 = 8
+nx3 = 1
+
+<physics>
+gas = true
+dust = true
+gravity = true
+
+<gas>
+cfl = 0.3
+reconstruct = plm
+riemann = hllc-general
+dfloor = 1.0e-10
+siefloor = 1.0e-10
+
+<gas/eos/ideal>
+gamma = 1.4
+
+<dust>
+cfl = 0.3
+nspecies = 2
+size_input = direct
+sizes = 1.0e-4, 1.0e-3
+grain_density = 1.0
+reconstruct = plm
+riemann = hlle
+dfloor = 1.0e-10
+
+<gravity/point>
+mass = 1.0
+
+<problem>
+r0 = 1.0
+rho0 = 1.0
+dslope = -1.0
+flare = 0.0
+h0 = 0.1
+polytropic_index = 1.0
+quiet_start = true
+
+<problem/wave_killing>
+x1_inner = 0.7
+x1_outer = 1.8
+x1_inner_rate = 5.0
+x1_outer_rate = 5.0
+x2_inner = -0.15
+x2_outer = 0.15
+x2_inner_rate = 5.0
+x2_outer_rate = 5.0

@@ -64,7 +64,8 @@ class ArtemisDriver : public EvolutionDriver {
 
 //----------------------------------------------------------------------------------------
 using TaskCollectionFnPtr = TaskCollection (*)(Mesh *pm, const Real time, const Real dt);
-Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin);
+Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin,
+                           Rummy::FullDeck *input_state);
 
 } // namespace artemis
 

@@ -175,7 +175,10 @@ int main(int argc, char *argv[]) {
     return 1;
   }
   // Redefine parthenon defaults
-  pman.app_input->ProcessPackages = ProcessPackages;
+  auto *input_state = pman.GetRummyFullDeck();
+  pman.app_input->ProcessPackages = [input_state](std::unique_ptr<ParameterInput> &pin) {
+    return ProcessPackages(pin, input_state);
+  };
 
   // Use Parthenon default reflecting boundary conditions
   pman.app_input->RegisterDefaultReflectingBoundaryConditions();

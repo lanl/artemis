@@ -18,6 +18,7 @@ artemis:
       _description: "(r,z,&phi;) axisymmetric coordinates."
   problem:
     _type: string
+    _default: "unset"
     _description: "Name of the problem pgen."
   amr_user:
     _type: bool

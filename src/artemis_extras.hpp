@@ -45,7 +45,6 @@ const std::vector<UnsplitTask> &GetUnsplitExplicitTasks();
 
 const std::vector<SplitTaskList> &GetSplitTaskLists();
 
-
-}
+} // namespace artemis
 
 #endif // ARTEMIS_EXTRAS_HPP_

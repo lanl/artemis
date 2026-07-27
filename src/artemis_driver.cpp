@@ -22,8 +22,8 @@
 
 // Artemis Includes
 #include "artemis.hpp"
-#include "artemis_extras.hpp"
 #include "artemis_driver.hpp"
+#include "artemis_extras.hpp"
 #include "drag/drag.hpp"
 #include "dust/coagulation/coagulation.hpp"
 #include "dust/dust.hpp"
@@ -166,7 +166,6 @@ TaskListStatus ArtemisDriver<GEOM>::Step() {
     status = Dust::Coagulation::CoagulationDriver<GEOM>(pmesh, tm);
     if (status != TaskListStatus::complete) return status;
   }
-
 
   // Other operator split tasks
   for (const auto &tc : GetSplitTaskLists()) {

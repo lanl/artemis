@@ -22,8 +22,8 @@
 #include <parthenon_manager.hpp>
 
 // Artemis includes
-#include "pgen.hpp"
 #include "artemis_extras.hpp"
+#include "pgen.hpp"
 #include "utils/artemis_utils.hpp"
 
 // Jaybenne includes

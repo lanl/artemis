@@ -14,6 +14,7 @@
 #define ARTEMIS_EXTRAS_HPP_
 
 #include <functional>
+#include <vector>
 
 namespace artemis {
 

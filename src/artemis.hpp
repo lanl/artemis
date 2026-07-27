@@ -11,14 +11,12 @@
 // the public, perform publicly and display publicly, and to permit others to do so.
 //========================================================================================
 
-// This file was created in part by generative AI
 #ifndef ARTEMIS_ARTEMIS_HPP_
 #define ARTEMIS_ARTEMIS_HPP_
 
 // C++ includes
 #include <limits>
 #include <string>
-#include <vector>
 
 // Parthenon includes
 #include <parthenon/driver.hpp>

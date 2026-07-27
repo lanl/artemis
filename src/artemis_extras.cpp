@@ -11,6 +11,8 @@
 // the public, perform publicly and display publicly, and to permit others to do so.
 //========================================================================================
 
+#include <utility> // std::move
+
 #include "artemis.hpp"
 #include "artemis_extras.hpp"
 

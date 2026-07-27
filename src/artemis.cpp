@@ -11,11 +11,6 @@
 // the public, perform publicly and display publicly, and to permit others to do so.
 //========================================================================================
 
-// This file was created in part by generative AI
-
-// C++ includes
-#include <utility>
-
 // Artemis includes
 #include "artemis.hpp"
 #include "artemis_driver.hpp"

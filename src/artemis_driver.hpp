@@ -63,7 +63,6 @@ class ArtemisDriver : public EvolutionDriver {
 };
 
 //----------------------------------------------------------------------------------------
-using TaskCollectionFnPtr = TaskCollection (*)(Mesh *pm, const Real time, const Real dt);
 Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin);
 
 } // namespace artemis

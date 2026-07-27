@@ -16,9 +16,11 @@
 #include <functional>
 #include <vector>
 
+#include "artemis.hpp"
+
 namespace artemis {
 
-//  sources
+//  Extra tasks in the main step
 using UnsplitTaskFn =
     std::function<TaskStatus(MeshData<Real> *md, const Real time, const Real dt)>;
 
@@ -27,14 +29,21 @@ struct UnsplitTask {
   UnsplitTaskFn function;
 };
 
+// Operator-split task collections
+using SplitTaskListFn = std::function<TaskListStatus(Mesh *pm, const SimTime &time)>;
+struct SplitTaskList {
+  std::string name;
+  SplitTaskListFn function;
+};
+
 void RegisterUnsplitExplicitTask(const std::string &name, UnsplitTaskFn function);
 void RegisterUnsplitImplicitTask(const std::string &name, UnsplitTaskFn function);
+void RegisterSplitTaskList(const std::string &name, SplitTaskListFn function);
 
 const std::vector<UnsplitTask> &GetUnsplitImplicitTasks();
 const std::vector<UnsplitTask> &GetUnsplitExplicitTasks();
 
-// TaskCollection function pointer for operator split tasks
-using TaskCollectionFnPtr = TaskCollection (*)(Mesh *pm, const Real time, const Real dt);
+const std::vector<SplitTaskList> &GetSplitTaskLists();
 
 
 }

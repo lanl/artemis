@@ -20,6 +20,8 @@ namespace artemis {
 
 std::vector<UnsplitTask> unsplit_expl_tasks;
 std::vector<UnsplitTask> unsplit_impl_tasks;
+std::vector<SplitTaskList> split_tasks;
+
 //----------------------------------------------------------------------------------------
 //! \fn void Artemis::RegisterUnsplitExplicitTask
 //! \brief Registers a named unsplit and explicit task in execution order
@@ -44,6 +46,17 @@ void RegisterUnsplitImplicitTask(const std::string &name, UnsplitTaskFn function
   unsplit_impl_tasks.push_back({name, std::move(function)});
 }
 
+//----------------------------------------------------------------------------------------
+//! \fn void Artemis::RegisterSplitTaskList
+//! \brief Registers a named operator split task collection in execution order
+void RegisterSplitTaskList(const std::string &name, SplitTaskListFn function) {
+  PARTHENON_REQUIRE(!name.empty(), "Split task collection name cannot be empty");
+  PARTHENON_REQUIRE(function != nullptr, "Cannot register a null split task collection");
+  for (const auto &task : split_tasks) {
+    PARTHENON_REQUIRE(task.name != name, "Duplicate split task collection name: " + name);
+  }
+  split_tasks.push_back({name, std::move(function)});
+}
 
 //----------------------------------------------------------------------------------------
 //! \fn const std::vector<UnsplitTask> &Artemis::GetUnsplitExplicitTasks
@@ -54,5 +67,10 @@ const std::vector<UnsplitTask> &GetUnsplitExplicitTasks() { return unsplit_expl_
 //! \fn const std::vector<UnsplitTask> &Artemis::GetUnsplitImplicitTasks
 //! \brief Returns unsplit and implicit tasks in registration order
 const std::vector<UnsplitTask> &GetUnsplitImplicitTasks() { return unsplit_impl_tasks; }
+
+//----------------------------------------------------------------------------------------
+//! \fn const std::vector<UnsplitTask> &Artemis::GetSplitTaskLists
+//! \brief Returns operator split task collections in registration order
+const std::vector<SplitTaskList> &GetSplitTaskLists() { return split_tasks; }
 
 } // namespace artemis

@@ -162,8 +162,17 @@ TaskListStatus ArtemisDriver<GEOM>::Step() {
   }
 
   // Operator split, dust coagulation
-  if (do_coagulation) status = Dust::Coagulation::CoagulationDriver<GEOM>(pmesh, tm);
-  if (status != TaskListStatus::complete) return status;
+  if (do_coagulation) {
+    status = Dust::Coagulation::CoagulationDriver<GEOM>(pmesh, tm);
+    if (status != TaskListStatus::complete) return status;
+  }
+
+
+  // Other operator split tasks
+  for (const auto &tc : GetSplitTaskLists()) {
+    status = tc.function(pmesh, tm);
+    if (status != TaskListStatus::complete) return status;
+  }
 
   // Compute new dt, (de)refine, and handle sparse (if enabled)
   status = PostStepTasks().Execute();

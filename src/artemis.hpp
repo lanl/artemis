@@ -16,7 +16,6 @@
 #define ARTEMIS_ARTEMIS_HPP_
 
 // C++ includes
-#include <functional>
 #include <limits>
 #include <string>
 #include <vector>
@@ -147,9 +146,6 @@ using BYTE = uint8_t;
 using BYTE = char;
 #endif
 
-// TaskCollection function pointer for operator split tasks
-using TaskCollectionFnPtr = TaskCollection (*)(Mesh *pm, const Real time, const Real dt);
-
 // Constants that enumerate...
 // ...Coordinate systems
 enum class Coordinates {
@@ -240,17 +236,6 @@ inline int ProblemDimension(parthenon::ParameterInput *pin) {
 namespace artemis {
 extern std::function<AmrTag(MeshBlockData<Real> *mbd)> ProblemCheckRefinementBlock;
 
-using UserSourceTaskFn =
-    std::function<TaskStatus(MeshData<Real> *md, const Real time, const Real dt)>;
-
-struct UserSourceTask {
-  std::string name;
-  UserSourceTaskFn function;
-};
-
-void RegisterUserSourceTask(const std::string &name, UserSourceTaskFn function);
-void ClearUserSourceTasks();
-const std::vector<UserSourceTask> &GetUserSourceTasks();
 } // namespace artemis
 
 #endif // ARTEMIS_ARTEMIS_HPP_

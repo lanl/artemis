@@ -23,6 +23,7 @@
 
 // Artemis includes
 #include "pgen.hpp"
+#include "artemis_extras.hpp"
 #include "utils/artemis_utils.hpp"
 
 // Jaybenne includes
@@ -45,8 +46,6 @@ void ProblemModifier(parthenon::ParthenonManager *pman) {
   PARTHENON_INSTRUMENT
   using BF = parthenon::BoundaryFace;
   using ID = parthenon::IndexDomain;
-
-  ClearUserSourceTasks();
 
   std::string artemis_problem =
       pman->pinput->GetOrAddString("artemis", "problem", "unset");
@@ -71,7 +70,7 @@ void ProblemModifier(parthenon::ParthenonManager *pman) {
 
     artemis::ProblemCheckRefinementBlock = disk::ProblemCheckRefinementBlock;
     if (pman->pinput->DoesBlockExist("problem/wave_killing")) {
-      RegisterUserSourceTask("disk_wave_killing", disk::WaveKilling<G>);
+      RegisterUnsplitExplicitTask("disk_wave_killing", disk::WaveKilling<G>);
     }
 
     pman->app_input->RegisterBoundaryCondition(BF::inner_x1, "ic",

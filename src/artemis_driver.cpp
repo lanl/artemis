@@ -22,6 +22,7 @@
 
 // Artemis Includes
 #include "artemis.hpp"
+#include "artemis_extras.hpp"
 #include "artemis_driver.hpp"
 #include "drag/drag.hpp"
 #include "dust/coagulation/coagulation.hpp"
@@ -327,16 +328,16 @@ TaskCollection ArtemisDriver<GEOM>::StepTasks() {
       }
 
       // Apply problem-generator source terms in registration order
-      TaskID user_src = rframe_src;
-      for (const auto &task : GetUserSourceTasks()) {
-        user_src = tl.AddTask(user_src, task.name, task.function, u0.get(), time, bdt);
+      TaskID expl_src = rframe_src;
+      for (const auto &task : GetUnsplitExplicitTasks()) {
+        expl_src = tl.AddTask(expl_src, task.name, task.function, u0.get(), time, bdt);
       }
 
       // Apply drag source term
       // NOTE(@pdmullen): RK integrated, operator split drag (RHS computed from U)
-      TaskID drag_src = user_src;
+      TaskID drag_src = expl_src;
       if (do_drag) {
-        drag_src = tl.AddTask(user_src, Drag::DragSource<GEOM>, u0.get(), time, bdt);
+        drag_src = tl.AddTask(expl_src, Drag::DragSource<GEOM>, u0.get(), time, bdt);
       }
 
       // Apply cooling source term
@@ -347,9 +348,14 @@ TaskCollection ArtemisDriver<GEOM>::StepTasks() {
                                  time, bdt, stage);
       }
 
+      TaskID impl_src = cooling_src;
+      for (const auto &task : GetUnsplitImplicitTasks()) {
+        impl_src = tl.AddTask(impl_src, task.name, task.function, u0.get(), time, bdt);
+      }
+
       // Set auxillary fields
       auto set_aux =
-          tl.AddTask(cooling_src, ArtemisDerived::SetAuxillaryFields<GEOM>, u0.get());
+          tl.AddTask(impl_src, ArtemisDerived::SetAuxillaryFields<GEOM>, u0.get());
 
       // Set (remaining) fields to be communicated
       auto c2p = tl.AddTask(set_aux, PreCommFillDerived<MeshData<Real>>, u0.get());

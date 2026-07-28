@@ -1,21 +1,28 @@
 [submodule "external/parthenon"]
-	path = external/parthenon
-	url = https://github.com/parthenon-hpc-lab/parthenon.git
+  path = external/parthenon
+  url = https://github.com/parthenon-hpc-lab/parthenon.git
+  ignore = dirty
 [submodule "external/singularity-eos"]
-	path = external/singularity-eos
-	url = https://github.com/lanl/singularity-eos.git
+  path = external/singularity-eos
+  url = https://github.com/lanl/singularity-eos.git
+  ignore = dirty
 [submodule "external/rebound"]
-	path = external/rebound
-	url = https://github.com/hannorein/rebound
+  path = external/rebound
+  url = https://github.com/hannorein/rebound
+  ignore = dirty
 [submodule "external/singularity-opac"]
-	path = external/singularity-opac
-	url = https://github.com/lanl/singularity-opac.git
+  path = external/singularity-opac
+  url = https://github.com/lanl/singularity-opac.git
+  ignore = dirty
 [submodule "external/jaybenne"]
-	path = external/jaybenne
-	url = https://github.com/lanl/jaybenne.git
+  path = external/jaybenne
+  url = https://github.com/lanl/jaybenne.git
+  ignore = dirty
 [submodule "external/Catch2"]
 	path = external/Catch2
 	url = https://github.com/catchorg/Catch2.git
+  ignore = dirty
 [submodule "external/kokkos-kernels"]
 	path = external/kokkos-kernels
 	url = https://github.com/kokkos/kokkos-kernels
+  ignore = dirty

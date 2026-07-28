@@ -14,6 +14,8 @@
 // Copyright(C) 2020 James M. Stone <jmstone@ias.edu> and the Athena code team
 // Licensed under the 3-clause BSD License (the "LICENSE")
 //========================================================================================
+
+// This file was created in part by generative AI
 #ifndef PGEN_DISK_HPP_
 #define PGEN_DISK_HPP_
 //! \file disk.hpp
@@ -73,6 +75,30 @@ struct DiskParams {
   bool log;
   bool multi_d, three_d;
 };
+
+//! \struct WaveKillingParams
+//! \brief Coordinate-space bounds and rates for disk wave-killing zones
+struct WaveKillingParams {
+  std::array<Real, 3> xmin, xmax;
+  std::array<Real, 3> inner, outer;
+  std::array<Real, 3> inner_rate, outer_rate;
+};
+
+KOKKOS_INLINE_FUNCTION
+Real WaveKillingRate(const WaveKillingParams &wave, const std::array<Real, 3> &xv) {
+  Real rate = 0.0;
+  for (int d = 0; d < 3; ++d) {
+    if (wave.inner_rate[d] > 0.0 && xv[d] < wave.inner[d]) {
+      const Real ramp = (xv[d] - wave.inner[d]) / (wave.inner[d] - wave.xmin[d]);
+      rate += wave.inner_rate[d] * SQR(ramp);
+    }
+    if (wave.outer_rate[d] > 0.0 && xv[d] > wave.outer[d]) {
+      const Real ramp = (xv[d] - wave.outer[d]) / (wave.xmax[d] - wave.outer[d]);
+      rate += wave.outer_rate[d] * SQR(ramp);
+    }
+  }
+  return rate;
+}
 
 struct State {
   Real gdens = Null<Real>();
@@ -348,6 +374,39 @@ inline void InitDiskParams(MeshBlock *pmb, ParameterInput *pin) {
     disk_params.nbody_temp = pin->GetOrAddBoolean("problem", "nbody_temp", false);
     disk_params.nbody_temp = disk_params.nbody_temp && params.Get<bool>("do_nbody");
     params.Add("disk_params", disk_params);
+
+    if (pin->DoesBlockExist("problem/wave_killing")) {
+      constexpr char block[] = "problem/wave_killing";
+      WaveKillingParams wave;
+      wave.xmin = {params.Get<Real>("x1min"), params.Get<Real>("x2min"),
+                   params.Get<Real>("x3min")};
+      wave.xmax = {params.Get<Real>("x1max"), params.Get<Real>("x2max"),
+                   params.Get<Real>("x3max")};
+
+      const std::array<std::string, 3> axis = {"x1", "x2", "x3"};
+      for (int d = 0; d < 3; ++d) {
+        wave.inner[d] = pin->GetOrAddReal(block, axis[d] + "_inner", wave.xmin[d]);
+        wave.outer[d] = pin->GetOrAddReal(block, axis[d] + "_outer", wave.xmax[d]);
+        wave.inner_rate[d] = pin->GetOrAddReal(block, axis[d] + "_inner_rate", 0.0);
+        wave.outer_rate[d] = pin->GetOrAddReal(block, axis[d] + "_outer_rate", 0.0);
+
+        PARTHENON_REQUIRE(wave.inner_rate[d] >= 0.0 && wave.outer_rate[d] >= 0.0,
+                          "Wave-killing rates must be nonnegative");
+        PARTHENON_REQUIRE(wave.inner[d] >= wave.xmin[d] &&
+                              wave.outer[d] <= wave.xmax[d] &&
+                              wave.inner[d] <= wave.outer[d],
+                          "Wave-killing bounds must satisfy xmin <= inner <= outer <= "
+                          "xmax");
+        PARTHENON_REQUIRE(wave.inner_rate[d] == 0.0 || wave.inner[d] > wave.xmin[d],
+                          "An active inner wave-killing zone must extend beyond xmin");
+        PARTHENON_REQUIRE(wave.outer_rate[d] == 0.0 || wave.outer[d] < wave.xmax[d],
+                          "An active outer wave-killing zone must begin before xmax");
+        PARTHENON_REQUIRE(nx[d] > 1 ||
+                              (wave.inner_rate[d] == 0.0 && wave.outer_rate[d] == 0.0),
+                          "Wave killing cannot be active in a collapsed dimension");
+      }
+      params.Add("wave_killing_params", wave);
+    }
   }
 }
 
@@ -446,6 +505,141 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
         DiskICImpl<GEOM>(v, 0, k, j, i, pco, eos_d(0), dp, particles, npart);
       });
+}
+
+//----------------------------------------------------------------------------------------
+//! \fn TaskStatus disk::WaveKilling
+//! \brief Relaxes disk gas and dust toward their initial profiles near mesh boundaries
+template <Coordinates GEOM>
+TaskStatus WaveKilling(MeshData<Real> *md, const Real /* time */, const Real dt) {
+  PARTHENON_INSTRUMENT
+  using parthenon::MakePackDescriptor;
+
+  auto pm = md->GetParentPointer();
+  auto &resolved_pkgs = pm->resolved_packages;
+  auto &artemis_pkg = pm->packages.Get("artemis");
+  const bool do_gas = artemis_pkg->template Param<bool>("do_gas");
+  const bool do_dust = artemis_pkg->template Param<bool>("do_dust");
+  const auto &cpars = artemis_pkg->template Param<geometry::CoordParams>("coord_params");
+  const auto disk_params = artemis_pkg->template Param<DiskParams>("disk_params");
+  const auto wave = artemis_pkg->template Param<WaveKillingParams>("wave_killing_params");
+
+  auto &gas_pkg = pm->packages.Get("gas");
+  const auto &eos_d = gas_pkg->template Param<EOS>("eos_d");
+  const Real de_switch = gas_pkg->template Param<Real>("de_switch");
+  const Real dflr_gas = gas_pkg->template Param<Real>("dfloor");
+  const Real sieflr_gas = gas_pkg->template Param<Real>("siefloor");
+
+  Real dflr_dust = Null<Real>();
+  if (do_dust) {
+    dflr_dust = pm->packages.Get("dust")->template Param<Real>("dfloor");
+  }
+
+  static auto desc =
+      MakePackDescriptor<gas::cons::density, gas::cons::momentum, gas::cons::total_energy,
+                         gas::cons::internal_energy, dust::cons::density,
+                         dust::cons::momentum>(resolved_pkgs.get());
+  auto vmesh = desc.GetPack(md);
+  static auto desc_g =
+      MakePackDescriptor<geom::x1v, geom::x2v, geom::x3v, geom::dx1, geom::dx2, geom::dx3,
+                         geom::hx1v, geom::hx2v, geom::hx3v>(resolved_pkgs.get());
+  auto vg = desc_g.GetPack(md);
+
+  const auto ib = md->GetBoundsI(IndexDomain::interior);
+  const auto jb = md->GetBoundsJ(IndexDomain::interior);
+  const auto kb = md->GetBoundsK(IndexDomain::interior);
+
+  ParArray1D<NBody::Particle> particles;
+  int npart = 0;
+  if (disk_params.nbody_temp) {
+    auto &nbody_pkg = pm->packages.Get("nbody");
+    particles = nbody_pkg->template Param<ParArray1D<NBody::Particle>>("particles");
+    npart = static_cast<int>(particles.size());
+  }
+
+  parthenon::par_for(
+      DEFAULT_LOOP_PATTERN, "DiskWaveKilling", parthenon::DevExecSpace(), 0,
+      md->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
+        geometry::Coords<GEOM> coords(cpars, vmesh.GetCoordinates(b), k, j, i);
+        const auto &xv = coords.GetCellCenter(vg, b, k, j, i);
+        const Real rate = WaveKillingRate(wave, xv);
+        if (rate <= 0.0) return;
+
+        const auto &dx = coords.GetCellWidths(vg, b, k, j, i);
+        const auto &hx = coords.GetScaleFactors(vg, b, k, j, i);
+        const Real fac = rate * dt / (1.0 + rate * dt);
+        const auto target =
+            ComputeDiskProfile<GEOM>(disk_params, coords, xv, dx, k, j, i, eos_d, do_gas,
+                                     do_dust, particles, npart);
+
+        if (do_gas) {
+          const Real target_vel[3] = {target.gvel1, target.gvel2, target.gvel3};
+          for (int n = 0; n < vmesh.GetSize(b, gas::cons::density()); ++n) {
+            Real &dens = vmesh(b, gas::cons::density(n), k, j, i);
+            Real &mom1 = vmesh(b, gas::cons::momentum(VI(n, 0)), k, j, i);
+            Real &mom2 = vmesh(b, gas::cons::momentum(VI(n, 1)), k, j, i);
+            Real &mom3 = vmesh(b, gas::cons::momentum(VI(n, 2)), k, j, i);
+            Real &etot = vmesh(b, gas::cons::total_energy(n), k, j, i);
+            Real &eint = vmesh(b, gas::cons::internal_energy(n), k, j, i);
+
+            dens = std::max(dens, dflr_gas);
+            Real sie = ArtemisUtils::DualEnergySIE(vmesh, b, n, k, j, i, de_switch, hx);
+            sie = std::max(sie, sieflr_gas);
+
+            const Real vel[3] = {mom1 / (dens * hx[0]), mom2 / (dens * hx[1]),
+                                 mom3 / (dens * hx[2])};
+            const Real temp = eos_d.TemperatureFromDensityInternalEnergy(dens, sie);
+            const Real new_dens = std::max(dflr_gas, dens + fac * (target.gdens - dens));
+            const Real new_temp = temp + fac * (target.gtemp - temp);
+            const Real new_sie =
+                std::max(sieflr_gas,
+                         eos_d.InternalEnergyFromDensityTemperature(new_dens, new_temp));
+            const Real new_vel[3] = {vel[0] + fac * (target_vel[0] - vel[0]),
+                                     vel[1] + fac * (target_vel[1] - vel[1]),
+                                     vel[2] + fac * (target_vel[2] - vel[2])};
+
+            const Real old_ke = 0.5 * dens * (SQR(vel[0]) + SQR(vel[1]) + SQR(vel[2]));
+            const Real new_ke =
+                0.5 * new_dens * (SQR(new_vel[0]) + SQR(new_vel[1]) + SQR(new_vel[2]));
+            const Real old_eint = dens * sie;
+            const Real new_eint = new_dens * new_sie;
+
+            dens = new_dens;
+            mom1 = new_dens * new_vel[0] * hx[0];
+            mom2 = new_dens * new_vel[1] * hx[1];
+            mom3 = new_dens * new_vel[2] * hx[2];
+            eint = new_eint;
+            etot += (new_eint - old_eint) + (new_ke - old_ke);
+            etot = std::max(etot, new_eint + new_ke);
+          }
+        }
+
+        if (do_dust) {
+          const Real target_vel[3] = {target.dvel1, target.dvel2, target.dvel3};
+          for (int n = 0; n < vmesh.GetSize(b, dust::cons::density()); ++n) {
+            Real &dens = vmesh(b, dust::cons::density(n), k, j, i);
+            Real &mom1 = vmesh(b, dust::cons::momentum(VI(n, 0)), k, j, i);
+            Real &mom2 = vmesh(b, dust::cons::momentum(VI(n, 1)), k, j, i);
+            Real &mom3 = vmesh(b, dust::cons::momentum(VI(n, 2)), k, j, i);
+
+            dens = std::max(dens, dflr_dust);
+            const Real vel[3] = {mom1 / (dens * hx[0]), mom2 / (dens * hx[1]),
+                                 mom3 / (dens * hx[2])};
+            const Real new_dens = std::max(dflr_dust, dens + fac * (target.ddens - dens));
+            const Real new_vel[3] = {vel[0] + fac * (target_vel[0] - vel[0]),
+                                     vel[1] + fac * (target_vel[1] - vel[1]),
+                                     vel[2] + fac * (target_vel[2] - vel[2])};
+
+            dens = new_dens;
+            mom1 = new_dens * new_vel[0] * hx[0];
+            mom2 = new_dens * new_vel[1] * hx[1];
+            mom3 = new_dens * new_vel[2] * hx[2];
+          }
+        }
+      });
+
+  return TaskStatus::complete;
 }
 
 //----------------------------------------------------------------------------------------

@@ -377,8 +377,14 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
       PARTHENON_FAIL("Opacity model not recognized!");
     }
   }
-  params.Add("opacity_h", opacity);
-  params.Add("opacity_d", opacity.GetOnDevice());
+  ParArray1D<ArtemisUtils::MeanOpacity> opacity_device("opacity_d", nspecies);
+  auto opacity_host = opacity_device.GetHostMirror();
+  for (int n = 0; n < nspecies; ++n) {
+    opacity_host(n) = opacity;
+    opacity_device(n) = opacity_host(n).GetOnDevice();
+  }
+  params.Add("opacity_h", opacity_host);
+  params.Add("opacity_d", opacity_device);
 
   // Scattering opacity model
   std::string scattering_model_name =
@@ -412,8 +418,14 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
     PARTHENON_FAIL("Scattering model not recognized!");
   }
 
-  params.Add("scattering_h", scattering);
-  params.Add("scattering_d", scattering.GetOnDevice());
+  ParArray1D<ArtemisUtils::MeanScattering> scattering_device("scattering_d", nspecies);
+  auto scattering_host = scattering_device.GetHostMirror();
+  for (int n = 0; n < nspecies; ++n) {
+    scattering_host(n) = scattering;
+    scattering_device(n) = scattering_host(n).GetOnDevice();
+  }
+  params.Add("scattering_h", scattering_host);
+  params.Add("scattering_d", scattering_device);
 
   // Dual energy switch
   // When internal > de_switch * total we use the total

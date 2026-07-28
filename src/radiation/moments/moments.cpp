@@ -410,7 +410,7 @@ void InitMesh(parthenon::Mesh *pmesh) {
             "coord_params");
 
     if (use_opac) {
-      const auto &opac_d = gas_pkg->Param<MeanOpacity>("opacity_d");
+      const auto &opac_d = gas_pkg->Param<ParArray1D<MeanOpacity>>("opacity_d");
       const bool multi_d = pmesh->ndim >= 2;
       const bool three_d = pmesh->ndim == 3;
       parthenon::par_for(
@@ -425,8 +425,8 @@ void InitMesh(parthenon::Mesh *pmesh) {
             Real dx_min = dx[0];
             if (multi_d) dx_min = std::min(dx_min, dx[1]);
             if (three_d) dx_min = std::min(dx_min, dx[2]);
-            const Real tau =
-                std::min(1.0, dx_min * opac_d.RosselandMeanAbsorptionCoefficient(rho, T));
+            const Real tau = std::min(
+                1.0, dx_min * opac_d(0).RosselandMeanAbsorptionCoefficient(rho, T));
             const Real Erad = tau * arad * SQR(SQR(T));
             vmesh(b, rad::cons::energy(0), k, j, i) = Erad;
             vmesh(b, rad::prim::energy(0), k, j, i) = Erad;

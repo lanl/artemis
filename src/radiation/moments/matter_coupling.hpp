@@ -42,8 +42,8 @@ TaskStatus MatterCouplingSimpleImpl(MeshData<Real> *u0, const Real dt) {
   // Extract gas package and params
   auto &gas_pkg = pm->packages.Get("gas");
   const auto &eos_d = gas_pkg->template Param<ParArray1D<EOS>>("eos_d");
-  auto opac_d = gas_pkg->template Param<MeanOpacity>("opacity_d");
-  auto scat_d = gas_pkg->template Param<MeanScattering>("scattering_d");
+  auto opac_d = gas_pkg->template Param<ParArray1D<MeanOpacity>>("opacity_d");
+  auto scat_d = gas_pkg->template Param<ParArray1D<MeanScattering>>("scattering_d");
   auto dflr = gas_pkg->template Param<Real>("dfloor");
   auto de_switch = gas_pkg->template Param<Real>("de_switch");
 
@@ -143,7 +143,7 @@ TaskStatus MatterCouplingSimpleImpl(MeshData<Real> *u0, const Real dt) {
           T = std::pow(B / arad, 0.25);
           e = eos_d(0).InternalEnergyFromDensityTemperature(dens, T) * dens;
           const Real Cv = dens * eos_d(0).SpecificHeatFromDensityTemperature(dens, T);
-          const Real a = chat * dt * opac_d.PlanckMeanAbsorptionCoefficient(dens, T);
+          const Real a = chat * dt * opac_d(0).PlanckMeanAbsorptionCoefficient(dens, T);
           const Real fleck = FleckFactor(arad, T, Cv);
 
           const Real Ri = a * (E - B);
@@ -172,8 +172,8 @@ TaskStatus MatterCouplingSimpleImpl(MeshData<Real> *u0, const Real dt) {
         e = eos_d(0).InternalEnergyFromDensityTemperature(dens, T) * dens;
         const Real dEg = e - e0;
         Real a = chat * dt *
-                 (opac_d.RosselandMeanAbsorptionCoefficient(dens, T) +
-                  scat_d.RosselandMeanTotalScatteringCoefficient(dens, T));
+                 (opac_d(0).RosselandMeanAbsorptionCoefficient(dens, T) +
+                  scat_d(0).RosselandMeanTotalScatteringCoefficient(dens, T));
         std::array<Real, 3> dF{-a / (1. + a) * Fr0[0], -a / (1. + a) * Fr0[1],
                                -a / (1. + a) * Fr0[2]};
         const Real icc = -1. / (c * chat * dens);
@@ -212,8 +212,8 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
   // Extract gas package and params
   auto &gas_pkg = pm->packages.Get("gas");
   const auto &eos_d = gas_pkg->template Param<ParArray1D<EOS>>("eos_d");
-  auto opac_d = gas_pkg->template Param<MeanOpacity>("opacity_d");
-  auto scat_d = gas_pkg->template Param<MeanScattering>("scattering_d");
+  auto opac_d = gas_pkg->template Param<ParArray1D<MeanOpacity>>("opacity_d");
+  auto scat_d = gas_pkg->template Param<ParArray1D<MeanScattering>>("scattering_d");
   auto dflr = gas_pkg->template Param<Real>("dfloor");
   auto de_switch = gas_pkg->template Param<Real>("de_switch");
 
@@ -367,9 +367,10 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
             const Real Cv = dens * eos_d(0).SpecificHeatFromDensityTemperature(dens, T);
             const Real fleck = FleckFactor(arad, T, Cv);
 
-            const Real sigp = chat * dt * opac_d.PlanckMeanAbsorptionCoefficient(dens, T);
+            const Real sigp =
+                chat * dt * opac_d(0).PlanckMeanAbsorptionCoefficient(dens, T);
             const Real sigs =
-                chat * dt * scat_d.RosselandMeanTotalScatteringCoefficient(dens, T);
+                chat * dt * scat_d(0).RosselandMeanTotalScatteringCoefficient(dens, T);
             const Real sigf = sigp + sigs;
 
             const Real ca = g * (sigf - g2 * sigs * (1. + bdbdp));
@@ -411,9 +412,9 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
           dEg = eg - eg0;
 
           const Real sigp =
-              chat * dt * opac_d.RosselandMeanAbsorptionCoefficient(dens, T);
+              chat * dt * opac_d(0).RosselandMeanAbsorptionCoefficient(dens, T);
           const Real sigs =
-              chat * dt * scat_d.RosselandMeanTotalScatteringCoefficient(dens, T);
+              chat * dt * scat_d(0).RosselandMeanTotalScatteringCoefficient(dens, T);
           const Real sigf = sigp + sigs;
 
           const Real a = g * sigf;

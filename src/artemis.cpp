@@ -192,10 +192,15 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
     if (do_imc) {
       auto eos_h_arr =
           packages.Get("gas")->Param<parthenon::ParArray1D<ArtemisUtils::EOS>>("eos_h");
-      auto opacity_h = packages.Get("gas")->Param<MeanOpacity>("opacity_h");
-      auto scattering_h = packages.Get("gas")->Param<MeanScattering>("scattering_h");
-      packages.Add(jaybenne::Initialize(pin.get(), opacity_h, scattering_h, eos_h_arr(0),
-                                        "radiation/imc"));
+      auto opacity_h =
+          packages.Get("gas")
+              ->Param<parthenon::ParArray1D<MeanOpacity>::host_mirror_type>("opacity_h");
+      auto scattering_h =
+          packages.Get("gas")
+              ->Param<parthenon::ParArray1D<MeanScattering>::host_mirror_type>(
+                  "scattering_h");
+      packages.Add(jaybenne::Initialize(pin.get(), opacity_h(0), scattering_h(0),
+                                        eos_h_arr(0), "radiation/imc"));
       PARTHENON_REQUIRE(coords == Coordinates::cartesian,
                         "Jaybenne currently supports only Cartesian coordinates!");
     } else if (do_moment) {

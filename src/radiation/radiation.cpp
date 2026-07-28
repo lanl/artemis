@@ -91,8 +91,9 @@ TaskStatus SetOpacities(MeshData<Real> *md) {
   auto &gas_pkg = pm->packages.Get("gas");
 
   const auto &eos_d = gas_pkg->template Param<ParArray1D<EOS>>("eos_d");
-  auto &opacity_d = gas_pkg->template Param<MeanOpacity>("opacity_d");
-  auto &scattering_d = gas_pkg->template Param<MeanScattering>("scattering_d");
+  const auto &opacity_d = gas_pkg->template Param<ParArray1D<MeanOpacity>>("opacity_d");
+  const auto &scattering_d =
+      gas_pkg->template Param<ParArray1D<MeanScattering>>("scattering_d");
 
   // Packing and indexing
   // TODO(): Will eventually incorporate other fluids
@@ -115,8 +116,8 @@ TaskStatus SetOpacities(MeshData<Real> *md) {
         Real &aa = vmesh(b, rad::opac::absorption(), k, j, i);
         Real &ss = vmesh(b, rad::opac::scattering(), k, j, i);
 
-        aa = opacity_d.AbsorptionCoefficient(rho, temp);
-        ss = scattering_d.RosselandMeanTotalScatteringCoefficient(rho, temp);
+        aa = opacity_d(0).AbsorptionCoefficient(rho, temp);
+        ss = scattering_d(0).RosselandMeanTotalScatteringCoefficient(rho, temp);
       });
 
   return TaskStatus::complete;

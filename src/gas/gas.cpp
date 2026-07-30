@@ -164,7 +164,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
       std::vector<std::string> filenames(nspecies, "");
       pin->GetOrAddVector<std::string>(block_name, "eos_file", filenames);
       ParArray1D<EOS> eos_device("eos_d", nspecies);
-      ParArray1D<EOS> eos_host = eos_device.GetHostMirror();
+      auto eos_host = eos_device.GetHostMirror();
       for (int n = 0; n < nspecies; ++n) {
         eos_host(n) = singularity::UnitSystem<ArtemisEOS::IdealHHe>(
             ArtemisEOS::IdealHHe(filenames[n]),

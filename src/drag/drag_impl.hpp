@@ -541,9 +541,9 @@ TaskStatus CoupleTwoFluids(MeshData<Real> *md, const Real dt) {
             vmesh(b, gas::cons::momentum(VI(0, 1)), k, j, i) / (hx[1] * d0),
             vmesh(b, gas::cons::momentum(VI(0, 2)), k, j, i) / (hx[2] * d0)};
         const std::array<Real, 3> v1{
-            vmesh(b, gas::cons::momentum(VI(1, 0)), k, j, i) / (hx[0] * d0),
-            vmesh(b, gas::cons::momentum(VI(1, 1)), k, j, i) / (hx[1] * d0),
-            vmesh(b, gas::cons::momentum(VI(1, 2)), k, j, i) / (hx[2] * d0)};
+            vmesh(b, gas::cons::momentum(VI(1, 0)), k, j, i) / (hx[0] * d1),
+            vmesh(b, gas::cons::momentum(VI(1, 1)), k, j, i) / (hx[1] * d1),
+            vmesh(b, gas::cons::momentum(VI(1, 2)), k, j, i) / (hx[2] * d1)};
 
         const Real ke0_old = 0.5 * d0 * (SQR(v0[0]) + SQR(v0[1]) + SQR(v0[2]));
         const Real ke1_old = 0.5 * d1 * (SQR(v1[0]) + SQR(v1[1]) + SQR(v1[2]));
@@ -554,8 +554,18 @@ TaskStatus CoupleTwoFluids(MeshData<Real> *md, const Real dt) {
           vmesh(b, gas::cons::momentum(VI(0, d)), k, j, i) += impulse;
           vmesh(b, gas::cons::momentum(VI(1, d)), k, j, i) -= impulse;
         }
-        const Real ke0_new = 0.5 * d0 * (SQR(v0[0]) + SQR(v0[1]) + SQR(v0[2]));
-        const Real ke1_new = 0.5 * d1 * (SQR(v1[0]) + SQR(v1[1]) + SQR(v1[2]));
+        const std::array<Real, 3> v0_new{
+            vmesh(b, gas::cons::momentum(VI(0, 0)), k, j, i) / (hx[0] * d0),
+            vmesh(b, gas::cons::momentum(VI(0, 1)), k, j, i) / (hx[1] * d0),
+            vmesh(b, gas::cons::momentum(VI(0, 2)), k, j, i) / (hx[2] * d0)};
+        const std::array<Real, 3> v1_new{
+            vmesh(b, gas::cons::momentum(VI(1, 0)), k, j, i) / (hx[0] * d1),
+            vmesh(b, gas::cons::momentum(VI(1, 1)), k, j, i) / (hx[1] * d1),
+            vmesh(b, gas::cons::momentum(VI(1, 2)), k, j, i) / (hx[2] * d1)};
+        const Real ke0_new =
+            0.5 * d0 * (SQR(v0_new[0]) + SQR(v0_new[1]) + SQR(v0_new[2]));
+        const Real ke1_new =
+            0.5 * d1 * (SQR(v1_new[0]) + SQR(v1_new[1]) + SQR(v1_new[2]));
 
         const Real dke0 = ke0_new - ke0_old;
         const Real dke1 = ke1_new - ke1_old;

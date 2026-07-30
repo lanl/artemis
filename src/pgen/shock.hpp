@@ -139,7 +139,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         const Real rho = upwind ? shkp.rhol : shkp.rhor;
         const Real vx = upwind ? shkp.vxl : shkp.vxr;
         const Real pres = upwind ? shkp.pl : shkp.pr;
-        const Real sie = (pres != Null<Real>())
+        const Real sie = std::isfinite(pres)
                              ? ArtemisUtils::EofPR(eos_d, pres, rho)
                              : eos_d.InternalEnergyFromDensityTemperature(
                                    rho, upwind ? shkp.tl : shkp.tr);
@@ -218,10 +218,10 @@ inline void ShockInnerX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse)
   pmb->par_for_bndry(
       "ShockInnerX1", nb, IndexDomain::inner_x1, TE::CC, coarse, false,
       KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
-        const Real sie =
-            (shkp.pl != Null<Real>())
-                ? ArtemisUtils::EofPR(eos_d, shkp.pl, shkp.rhol)
-                : eos_d.InternalEnergyFromDensityTemperature(shkp.rhol, shkp.tl);
+        const Real sie = std::isfinite(shkp.pl)
+                             ? ArtemisUtils::EofPR(eos_d, shkp.pl, shkp.rhol)
+                             : eos_d.InternalEnergyFromDensityTemperature(shkp.rhol,
+                                                                          shkp.tl);
         const Real T = eos_d.TemperatureFromDensityInternalEnergy(shkp.rhol, sie);
         for (int n = 0; n < v.GetSize(0, gas::prim::density()); ++n) {
           v(0, gas::prim::density(n), k, j, i) = shkp.rhol;
@@ -299,10 +299,10 @@ inline void ShockOuterX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse)
   pmb->par_for_bndry(
       "ShockOuterX1", nb, IndexDomain::outer_x1, TE::CC, coarse, false,
       KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
-        const Real sie =
-            (shkp.pr != Null<Real>())
-                ? ArtemisUtils::EofPR(eos_d, shkp.pr, shkp.rhor)
-                : eos_d.InternalEnergyFromDensityTemperature(shkp.rhor, shkp.tr);
+        const Real sie = std::isfinite(shkp.pr)
+                             ? ArtemisUtils::EofPR(eos_d, shkp.pr, shkp.rhor)
+                             : eos_d.InternalEnergyFromDensityTemperature(shkp.rhor,
+                                                                          shkp.tr);
         const Real T = eos_d.TemperatureFromDensityInternalEnergy(shkp.rhor, sie);
         for (int n = 0; n < v.GetSize(0, gas::prim::density()); ++n) {
           v(0, gas::prim::density(n), k, j, i) = shkp.rhor;

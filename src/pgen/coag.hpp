@@ -50,10 +50,10 @@ namespace {
 struct DustCoagulationVariable {
   int ndust;
   int ninit_dust;
-  Real gamma, gm1;
   Real h0;
   Real d2g;
   Real rho0;
+  Real omk;
 };
 
 } // end anonymous namespace
@@ -89,27 +89,18 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   dcv.ninit_dust = pin->GetOrAddReal("problem", "ninit_dust", 1);
   dcv.d2g = pin->GetOrAddReal("problem", "dust_to_gas", 0.01);
   dcv.rho0 = pin->GetOrAddReal("problem", "rho0", 1.0);
+  dcv.omk = pin->GetOrAddReal("problem", "om0", 1.0);
 
   auto gas_pkg = pmb->packages.Get("gas");
-  const auto &eos_d = gas_pkg->template Param<ParArray1D<EOS>>("eos_d");
+  const auto &eos_h = gas_pkg->template Param<ParArray1D<EOS>>("eos_h");
 
   // Extract adiabatic index and H0
-  dcv.gamma = gas_pkg->Param<Real>("adiabatic_index");
-  dcv.gm1 = dcv.gamma - 1.0;
   dcv.h0 = pin->GetOrAddReal("problem", "h0", 0.05);
 
   // Extract fluid state vector
   const Real gdens = dcv.rho0;
-  const auto mu = gas_pkg->Param<Real>("mu");
-  const auto &constants = artemis_pkg->Param<ArtemisUtils::Constants>("constants");
-  const Real kbmu = constants.GetKBCode() / (mu * constants.GetAMUCode());
-  const Real gtemp = SQR(dcv.h0) / kbmu / dcv.gamma;
-  const Real gsie = eos_d(0).InternalEnergyFromDensityTemperature(gdens, gtemp);
-  const Real pres = eos_d(0).PressureFromDensityTemperature(gdens, gtemp);
-  if (pmb->gid == 0) {
-    std::cout << "gamma, h0, pres=" << dcv.gamma << " " << dcv.h0 << " "
-              << dcv.gm1 * gdens * gsie << " " << pres << std::endl;
-  }
+  const Real pres = gdens * SQR(dcv.h0 * dcv.omk);
+  const Real gsie = ArtemisUtils::EofPR(eos_h(0), pres, gdens);
 
   // Using MRN distribution for the initial dust setup
   ParArray1D<Real> dust_size = dust_pkg->template Param<ParArray1D<Real>>("sizes");

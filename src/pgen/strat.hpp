@@ -53,7 +53,6 @@ struct StratParams {
   Real d2g;
   Real temp0;
   Real r0;
-  Real kbmu;
   bool three_d;
   Real ar;
   Real dvdx;
@@ -85,17 +84,16 @@ inline void InitStratParams(MeshBlock *pmb, ParameterInput *pin) {
     strat_params.do_dust = params.Get<bool>("do_dust");
 
     auto &gas_pkg = pmb->packages.Get("gas");
-    const auto mu = gas_pkg->Param<Real>("mu");
-    const auto eos_arr = gas_pkg->Param<ParArray1D<EOS>>("eos_h");
-    const EOS &eos = eos_arr(0);
+    const auto &eos_h = gas_pkg->Param<ParArray1D<EOS>>("eos_h");
     auto &constants = artemis_pkg->Param<ArtemisUtils::Constants>("constants");
-    strat_params.kbmu = constants.GetKBCode() / (mu * constants.GetAMUCode());
     strat_params.dfloor = gas_pkg->Param<Real>("dfloor");
     strat_params.siefloor = gas_pkg->Param<Real>("siefloor");
+
+    // Note that this is true for a gaussian profile when integrated from z=\inf to z=0
+    strat_params.pres0 =
+        strat_params.rho0 * SQR(strat_params.h * strat_params.r0 * strat_params.Om0);
     strat_params.temp0 =
-        SQR(strat_params.h * strat_params.r0 * strat_params.Om0) / strat_params.kbmu;
-    strat_params.pres0 = eos.PressureFromDensityTemperature(
-        strat_params.rho0, strat_params.temp0); // strat_params.rho0 * strat_params.temp0;
+        ArtemisUtils::TofPR(eos_h(0), strat_params.pres0, strat_params.rho0);
 
     strat_params.do_imc = params.Get<bool>("do_imc");
     strat_params.do_moment = params.Get<bool>("do_moment");

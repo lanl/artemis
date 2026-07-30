@@ -57,7 +57,7 @@ namespace disk {
 struct DiskParams {
   Real r0, h0;
   Real p, q, flare;
-  Real rho0, dens_min, pres_min, sie_min, temp_min;
+  Real rho0, temp0, dens_min, pres_min, sie_min, temp_min;
   Real gm, Omega0, l0;
   Real omf;
   Real dust_to_gas;
@@ -67,7 +67,7 @@ struct DiskParams {
   Real alpha, nu0, nu_indx;
   Real mdot;
   Real temp_soft2;
-  Real kbmu, ar;
+  Real ar;
   bool do_gas, do_dust, do_moment, do_imc;
   bool nbody_temp;
   bool quiet_start;
@@ -146,11 +146,9 @@ Real TempProfile(struct DiskParams pgen, const Real R, const Real z) {
   // T = T0 (rho/rho0)^(Gamma-1)
   const Real rho = DenProfile(pgen, R, z);
   const Real rho0 = DenProfile(pgen, R, 0.0);
-  const Real H = R * pgen.h0 * std::pow(R / pgen.r0, pgen.flare);
   const Real ir1 = 1.0 / std::sqrt(R * R + pgen.temp_soft2);
-  const Real omk2 = SQR(pgen.Omega0) * ir1 * ir1 * ir1;
-  // c_iso^2 = P/rho = kb/mu T = Omk^2 H^2
-  const Real T0 = omk2 * H * H / (pgen.kbmu * pgen.Gamma);
+  const Real ir3 = ir1 * ir1 * ir1;
+  const Real T0 = pgen.temp0 * ir3 * std::pow(R / pgen.r0, pgen.flare + 1);
   return std::max(pgen.temp_min, T0 * std::pow(rho / rho0, pgen.Gamma - 1.0));
 }
 
@@ -301,15 +299,16 @@ inline void InitDiskParams(MeshBlock *pmb, ParameterInput *pin) {
     disk_params.l0 = pin->GetOrAddReal("problem", "l0", 0.0);
     disk_params.dust_to_gas = pin->GetOrAddReal("problem", "dust_to_gas", 0.01);
     disk_params.temp_soft2 = pin->GetOrAddReal("problem", "temp_soft", 0.0);
-    const auto mu = gas_pkg->Param<Real>("mu");
-    auto &constants = artemis_pkg->Param<ArtemisUtils::Constants>("constants");
-    const auto &eos_arr = gas_pkg->Param<ParArray1D<ArtemisUtils::EOS>>("eos_h");
-    const auto &eos = eos_arr(0);
-    disk_params.kbmu = constants.GetKBCode() / (mu * constants.GetAMUCode());
-    disk_params.pres_min =
-        eos.PressureFromDensityInternalEnergy(disk_params.dens_min, disk_params.sie_min);
-    disk_params.temp_min = eos.TemperatureFromDensityInternalEnergy(disk_params.dens_min,
-                                                                    disk_params.sie_min);
+    const auto &eos_h = gas_pkg->Param<ParArray1D<ArtemisUtils::EOS>>("eos_h");
+    const Real p0 = disk_params.rho0 *
+                    SQR(disk_params.h0 * disk_params.r0 * disk_params.Omega0) /
+                    disk_params.Gamma;
+    disk_params.temp0 = ArtemisUtils::TofPR(eos_h(0), p0, disk_params.rho0);
+
+    disk_params.pres_min = eos_h(0).PressureFromDensityInternalEnergy(
+        disk_params.dens_min, disk_params.sie_min);
+    disk_params.temp_min = eos_h(0).TemperatureFromDensityInternalEnergy(
+        disk_params.dens_min, disk_params.sie_min);
 
     const auto nx = params.Get<std::array<int, 3>>("prob_dim");
     disk_params.three_d = nx[2] > 1;
@@ -321,6 +320,7 @@ inline void InitDiskParams(MeshBlock *pmb, ParameterInput *pin) {
     disk_params.do_imc = params.Get<bool>("do_imc");
     disk_params.do_moment = params.Get<bool>("do_moment");
 
+    auto &constants = artemis_pkg->Param<ArtemisUtils::Constants>("constants");
     disk_params.ar = constants.GetARCode();
 
     Real q = pin->GetOrAddReal("problem", "tslope", -Big<Real>());

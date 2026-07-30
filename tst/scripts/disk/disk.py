@@ -95,6 +95,12 @@ def run(**kwargs):
                     ),
                 )
 
+    artemis.run(
+        _nranks,
+        "disk/wave_killing.in",
+        ["parthenon/job/problem_id={}_wave_killing".format(_file_id)],
+    )
+
 
 # Analyze outputs
 def analyze():
@@ -184,6 +190,28 @@ def analyze():
                         )
                     )
                 bad |= mybad
+
+    wave_file = os.path.join(
+        artemis.get_data_dir(), "{}_wave_killing.out1.final.phdf".format(_file_id)
+    )
+    with h5py.File(wave_file, "r") as f:
+        gas_dens = f["gas.prim.density_0"][...]
+        gas_temp = f["gas.prim.pressure_0"][...] / gas_dens
+        gas_vel = f["gas.prim.velocity_0"][...]
+        dust_dens = np.stack(
+            [f["dust.prim.density_{:d}".format(n)][...] for n in range(2)]
+        )
+        dust_vel = np.stack(
+            [f["dust.prim.velocity_{:d}".format(n)][...] for n in range(2)]
+        )
+
+    wave_fields = (gas_dens, gas_temp, gas_vel, dust_dens, dust_vel)
+    wave_bad = any(np.any(~np.isfinite(field)) for field in wave_fields)
+    wave_bad |= np.any(gas_dens <= 0.0) or np.any(gas_temp <= 0.0)
+    wave_bad |= np.any(dust_dens <= 0.0)
+    if wave_bad:
+        logger.debug("disk_wave_killing FAILED: non-finite or non-positive state")
+    bad |= wave_bad
 
     return not bad
 

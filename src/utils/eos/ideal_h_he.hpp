@@ -299,7 +299,7 @@ class IdealHHe : public singularity::eos_base::EosBase<IdealHHe> {
   PORTABLE_INLINE_FUNCTION Real GruneisenParamFromDensityTemperature(
       const Real rho, const Real temperature,
       Indexer_t &&lambda = static_cast<Real *>(nullptr)) const {
-    const Real sie = GruneisenParamFromDensityTemperature(rho, temperature);
+    const Real sie = InternalEnergyFromDensityTemperature(rho, temperature);
     return GruneisenParamFromDensityInternalEnergy(rho, sie);
   }
   template <typename Indexer_t = Real *>

@@ -11,6 +11,8 @@
 // the public, perform publicly and display publicly, and to permit others to do so.
 //========================================================================================
 
+// This file was created in part by generative AI
+
 // NOTE(PDM): The following is largely borrowed from the open-source LANL phoebus
 // software, with additional extensions motivated by other downstream development.
 
@@ -21,6 +23,7 @@
 // Artemis Includes
 #include "artemis.hpp"
 #include "artemis_driver.hpp"
+#include "artemis_extras.hpp"
 #include "drag/drag.hpp"
 #include "dust/coagulation/coagulation.hpp"
 #include "dust/dust.hpp"
@@ -160,8 +163,16 @@ TaskListStatus ArtemisDriver<GEOM>::Step() {
   }
 
   // Operator split, dust coagulation
-  if (do_coagulation) status = Dust::Coagulation::CoagulationDriver<GEOM>(pmesh, tm);
-  if (status != TaskListStatus::complete) return status;
+  if (do_coagulation) {
+    status = Dust::Coagulation::CoagulationDriver<GEOM>(pmesh, tm);
+    if (status != TaskListStatus::complete) return status;
+  }
+
+  // Other operator split tasks
+  for (const auto &tc : GetSplitTaskLists()) {
+    status = tc.function(pmesh, tm);
+    if (status != TaskListStatus::complete) return status;
+  }
 
   // Compute new dt, (de)refine, and handle sparse (if enabled)
   status = PostStepTasks().Execute();
@@ -336,11 +347,17 @@ TaskCollection ArtemisDriver<GEOM>::StepTasks() {
             tl.AddTask(rt_src, RotatingFrame::RotatingFrameForce, u0.get(), time, bdt);
       }
 
+      // Apply problem-generator source terms in registration order
+      TaskID expl_src = rframe_src;
+      for (const auto &task : GetUnsplitExplicitTasks()) {
+        expl_src = tl.AddTask(expl_src, task.name, task.function, u0.get(), time, bdt);
+      }
+
       // Apply drag source term
       // NOTE(@pdmullen): RK integrated, operator split drag (RHS computed from U)
-      TaskID drag_src = rframe_src;
+      TaskID drag_src = expl_src;
       if (do_drag) {
-        drag_src = tl.AddTask(rframe_src, Drag::DragSource<GEOM>, u0.get(), time, bdt);
+        drag_src = tl.AddTask(expl_src, Drag::DragSource<GEOM>, u0.get(), time, bdt);
       }
 
       // Apply cooling source term
@@ -351,9 +368,14 @@ TaskCollection ArtemisDriver<GEOM>::StepTasks() {
                                  time, bdt, stage);
       }
 
+      TaskID impl_src = cooling_src;
+      for (const auto &task : GetUnsplitImplicitTasks()) {
+        impl_src = tl.AddTask(impl_src, task.name, task.function, u0.get(), time, bdt);
+      }
+
       // Set auxillary fields
       auto set_aux =
-          tl.AddTask(cooling_src, ArtemisDerived::SetAuxillaryFields<GEOM>, u0.get());
+          tl.AddTask(impl_src, ArtemisDerived::SetAuxillaryFields<GEOM>, u0.get());
 
       // Set (remaining) fields to be communicated
       auto c2p = tl.AddTask(set_aux, PreCommFillDerived<MeshData<Real>>, u0.get());

@@ -15,6 +15,8 @@
 set (SRC_LIST
   artemis_driver.cpp
   artemis_driver.hpp
+  artemis_extras.cpp
+  artemis_extras.hpp
   artemis.cpp
   artemis.hpp
 

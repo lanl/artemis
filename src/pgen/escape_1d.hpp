@@ -17,9 +17,9 @@
 //!
 //! ## Problem Description
 //! Two (or more) gas species occupy a 1D spherical atmosphere under the gravity of a
-//! central point mass.  Species 0 is the "light" component (e.g., hydrogen, mu=1) that
-//! has enough thermal energy to escape via a Parker-type wind.  Species 1 is the
-//! "heavy" component (e.g., oxygen, mu=16) that is gravitationally bound.
+//! central point mass.  Species 0 is the "light" component (e.g., hydrogen) that has
+//! enough thermal energy to escape via a Parker-type wind.  Species 1 is the "heavy"
+//! component (e.g., oxygen) that is gravitationally bound.
 //!
 //! Chapman-Cowling drag couples the two fluids.  The test demonstrates:
 //!   (a) Qualitative: heavy species is entrained and dragged outward by light species.
@@ -27,10 +27,9 @@
 //!       solution at late times (in the absence of heavy species).
 //!
 //! ## Initial Conditions
-//! Isothermal hydrostatic equilibrium initialised from the stellar surface at r0.
-//! Each species satisfies:
-//!   rho_n(r) = rho0_n * exp(-mu_n * G*M / (R_gas_n * T0) * (1/r0 - 1/r))
-//! where R_gas_n = kB / (mu_n * m_amu).
+//! Isothermal hydrostatic equilibrium is initialized from the stellar surface at r0.
+//! For each species, the profile satisfies dP/dr = -rho*G*M/r^2 at fixed T0. The
+//! density is integrated from the EOS-derived isothermal derivative dP/drho.
 //!
 //! ## Boundary Conditions
 //! - inner_x1: hydrostatic inflow (density fixed, velocity set by Parker wind)
@@ -39,15 +38,14 @@
 //! ## Required input parameters (in [problem] block)
 //! - rho0_0     : base density species 0 [code units]
 //! - rho0_1     : base density species 1 [code units]
-//! - T0         : isothermal temperature [K]
+//! - T0         : isothermal temperature [EOS/code temperature units]
 //! - r0         : inner radius (base of atmosphere) [code units]
 //! - gm         : G*M [code units]  (central body, can match gravity package)
-//! - nspecies   : number of species (2 for this test)
+//! - npoints    : number of hydrostatic integration steps (optional; default 50)
 
 // C/C++ headers
 #include <cmath>
 #include <string>
-#include <vector>
 
 // Artemis headers
 #include "artemis.hpp"
@@ -62,12 +60,11 @@ namespace escape_1d {
 
 struct Escape1DParams {
   int nspecies;
+  int npoints;
   Real rho0[8]; // base densities (up to 8 species)
-  Real T0;      // common isothermal temperature [K]
+  Real T0;      // common isothermal temperature [EOS/code temperature units]
   Real r0;      // inner boundary radius [code length]
   Real gm;      // G*M [code length^3 / code time^2]
-  Real kbmu[8]; // kB/(mu_n * m_amu) = R_gas per species [code velocity^2 / K]
-  Real mu[8];   // molecular masses [AMU]
   Real dfloor;
   Real siefloor;
 };
@@ -81,29 +78,27 @@ inline void InitEscape1DParams(MeshBlock *pmb, ParameterInput *pin) {
   if (params.hasKey("escape1d_params")) return;
 
   auto &gas_pkg = pmb->packages.Get("gas");
-  const Real kb = gas_pkg->Param<Real>("kb");
-  const Real amu = gas_pkg->Param<Real>("amu");
   const int nspecies = gas_pkg->Param<int>("nspecies");
   PARTHENON_REQUIRE(nspecies >= 2, "escape_1d requires at least 2 gas species");
   PARTHENON_REQUIRE(nspecies <= 8, "escape_1d supports at most 8 species");
 
-  // Per-species molecular masses from gas/species_mu
-  auto mu_arr = gas_pkg->Param<ParArray1D<Real>>("mu");
-  auto mu_h = mu_arr.GetHostMirrorAndCopy();
-
   Escape1DParams ep{};
   ep.nspecies = nspecies;
+  ep.npoints = pin->GetOrAddInteger("problem", "npoints", 50);
   ep.T0 = pin->GetOrAddReal("problem", "T0", 1.0e4);
   ep.r0 = pin->GetOrAddReal("problem", "r0", 1.0);
   ep.gm = pin->GetOrAddReal("problem", "gm", 1.0);
   ep.dfloor = gas_pkg->Param<Real>("dfloor");
   ep.siefloor = gas_pkg->Param<Real>("siefloor");
+  PARTHENON_REQUIRE(ep.npoints > 0, "escape_1d problem/npoints must be positive");
+  PARTHENON_REQUIRE(ep.T0 > 0.0, "escape_1d problem/T0 must be positive");
+  PARTHENON_REQUIRE(ep.r0 > 0.0, "escape_1d problem/r0 must be positive");
+  PARTHENON_REQUIRE(ep.gm >= 0.0, "escape_1d problem/gm must be non-negative");
 
   const std::string rho0_key = "rho0_";
   for (int n = 0; n < nspecies; ++n) {
-    ep.mu[n] = mu_h(n);
-    ep.kbmu[n] = kb / (ep.mu[n] * amu);
     ep.rho0[n] = pin->GetOrAddReal("problem", rho0_key + std::to_string(n), 1.0e-4);
+    PARTHENON_REQUIRE(ep.rho0[n] > 0.0, "escape_1d base densities must be positive");
   }
   params.Add("escape1d_params", ep);
 }
@@ -112,10 +107,35 @@ inline void InitEscape1DParams(MeshBlock *pmb, ParameterInput *pin) {
 // Helpers: isothermal hydrostatic density at radius r
 // ---------------------------------------------------------------------------
 KOKKOS_FORCEINLINE_FUNCTION
-Real IsothermalDens(const Escape1DParams &ep, const int n, const Real r) {
-  const Real H_inv = ep.gm / (ep.kbmu[n] * ep.T0); // inverse scale height at r0
-  const Real exponent = -H_inv * (1.0 / ep.r0 - 1.0 / r);
-  return ep.rho0[n] * std::exp(exponent);
+Real IsothermalDPDRho(const EOS &eos, const Real rho, const Real temp) {
+  constexpr Real dlnrho = 1.0e-6;
+  const Real pp = eos.PressureFromDensityTemperature(rho * (1.0 + dlnrho), temp);
+  const Real pm = eos.PressureFromDensityTemperature(rho * (1.0 - dlnrho), temp);
+  return (pp - pm) / (2.0 * dlnrho * rho);
+}
+
+KOKKOS_FORCEINLINE_FUNCTION
+Real IsothermalDens(const EOS &eos, const Escape1DParams &ep, const int n, const Real r) {
+  // With Phi(r) - Phi(r0) = GM * (1/r0 - 1/r), hydrostatic equilibrium gives
+  // d ln(rho) / d Phi = -1 / (dP/drho)_T.
+  const Real dphi = ep.gm * (1.0 / ep.r0 - 1.0 / r);
+  const Real dphi_step = dphi / static_cast<Real>(ep.npoints);
+  Real lnrho = std::log(std::max(ep.rho0[n], ep.dfloor));
+
+  for (int p = 0; p < ep.npoints; ++p) {
+    const Real rho = std::exp(lnrho);
+    if ((dphi_step > 0.0) && (rho <= ep.dfloor)) return ep.dfloor;
+
+    const Real dpdrho = IsothermalDPDRho(eos, rho, ep.T0);
+    const Real k1 = -1.0 / std::max(dpdrho, Fuzz<Real>());
+
+    const Real rho_mid = std::exp(lnrho + 0.5 * dphi_step * k1);
+    if ((dphi_step > 0.0) && (rho_mid <= ep.dfloor)) return ep.dfloor;
+
+    const Real dpdrho_mid = IsothermalDPDRho(eos, rho_mid, ep.T0);
+    lnrho -= dphi_step / std::max(dpdrho_mid, Fuzz<Real>());
+  }
+  return std::max(std::exp(lnrho), ep.dfloor);
 }
 
 //----------------------------------------------------------------------------------------
@@ -164,7 +184,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
         const Real r = coords.x1v();
         for (int n = 0; n < ns; ++n) {
-          const Real rho = std::max(IsothermalDens(ep, n, r), ep.dfloor);
+          const Real rho = IsothermalDens(eos_d(n), ep, n, r);
           const Real sie = std::max(
               eos_d(n).InternalEnergyFromDensityTemperature(rho, ep.T0), ep.siefloor);
           v(0, gas::prim::density(n), k, j, i) = rho;
@@ -218,7 +238,7 @@ void Escape1DInnerX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) {
         const Real r = coords.x1v();
 
         for (int n = 0; n < ns; ++n) {
-          const Real rho = std::max(IsothermalDens(ep, n, r), ep.dfloor);
+          const Real rho = IsothermalDens(eos_d(n), ep, n, r);
           const Real sie = std::max(
               eos_d(n).InternalEnergyFromDensityTemperature(rho, ep.T0), ep.siefloor);
 

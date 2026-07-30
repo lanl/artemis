@@ -26,6 +26,7 @@
 #include "constant.hpp"
 #include "crooked_pipe.hpp"
 #include "disk.hpp"
+#include "function_init.hpp"
 #include "gaussian_bump.hpp"
 #include "geometry/geometry.hpp"
 #include "grav_slab.hpp"
@@ -47,7 +48,8 @@ namespace artemis {
 template <Coordinates T>
 void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   PARTHENON_INSTRUMENT
-  std::string name = pin->GetString("artemis", "problem");
+  function_init::Initialize<T>(pmb, pin);
+  std::string name = pin->GetOrAddString("artemis", "problem", "unset");
   if (name == "advection") {
     advection::ProblemGenerator<T>(pmb, pin);
   } else if (name == "beam") {
@@ -84,6 +86,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
     thermalization::ProblemGenerator<T>(pmb, pin);
   } else if (name == "crooked_pipe") {
     crooked_pipe::ProblemGenerator<T>(pmb, pin);
+  } else if (name == "unset") {
+    return;
   } else {
     PARTHENON_FAIL("Invalid problem name!");
   }
@@ -98,7 +102,7 @@ void InitMeshBlockData(MeshBlock *pmb, ParameterInput *pin) {
 
   geometry::InitBlockGeom<GEOM>(pmb, pin);
 
-  std::string name = pin->GetString("artemis", "problem");
+  std::string name = pin->GetOrAddString("artemis", "problem", "unset");
   if (name == "beam") {
     beam::InitBeamParams(pmb, pin);
   } else if (name == "conduction") {

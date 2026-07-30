@@ -20,7 +20,6 @@
 
 // Artemis Includes
 #include "artemis.hpp"
-#include "artemis_driver.hpp"
 #include "derived/fill_derived.hpp"
 #include "dust/dust.hpp"
 #include "gas/gas.hpp"
@@ -63,6 +62,8 @@ class ArtemisDriver : public EvolutionDriver {
 };
 
 //----------------------------------------------------------------------------------------
+Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin,
+                           Rummy::FullDeck *input_state);
 Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin);
 
 } // namespace artemis

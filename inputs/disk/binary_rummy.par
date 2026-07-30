@@ -1,0 +1,224 @@
+# ========================================================================================
+#  (C) (or copyright) 2023-2025. Triad National Security, LLC. All rights reserved.
+#
+#  This program was produced under U.S. Government contract 89233218CNA000001 for Los
+#  Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
+#  for the U.S. Department of Energy/National Nuclear Security Administration. All rights
+#  in the program are reserved by Triad National Security, LLC, and the U.S. Department
+#  of Energy/National Nuclear Security Administration. The Government is granted for
+#  itself and others acting on its behalf a nonexclusive, paid-up, irrevocable worldwide
+#  license in this material to reproduce, prepare derivative works, distribute copies to
+#  the public, perform publicly and display publicly, and to permit others to do so.
+# ========================================================================================
+
+# Disk setup without the pgen!
+# This uses input file functions to specify the ICs
+
+
+# Global vars for a simple PPD
+r0 = 1.0
+rho0 = 1.0
+
+dslope = -0.5
+tslope = -1.0
+
+h0 = 0.05
+GM = 1.0
+q = 1e-5
+
+Om0 = sqrt(GM/r0**3)
+omf = 0.0
+alpha0 = 1e-3
+
+# Constant Mdot IC
+mdot0 = 3*pi*alpha0*h0**2
+
+fn Omk(r) {
+  return Om0  * r**(-1.5)
+}
+
+fn nu(r) {
+  return alpha0 * h0**2 * sqrt(r/r0)
+}
+
+# These are the fields that will be called by Artemis
+# Note the calling convention for fields for ICs is
+# func(x1,x2,x3,time)
+
+# pressure supported vphi
+fn vphi(r,phi,z,time) {
+  return Omk(r)*r * ( 1.0  - 2.5*h0**2)
+}
+
+# Viscous vr
+fn vr(r,phi,z,time) {
+  return -1.5*nu(r)/r
+}
+
+fn vz(r,phi,z,time) {
+  return 0
+}
+
+fn density(r,phi,z,time) {
+  return mdot0/(3*pi*nu(r))
+}
+
+fn temperature(r,phi,z,time) {
+  return (h0*Om0)**2 * (r/r0)**tslope
+}
+
+
+# Begin the normal input blocks
+
+<artemis>
+coordinates = "cylindrical"  
+radial_spacing = "logarithmic"
+
+<parthenon/job>
+problem_id = "disk"  # problem ID: basename of output filenames
+
+<parthenon/output(snap)>
+variables = "gas.prim.density",  &
+            "gas.prim.velocity", &
+            "gas.prim.pressure"
+file_type = "hdf5"               # HDF5 data dump
+dt        = 0.05 * 2*pi
+
+<parthenon/output(dump)>
+file_type = "rst"                # Restart
+dt        = 2*pi
+
+<parthenon/time>
+nlim       = -1                 # cycle limit
+tlim       = 10 * 2*pi
+integrator = "rk2"                # time integration algorithm
+ncycle_out = 1               # interval for stdout summary info
+
+<parthenon/mesh>
+nghost = 2
+# refinement = adaptive
+# numlevel = 4
+
+nx1    = 128                 # Number of zones in X1-direction
+x1min  = log(.3)
+x1max  = log(3.0)
+ix1_bc = "reflecting"                 # Inner-X1 boundary condition flag
+ox1_bc = "reflecting"                 # Outer-X1 boundary condition flag
+
+nx2    = 256                # Number of zones in X2-direction
+x2min  = -pi                # minimum value of X2
+x2max  = pi
+ix2_bc = "periodic"          # Inner-X2 boundary condition flag
+ox2_bc = "periodic"           # Outer-X2 boundary condition flag
+
+nx3    = 1                  # Number of zones in X3-direction
+x3min  = -0.5               # minimum value of X3
+x3max  = 0.5                # maximum value of X3
+ix3_bc = "periodic"           # Inner-X3 boundary condition flag
+ox3_bc = "periodic"           # Outer-X3 boundary condition flag
+
+<parthenon/meshblock>
+nx1 = 32  # Number of cells in each MeshBlock, X1-dir
+nx2 = 32  # Number of cells in each MeshBlock, X2-dir
+nx3 = 1   # Number of cells in each MeshBlock, X3-dir
+
+<physics>
+gas = true
+# dust = true
+gravity = true
+nbody = true
+drag = true
+cooling = true
+viscosity = true
+# Turn on RF if the omf var is non-zero
+# and turn on orbital advection if RF is on
+rotating_frame = (omf > 0.0)
+orbital_advection = rotating_frame  
+
+<gas>
+cfl = 0.3
+reconstruct = "plm"
+riemann = "hllc-general"
+dfloor = 1.0e-10
+siefloor = 1.0e-10
+refine_field = "pressure"
+refine_type = "gradient"
+refine_thr = 3.0
+
+# Pass the fields to Artemis in this block
+<gas/initialize>
+velocity_x1 = "vr"
+velocity_x2 = "vphi"
+velocity_x3 = "vz"
+density = "density"
+temperature = "temperature"
+
+
+<gas/eos/ideal>
+gamma = 1.00001
+
+
+<rotating_frame>
+omega = omf
+gm = GM
+
+<gas/viscosity>
+type = "alpha"
+alpha = alpha0
+
+<gas/damping>
+inner_x1 = 0.45
+outer_x1 = 2.8
+inner_x1_rate = 30.0
+outer_x1_rate = 30.0
+
+<gravity/nbody>
+mtot = GM
+
+<nbody>
+dt_reb = 0.01
+integrator = "ias15"
+
+# central star
+# Note that we can name the particle here as star
+<nbody/particle(star)>
+mass = GM
+couple = 1
+
+# Note that the ./ is a shorthand for the last parent node (i.e., nbody)
+<./soft>
+type = "none"
+
+# the planet
+<nbody/particle(planet)>
+mass = q * GM
+couple = 1
+
+<./soft>
+radius = 0.03
+type = "plummer"
+
+# initialize the particles as a binary
+# Note that we can refer to the primary/secondary by name
+<nbody/binary>
+mass = GM
+primary = "star"
+secondary = "planet"
+a = r0
+e = 0.0
+f = 0.0
+
+
+<drag>
+type = "self"
+
+<cooling>
+type = "beta"
+tref = "powerlaw"
+beta0 = 1e-8
+# We can call the temperature function directly at r0 to set the tcyl value 
+tcyl = temperature(r0,0,0,0)
+cyl_plaw =  tslope
+
+# Note that there is no  <problem> block because there is no pgen
+

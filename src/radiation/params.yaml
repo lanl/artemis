@@ -87,6 +87,30 @@ radiation:
       _type: int
       _description: "Scratch level for radiation"
       _default: 0
+    initialize:
+      _type: node
+      _description: "Initialize moment primitives from functions defined in the input."
+      system:
+        _type: string
+        _description: "Coordinate system used for function arguments and reduced-flux components. Defaults to artemis/coordinates."
+        cartesian:
+          _type: opt
+          _description: "Cartesian coordinates and vector components."
+        cylindrical:
+          _type: opt
+          _description: "Cylindrical coordinates and vector components."
+        spherical:
+          _type: opt
+          _description: "Spherical coordinates and vector components."
+        axisymmetric:
+          _type: opt
+          _description: "Axisymmetric coordinates and vector components."
+      energy:
+        _type: string
+        _description: "Name of a scalar radiation-energy function with arguments (x1, x2, x3, time)."
+      reduced_flux_x(1,2,3):
+        _type: string
+        _description: "Name of a scalar reduced-flux function with arguments (x1, x2, x3, time)."
     refine_field:
       _type: string
       _default: "none"

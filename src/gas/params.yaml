@@ -28,6 +28,40 @@ gas:
     _default: 0
     _description: "Gas scratch memory level"
 
+  initialize:
+    _type: node
+    _description: "Initialize gas primitives from functions defined in the input."
+    system:
+      _type: string
+      _description: "Coordinate system used for function arguments and velocity components. Defaults to artemis/coordinates."
+      cartesian:
+        _type: opt
+        _description: "Cartesian coordinates and vector components."
+      cylindrical:
+        _type: opt
+        _description: "Cylindrical coordinates and vector components."
+      spherical:
+        _type: opt
+        _description: "Spherical coordinates and vector components."
+      axisymmetric:
+        _type: opt
+        _description: "Axisymmetric coordinates and vector components."
+    density:
+      _type: string
+      _description: "Name of a scalar function with arguments (x1, x2, x3, time)."
+    temperature:
+      _type: string
+      _description: "Name of the temperature function. Exclusive with pressure and internal_energy."
+    pressure:
+      _type: string
+      _description: "Name of the pressure function. Exclusive with temperature and internal_energy."
+    internal_energy:
+      _type: string
+      _description: "Name of the specific-internal-energy function. Exclusive with temperature and pressure."
+    velocity_x(1,2,3):
+      _type: string
+      _description: "Name of a scalar velocity-component function with arguments (x1, x2, x3, time)."
+
   de_switch:
     _type: Real
     _default: 0.0

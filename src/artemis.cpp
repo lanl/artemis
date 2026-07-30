@@ -22,6 +22,7 @@
 #include "geometry/geometry.hpp"
 #include "gravity/gravity.hpp"
 #include "nbody/nbody.hpp"
+#include "pgen/function_init.hpp"
 #include "radiation/moments/moments.hpp"
 #include "radiation/radiation.hpp"
 #include "radiation/raytrace/raytrace.hpp"
@@ -39,7 +40,8 @@ namespace artemis {
 //----------------------------------------------------------------------------------------
 //! \fn  Packages_t Artemis::ProcessPackages
 //! \brief Process and initialize relevant packages
-Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
+Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin,
+                           Rummy::FullDeck *input_state) {
   Packages_t packages;
 
   // Extract artemis package and params
@@ -47,7 +49,7 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   Params &params = artemis->AllParams();
 
   // Store selected pgen name
-  artemis->AddParam("pgen_name", pin->GetString("artemis", "problem"));
+  artemis->AddParam("pgen_name", pin->GetOrAddString("artemis", "problem", "unset"));
   artemis->AddParam("job_name", pin->GetString("parthenon/job", "problem_id"));
   artemis->AddParam("integrator", pin->GetString("parthenon/time", "integrator"));
   std::array<int, 3> nx{pin->GetInteger("parthenon/mesh", "nx1"),
@@ -245,6 +247,8 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   const bool report = pin->GetOrAddBoolean("artemis", "print_artemis_config", true);
   if (report) ArtemisUtils::PrintArtemisConfiguration(packages);
 
+  // Store any functions from the input file to be called later
+  function_init::Configure(pin.get(), input_state, packages);
   return packages;
 }
 

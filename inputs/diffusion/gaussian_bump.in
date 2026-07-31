@@ -28,7 +28,7 @@ dt        = 0.05  # time increment between outputs
 <parthenon/output2>
 file_type = hst
 dt        = 0.05  # time increment between outputs
-fmt       = 0.16f
+data_format = %24.17e
 
 
 <parthenon/time>

@@ -163,7 +163,10 @@ struct RiemannSolver<RSolver::llf, FLUID_TYPE, CTYPE,
                 vdBr = wr_ivx * wr_ibx + wr_ivy * wr_iby + wr_ivz * wr_ibz;
                 el += pbl;
                 er += pbr;
-                fsum_e -= (wl_ibx * vdBl + wr_ibx * vdBr) / mu0;
+                // E includes magnetic energy and the total pressure contains an equal
+                // magnetic-pressure contribution, so each state contributes 2 P_B v_x.
+                fsum_e += 2.0 * (pbl * wl_ivx + pbr * wr_ivx) -
+                           (wl_ibx * vdBl + wr_ibx * vdBr) / mu0;
                 fsum_by = (wl_ivx * wl_iby - wl_ivy * wl_ibx) +
                           (wr_ivx * wr_iby - wr_ivy * wr_ibx);
                 fsum_bz = (wl_ivx * wl_ibz - wl_ivz * wl_ibx) +

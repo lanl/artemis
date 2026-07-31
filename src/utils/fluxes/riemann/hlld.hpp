@@ -138,7 +138,7 @@ struct RiemannSolver<RSolver::hlld, FLUID_TYPE, CTYPE,
                           0.5 * wr_idn * (SQR(wr_ivx) + SQR(wr_ivy) + SQR(wr_ivz)) + pbr;
 
           const Real fl_d = wl_idn * wl_ivx;
-          const Real fl_mx = wl_idn * SQR(wl_ivx) + ptl - bxsq_n;
+          const Real fl_mx = wl_idn * SQR(wl_ivx) - bxsq_n;
           const Real fl_my = wl_idn * wl_ivx * wl_ivy - bxi_n * wl_iby_n;
           const Real fl_mz = wl_idn * wl_ivx * wl_ivz - bxi_n * wl_ibz_n;
           const Real fl_e = (el + ptl) * wl_ivx - bxi_n * vdotBl;
@@ -146,7 +146,7 @@ struct RiemannSolver<RSolver::hlld, FLUID_TYPE, CTYPE,
           const Real fl_bz = wl_ivx * wl_ibz - bxi * wl_ivz;
 
           const Real fr_d = wr_idn * wr_ivx;
-          const Real fr_mx = wr_idn * SQR(wr_ivx) + ptr - bxsq_n;
+          const Real fr_mx = wr_idn * SQR(wr_ivx) - bxsq_n;
           const Real fr_my = wr_idn * wr_ivx * wr_ivy - bxi_n * wr_iby_n;
           const Real fr_mz = wr_idn * wr_ivx * wr_ivz - bxi_n * wr_ibz_n;
           const Real fr_e = (er + ptr) * wr_ivx - bxi_n * vdotBr;
@@ -348,7 +348,7 @@ struct RiemannSolver<RSolver::hlld, FLUID_TYPE, CTYPE,
             pmag_face = pbl;
           } else if (sal >= 0.0) {
             frho = fl_d + sl * (dlst - wl_idn);
-            fmx = fl_mx + sl * (dlst * sm - wl_idn * wl_ivx);
+            fmx = fl_mx + (ptl - ptst) + sl * (dlst * sm - wl_idn * wl_ivx);
             fmy = fl_my + sl * (dlst * vlst_y - wl_idn * wl_ivy);
             fmz = fl_mz + sl * (dlst * vlst_z - wl_idn * wl_ivz);
             fe = fl_e + sl * (elst - el);
@@ -358,7 +358,7 @@ struct RiemannSolver<RSolver::hlld, FLUID_TYPE, CTYPE,
             pmag_face = 0.5 * (bxsq_n + SQR(blst_y) + SQR(blst_z));
           } else if (sm >= 0.0) {
             frho = fl_d + sl * (dlst - wl_idn);
-            fmx = fl_mx + sl * (dlst * sm - wl_idn * wl_ivx);
+            fmx = fl_mx + (ptl - ptst) + sl * (dlst * sm - wl_idn * wl_ivx);
             fmy = fl_my + sl * (dlst * vlst_y - wl_idn * wl_ivy) +
                   sal * dlst * (vdst_y - vlst_y);
             fmz = fl_mz + sl * (dlst * vlst_z - wl_idn * wl_ivz) +
@@ -372,7 +372,7 @@ struct RiemannSolver<RSolver::hlld, FLUID_TYPE, CTYPE,
             pmag_face = 0.5 * (bxsq_n + SQR(bdst_y) + SQR(bdst_z));
           } else if (sar > 0.0) {
             frho = fr_d + sr * (drst - wr_idn);
-            fmx = fr_mx + sr * (drst * sm - wr_idn * wr_ivx);
+            fmx = fr_mx + (ptr - ptst) + sr * (drst * sm - wr_idn * wr_ivx);
             fmy = fr_my + sr * (drst * vrst_y - wr_idn * wr_ivy) +
                   sar * drst * (vdst_y - vrst_y);
             fmz = fr_mz + sr * (drst * vrst_z - wr_idn * wr_ivz) +
@@ -386,7 +386,7 @@ struct RiemannSolver<RSolver::hlld, FLUID_TYPE, CTYPE,
             pmag_face = 0.5 * (bxsq_n + SQR(bdst_y) + SQR(bdst_z));
           } else if (sr > 0.0) {
             frho = fr_d + sr * (drst - wr_idn);
-            fmx = fr_mx + sr * (drst * sm - wr_idn * wr_ivx);
+            fmx = fr_mx + (ptr - ptst) + sr * (drst * sm - wr_idn * wr_ivx);
             fmy = fr_my + sr * (drst * vrst_y - wr_idn * wr_ivy);
             fmz = fr_mz + sr * (drst * vrst_z - wr_idn * wr_ivz);
             fe = fr_e + sr * (erst - er);

@@ -22,10 +22,19 @@ problem_id = orszag_tang  # problem ID: basename of output filenames
 variables = gas.prim.density,  &
             gas.prim.pressure, &
             gas.prim.velocity, &
+            gas.cons.total_energy,    &
+            gas.cons.internal_energy, &
             field.cell.B,      &
+            field.cell.energy, &
             field.cell.divB
 file_type = hdf5  # HDF5 data dump
 dt        = 0.05  # time increment between outputs
+
+<parthenon/output2>
+file_type = hst
+data_format = %24.17e
+dt = 0.01
+
 
 <parthenon/time>
 nlim       = -1    # cycle limit
@@ -69,8 +78,7 @@ dust = false
 <gas>
 cfl = 0.4
 reconstruct = plm
-riemann = llf
-update_fluxes = true
+riemann = hlld
 dfloor = 1.0e-10
 siefloor = 1.0e-10
 

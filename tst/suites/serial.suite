@@ -17,6 +17,7 @@ advection/advection
 coords/blast
 disk/disk
 hydro/linwave
+mhd/brio_wu
 self_gravity/grav_slab
 ssheet/ssheet
 diffusion/alpha_disk

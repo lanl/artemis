@@ -33,6 +33,7 @@ template <Coordinates GEOM>
 TaskStatus SetAuxillaryFields(MeshData<Real> *md) {
   PARTHENON_INSTRUMENT
   using parthenon::MakePackDescriptor;
+  using TE = parthenon::TopologicalElement;
   auto pm = md->GetParentPointer();
   auto &resolved_pkgs = pm->resolved_packages;
 
@@ -41,6 +42,8 @@ TaskStatus SetAuxillaryFields(MeshData<Real> *md) {
   const bool do_gas = artemis_pkg->template Param<bool>("do_gas");
   const bool do_mhd = artemis_pkg->template Param<bool>("do_mhd");
   if (!(do_gas)) return TaskStatus::complete;
+  const Real mu0_code =
+      do_mhd ? pm->packages.Get("mhd")->template Param<Real>("mu0_code") : 1.0;
 
   // Extract gas parameters
   const Real dflr_gas = pm->packages.Get("gas").get()->template Param<Real>("dfloor");
@@ -50,15 +53,17 @@ TaskStatus SetAuxillaryFields(MeshData<Real> *md) {
   // Packing and indexing
   static auto desc =
       MakePackDescriptor<gas::cons::density, gas::cons::momentum, gas::cons::total_energy,
-                         gas::cons::internal_energy, field::cell::energy>(
-          resolved_pkgs.get());
+                         gas::cons::internal_energy, field::face::B>(resolved_pkgs.get());
   auto vmesh = desc.GetPack(md);
-  static auto desc_g =
-      MakePackDescriptor<geom::hx1v, geom::hx2v, geom::hx3v>(resolved_pkgs.get());
+  static auto desc_g = MakePackDescriptor<geom::x1v, geom::x2v, geom::x3v, geom::hx1v,
+                                          geom::hx2v, geom::hx3v>(resolved_pkgs.get());
   auto vg = desc_g.GetPack(md);
   IndexRange ib = md->GetBoundsI(IndexDomain::interior);
   IndexRange jb = md->GetBoundsJ(IndexDomain::interior);
   IndexRange kb = md->GetBoundsK(IndexDomain::interior);
+  const int ndim = pm->ndim;
+  const int multid = ndim >= 2;
+  const int threed = ndim == 3;
 
   const auto &cpars = artemis_pkg->template Param<geometry::CoordParams>("coord_params");
 
@@ -71,6 +76,30 @@ TaskStatus SetAuxillaryFields(MeshData<Real> *md) {
         geometry::Coords<GEOM> coords(cpars, vmesh.GetCoordinates(b), k, j, i);
 
         const auto &hx = coords.GetScaleFactors(vg, b, k, j, i);
+        Real emag = 0.0;
+        if (do_mhd) {
+          const auto xv = coords.GetCellCenter(vg, b, k, j, i);
+          const auto &bnds = coords.GetBounds();
+          const Real bx =
+              ((bnds.x1[1] - xv[0]) * vmesh(b, TE::F1, field::face::B(), k, j, i) +
+               (xv[0] - bnds.x1[0]) * vmesh(b, TE::F1, field::face::B(), k, j, i + 1)) /
+              (bnds.x1[1] - bnds.x1[0]);
+          const Real by =
+              multid
+                  ? (((bnds.x2[1] - xv[1]) * vmesh(b, TE::F2, field::face::B(), k, j, i) +
+                      (xv[1] - bnds.x2[0]) *
+                          vmesh(b, TE::F2, field::face::B(), k, j + multid, i)) /
+                     (bnds.x2[1] - bnds.x2[0]))
+                  : vmesh(b, TE::F2, field::face::B(), k, j, i);
+          const Real bz =
+              threed
+                  ? (((bnds.x3[1] - xv[2]) * vmesh(b, TE::F3, field::face::B(), k, j, i) +
+                      (xv[2] - bnds.x3[0]) *
+                          vmesh(b, TE::F3, field::face::B(), k + threed, j, i)) /
+                     (bnds.x3[1] - bnds.x3[0]))
+                  : vmesh(b, TE::F3, field::face::B(), k, j, i);
+          emag = MHD::MagneticEnergyDensity(bx, by, bz, mu0_code);
+        }
 
         for (int n = 0; n < vmesh.GetSize(b, gas::cons::density()); ++n) {
           // Extract state vector
@@ -82,10 +111,9 @@ TaskStatus SetAuxillaryFields(MeshData<Real> *md) {
           u_d = (dfloor)*u_d + (!dfloor) * dflr_gas;
 
           // Compute SIE via dual energy formalism and apply floor
-          const Real emag =
-              (do_mhd && (n == 0)) ? vmesh(b, field::cell::energy(), k, j, i) : 0.0;
-          Real sie =
-              ArtemisUtils::DualEnergySIE(vmesh, b, n, k, j, i, de_switch, hx, emag);
+          const Real species_emag = (do_mhd && (n == 0)) ? emag : 0.0;
+          Real sie = ArtemisUtils::DualEnergySIE(vmesh, b, n, k, j, i, de_switch, hx,
+                                                 species_emag);
           const Real efloor = (sie > sieflr_gas);
           sie = (efloor)*sie + (!efloor) * sieflr_gas;
 

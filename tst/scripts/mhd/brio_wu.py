@@ -35,6 +35,7 @@ _reference_file = os.path.join(os.path.dirname(__file__), "brio_wu.std")
 _fields = ("density", "pressure", "velocity_x", "velocity_y", "magnetic_y")
 _profile_tolerance = 3.0e-2
 _solvers = ["llf", "hlle", "hlld"]
+_nx = 512
 
 
 def run(**kwargs):
@@ -47,8 +48,8 @@ def run(**kwargs):
                 "parthenon/job/problem_id={}_{}".format(_file_id, r),
                 "gas/riemann={}".format(r),
                 "gas/scr_level=1",
-                "parthenon/mesh/nx1=512",
-                "parthenon/meshblock/nx1=512",
+                "parthenon/mesh/nx1={:d}".format(_nx),
+                "parthenon/meshblock/nx1={:d}".format(int(_nx / _nranks)),
                 "parthenon/time/ncycle_out=1",
             ],
         ]

@@ -53,8 +53,8 @@ def run(**kwargs):
             "gas/riemann=hlld",
             "parthenon/mesh/nx1=64",
             "parthenon/mesh/nx2=64",
-            "parthenon/meshblock/nx1={:d}".format(int(64/npx)),
-            "parthenon/meshblock/nx2={:d}".format(int(64/npy)),
+            "parthenon/meshblock/nx1={:d}".format(int(64 / npx)),
+            "parthenon/meshblock/nx2={:d}".format(int(64 / npy)),
             "parthenon/output1/dt=0.1",
             "parthenon/time/ncycle_out=100",
         ],
@@ -83,7 +83,9 @@ def analyze():
         logger.warning("Orszag-Tang has non-positive density or pressure")
         status = False
     if np.max(np.abs(snapshot["divB"])) > 1.0e-10:
-        logger.warning("Orszag-Tang max|divB| is too large: %.8e", np.max(np.abs(snapshot["divB"])))
+        logger.warning(
+            "Orszag-Tang max|divB| is too large: %.8e", np.max(np.abs(snapshot["divB"]))
+        )
         status = False
     if not np.isclose(np.mean(density), _rho0, rtol=1.0e-12, atol=0.0):
         logger.warning("Orszag-Tang mean density changed: %.16e", np.mean(density))
@@ -93,14 +95,21 @@ def analyze():
     if np.max(np.abs(momentum)) > 1.0e-10:
         logger.warning("Orszag-Tang mean momentum is too large: %s", momentum)
         status = False
-    if not np.isclose(np.mean(total_energy), _initial_total_energy, rtol=1.0e-8, atol=0.0):
-        logger.warning("Orszag-Tang mean total energy changed: %.16e", np.mean(total_energy))
+    if not np.isclose(
+        np.mean(total_energy), _initial_total_energy, rtol=1.0e-8, atol=0.0
+    ):
+        logger.warning(
+            "Orszag-Tang mean total energy changed: %.16e", np.mean(total_energy)
+        )
         status = False
 
     kinetic_energy = 0.5 * density * np.sum(velocity**2, axis=1)
     residual = total_energy - internal_energy - kinetic_energy - magnetic_energy
     if np.max(np.abs(residual)) > 1.0e-10:
-        logger.warning("Orszag-Tang energy decomposition residual is %.8e", np.max(np.abs(residual)))
+        logger.warning(
+            "Orszag-Tang energy decomposition residual is %.8e",
+            np.max(np.abs(residual)),
+        )
         status = False
     if np.mean(internal_energy) < _p0 / (_gamma - 1.0) + 1.0e-3 * _initial_total_energy:
         logger.warning("Orszag-Tang did not produce the expected shock heating")
@@ -110,7 +119,9 @@ def analyze():
 
 
 def _latest_file(base):
-    files = sorted(glob.glob(os.path.join(artemis.get_data_dir(), base + ".out1.final.phdf")))
+    files = sorted(
+        glob.glob(os.path.join(artemis.get_data_dir(), base + ".out1.final.phdf"))
+    )
     if not files:
         raise RuntimeError("No output files found for " + base)
     return files[-1]

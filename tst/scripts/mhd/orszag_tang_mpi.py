@@ -29,6 +29,7 @@ orszag_tang._file_id = "orszag_tang_mpi"
 def run(**kwargs):
     return orszag_tang.run(**kwargs)
 
+
 # Analyze outputs
 def analyze():
     return orszag_tang.analyze()

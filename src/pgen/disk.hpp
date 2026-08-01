@@ -289,7 +289,8 @@ inline void InitDiskParams(MeshBlock *pmb, ParameterInput *pin) {
     disk_params.h0 = pin->GetOrAddReal("problem", "h0", 0.05);
     disk_params.Gamma = pin->GetOrAddReal("problem", "polytropic_index", 1.0);
 
-    PARTHENON_REQUIRE(disk_params.Gamma >= 1, "problem/gamma needs to be >= 1");
+    PARTHENON_REQUIRE(disk_params.Gamma >= 1,
+                      "problem/polytropic_index needs to be >= 1");
 
     disk_params.dens_min = gas_pkg->Param<Real>("dfloor");
     disk_params.sie_min = gas_pkg->Param<Real>("siefloor");
@@ -525,7 +526,7 @@ TaskStatus WaveKilling(MeshData<Real> *md, const Real /* time */, const Real dt)
   const auto wave = artemis_pkg->template Param<WaveKillingParams>("wave_killing_params");
 
   auto &gas_pkg = pm->packages.Get("gas");
-  const auto &eos_d = gas_pkg->template Param<EOS>("eos_d");
+  const auto &eos_d = gas_pkg->template Param<ParArray1D<EOS>>("eos_d");
   const Real de_switch = gas_pkg->template Param<Real>("de_switch");
   const Real dflr_gas = gas_pkg->template Param<Real>("dfloor");
   const Real sieflr_gas = gas_pkg->template Param<Real>("siefloor");
@@ -570,8 +571,8 @@ TaskStatus WaveKilling(MeshData<Real> *md, const Real /* time */, const Real dt)
         const auto &hx = coords.GetScaleFactors(vg, b, k, j, i);
         const Real fac = rate * dt / (1.0 + rate * dt);
         const auto target =
-            ComputeDiskProfile<GEOM>(disk_params, coords, xv, dx, k, j, i, eos_d, do_gas,
-                                     do_dust, particles, npart);
+            ComputeDiskProfile<GEOM>(disk_params, coords, xv, dx, k, j, i, eos_d(0),
+                                     do_gas, do_dust, particles, npart);
 
         if (do_gas) {
           const Real target_vel[3] = {target.gvel1, target.gvel2, target.gvel3};
@@ -589,12 +590,12 @@ TaskStatus WaveKilling(MeshData<Real> *md, const Real /* time */, const Real dt)
 
             const Real vel[3] = {mom1 / (dens * hx[0]), mom2 / (dens * hx[1]),
                                  mom3 / (dens * hx[2])};
-            const Real temp = eos_d.TemperatureFromDensityInternalEnergy(dens, sie);
+            const Real temp = eos_d(0).TemperatureFromDensityInternalEnergy(dens, sie);
             const Real new_dens = std::max(dflr_gas, dens + fac * (target.gdens - dens));
             const Real new_temp = temp + fac * (target.gtemp - temp);
-            const Real new_sie =
-                std::max(sieflr_gas,
-                         eos_d.InternalEnergyFromDensityTemperature(new_dens, new_temp));
+            const Real new_sie = std::max(
+                sieflr_gas,
+                eos_d(0).InternalEnergyFromDensityTemperature(new_dens, new_temp));
             const Real new_vel[3] = {vel[0] + fac * (target_vel[0] - vel[0]),
                                      vel[1] + fac * (target_vel[1] - vel[1]),
                                      vel[2] + fac * (target_vel[2] - vel[2])};

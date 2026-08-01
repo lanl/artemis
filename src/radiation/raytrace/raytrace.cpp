@@ -43,8 +43,15 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   } else {
     PARTHENON_FAIL("Opacity model not recognized!");
   }
-  params.Add("opacity_h", opacity);
-  params.Add("opacity_d", opacity.GetOnDevice());
+  const int nspecies = pin->GetOrAddInteger("gas", "nspecies", 1);
+  ParArray1D<ArtemisUtils::Opacity> opacity_device("opacity_d", nspecies);
+  auto opacity_host = opacity_device.GetHostMirror();
+  for (int n = 0; n < nspecies; ++n) {
+    opacity_host(n) = opacity;
+    opacity_device(n) = opacity_host(n).GetOnDevice();
+  }
+  params.Add("opacity_h", opacity_host);
+  params.Add("opacity_d", opacity_device);
 
   const Real stellar_temp = pin->GetReal("radiation/raytrace", "temperature_cgs");
   Real stellar_radius = pin->GetReal("radiation/raytrace", "radius_solar");
@@ -277,7 +284,7 @@ TaskStatus EvalOpac(MeshData<Real> *md) {
 
   ParArray1D<ArtemisUtils::EOS> eos_d =
       gas_pkg->Param<ParArray1D<ArtemisUtils::EOS>>("eos_d");
-  ArtemisUtils::Opacity opacity_d = rt_pkg->Param<ArtemisUtils::Opacity>("opacity_d");
+  const auto opacity_d = rt_pkg->Param<ParArray1D<ArtemisUtils::Opacity>>("opacity_d");
 
   static auto desc =
       MakePackDescriptor<gas::prim::density, gas::prim::sie, rad::star::absorption>(
@@ -299,7 +306,7 @@ TaskStatus EvalOpac(MeshData<Real> *md) {
         //%%%%%%%%%%%%%%%%
         const Real temp = eos_d(0).TemperatureFromDensityInternalEnergy(rho, sie);
         vmesh(b, rad::star::absorption(), k, j, i) =
-            opacity_d.AbsorptionCoefficient(rho, temp, 1.0);
+            opacity_d(0).AbsorptionCoefficient(rho, temp, 1.0);
       });
 
   return TaskStatus::complete;

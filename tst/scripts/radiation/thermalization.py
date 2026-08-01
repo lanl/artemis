@@ -63,8 +63,8 @@ def run(**kwargs):
         arguments = [
             "parthenon/job/problem_id=" + fid,
             "parthenon/time/tlim={:24.16e}".format(_tf),
-            "gas/gamma={:24.16e}".format(_gamma),
-            "gas/mu={:24.16e}".format(_mu),
+            "gas/eos/ideal/gamma={:24.16e}".format(_gamma),
+            "gas/eos/ideal/mu={:24.16e}".format(_mu),
             "gas/opacity/absorption/opacity_model=constant",
             "gas/opacity/absorption/kappa_a={:24.16e}".format(_ka),
             "problem/rho={:24.16e}".format(_rho),

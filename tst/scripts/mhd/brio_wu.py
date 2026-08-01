@@ -23,11 +23,18 @@ import os
 
 import h5py
 import numpy as np
+import scripts.utils.artemis as artemis
 from scipy.interpolate import interp1d
 
-import scripts.utils.artemis as artemis
 
 logger = logging.getLogger("artemis" + __name__[7:])
+logging.getLogger("h5py").setLevel(logging.WARNING)
+logging.getLogger("matplotlib").setLevel(logging.WARNING)
+
+import matplotlib
+
+matplotlib.use("Agg")  # Use the Agg backend to avoid issues with DISPLAY not being set
+import matplotlib.pyplot as plt
 
 _nranks = 1
 _file_id = "mhd_brio_wu"
@@ -59,6 +66,7 @@ def run(**kwargs):
 
 def analyze():
     logger.debug("Analyzing test " + __name__)
+    os.makedirs(artemis.get_fig_dir(), exist_ok=True)
     status = True
     reference = np.loadtxt(_reference_file, comments="#", ndmin=2)
 
@@ -124,5 +132,34 @@ def analyze():
         status = status and test_one(x, u[0, :], 3, r)
         status = status and test_one(x, u[1, :], 4, r)
         status = status and test_one(x, B[1, :], 7, r)
+
+        fig, axes = plt.subplots(2, 3, figsize=(4 * 3, 4 * 2))
+        axes[0, 0].plot(reference[:, 0], reference[:, 1], "-k")
+        axes[0, 0].plot(x, d)
+        axes[0, 1].plot(reference[:, 0], reference[:, 2], "-k")
+        axes[0, 1].plot(x, p)
+        axes[0, 2].plot(reference[:, 0], reference[:, 3], "-k")
+        axes[0, 2].plot(x, u[0, :])
+        axes[1, 0].plot(reference[:, 0], reference[:, 4], "-k")
+        axes[1, 0].plot(x, u[1, :])
+        axes[1, 1].plot(reference[:, 0], reference[:, 6], "-k")
+        axes[1, 1].plot(x, B[0, :])
+        axes[1, 2].plot(reference[:, 0], reference[:, 7], "-k")
+        axes[1, 2].plot(x, B[1, :])
+        axes[0, 0].set_ylabel("$\\rho$", fontsize=14)
+        axes[0, 1].set_ylabel("$P$", fontsize=14)
+        axes[0, 2].set_ylabel("$v_x$", fontsize=14)
+        axes[1, 0].set_ylabel("$v_y$", fontsize=14)
+        axes[1, 1].set_ylabel("$B_x$", fontsize=14)
+        axes[1, 2].set_ylabel("$B_y$", fontsize=14)
+        for ax in axes.flatten():
+            ax.tick_params(labelsize=12)
+            ax.set_xlabel("$x$", fontsize=14)
+            ax.minorticks_on()
+        fig.tight_layout()
+        fig.savefig(
+            os.path.join(artemis.get_fig_dir(), _file_id + "_{}.png".format(r)),
+            bbox_inches="tight",
+        )
 
     return status

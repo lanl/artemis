@@ -33,7 +33,7 @@ _nranks = 1
 _file_id = "mhd_brio_wu"
 _reference_file = os.path.join(os.path.dirname(__file__), "brio_wu.std")
 _fields = ("density", "pressure", "velocity_x", "velocity_y", "magnetic_y")
-_profile_tolerance = 3.0e-2
+_profile_tolerance = 1e-3
 _solvers = ["llf", "hlle", "hlld"]
 _nx = 512
 
@@ -50,7 +50,7 @@ def run(**kwargs):
                 "gas/scr_level=1",
                 "parthenon/mesh/nx1={:d}".format(_nx),
                 "parthenon/meshblock/nx1={:d}".format(int(_nx / _nranks)),
-                "parthenon/time/ncycle_out=1",
+                "parthenon/time/ncycle_out=100",
             ],
         ]
         print("artemis -i " + args[1] + " " + " ".join(args[2]))
@@ -62,7 +62,7 @@ def analyze():
     status = True
     reference = np.loadtxt(_reference_file, comments="#", ndmin=2)
 
-    def test_one(x, v, column):
+    def test_one(x, v, column, solver):
         names = ["density", "pressure", "vx", "vy", "vz", "Bx", "By", "Bz"]
         dynamic_range = np.ptp(reference[:, column])
         f = interp1d(
@@ -75,10 +75,9 @@ def analyze():
         l1 = np.mean(np.abs(v - f(x))) / dynamic_range
         if l1 > _profile_tolerance:
             logger.warning(
-                "%s normalized L1 error %.8e exceeds %.8e",
-                names[column - 1],
-                l1,
-                _profile_tolerance,
+                "{} normalized L1 error {:.8e} exceeds {:.8e} in {}".format(
+                    names[column - 1], l1, _profile_tolerance, solver
+                )
             )
             return False
         return True
@@ -97,30 +96,33 @@ def analyze():
             divB = f["field.cell.divB"][0, 0, 0, :]
 
         if not np.all(np.isfinite(np.vstack((d, p, u, B, divB)))):
-            logger.warning("Brio-Wu output contains non-finite values")
+            logger.warning("Brio-Wu output contains non-finite values in " + r)
             status = False
 
         if np.min(d) <= 0.0:
-            logger.warning("Brio-Wu density is not positive")
+            logger.warning("Brio-Wu density is not positive in " + r)
             status = False
         if np.min(p) <= 0.0:
-            logger.warning("Brio-Wu pressure is not positive")
+            logger.warning("Brio-Wu pressure is not positive in " + r)
             status = False
         if np.max(np.abs(B[0, :] - 0.75)) > 1.0e-12:
-            logger.warning("Brio-Wu Bx is not constant at 0.75")
+            logger.warning("Brio-Wu Bx is not constant at 0.75 in " + r)
             status = False
         if np.max(np.abs(divB)) > 1.0e-10:
-            logger.warning("Brio-Wu max|divB| is too large: %.8e", np.max(np.abs(divB)))
+            logger.warning(
+                "Brio-Wu max|divB| is too large: {:.8e} in {}".format(
+                    np.max(np.abs(divB)), r
+                )
+            )
             status = False
         if max(np.max(np.abs(u[2, :])), np.max(np.abs(B[2, :]))) > 1.0e-12:
-            logger.warning("Brio-Wu developed an out-of-plane component")
+            logger.warning("Brio-Wu developed an out-of-plane component in " + r)
             status = False
 
-        status = status and test_one(x, d, 1)
-        status = status and test_one(x, p, 2)
-        status = status and test_one(x, u[0, :], 3)
-        status = status and test_one(x, u[1, :], 4)
-        status = status and test_one(x, u[2, :], 5)
-        status = status and test_one(x, B[1, :], 7)
+        status = status and test_one(x, d, 1, r)
+        status = status and test_one(x, p, 2, r)
+        status = status and test_one(x, u[0, :], 3, r)
+        status = status and test_one(x, u[1, :], 4, r)
+        status = status and test_one(x, B[1, :], 7, r)
 
     return status

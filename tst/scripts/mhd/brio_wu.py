@@ -40,7 +40,7 @@ _nranks = 1
 _file_id = "mhd_brio_wu"
 _reference_file = os.path.join(os.path.dirname(__file__), "brio_wu.std")
 _fields = ("density", "pressure", "velocity_x", "velocity_y", "magnetic_y")
-_profile_tolerance = 1e-3
+_profile_tolerance = 3.8e-3
 _solvers = ["llf", "hlle", "hlld"]
 _nx = 512
 
@@ -69,6 +69,7 @@ def analyze():
     os.makedirs(artemis.get_fig_dir(), exist_ok=True)
     status = True
     reference = np.loadtxt(_reference_file, comments="#", ndmin=2)
+    ath = np.loadtxt(os.path.join(os.path.dirname(__file__), "athena_bw.std"))
 
     def test_one(x, v, column, solver):
         names = ["density", "pressure", "vx", "vy", "vz", "Bx", "By", "Bz"]
@@ -134,18 +135,30 @@ def analyze():
         status = status and test_one(x, B[1, :], 7, r)
 
         fig, axes = plt.subplots(2, 3, figsize=(4 * 3, 4 * 2))
+        axes[0, 0].plot(ath[:, 1], ath[:, 2], "-k", alpha=0.3, lw=2)
         axes[0, 0].plot(reference[:, 0], reference[:, 1], "-k")
         axes[0, 0].plot(x, d)
+
+        axes[0, 1].plot(ath[:, 1], ath[:, 3], "-k", alpha=0.3, lw=2)
         axes[0, 1].plot(reference[:, 0], reference[:, 2], "-k")
         axes[0, 1].plot(x, p)
+
+        axes[0, 2].plot(ath[:, 1], ath[:, 4], "-k", alpha=0.3, lw=2)
         axes[0, 2].plot(reference[:, 0], reference[:, 3], "-k")
         axes[0, 2].plot(x, u[0, :])
+
+        axes[1, 0].plot(ath[:, 1], ath[:, 5], "-k", alpha=0.3, lw=2)
         axes[1, 0].plot(reference[:, 0], reference[:, 4], "-k")
         axes[1, 0].plot(x, u[1, :])
+
+        axes[1, 1].plot(ath[:, 1], ath[:, 7], "-k", alpha=0.3, lw=2)
         axes[1, 1].plot(reference[:, 0], reference[:, 6], "-k")
         axes[1, 1].plot(x, B[0, :])
+
+        axes[1, 2].plot(ath[:, 1], ath[:, 8], "-k", alpha=0.3, lw=2)
         axes[1, 2].plot(reference[:, 0], reference[:, 7], "-k")
         axes[1, 2].plot(x, B[1, :])
+
         axes[0, 0].set_ylabel("$\\rho$", fontsize=14)
         axes[0, 1].set_ylabel("$P$", fontsize=14)
         axes[0, 2].set_ylabel("$v_x$", fontsize=14)

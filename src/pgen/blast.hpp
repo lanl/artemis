@@ -184,7 +184,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         Real total_vol = coords.GetVolume(vg, 0, k, j, i);
         const auto &xv = coords.GetCellCenter(vg, 0, k, j, i);
         Real den = pars.d0;
-        Real e0 = ArtemisUtils::EofPR(eos(0), pars.p0, den);
+        Real e0 = den * ArtemisUtils::EofPR(eos(0), pars.p0, den);
         Real internal_energy = 0.0;
         auto xcart = coords.ConvertToCart(xv);
         const auto &xc = coords.ConvertToCart(pars.x0);

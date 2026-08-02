@@ -205,7 +205,7 @@ inline void UserWorkAfterLoop(Mesh *pmesh, ParameterInput *pin, parthenon::SimTi
         const Real cm1 = rho * slab.vx;
         const Real cm2 = rho * slab.vy;
         const Real cm3 = rho * slab.vz;
-        const Real ce = ArtemisUtils::EofPR(eos_d(0), pres, rho) +
+        const Real ce = rho * ArtemisUtils::EofPR(eos_d(0), pres, rho) +
                         0.5 * (SQR(cm1) + SQR(cm2) + SQR(cm3)) / rho;
 
         // accumulate L1 errors

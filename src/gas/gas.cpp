@@ -141,7 +141,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
     params.Add("amu", constants.GetAMUCode());
     params.Add("Rgas", constants.GetKBCode() / (constants.GetAMUCode() * mu_v[0]));
     ParArray1D<EOS> eos_device("eos_d", nspecies);
-    ParArray1D<EOS>::host_mirror_type eos_host(eos_device.GetHostMirror());
+    auto eos_host = eos_device.GetHostMirror();
     for (int n = 0; n < nspecies; ++n) {
       eos_host(n) = singularity::UnitSystem<singularity::IdealGas>(
           singularity::IdealGas(gamma_v[n] - 1.,
@@ -164,7 +164,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
       std::vector<std::string> filenames(nspecies, "");
       pin->GetOrAddVector<std::string>(block_name, "eos_file", filenames);
       ParArray1D<EOS> eos_device("eos_d", nspecies);
-      ParArray1D<EOS>::host_mirror_type eos_host(eos_device.GetHostMirror());
+      auto eos_host = eos_device.GetHostMirror();
       for (int n = 0; n < nspecies; ++n) {
         eos_host(n) = singularity::UnitSystem<ArtemisEOS::IdealHHe>(
             ArtemisEOS::IdealHHe(filenames[n]),
@@ -206,7 +206,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
                         "y must have nspecies entries");
 
       ParArray1D<EOS> eos_device("eos_d", nspecies);
-      ParArray1D<EOS>::host_mirror_type eos_host(eos_device.GetHostMirror());
+      auto eos_host = eos_device.GetHostMirror();
       for (int n = 0; n < nspecies; ++n) {
         ArtemisEOS::IdealHHe eos_base(X_v[n], Y_v[n], ltmin, ltmax, nt, ldmin, ldmax, nd,
                                       save_to_file, true);
@@ -241,7 +241,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
     PARTHENON_REQUIRE(filenames.size() == static_cast<size_t>(nspecies),
                       "eos_file must have nspecies entries");
     ParArray1D<EOS> eos_device("eos_d", nspecies);
-    ParArray1D<EOS>::host_mirror_type eos_host(eos_device.GetHostMirror());
+    auto eos_host = eos_device.GetHostMirror();
     for (int n = 0; n < nspecies; ++n) {
       eos_host(n) = singularity::UnitSystem<singularity::SpinerEOSDependsRhoSie>(
           singularity::SpinerEOSDependsRhoSie(filenames[n], matid[n]),
@@ -272,7 +272,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
     PARTHENON_REQUIRE(filenames.size() == static_cast<size_t>(nspecies),
                       "eos_file must have nspecies entries");
     ParArray1D<EOS> eos_device("eos_d", nspecies);
-    ParArray1D<EOS>::host_mirror_type eos_host(eos_device.GetHostMirror());
+    auto eos_host = eos_device.GetHostMirror();
     for (int n = 0; n < nspecies; ++n) {
       eos_host(n) = singularity::UnitSystem<singularity::SpinerEOSDependsRhoT>(
           singularity::SpinerEOSDependsRhoT(filenames[n], matid[n]),
@@ -378,8 +378,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
     }
   }
   ParArray1D<ArtemisUtils::MeanOpacity> opacity_device("opacity_d", nspecies);
-  ParArray1D<ArtemisUtils::MeanOpacity>::host_mirror_type opacity_host(
-      opacity_device.GetHostMirror());
+  auto opacity_host = opacity_device.GetHostMirror();
   for (int n = 0; n < nspecies; ++n) {
     opacity_host(n) = opacity;
     opacity_device(n) = opacity_host(n).GetOnDevice();
@@ -420,8 +419,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   }
 
   ParArray1D<ArtemisUtils::MeanScattering> scattering_device("scattering_d", nspecies);
-  ParArray1D<ArtemisUtils::MeanScattering>::host_mirror_type scattering_host(
-      scattering_device.GetHostMirror());
+  auto scattering_host = scattering_device.GetHostMirror();
   for (int n = 0; n < nspecies; ++n) {
     scattering_host(n) = scattering;
     scattering_device(n) = scattering_host(n).GetOnDevice();

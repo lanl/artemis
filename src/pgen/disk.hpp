@@ -146,9 +146,10 @@ Real TempProfile(struct DiskParams pgen, const Real R, const Real z) {
   // T = T0 (rho/rho0)^(Gamma-1)
   const Real rho = DenProfile(pgen, R, z);
   const Real rho0 = DenProfile(pgen, R, 0.0);
+  const Real rr = R / pgen.r0;
   const Real ir1 = 1.0 / std::sqrt(R * R + pgen.temp_soft2);
-  const Real ir3 = ir1 * ir1 * ir1;
-  const Real T0 = pgen.temp0 * ir3 * std::pow(R / pgen.r0, pgen.flare + 1);
+  const Real T0 = pgen.temp0 * SQR(rr) * std::pow(rr, 2.0 * pgen.flare) * pgen.r0 *
+                  pgen.r0 * pgen.r0 * ir1 * ir1 * ir1;
   return std::max(pgen.temp_min, T0 * std::pow(rho / rho0, pgen.Gamma - 1.0));
 }
 

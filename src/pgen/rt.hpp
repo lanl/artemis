@@ -115,7 +115,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         const int fid = (upper) ? 1 : 0;
 
         v(0, gas::prim::density(fid), k, j, i) = dens;
-        v(0, gas::prim::sie(fid), k, j, i) = ArtemisUtils::EofPR(eos(0), pres, dens);
+        v(0, gas::prim::sie(fid), k, j, i) = ArtemisUtils::EofPR(eos(fid), pres, dens);
         v(0, gas::prim::velocity(VI(fid, 0)), k, j, i) = 0.0;
         v(0, gas::prim::velocity(VI(fid, 1)), k, j, i) =
             pars.amp * std::cos(pars.freq * xc);

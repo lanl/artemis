@@ -169,7 +169,7 @@ inline void ShockInnerX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse)
           v(0, gas::prim::velocity(VI(n, 1)), k, j, i) = 0.0;
           v(0, gas::prim::velocity(VI(n, 2)), k, j, i) = 0.0;
           v(0, gas::prim::sie(n), k, j, i) =
-              eos_d(0).InternalEnergyFromDensityTemperature(shkp.rhol, shkp.tl);
+              eos_d(n).InternalEnergyFromDensityTemperature(shkp.rhol, shkp.tl);
         }
         if (do_moment) {
           for (int n = 0; n < v.GetSize(0, rad::prim::energy()); ++n) {
@@ -220,7 +220,7 @@ inline void ShockOuterX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse)
           v(0, gas::prim::velocity(VI(n, 1)), k, j, i) = 0.0;
           v(0, gas::prim::velocity(VI(n, 2)), k, j, i) = 0.0;
           v(0, gas::prim::sie(n), k, j, i) =
-              eos_d(0).InternalEnergyFromDensityTemperature(shkp.rhor, shkp.tr);
+              eos_d(n).InternalEnergyFromDensityTemperature(shkp.rhor, shkp.tr);
         }
         if (do_moment) {
           for (int n = 0; n < v.GetSize(0, rad::prim::energy()); ++n) {

@@ -191,7 +191,9 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
     // Select between Jaybenne IMC or Moments
     if (do_imc) {
       auto eos_h_arr =
-          packages.Get("gas")->Param<parthenon::ParArray1D<ArtemisUtils::EOS>>("eos_h");
+          packages.Get("gas")
+              ->Param<parthenon::ParArray1D<ArtemisUtils::EOS>::host_mirror_type>(
+                  "eos_h");
       auto opacity_h =
           packages.Get("gas")
               ->Param<parthenon::ParArray1D<MeanOpacity>::host_mirror_type>("opacity_h");

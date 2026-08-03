@@ -87,9 +87,9 @@ TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, FLUX vflx,
   const bool three_d = (pm->ndim > 2);
 
   // Adiabatic index, if used
-  EOS eos;
+  ParArray1D<EOS> eos;
   if constexpr (F == Fluid::gas) {
-    eos = pkg->template Param<EOS>("eos_d");
+    eos = pkg->template Param<ParArray1D<EOS>>("eos_d");
   }
 
   const auto &cpars =

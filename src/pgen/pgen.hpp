@@ -26,6 +26,7 @@
 #include "constant.hpp"
 #include "crooked_pipe.hpp"
 #include "disk.hpp"
+#include "escape_1d.hpp"
 #include "gaussian_bump.hpp"
 #include "geometry/geometry.hpp"
 #include "grav_slab.hpp"
@@ -78,6 +79,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
     rt::ProblemGenerator<T>(pmb, pin);
   } else if (name == "shock") {
     shock::ProblemGenerator<T>(pmb, pin);
+  } else if (name == "escape_1d") {
+    escape_1d::ProblemGenerator<T>(pmb, pin);
   } else if (name == "strat") {
     strat::ProblemGenerator<T>(pmb, pin);
   } else if (name == "thermalization") {
@@ -107,6 +110,8 @@ void InitMeshBlockData(MeshBlock *pmb, ParameterInput *pin) {
     disk::InitDiskParams(pmb, pin);
   } else if (name == "shock") {
     shock::InitShockParams(pmb, pin);
+  } else if (name == "escape_1d") {
+    escape_1d::InitEscape1DParams(pmb, pin);
   } else if (name == "strat") {
     strat::InitStratParams(pmb, pin);
   }

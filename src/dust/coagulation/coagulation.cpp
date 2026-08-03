@@ -14,9 +14,11 @@
 // This closely follows the implementation in Stammler and Birnstiel (2022) ApJ 935:35
 //========================================================================================
 
+#include <vector>
+
 // Artemis includes
-#include "dust/coagulation/coagulation.hpp"
 #include "artemis.hpp"
+#include "dust/coagulation/coagulation.hpp"
 #include "dust/dust.hpp"
 #include "geometry/geometry.hpp"
 #include "utils/artemis_utils.hpp"
@@ -66,7 +68,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin, Params &gas_par
   dcpars.chi = pin->GetOrAddReal("dust/coagulation", "chi", 1.0);
 
   // Properties used in computing rates
-  drpars.mmw = gas_params.Get<Real>("mu") * constants.GetAMUPhysical();
+  auto gas_mu = gas_params.Get<ParArray1D<Real>>("mu");
+  const auto gas_mu_h = gas_mu.GetHostMirrorAndCopy();
+  drpars.mmw = gas_mu_h(0) * constants.GetAMUPhysical();
   drpars.cross_section =
       pin->GetOrAddReal("dust/coagulation", "cross_section_cgs", 2.0e-15);
   drpars.vfrag = pin->GetOrAddReal("dust/coagulation", "vfrag_cgs", 1.e3);
@@ -222,7 +226,7 @@ TaskStatus CoagulationStep(MeshData<Real> *md, const Real time, const Real dt) {
 
   // Extract EOS
   auto &gas_pkg = pm->packages.Get("gas");
-  auto eos_d = gas_pkg->template Param<EOS>("eos_d");
+  const auto &eos_d = gas_pkg->template Param<ParArray1D<EOS>>("eos_d");
 
   // Extract dust params
   auto &dust_pkg = pm->packages.Get("dust");
@@ -306,8 +310,8 @@ TaskStatus CoagulationStep(MeshData<Real> *md, const Real time, const Real dt) {
         // Extract gas state vector
         const Real &gdens = vmesh(b, gas::prim::density(0), k, j, i);
         const Real &gsie = vmesh(b, gas::prim::sie(0), k, j, i);
-        const Real kT = eos_d.TemperatureFromDensityInternalEnergy(gdens, gsie);
-        const Real &gbulk = eos_d.BulkModulusFromDensityInternalEnergy(gdens, gsie);
+        const Real kT = eos_d(0).TemperatureFromDensityInternalEnergy(gdens, gsie);
+        const Real &gbulk = eos_d(0).BulkModulusFromDensityInternalEnergy(gdens, gsie);
         const Real cs1 = std::sqrt(gbulk / gdens) * vel0;
         const Real gdens1 = gdens * rho0;
         const Real kT1 = kT * kT0;

@@ -55,7 +55,7 @@ def run(**kwargs):
                     + _file_id
                     + "_{}_de{:d}_{}".format(fv, int(10 * dv), cv),
                     "gas/de_switch={:.1e}".format(dv),
-                    "gas/gamma=1.4",
+                    "problem/polytropic_index=1.4",
                     "gas/riemann=" + fv,
                 ]
                 artemis.run(_nranks, "disk/binary_cyl.in", arguments)

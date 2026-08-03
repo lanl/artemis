@@ -13,6 +13,7 @@
 
 // C++ headers
 #include <limits>
+#include <vector>
 
 // Artemis includes
 #include "artemis.hpp"
@@ -389,7 +390,7 @@ void InitMesh(parthenon::Mesh *pmesh) {
 
   const Real arad = moments_pkg->Param<Real>("arad");
   const bool use_opac = moments_pkg->Param<bool>("use_opac");
-  const auto &eos_d = gas_pkg->Param<EOS>("eos_d");
+  const auto &eos_d = gas_pkg->Param<ParArray1D<EOS>>("eos_d");
 
   for (int partition = 0; partition < pmesh->DefaultNumPartitions(); partition++) {
     auto md = pmesh->mesh_data.GetOrAdd("u0c", partition).get();
@@ -410,7 +411,7 @@ void InitMesh(parthenon::Mesh *pmesh) {
             "coord_params");
 
     if (use_opac) {
-      const auto &opac_d = gas_pkg->Param<MeanOpacity>("opacity_d");
+      const auto &opac_d = gas_pkg->Param<ParArray1D<MeanOpacity>>("opacity_d");
       const bool multi_d = pmesh->ndim >= 2;
       const bool three_d = pmesh->ndim == 3;
       parthenon::par_for(
@@ -421,12 +422,12 @@ void InitMesh(parthenon::Mesh *pmesh) {
             const auto &dx = coords.GetCellWidths();
             const Real &rho = vmesh(b, gas::prim::density(0), k, j, i);
             const Real &sie = vmesh(b, gas::prim::sie(0), k, j, i);
-            const Real T = eos_d.TemperatureFromDensityInternalEnergy(rho, sie);
+            const Real T = eos_d(0).TemperatureFromDensityInternalEnergy(rho, sie);
             Real dx_min = dx[0];
             if (multi_d) dx_min = std::min(dx_min, dx[1]);
             if (three_d) dx_min = std::min(dx_min, dx[2]);
-            const Real tau =
-                std::min(1.0, dx_min * opac_d.RosselandMeanAbsorptionCoefficient(rho, T));
+            const Real tau = std::min(
+                1.0, dx_min * opac_d(0).RosselandMeanAbsorptionCoefficient(rho, T));
             const Real Erad = tau * arad * SQR(SQR(T));
             vmesh(b, rad::cons::energy(0), k, j, i) = Erad;
             vmesh(b, rad::prim::energy(0), k, j, i) = Erad;
@@ -442,7 +443,7 @@ void InitMesh(parthenon::Mesh *pmesh) {
           KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
             const Real &rho = vmesh(b, gas::prim::density(0), k, j, i);
             const Real &sie = vmesh(b, gas::prim::sie(0), k, j, i);
-            const Real T = eos_d.TemperatureFromDensityInternalEnergy(rho, sie);
+            const Real T = eos_d(0).TemperatureFromDensityInternalEnergy(rho, sie);
             const Real Erad = arad * SQR(SQR(T));
             vmesh(b, rad::cons::energy(0), k, j, i) = Erad;
             vmesh(b, rad::prim::energy(0), k, j, i) = Erad;

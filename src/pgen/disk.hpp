@@ -33,6 +33,7 @@
 #include <limits>
 #include <sstream>
 #include <string>
+#include <vector>
 
 // Artemis headers
 #include "artemis.hpp"
@@ -57,7 +58,7 @@ namespace disk {
 struct DiskParams {
   Real r0, h0;
   Real p, q, flare;
-  Real rho0, dens_min, pres_min, sie_min, temp_min;
+  Real rho0, temp0, dens_min, pres_min, sie_min, temp_min;
   Real gm, Omega0, l0;
   Real omf;
   Real dust_to_gas;
@@ -67,7 +68,7 @@ struct DiskParams {
   Real alpha, nu0, nu_indx;
   Real mdot;
   Real temp_soft2;
-  Real kbmu, ar;
+  Real ar;
   bool do_gas, do_dust, do_moment, do_imc;
   bool nbody_temp;
   bool quiet_start;
@@ -146,11 +147,10 @@ Real TempProfile(struct DiskParams pgen, const Real R, const Real z) {
   // T = T0 (rho/rho0)^(Gamma-1)
   const Real rho = DenProfile(pgen, R, z);
   const Real rho0 = DenProfile(pgen, R, 0.0);
-  const Real H = R * pgen.h0 * std::pow(R / pgen.r0, pgen.flare);
+  const Real rr = R / pgen.r0;
   const Real ir1 = 1.0 / std::sqrt(R * R + pgen.temp_soft2);
-  const Real omk2 = SQR(pgen.Omega0) * ir1 * ir1 * ir1;
-  // c_iso^2 = P/rho = kb/mu T = Omk^2 H^2
-  const Real T0 = omk2 * H * H / (pgen.kbmu * pgen.Gamma);
+  const Real T0 = pgen.temp0 * SQR(rr) * std::pow(rr, 2.0 * pgen.flare) * pgen.r0 *
+                  pgen.r0 * pgen.r0 * ir1 * ir1 * ir1;
   return std::max(pgen.temp_min, T0 * std::pow(rho / rho0, pgen.Gamma - 1.0));
 }
 
@@ -291,7 +291,8 @@ inline void InitDiskParams(MeshBlock *pmb, ParameterInput *pin) {
     disk_params.h0 = pin->GetOrAddReal("problem", "h0", 0.05);
     disk_params.Gamma = pin->GetOrAddReal("problem", "polytropic_index", 1.0);
 
-    PARTHENON_REQUIRE(disk_params.Gamma >= 1, "problem/gamma needs to be >= 1");
+    PARTHENON_REQUIRE(disk_params.Gamma >= 1,
+                      "problem/polytropic_index needs to be >= 1");
 
     disk_params.dens_min = gas_pkg->Param<Real>("dfloor");
     disk_params.sie_min = gas_pkg->Param<Real>("siefloor");
@@ -301,14 +302,16 @@ inline void InitDiskParams(MeshBlock *pmb, ParameterInput *pin) {
     disk_params.l0 = pin->GetOrAddReal("problem", "l0", 0.0);
     disk_params.dust_to_gas = pin->GetOrAddReal("problem", "dust_to_gas", 0.01);
     disk_params.temp_soft2 = pin->GetOrAddReal("problem", "temp_soft", 0.0);
-    const auto mu = gas_pkg->Param<Real>("mu");
-    auto &constants = artemis_pkg->Param<ArtemisUtils::Constants>("constants");
-    const auto &eos = gas_pkg->Param<ArtemisUtils::EOS>("eos_h");
-    disk_params.kbmu = constants.GetKBCode() / (mu * constants.GetAMUCode());
-    disk_params.pres_min =
-        eos.PressureFromDensityInternalEnergy(disk_params.dens_min, disk_params.sie_min);
-    disk_params.temp_min = eos.TemperatureFromDensityInternalEnergy(disk_params.dens_min,
-                                                                    disk_params.sie_min);
+    const auto &eos_h = gas_pkg->Param<std::vector<ArtemisUtils::EOS>>("eos_h");
+    const Real p0 = disk_params.rho0 *
+                    SQR(disk_params.h0 * disk_params.r0 * disk_params.Omega0) /
+                    disk_params.Gamma;
+    disk_params.temp0 = ArtemisUtils::TofPR(eos_h[0], p0, disk_params.rho0);
+
+    disk_params.pres_min = eos_h[0].PressureFromDensityInternalEnergy(
+        disk_params.dens_min, disk_params.sie_min);
+    disk_params.temp_min = eos_h[0].TemperatureFromDensityInternalEnergy(
+        disk_params.dens_min, disk_params.sie_min);
 
     const auto nx = params.Get<std::array<int, 3>>("prob_dim");
     disk_params.three_d = nx[2] > 1;
@@ -320,6 +323,7 @@ inline void InitDiskParams(MeshBlock *pmb, ParameterInput *pin) {
     disk_params.do_imc = params.Get<bool>("do_imc");
     disk_params.do_moment = params.Get<bool>("do_moment");
 
+    auto &constants = artemis_pkg->Param<ArtemisUtils::Constants>("constants");
     disk_params.ar = constants.GetARCode();
 
     Real q = pin->GetOrAddReal("problem", "tslope", -Big<Real>());
@@ -469,7 +473,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   // Extract gas package and params
   auto &gas_pkg = pmb->packages.Get("gas");
-  const auto &eos_d = gas_pkg->template Param<EOS>("eos_d");
+  const auto &eos_d = gas_pkg->template Param<ParArray1D<EOS>>("eos_d");
 
   // Disk parameters
   auto disk_params = artemis_pkg->Param<DiskParams>("disk_params");
@@ -502,9 +506,8 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   pmb->par_for(
       "disk", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        DiskICImpl<GEOM>(v, 0, k, j, i, pco, eos_d, dp, particles, npart);
+        DiskICImpl<GEOM>(v, 0, k, j, i, pco, eos_d(0), dp, particles, npart);
       });
-  if (dp.do_imc) jaybenne::InitializeRadiation(md.get(), true);
 }
 
 //----------------------------------------------------------------------------------------
@@ -525,7 +528,7 @@ TaskStatus WaveKilling(MeshData<Real> *md, const Real /* time */, const Real dt)
   const auto wave = artemis_pkg->template Param<WaveKillingParams>("wave_killing_params");
 
   auto &gas_pkg = pm->packages.Get("gas");
-  const auto &eos_d = gas_pkg->template Param<EOS>("eos_d");
+  const auto &eos_d = gas_pkg->template Param<ParArray1D<EOS>>("eos_d");
   const Real de_switch = gas_pkg->template Param<Real>("de_switch");
   const Real dflr_gas = gas_pkg->template Param<Real>("dfloor");
   const Real sieflr_gas = gas_pkg->template Param<Real>("siefloor");
@@ -570,8 +573,8 @@ TaskStatus WaveKilling(MeshData<Real> *md, const Real /* time */, const Real dt)
         const auto &hx = coords.GetScaleFactors(vg, b, k, j, i);
         const Real fac = rate * dt / (1.0 + rate * dt);
         const auto target =
-            ComputeDiskProfile<GEOM>(disk_params, coords, xv, dx, k, j, i, eos_d, do_gas,
-                                     do_dust, particles, npart);
+            ComputeDiskProfile<GEOM>(disk_params, coords, xv, dx, k, j, i, eos_d(0),
+                                     do_gas, do_dust, particles, npart);
 
         if (do_gas) {
           const Real target_vel[3] = {target.gvel1, target.gvel2, target.gvel3};
@@ -589,12 +592,12 @@ TaskStatus WaveKilling(MeshData<Real> *md, const Real /* time */, const Real dt)
 
             const Real vel[3] = {mom1 / (dens * hx[0]), mom2 / (dens * hx[1]),
                                  mom3 / (dens * hx[2])};
-            const Real temp = eos_d.TemperatureFromDensityInternalEnergy(dens, sie);
+            const Real temp = eos_d(0).TemperatureFromDensityInternalEnergy(dens, sie);
             const Real new_dens = std::max(dflr_gas, dens + fac * (target.gdens - dens));
             const Real new_temp = temp + fac * (target.gtemp - temp);
-            const Real new_sie =
-                std::max(sieflr_gas,
-                         eos_d.InternalEnergyFromDensityTemperature(new_dens, new_temp));
+            const Real new_sie = std::max(
+                sieflr_gas,
+                eos_d(0).InternalEnergyFromDensityTemperature(new_dens, new_temp));
             const Real new_vel[3] = {vel[0] + fac * (target_vel[0] - vel[0]),
                                      vel[1] + fac * (target_vel[1] - vel[1]),
                                      vel[2] + fac * (target_vel[2] - vel[2])};
@@ -665,7 +668,7 @@ void DiskBoundaryVisc(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) {
 
   // Extract gas package and params
   auto &gas_pkg = pmb->packages.Get("gas");
-  auto eos_d = gas_pkg->template Param<EOS>("eos_d");
+  const auto &eos_d = gas_pkg->template Param<ParArray1D<EOS>>("eos_d");
 
   // Packing
   static auto descriptors = ArtemisUtils::GetBoundaryPackDescriptorMap<
@@ -760,8 +763,8 @@ void DiskBoundaryVisc(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) {
         const Real dx = std::log(xvp1[ix1] / xvm1[ix1]);
         const Real xmadx = xma / dx;
 
-        const Real nua = ViscosityProfile(dp, eos_d, xcyla[0], xcyla[2]);
-        const Real nug = ViscosityProfile(dp, eos_d, xcyl[0], xcyl[2]);
+        const Real nua = ViscosityProfile(dp, eos_d(0), xcyla[0], xcyla[2]);
+        const Real nug = ViscosityProfile(dp, eos_d(0), xcyl[0], xcyl[2]);
 
         // Viscous BC for gas
         if (do_gas) {
@@ -884,7 +887,7 @@ void DiskBoundaryIC(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) {
   auto disk_params = artemis_pkg->Param<DiskParams>("disk_params");
 
   auto &gas_pkg = pmb->packages.Get("gas");
-  auto eos_d = gas_pkg->template Param<EOS>("eos_d");
+  const auto &eos_d = gas_pkg->template Param<ParArray1D<EOS>>("eos_d");
 
   static auto descriptors = ArtemisUtils::GetBoundaryPackDescriptorMap<
       gas::prim::density, gas::prim::velocity, gas::prim::sie, dust::prim::density,
@@ -908,7 +911,7 @@ void DiskBoundaryIC(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) {
   pmb->par_for_bndry(
       "DiskInnerX1", nb, BDY, parthenon::TopologicalElement::CC, coarse, fine,
       KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
-        DiskICImpl<GEOM>(v, 0, k, j, i, pco, eos_d, dp, particles, npart);
+        DiskICImpl<GEOM>(v, 0, k, j, i, pco, eos_d(0), dp, particles, npart);
       });
 }
 
@@ -930,7 +933,7 @@ void DiskBoundaryExtrap(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) 
 
   // Extract gas parameters
   auto &gas_pkg = pmb->packages.Get("gas");
-  auto eos_d = gas_pkg->template Param<EOS>("eos_d");
+  const auto &eos_d = gas_pkg->template Param<ParArray1D<EOS>>("eos_d");
 
   auto disk_params = artemis_pkg->Param<DiskParams>("disk_params");
   auto &dp = disk_params;

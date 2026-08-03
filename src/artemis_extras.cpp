@@ -12,6 +12,7 @@
 //========================================================================================
 
 #include <utility> // std::move
+#include <vector>  // std::vector
 
 #include "artemis.hpp"
 #include "artemis_extras.hpp"

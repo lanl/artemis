@@ -23,22 +23,15 @@
 
 namespace ArtemisUtils {
 
-// Maximum size of lambda array for optional extra EOS arguments.
-// As it happens this must be >= 1 for device code.
-static constexpr int lambda_max_vals = 1;
-
 // Variant containing all EOSs to be used in Artemis.
 
 using EOS =
     singularity::Variant<singularity::UnitSystem<singularity::IdealGas>
 #ifdef SPINER_USE_HDF
                          ,
-                         singularity::UnitSystem<ArtemisEOS::IdealHHe>
-#ifdef WITH_SESAME
-                         ,
-                         singularity::UnitSystem<singularity::SpinerEOSDependsRhoT>,
-                         singularity::UnitSystem<singularity::SpinerEOSDependsRhoSie>
-#endif
+                         singularity::UnitSystem<ArtemisEOS::IdealHHe>,
+                         singularity::UnitSystem<singularity::SpinerEOSDependsRhoSie>,
+                         singularity::UnitSystem<singularity::SpinerEOSDependsRhoT>
 #endif
                          >;
 

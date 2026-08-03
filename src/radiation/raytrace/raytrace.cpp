@@ -1,7 +1,22 @@
+//========================================================================================
+// (C) (or copyright) 2025-2026. Triad National Security, LLC. All rights reserved.
+//
+// This program was produced under U.S. Government contract 89233218CNA000001 for Los
+// Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
+// for the U.S. Department of Energy/National Nuclear Security Administration. All rights
+// in the program are reserved by Triad National Security, LLC, and the U.S. Department
+// of Energy/National Nuclear Security Administration. The Government is granted for
+// itself and others acting on its behalf a nonexclusive, paid-up, irrevocable worldwide
+// license in this material to reproduce, prepare derivative works, distribute copies to
+// the public, perform publicly and display publicly, and to permit others to do so.
+//========================================================================================
+
+#include <vector>
+
 // Artemis includes
-#include "raytrace.hpp"
 #include "artemis.hpp"
 #include "geometry/geometry.hpp"
+#include "raytrace.hpp"
 #include "utils/artemis_utils.hpp"
 #include "utils/eos/eos.hpp"
 #include "utils/opacity/opacity.hpp"
@@ -43,8 +58,17 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   } else {
     PARTHENON_FAIL("Opacity model not recognized!");
   }
-  params.Add("opacity_h", opacity);
-  params.Add("opacity_d", opacity.GetOnDevice());
+  const int nspecies = pin->GetOrAddInteger("gas", "nspecies", 1);
+  ParArray1D<ArtemisUtils::Opacity> opacity_device("opacity_d", nspecies);
+  std::vector<ArtemisUtils::Opacity> opacity_host(nspecies);
+  auto opacity_device_host = opacity_device.GetHostMirror();
+  for (int n = 0; n < nspecies; ++n) {
+    opacity_host[n] = opacity;
+    opacity_device_host(n) = opacity_host[n].GetOnDevice();
+  }
+  opacity_device.DeepCopy(opacity_device_host);
+  params.Add("opacity_h", opacity_host);
+  params.Add("opacity_d", opacity_device);
 
   const Real stellar_temp = pin->GetReal("radiation/raytrace", "temperature_cgs");
   Real stellar_radius = pin->GetReal("radiation/raytrace", "radius_solar");
@@ -275,9 +299,9 @@ TaskStatus EvalOpac(MeshData<Real> *md) {
   auto &rt_pkg = pm->packages.Get("raytrace");
   auto &gas_pkg = pm->packages.Get("gas");
 
-  ArtemisUtils::EOS eos_d = gas_pkg->template Param<ArtemisUtils::EOS>("eos_d");
-  ArtemisUtils::Opacity opacity_d =
-      rt_pkg->template Param<ArtemisUtils::Opacity>("opacity_d");
+  ParArray1D<ArtemisUtils::EOS> eos_d =
+      gas_pkg->Param<ParArray1D<ArtemisUtils::EOS>>("eos_d");
+  const auto opacity_d = rt_pkg->Param<ParArray1D<ArtemisUtils::Opacity>>("opacity_d");
 
   static auto desc =
       MakePackDescriptor<gas::prim::density, gas::prim::sie, rad::star::absorption>(
@@ -297,9 +321,9 @@ TaskStatus EvalOpac(MeshData<Real> *md) {
         //%%%%%%%%%%%%%%%%
         // Evaluated at T*
         //%%%%%%%%%%%%%%%%
-        const Real temp = eos_d.TemperatureFromDensityInternalEnergy(rho, sie);
+        const Real temp = eos_d(0).TemperatureFromDensityInternalEnergy(rho, sie);
         vmesh(b, rad::star::absorption(), k, j, i) =
-            opacity_d.AbsorptionCoefficient(rho, temp, 1.0);
+            opacity_d(0).AbsorptionCoefficient(rho, temp, 1.0);
       });
 
   return TaskStatus::complete;

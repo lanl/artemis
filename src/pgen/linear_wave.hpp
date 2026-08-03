@@ -33,6 +33,7 @@
 #include <limits>
 #include <sstream>
 #include <string>
+#include <vector>
 
 // Artemis headers
 #include "artemis.hpp"
@@ -46,10 +47,9 @@ namespace {
 struct LinWaveVariables {
   int wave_flag;
   Real amp, vflow, lambda;
-  Real d0, p0, v1_0, k_par;
+  Real d0, p0, sie, cs, v1_0, k_par;
   Real cos_a2, cos_a3, sin_a2, sin_a3;
   Real rem[5][5], ev[5];
-  Real gamma, gm1;
 };
 
 } // end anonymous namespace
@@ -62,13 +62,12 @@ static LinWaveVariables lwv;
 //! \fn void HydroEigensystem()
 //! \brief computes eigenvectors of linear waves in ideal gas/isothermal hydrodynamics
 KOKKOS_INLINE_FUNCTION void HydroEigensystem(const Real d, const Real v1, const Real v2,
-                                             const Real v3, const Real p,
-                                             const Real gamma, Real eigenvalues[5],
+                                             const Real v3, const Real p, const Real sie,
+                                             const Real a, Real eigenvalues[5],
                                              Real right_eigenmatrix[5][5]) {
   //--- Ideal Gas Hydrodynamics ---
   Real vsq = v1 * v1 + v2 * v2 + v3 * v3;
-  Real h = (p / (gamma - 1.0) + 0.5 * d * vsq + p) / d;
-  Real a = std::sqrt(gamma * p / d);
+  Real h = (d * sie + 0.5 * d * vsq + p) / d;
 
   // Compute eigenvalues (eq. B2)
   eigenvalues[0] = v1 - a;
@@ -195,18 +194,22 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   lwv.k_par = 2.0 * (M_PI) / lwv.lambda;
 
   // Set background state: v1_0 is parallel to wavevector.
-  lwv.d0 = 1.0;
-  lwv.v1_0 = lwv.vflow;
-  // TODO(PDM): Replace the below with a call to singularity-eos
   auto gas_pkg = pmb->packages.Get("gas");
-  PARTHENON_REQUIRE(gas_pkg->Param<std::string>("eos_type") == "ideal",
-                    "linear_wave pgen requires an ideal gas");
-  lwv.gamma = gas_pkg->Param<Real>("adiabatic_index");
-  lwv.gm1 = lwv.gamma - 1.0;
-  lwv.p0 = 1.0 / lwv.gamma;
+  PARTHENON_REQUIRE((gas_pkg->Param<int>("nspecies") == 1),
+                    "linear wave pgen requires a single gas species.")
+  const auto &eos_h = gas_pkg->Param<std::vector<ArtemisUtils::EOS>>("eos_h");
+
+  lwv.v1_0 = lwv.vflow;
+  lwv.d0 = pin->GetOrAddReal("problem", "rho", 1.0);
+  lwv.p0 = pin->GetOrAddReal("problem", "pres", 0.6); // 1/gamma
+
+  lwv.sie = ArtemisUtils::EofPR(eos_h[0], lwv.p0, lwv.d0);
+  const Real bmod = eos_h[0].BulkModulusFromDensityInternalEnergy(lwv.d0, lwv.sie);
+  lwv.cs = std::sqrt(bmod / lwv.d0);
 
   // Compute eigenvectors in hydrodynamics
-  HydroEigensystem(lwv.d0, lwv.v1_0, 0.0, 0.0, lwv.p0, lwv.gamma, lwv.ev, lwv.rem);
+
+  HydroEigensystem(lwv.d0, lwv.v1_0, 0.0, 0.0, lwv.p0, lwv.sie, lwv.cs, lwv.ev, lwv.rem);
 
   // set new time limit, interpreted as number of wave periods for evolution
   const Real nperiod = pin->GetOrAddReal("problem", "nperiod", 1.0);
@@ -255,7 +258,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         const Real cm2 =
             mx * lin.cos_a2 * lin.sin_a3 + my * lin.cos_a3 - mz * lin.sin_a2 * lin.sin_a3;
         const Real cm3 = mx * lin.sin_a2 + mz * lin.cos_a2;
-        const Real ce = lin.p0 / lin.gm1 + 0.5 * lin.d0 * (lin.v1_0) * (lin.v1_0) +
+        const Real ce = lin.d0 * lin.sie + 0.5 * lin.d0 * (lin.v1_0) * (lin.v1_0) +
                         lin.amp * sn * lin.rem[4][lin.wave_flag];
         const Real cu = ce - 0.5 * (SQR(cm1) + SQR(cm2) + SQR(cm3)) / cd;
         v(0, gas::prim::density(), k, j, i) = cd;
@@ -321,7 +324,7 @@ inline void UserWorkAfterLoop(Mesh *pmesh, ParameterInput *pin, parthenon::SimTi
         Real cm2 =
             mx * lin.cos_a2 * lin.sin_a3 + my * lin.cos_a3 - mz * lin.sin_a2 * lin.sin_a3;
         Real cm3 = mx * lin.sin_a2 + mz * lin.cos_a2;
-        Real ce = lin.p0 / lin.gm1 + 0.5 * lin.d0 * (lin.v1_0) * (lin.v1_0) +
+        Real ce = lin.d0 * lin.sie + 0.5 * lin.d0 * (lin.v1_0) * (lin.v1_0) +
                   lin.amp * sn * lin.rem[4][lin.wave_flag];
 
         // conserved variables:

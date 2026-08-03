@@ -69,13 +69,13 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const bool do_gas = artemis_pkg->Param<bool>("do_gas");
   const bool do_gravity = artemis_pkg->Param<bool>("do_gravity");
   auto cond_params = artemis_pkg->Param<CondParams>("cond_pgen_params");
-  EOS eos_d;
+  ParArray1D<EOS> eos_d;
   Real gx1 = 0.;
   if (do_gas) {
     auto gas_pkg = pmb->packages.Get("gas");
     PARTHENON_REQUIRE(gas_pkg->Param<int>("nspecies") == 1,
                       "Cond pgen requires a single gas species.")
-    eos_d = gas_pkg->Param<EOS>("eos_d");
+    eos_d = gas_pkg->Param<ParArray1D<EOS>>("eos_d");
     if (do_gravity) {
       auto grav_pkg = pmb->packages.Get("gravity");
       if (grav_pkg->Param<Gravity::GravityType>("type") ==
@@ -111,7 +111,8 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
           const auto &xv = coords.GetCellCenter();
 
-          const Real P0 = eos_d.PressureFromDensityTemperature(pars.g_rho, pars.g_temp);
+          const Real P0 =
+              eos_d(0).PressureFromDensityTemperature(pars.g_rho, pars.g_temp);
           const Real Rgas = P0 / (pars.g_rho * pars.g_temp);
           const Real P = P0 * std::exp(gx1 * pars.g_rho / P0 * (xv[0] - x1min));
           const Real dens = P / (Rgas * pars.g_temp);
@@ -121,7 +122,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           v(0, gas::prim::velocity(1), k, j, i) = pars.g_vx2;
           v(0, gas::prim::velocity(2), k, j, i) = pars.g_vx3;
           v(0, gas::prim::sie(0), k, j, i) =
-              eos_d.InternalEnergyFromDensityTemperature(dens, pars.g_temp);
+              eos_d(0).InternalEnergyFromDensityTemperature(dens, pars.g_temp);
         }
       });
 }
@@ -142,7 +143,7 @@ void CondBoundaryImpl(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) {
   auto &gas_pkg = pmb->packages.Get("gas");
   auto do_gas = artemis_pkg->template Param<bool>("do_gas");
   auto diff_params = gas_pkg->Param<Diffusion::DiffCoeffParams>("cond_params");
-  auto eos_d = gas_pkg->template Param<EOS>("eos_d");
+  const auto &eos_d = gas_pkg->template Param<ParArray1D<EOS>>("eos_d");
 
   // Packing
   static auto descriptors =
@@ -231,10 +232,10 @@ void CondBoundaryImpl(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) {
           // active zone
           const Real da = v(0, gas::prim::density(0), ia[0], ia[1], ia[2]);
           const Real siea = v(0, gas::prim::sie(0), ia[0], ia[1], ia[2]);
-          const Real Ta = eos_d.TemperatureFromDensityInternalEnergy(da, siea);
-          const Real Pa = eos_d.PressureFromDensityInternalEnergy(da, siea);
+          const Real Ta = eos_d(0).TemperatureFromDensityInternalEnergy(da, siea);
+          const Real Pa = eos_d(0).PressureFromDensityInternalEnergy(da, siea);
 
-          const Real ka = dcoeff.Get(dcp, ca, xva, da, siea, eos_d);
+          const Real ka = dcoeff.Get(dcp, ca, xva, da, siea, eos_d(0));
           Real Tg = dp.g_temp;
           if (INNER) {
             Tg = Ta - dp.flux * xma / ka;
@@ -242,7 +243,7 @@ void CondBoundaryImpl(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) {
 
           // Density from dP/dx = - rho g
           const Real densg = da * (Ta - 0.5 * gx1 * xma) / (Tg + 0.5 * gx1 * xma);
-          const Real sieg = eos_d.InternalEnergyFromDensityTemperature(densg, Tg);
+          const Real sieg = eos_d(0).InternalEnergyFromDensityTemperature(densg, Tg);
 
           // Extrapolate gas velocity
           Real gva[3] = {v(0, gas::prim::velocity(0), ia[0], ia[1], ia[2]),

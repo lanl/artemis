@@ -136,8 +136,8 @@ problem(disk):
     _description: "Guess for the binary eignvalue that reduces the density near the outer boundary"
   polytropic_index:
     _type: Real
-    _default: "gas/gamma"
-    _description: "The polytropic index of the initial disk profile. Defaults to the gas adiabatic index"
+    _default: "1.0"
+    _description: "The polytropic index of the initial disk profile."
   mdot:
     _type: Real
     _description: "Specified mass flux through the disk. This is used to set the density normalization and the viscous outer boundary condition inflow rate."

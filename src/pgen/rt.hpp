@@ -20,6 +20,7 @@
 #include "utils/eos/eos.hpp"
 
 using ArtemisUtils::EOS;
+using ArtemisUtils::VI;
 
 namespace {
 struct RTParams {
@@ -57,7 +58,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   RT_params.freq = pin->GetOrAddReal("problem", "frequency", 6 * M_PI);
   RT_params.amp = pin->GetOrAddReal("problem", "amplitude", 0.01);
 
-  const auto &eos = gas_pkg->Param<ArtemisUtils::EOS>("eos_d");
+  const auto &eos = gas_pkg->template Param<ParArray1D<ArtemisUtils::EOS>>("eos_d");
 
   // packing and capture variables for kernel
   auto &md = pmb->meshblock_data.Get();
@@ -111,11 +112,14 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         const Real p0 = pars.pres0 + (upper)*gx * (pars.y0 - zmin) * pars.rho0;
         const Real pres = p0 + gx * (zc - z0) * dens;
 
-        v(0, gas::prim::density(0), k, j, i) = dens;
-        v(0, gas::prim::sie(0), k, j, i) = ArtemisUtils::EofPR(eos, pres, dens);
-        v(0, gas::prim::velocity(0), k, j, i) = 0.0;
-        v(0, gas::prim::velocity(1), k, j, i) = pars.amp * std::cos(pars.freq * xc);
-        v(0, gas::prim::velocity(2), k, j, i) = 0.0;
+        const int fid = (upper) ? 1 : 0;
+
+        v(0, gas::prim::density(fid), k, j, i) = dens;
+        v(0, gas::prim::sie(fid), k, j, i) = ArtemisUtils::EofPR(eos(fid), pres, dens);
+        v(0, gas::prim::velocity(VI(fid, 0)), k, j, i) = 0.0;
+        v(0, gas::prim::velocity(VI(fid, 1)), k, j, i) =
+            pars.amp * std::cos(pars.freq * xc);
+        v(0, gas::prim::velocity(VI(fid, 2)), k, j, i) = 0.0;
       });
 }
 

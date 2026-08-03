@@ -41,9 +41,9 @@ TaskStatus MatterCouplingSimpleImpl(MeshData<Real> *u0, const Real dt) {
 
   // Extract gas package and params
   auto &gas_pkg = pm->packages.Get("gas");
-  auto eos_d = gas_pkg->template Param<EOS>("eos_d");
-  auto opac_d = gas_pkg->template Param<MeanOpacity>("opacity_d");
-  auto scat_d = gas_pkg->template Param<MeanScattering>("scattering_d");
+  const auto &eos_d = gas_pkg->template Param<ParArray1D<EOS>>("eos_d");
+  auto opac_d = gas_pkg->template Param<ParArray1D<MeanOpacity>>("opacity_d");
+  auto scat_d = gas_pkg->template Param<ParArray1D<MeanScattering>>("scattering_d");
   auto dflr = gas_pkg->template Param<Real>("dfloor");
   auto de_switch = gas_pkg->template Param<Real>("de_switch");
 
@@ -118,16 +118,17 @@ TaskStatus MatterCouplingSimpleImpl(MeshData<Real> *u0, const Real dt) {
 
         // Note(AMD): There is some floating point difference between the internal energy
         // used to compute the temperature and the internal energy obtained from that
-        // temperature: T = eos_d.TemperatureFromDensityInternalEnergy(dens, eg/dens); eg
-        // /= dens * eos_d.InternalEnergyFromDensityTemperature(dens,T)
+        // temperature: T = eos_d(0).TemperatureFromDensityInternalEnergy(dens, eg/dens);
+        // eg
+        // /= dens * eos_d(0).InternalEnergyFromDensityTemperature(dens,T)
         //
         // Because of this, zero opacity problems will not result in zero change as
         // expected. Thus, we recalculate the internal and total energies from the
         // temperature. This does not affect energy conservation because at the end of the
         // step we update the energy with an increment.
 
-        Real T = eos_d.TemperatureFromDensityInternalEnergy(dens, e0 / dens);
-        e0 = dens * eos_d.InternalEnergyFromDensityTemperature(dens, T);
+        Real T = eos_d(0).TemperatureFromDensityInternalEnergy(dens, e0 / dens);
+        e0 = dens * eos_d(0).InternalEnergyFromDensityTemperature(dens, T);
         Real e = e0;
         Real B = arad * SQR(SQR(T));
 
@@ -140,9 +141,9 @@ TaskStatus MatterCouplingSimpleImpl(MeshData<Real> *u0, const Real dt) {
         Real inner_err = 0.;
         for (inner_iter = 0; inner_iter < inner_max; inner_iter++) {
           T = std::pow(B / arad, 0.25);
-          e = eos_d.InternalEnergyFromDensityTemperature(dens, T) * dens;
-          const Real Cv = dens * eos_d.SpecificHeatFromDensityTemperature(dens, T);
-          const Real a = chat * dt * opac_d.PlanckMeanAbsorptionCoefficient(dens, T);
+          e = eos_d(0).InternalEnergyFromDensityTemperature(dens, T) * dens;
+          const Real Cv = dens * eos_d(0).SpecificHeatFromDensityTemperature(dens, T);
+          const Real a = chat * dt * opac_d(0).PlanckMeanAbsorptionCoefficient(dens, T);
           const Real fleck = FleckFactor(arad, T, Cv);
 
           const Real Ri = a * (E - B);
@@ -168,11 +169,11 @@ TaskStatus MatterCouplingSimpleImpl(MeshData<Real> *u0, const Real dt) {
           PARTHENON_FAIL("Radiation matter coupling did not converge!");
         }
         T = std::pow(B / arad, 0.25);
-        e = eos_d.InternalEnergyFromDensityTemperature(dens, T) * dens;
+        e = eos_d(0).InternalEnergyFromDensityTemperature(dens, T) * dens;
         const Real dEg = e - e0;
         Real a = chat * dt *
-                 (opac_d.RosselandMeanAbsorptionCoefficient(dens, T) +
-                  scat_d.RosselandMeanTotalScatteringCoefficient(dens, T));
+                 (opac_d(0).RosselandMeanAbsorptionCoefficient(dens, T) +
+                  scat_d(0).RosselandMeanTotalScatteringCoefficient(dens, T));
         std::array<Real, 3> dF{-a / (1. + a) * Fr0[0], -a / (1. + a) * Fr0[1],
                                -a / (1. + a) * Fr0[2]};
         const Real icc = -1. / (c * chat * dens);
@@ -210,9 +211,9 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
 
   // Extract gas package and params
   auto &gas_pkg = pm->packages.Get("gas");
-  auto eos_d = gas_pkg->template Param<EOS>("eos_d");
-  auto opac_d = gas_pkg->template Param<MeanOpacity>("opacity_d");
-  auto scat_d = gas_pkg->template Param<MeanScattering>("scattering_d");
+  const auto &eos_d = gas_pkg->template Param<ParArray1D<EOS>>("eos_d");
+  auto opac_d = gas_pkg->template Param<ParArray1D<MeanOpacity>>("opacity_d");
+  auto scat_d = gas_pkg->template Param<ParArray1D<MeanScattering>>("scattering_d");
   auto dflr = gas_pkg->template Param<Real>("dfloor");
   auto de_switch = gas_pkg->template Param<Real>("de_switch");
 
@@ -275,16 +276,17 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
 
         // Note(AMD): There is some floating point difference between the internal energy
         // used to compute the temperature and the internal energy obtained from that
-        // temperature: T = eos_d.TemperatureFromDensityInternalEnergy(dens, eg/dens); eg
-        // /= dens * eos_d.InternalEnergyFromDensityTemperature(dens,T)
+        // temperature: T = eos_d(0).TemperatureFromDensityInternalEnergy(dens, eg/dens);
+        // eg
+        // /= dens * eos_d(0).InternalEnergyFromDensityTemperature(dens,T)
         //
         // Because of this, zero opacity problems will not result in zero change as
         // expected. Thus, we recalculate the internal and total energies from the
         // temperature. This does not affect energy conservation because at the end of the
         // step we update the energy with an increment.
-        Real T = eos_d.TemperatureFromDensityInternalEnergy(
+        Real T = eos_d(0).TemperatureFromDensityInternalEnergy(
             dens, v0(b, gas::cons::internal_energy(), k, j, i) / dens);
-        Real eg0 = dens * eos_d.InternalEnergyFromDensityTemperature(dens, T);
+        Real eg0 = dens * eos_d(0).InternalEnergyFromDensityTemperature(dens, T);
         Real B = arad * SQR(SQR(T));
 
         const auto vb = RotatingFrame::BackgroundVelocity<GEOM>(
@@ -359,14 +361,16 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
           // start inner iteration for (B,E)
           for (inner_iter = 1; inner_iter <= inner_max; inner_iter++) {
             T = std::pow(eref * B / arad, 0.25);
-            Real eint = dens * eos_d.InternalEnergyFromDensityTemperature(dens, T) / eref;
+            Real eint =
+                dens * eos_d(0).InternalEnergyFromDensityTemperature(dens, T) / eref;
             Real et = ke + eint;
-            const Real Cv = dens * eos_d.SpecificHeatFromDensityTemperature(dens, T);
+            const Real Cv = dens * eos_d(0).SpecificHeatFromDensityTemperature(dens, T);
             const Real fleck = FleckFactor(arad, T, Cv);
 
-            const Real sigp = chat * dt * opac_d.PlanckMeanAbsorptionCoefficient(dens, T);
+            const Real sigp =
+                chat * dt * opac_d(0).PlanckMeanAbsorptionCoefficient(dens, T);
             const Real sigs =
-                chat * dt * scat_d.RosselandMeanTotalScatteringCoefficient(dens, T);
+                chat * dt * scat_d(0).RosselandMeanTotalScatteringCoefficient(dens, T);
             const Real sigf = sigp + sigs;
 
             const Real ca = g * (sigf - g2 * sigs * (1. + bdbdp));
@@ -404,13 +408,13 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
           // Have new E and T
 
           T = std::pow(eref * B / arad, 0.25);
-          Real eg = dens * eos_d.InternalEnergyFromDensityTemperature(dens, T) / eref;
+          Real eg = dens * eos_d(0).InternalEnergyFromDensityTemperature(dens, T) / eref;
           dEg = eg - eg0;
 
           const Real sigp =
-              chat * dt * opac_d.RosselandMeanAbsorptionCoefficient(dens, T);
+              chat * dt * opac_d(0).RosselandMeanAbsorptionCoefficient(dens, T);
           const Real sigs =
-              chat * dt * scat_d.RosselandMeanTotalScatteringCoefficient(dens, T);
+              chat * dt * scat_d(0).RosselandMeanTotalScatteringCoefficient(dens, T);
           const Real sigf = sigp + sigs;
 
           const Real a = g * sigf;

@@ -600,7 +600,7 @@ TaskStatus MomentumFluxImpl(MeshData<Real> *md, DiffCoeffParams dp, PKG &pkg,
                           "Momentum diffusion only works with a gas fluid");
 
   auto pm = md->GetParentPointer();
-  auto eos_d = pkg->template Param<EOS>("eos_d");
+  const auto &eos_d = pkg->template Param<ParArray1D<EOS>>("eos_d");
 
   Real qshear = 0.0, om0 = 0.0, gm_bg = 0.0;
   const bool do_oa =
@@ -660,7 +660,7 @@ TaskStatus MomentumFluxImpl(MeshData<Real> *md, DiffCoeffParams dp, PKG &pkg,
                                                multi_d, three_d, vprim, vg, divu);
           // 3. Viscosity values. No barrier
           DiffusionCoeff<DIFF, GEOM, FLUID_TYPE> diffcoeff;
-          diffcoeff.evaluate(dp, mbr, b, n, k, j, il - 1, iu, vprim, eos_d, mu);
+          diffcoeff.evaluate(dp, mbr, b, n, k, j, il - 1, iu, vprim, eos_d(n), mu);
 
           mbr.team_barrier();
 
@@ -713,7 +713,7 @@ TaskStatus MomentumFluxImpl(MeshData<Real> *md, DiffCoeffParams dp, PKG &pkg,
 
               // 3. Viscosity values. No barrier
               DiffusionCoeff<DIFF, GEOM, FLUID_TYPE> diffcoeff;
-              diffcoeff.evaluate(dp, mbr, b, n, k, j, il, iu, vprim, eos_d, mu_jm1);
+              diffcoeff.evaluate(dp, mbr, b, n, k, j, il, iu, vprim, eos_d(n), mu_jm1);
 
               mbr.team_barrier();
               if (j > jl) {
@@ -767,7 +767,7 @@ TaskStatus MomentumFluxImpl(MeshData<Real> *md, DiffCoeffParams dp, PKG &pkg,
 
               // 2. Viscosity values. No barrier
               DiffusionCoeff<DIFF, GEOM, FLUID_TYPE> diffcoeff;
-              diffcoeff.evaluate(dp, mbr, b, n, k, j, il, iu, vprim, eos_d, mu_km1);
+              diffcoeff.evaluate(dp, mbr, b, n, k, j, il, iu, vprim, eos_d(n), mu_km1);
 
               mbr.team_barrier();
               if (k > kl) {

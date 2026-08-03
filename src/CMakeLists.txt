@@ -25,6 +25,8 @@ set (SRC_LIST
 
   drag/drag.cpp
   drag/drag.hpp
+  drag/drag_impl.hpp
+  drag/collision_integrals.hpp
 
   dust/dust.cpp
   dust/dust.hpp
@@ -139,10 +141,6 @@ if (ARTEMIS_PORTABLE_RESTART)
   add_compile_definitions(PORTABLE_RESTART)
 endif()
 
-if (ARTEMIS_ENABLE_SESAME_EOS)
-  add_compile_definitions(WITH_SESAME)
-endif()
-
 # Generate library
 add_library(artemislib ${SRC_LIST})
 
@@ -168,6 +166,7 @@ endif()
 
 # Link libraries
 target_link_libraries(artemislib PUBLIC parthenon
+  KokkosKernels::kokkoskernels
   singularity-eos
   ${CMAKE_BINARY_DIR}/rebound/librebound.so
   lib_jaybenne_package

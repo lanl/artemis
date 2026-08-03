@@ -11,6 +11,8 @@
 // the public, perform publicly and display publicly, and to permit others to do so.
 //========================================================================================
 
+#include <vector>
+
 // Artemis includes
 #include "artemis.hpp"
 #include "artemis_driver.hpp"
@@ -102,6 +104,7 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   const bool do_radiation = pin->GetOrAddBoolean("physics", "radiation", false);
   const bool do_coagulation = pin->GetOrAddBoolean("physics", "coagulation", false);
   const bool do_raytrace = pin->GetOrAddBoolean("physics", "raytrace", false);
+  const bool do_closure = pin->GetOrAddBoolean("physics", "closure", false);
   const bool do_orbital_advection =
       pin->GetOrAddBoolean("physics", "orbital_advection", false);
 
@@ -145,6 +148,7 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   artemis->AddParam("do_orbital_advection", do_orbital_advection);
   artemis->AddParam("do_raytrace", do_raytrace);
   artemis->AddParam("update_fluxes", update_fluxes);
+  artemis->AddParam("do_closure", do_closure);
 
   // Set coordinate system
   const int ndim = ProblemDimension(pin.get());
@@ -172,7 +176,7 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   if (do_rotating_frame || do_orbital_advection)
     packages.Add(RotatingFrame::Initialize(pin.get()));
   if (do_cooling) packages.Add(Gas::Cooling::Initialize(pin.get()));
-  if (do_drag) packages.Add(Drag::Initialize(pin.get()));
+  if (do_drag) packages.Add(Drag::Initialize(pin.get(), constants, packages));
 
   // Operator split dust coagulation
   if (do_coagulation) {
@@ -188,11 +192,12 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
     packages.Add(Radiation::Initialize(pin.get(), constants, do_imc));
     // Select between Jaybenne IMC or Moments
     if (do_imc) {
-      auto eos_h = packages.Get("gas")->Param<EOS>("eos_h");
-      auto opacity_h = packages.Get("gas")->Param<MeanOpacity>("opacity_h");
-      auto scattering_h = packages.Get("gas")->Param<MeanScattering>("scattering_h");
-      packages.Add(jaybenne::Initialize(pin.get(), opacity_h, scattering_h, eos_h,
-                                        "radiation/imc"));
+      auto eos_h = packages.Get("gas")->Param<std::vector<ArtemisUtils::EOS>>("eos_h");
+      auto opacity_h = packages.Get("gas")->Param<std::vector<MeanOpacity>>("opacity_h");
+      auto scattering_h =
+          packages.Get("gas")->Param<std::vector<MeanScattering>>("scattering_h");
+      packages.Add(jaybenne::Initialize(pin.get(), opacity_h[0], scattering_h[0],
+                                        eos_h[0], "radiation/imc"));
       PARTHENON_REQUIRE(coords == Coordinates::cartesian,
                         "Jaybenne currently supports only Cartesian coordinates!");
     } else if (do_moment) {
@@ -237,6 +242,8 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   // Add history for all packages with history output
   if (do_gas) Gas::AddHistory(coords, packages.Get("gas")->AllParams());
   if (do_dust) Dust::AddHistory(coords, packages.Get("dust")->AllParams());
+
+  params.Add("do_sparse", pin->GetBoolean("parthenon/sparse", "enable_sparse"));
 
   // Add artemis package
   packages.Add(artemis);

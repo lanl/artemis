@@ -40,7 +40,6 @@ namespace {
 struct GravSlabVariables {
   Real rho0, p0;
   Real eps;
-  Real gamma, gm1;
   Real four_pi_G;
   Real vx, vy, vz;
   Real kx, ky, kz;
@@ -85,14 +84,12 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   // Extract adiabatic index
   auto gas_pkg = pmb->packages.Get("gas");
-  PARTHENON_REQUIRE(gas_pkg->Param<std::string>("eos_type") == "ideal",
-                    "grav_slab requires ideal gas");
-  gsv.gamma = gas_pkg->Param<Real>("adiabatic_index");
-  gsv.gm1 = gsv.gamma - 1.0;
 
   // set new time limit, interpreted as number of wave periods for evolution
   const Real nperiod = pin->GetOrAddReal("problem", "nperiod", 1.0);
   pin->SetReal("parthenon/time", "tlim", nperiod * 3.0 * M_PI);
+
+  const auto &eos_d = gas_pkg->template Param<ParArray1D<EOS>>("eos_d");
 
   // packing and capture variables for kernel
   auto &md = pmb->meshblock_data.Get();
@@ -136,7 +133,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
             (slab.four_pi_G * slab.eps * SQR(slab.rho0) / slab.k2) *
                 ((1.0 - SQR(slab.eps) / 12.0) * c1 + (slab.eps / 3.0) * c2 +
                  (SQR(slab.eps) / 12.0) * c3 + (slab.eps * SQR(slab.eps) / 144.0) * c4);
-        const Real sie = pres / (slab.gm1 * rho);
+        const Real sie = ArtemisUtils::EofPR(eos_d(0), pres, rho);
 
         v(0, gas::prim::density(), k, j, i) = rho;
         v(0, gas::prim::velocity(0), k, j, i) = slab.vx;
@@ -174,6 +171,8 @@ inline void UserWorkAfterLoop(Mesh *pmesh, ParameterInput *pin, parthenon::SimTi
   const auto &cpars =
       pmesh->packages.Get("artemis")->template Param<geometry::CoordParams>(
           "coord_params");
+  const auto &eos_d =
+      pmesh->packages.Get("gas")->template Param<ParArray1D<EOS>>("eos_d");
 
   ArtemisUtils::array_type<Real, nvars> l1_err;
   parthenon::par_reduce(
@@ -206,7 +205,8 @@ inline void UserWorkAfterLoop(Mesh *pmesh, ParameterInput *pin, parthenon::SimTi
         const Real cm1 = rho * slab.vx;
         const Real cm2 = rho * slab.vy;
         const Real cm3 = rho * slab.vz;
-        const Real ce = pres / slab.gm1 + 0.5 * (SQR(cm1) + SQR(cm2) + SQR(cm3)) / rho;
+        const Real ce = rho * ArtemisUtils::EofPR(eos_d(0), pres, rho) +
+                        0.5 * (SQR(cm1) + SQR(cm2) + SQR(cm3)) / rho;
 
         // accumulate L1 errors
         lsum.myArray[0] += vol * std::abs(v(b, gas::cons::density(0), k, j, i) - ca);

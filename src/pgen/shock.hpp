@@ -80,14 +80,11 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const bool do_moment = artemis_pkg->Param<bool>("do_moment");
   PARTHENON_REQUIRE(do_gas, "The shock problem requires gas hydrodynamics!");
   PARTHENON_REQUIRE(!(do_dust), "The shock problem does not permit dust hydrodynamics!");
-  auto eos_d = pmb->packages.Get("gas")->Param<EOS>("eos_d");
-
+  const auto &eos_d = pmb->packages.Get("gas")->Param<ParArray1D<EOS>>("eos_d");
   Real ar = Null<Real>();
   if (do_moment) {
     ar = pmb->packages.Get("moments")->Param<Real>("arad");
   }
-
-  // packing and capture variables for kernel
   auto &md = pmb->meshblock_data.Get();
   for (auto &var : md->GetVariableVector()) {
     if (!var->IsAllocated()) pmb->AllocateSparse(var->label());
@@ -123,7 +120,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         v(0, gas::prim::velocity(1), k, j, i) = 0.0;
         v(0, gas::prim::velocity(2), k, j, i) = 0.0;
         v(0, gas::prim::sie(0), k, j, i) =
-            eos_d.InternalEnergyFromDensityTemperature(rho, T);
+            eos_d(0).InternalEnergyFromDensityTemperature(rho, T);
         if (do_moment) {
           v(0, rad::prim::energy(0), k, j, i) = ar * SQR(SQR(T));
           v(0, rad::prim::flux(0), k, j, i) = 0.0;
@@ -147,7 +144,8 @@ inline void ShockInnerX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse)
   auto artemis_pkg = pmb->packages.Get("artemis");
   const bool do_moment = artemis_pkg->Param<bool>("do_moment");
   auto shkp = artemis_pkg->Param<ShockParams>("shock_params");
-  auto eos_d = pmb->packages.Get("gas")->Param<EOS>("eos_d");
+  const auto &eos_d = pmb->packages.Get("gas")->Param<ParArray1D<EOS>>("eos_d");
+
   Real ar = Null<Real>();
   if (do_moment) {
     ar = pmb->packages.Get("moments")->Param<Real>("arad");
@@ -171,7 +169,7 @@ inline void ShockInnerX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse)
           v(0, gas::prim::velocity(VI(n, 1)), k, j, i) = 0.0;
           v(0, gas::prim::velocity(VI(n, 2)), k, j, i) = 0.0;
           v(0, gas::prim::sie(n), k, j, i) =
-              eos_d.InternalEnergyFromDensityTemperature(shkp.rhol, shkp.tl);
+              eos_d(n).InternalEnergyFromDensityTemperature(shkp.rhol, shkp.tl);
         }
         if (do_moment) {
           for (int n = 0; n < v.GetSize(0, rad::prim::energy()); ++n) {
@@ -198,7 +196,7 @@ inline void ShockOuterX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse)
   auto artemis_pkg = pmb->packages.Get("artemis");
   const bool do_moment = artemis_pkg->Param<bool>("do_moment");
   auto shkp = artemis_pkg->Param<ShockParams>("shock_params");
-  auto eos_d = pmb->packages.Get("gas")->Param<EOS>("eos_d");
+  const auto &eos_d = pmb->packages.Get("gas")->Param<ParArray1D<EOS>>("eos_d");
   Real ar = Null<Real>();
   if (do_moment) {
     ar = pmb->packages.Get("moments")->Param<Real>("arad");
@@ -222,7 +220,7 @@ inline void ShockOuterX1(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse)
           v(0, gas::prim::velocity(VI(n, 1)), k, j, i) = 0.0;
           v(0, gas::prim::velocity(VI(n, 2)), k, j, i) = 0.0;
           v(0, gas::prim::sie(n), k, j, i) =
-              eos_d.InternalEnergyFromDensityTemperature(shkp.rhor, shkp.tr);
+              eos_d(n).InternalEnergyFromDensityTemperature(shkp.rhor, shkp.tr);
         }
         if (do_moment) {
           for (int n = 0; n < v.GetSize(0, rad::prim::energy()); ++n) {

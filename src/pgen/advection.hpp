@@ -33,6 +33,7 @@
 #include <limits>
 #include <sstream>
 #include <string>
+#include <vector>
 
 // Artemis headers
 #include "artemis.hpp"
@@ -45,9 +46,8 @@ namespace {
 //! \brief container for variables shared with advection pgen and error functions
 struct AdvectionVariables {
   Real amp, vflow, lambda;
-  Real d0, p0, v1_0, k_par;
+  Real d0, p0, sie, v1_0, k_par;
   Real cos_a2, cos_a3, sin_a2, sin_a3;
-  Real gamma, gm1;
   int nspec;
 };
 
@@ -147,18 +147,15 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const bool do_dust = artemis_pkg->Param<bool>("do_dust");
 
   // Set background state: v1_0 is parallel to wavevector.
-  // TODO(PDM): Replace the below with a call to singularity-eos
-  av.d0 = 1.0;
+  av.d0 = pin->GetOrAddReal("problem", "rho", 1.0);
   av.v1_0 = av.vflow;
   if (do_gas) {
     auto gas_pkg = pmb->packages.Get("gas");
-    PARTHENON_REQUIRE(gas_pkg->Param<std::string>("eos_type") == "ideal",
-                      "advection pgen requires an ideal gas");
     PARTHENON_REQUIRE((gas_pkg->Param<int>("nspecies") == 1),
                       "Advection pgen requires a single gas species.")
-    av.gamma = gas_pkg->Param<Real>("adiabatic_index");
-    av.gm1 = av.gamma - 1.0;
-    av.p0 = 1.0 / av.gamma;
+    const auto &eos_h = gas_pkg->Param<std::vector<ArtemisUtils::EOS>>("eos_h");
+    av.p0 = pin->GetOrAddReal("problem", "pres", 0.6); // 1/gamma
+    av.sie = ArtemisUtils::EofPR(eos_h[0], av.p0, av.d0);
   }
   if (do_dust) {
     auto dust_pkg = pmb->packages.Get("dust");
@@ -208,7 +205,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         const Real cm1 = mx * adv.cos_a2 * adv.cos_a3;
         const Real cm2 = mx * adv.cos_a2 * adv.sin_a3;
         const Real cm3 = mx * adv.sin_a2;
-        const Real ce = adv.p0 / adv.gm1 + 0.5 * adv.d0 * SQR(adv.v1_0) +
+        const Real ce = adv.d0 * adv.sie + 0.5 * adv.d0 * SQR(adv.v1_0) +
                         0.5 * adv.d0 * adv.amp * sn * SQR(adv.v1_0);
         const Real cu = ce - 0.5 * (SQR(cm1) + SQR(cm2) + SQR(cm3)) / cd;
 
@@ -293,7 +290,7 @@ inline void UserWorkAfterLoop(Mesh *pmesh, ParameterInput *pin, parthenon::SimTi
         Real cm1 = mx * adv.cos_a2 * adv.cos_a3;
         Real cm2 = mx * adv.cos_a2 * adv.sin_a3;
         Real cm3 = mx * adv.sin_a2;
-        Real ce = adv.p0 / adv.gm1 + 0.5 * adv.d0 * SQR(adv.v1_0) +
+        Real ce = adv.d0 * adv.sie + 0.5 * adv.d0 * SQR(adv.v1_0) +
                   0.5 * adv.d0 * adv.amp * sn * SQR(adv.v1_0);
 
         // conserved variables:

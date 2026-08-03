@@ -65,7 +65,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   bump_params.vfac = pin->GetOrAddReal("problem", "vx2_bump", 0.0);
   bump_params.wfac = pin->GetOrAddReal("problem", "vx3_bump", 0.0);
 
-  ArtemisUtils::EOS eos;
+  ParArray1D<ArtemisUtils::EOS> eos;
   if (do_gas) {
     auto gas_pkg = pmb->packages.Get("gas");
     PARTHENON_REQUIRE((gas_pkg->Param<int>("nspecies") == 1),
@@ -75,7 +75,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
     bump_params.g_vx2 = pin->GetOrAddReal("problem", "gas_vx2", 0.0);
     bump_params.g_vx3 = pin->GetOrAddReal("problem", "gas_vx3", 0.0);
     bump_params.g_pres = pin->GetOrAddReal("problem", "gas_pres", 1.0);
-    eos = gas_pkg->Param<ArtemisUtils::EOS>("eos_d");
+    eos = gas_pkg->template Param<ParArray1D<ArtemisUtils::EOS>>("eos_d");
   }
   if (do_dust) {
     auto dust_pkg = pmb->packages.Get("dust");
@@ -179,16 +179,17 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           if (pars.tfac > 0.0) {
             // P = const, T = T0*(1 + f)
             // Input pressure and density to get background T
-            temp = ArtemisUtils::TofPR(eos, pres, dens);
+            temp = ArtemisUtils::TofPR(eos(0), pres, dens);
             temp *= (1. + pars.tfac * bump);
             // Input pressure and temperature
-            v(0, gas::prim::density(0), k, j, i) = ArtemisUtils::RofPT(eos, pres, temp);
-            v(0, gas::prim::sie(0), k, j, i) = ArtemisUtils::EofPT(eos, pres, temp);
+            v(0, gas::prim::density(0), k, j, i) =
+                ArtemisUtils::RofPT(eos(0), pres, temp);
+            v(0, gas::prim::sie(0), k, j, i) = ArtemisUtils::EofPT(eos(0), pres, temp);
           } else {
             dens = pars.g_rho * (1. + pars.dfac * bump);
             v(0, gas::prim::density(0), k, j, i) = dens;
             // input density and pressure
-            v(0, gas::prim::sie(0), k, j, i) = ArtemisUtils::EofPR(eos, pres, dens);
+            v(0, gas::prim::sie(0), k, j, i) = ArtemisUtils::EofPR(eos(0), pres, dens);
           }
         }
         if (do_dust) {

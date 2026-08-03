@@ -13,6 +13,8 @@
 #ifndef UTILS_ARTEMIS_UTILS_HPP_
 #define UTILS_ARTEMIS_UTILS_HPP_
 
+#include <vector>
+
 // Artemis includes
 #include "artemis.hpp"
 #include "utils/refinement/prolongation.hpp"

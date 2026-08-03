@@ -11,10 +11,12 @@
 // the public, perform publicly and display publicly, and to permit others to do so.
 //========================================================================================
 
+#include <vector>
+
 // Artemis includes
-#include "radiation.hpp"
 #include "artemis.hpp"
 #include "geometry/geometry.hpp"
+#include "radiation.hpp"
 #include "utils/artemis_utils.hpp"
 #include "utils/eos/eos.hpp"
 #include "utils/opacity/opacity.hpp"
@@ -90,9 +92,10 @@ TaskStatus SetOpacities(MeshData<Real> *md) {
   auto &resolved_pkgs = pm->resolved_packages;
   auto &gas_pkg = pm->packages.Get("gas");
 
-  EOS eos_d = gas_pkg->template Param<EOS>("eos_d");
-  MeanOpacity opacity_d = gas_pkg->template Param<MeanOpacity>("opacity_d");
-  MeanScattering scattering_d = gas_pkg->template Param<MeanScattering>("scattering_d");
+  const auto &eos_d = gas_pkg->template Param<ParArray1D<EOS>>("eos_d");
+  const auto &opacity_d = gas_pkg->template Param<ParArray1D<MeanOpacity>>("opacity_d");
+  const auto &scattering_d =
+      gas_pkg->template Param<ParArray1D<MeanScattering>>("scattering_d");
 
   // Packing and indexing
   // TODO(): Will eventually incorporate other fluids
@@ -111,12 +114,12 @@ TaskStatus SetOpacities(MeshData<Real> *md) {
       KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
         const Real &rho = vmesh(b, gas::prim::density(), k, j, i);
         const Real &sie = vmesh(b, gas::prim::sie(), k, j, i);
-        const Real temp = eos_d.TemperatureFromDensityInternalEnergy(rho, sie);
+        const Real temp = eos_d(0).TemperatureFromDensityInternalEnergy(rho, sie);
         Real &aa = vmesh(b, rad::opac::absorption(), k, j, i);
         Real &ss = vmesh(b, rad::opac::scattering(), k, j, i);
 
-        aa = opacity_d.AbsorptionCoefficient(rho, temp);
-        ss = scattering_d.RosselandMeanTotalScatteringCoefficient(rho, temp);
+        aa = opacity_d(0).AbsorptionCoefficient(rho, temp);
+        ss = scattering_d(0).RosselandMeanTotalScatteringCoefficient(rho, temp);
       });
 
   return TaskStatus::complete;

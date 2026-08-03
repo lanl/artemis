@@ -12,6 +12,9 @@
 //========================================================================================
 
 // C++ headers
+#include <vector>
+
+// Artemis headers
 #include "artemis_utils.hpp"
 #include "nbody/nbody_utils.hpp"
 #include "units.hpp"
@@ -51,18 +54,19 @@ void PrintArtemisConfiguration(Packages_t &packages) {
     if (params.Get<bool>("do_moment")) msg += hfill + "Moment radiation\n";
     printf("\n=====================================================\n");
     printf("  ARTEMIS\n");
-    printf("    name:            %s\n", params.Get<std::string>("job_name").c_str());
-    printf("    problem:         %s\n", params.Get<std::string>("pgen_name").c_str());
-    printf("    coordinates:     %dD %s\n", nd, params.Get<std::string>("coord_sys").c_str());
-    printf("    integrator:      %s\n", params.Get<std::string>("integrator").c_str());
-    printf("    MPI ranks:       %d\n", parthenon::Globals::nranks);
-    printf("    dimensions:      %dx%dx%d\n", nx[0], nx[1], nx[2]);
-    printf("    meshblock:       %dx%dx%d\n", nb[0], nb[1], nb[2]);
-    printf("    Unit System:  %s\n", units.GetSystemName().c_str());
-    printf("                  [L] = %.2e\n", units.GetLengthCodeToPhysical());
-    printf("                  [M] = %.2e\n", units.GetMassCodeToPhysical());
-    printf("                  [T] = %.2e\n", units.GetTimeCodeToPhysical());
-    printf("                  [K] = %.2e\n", units.GetTemperatureCodeToPhysical());
+    printf("              name:  %s\n", params.Get<std::string>("job_name").c_str());
+    printf("           problem:  %s\n", params.Get<std::string>("pgen_name").c_str());
+    printf("            sparse:  %s\n", params.Get<bool>("do_sparse") ? "yes" : "no");
+    printf("       coordinates:  %dD %s\n", nd, params.Get<std::string>("coord_sys").c_str());
+    printf("        integrator:  %s\n", params.Get<std::string>("integrator").c_str());
+    printf("         MPI ranks:  %d\n", parthenon::Globals::nranks);
+    printf("        dimensions:  %dx%dx%d\n", nx[0], nx[1], nx[2]);
+    printf("         meshblock:  %dx%dx%d\n", nb[0], nb[1], nb[2]);
+    printf("       Unit System:  %s\n", units.GetSystemName().c_str());
+    printf("                     [L] = %.2e\n", units.GetLengthCodeToPhysical());
+    printf("                     [M] = %.2e\n", units.GetMassCodeToPhysical());
+    printf("                     [T] = %.2e\n", units.GetTimeCodeToPhysical());
+    printf("                     [K] = %.2e\n", units.GetTemperatureCodeToPhysical());
     printf("    Active physics:  %s", msg.c_str());
     if (params.Get<bool>("do_nbody")) {
       auto nbody_pkg = packages.Get("nbody");

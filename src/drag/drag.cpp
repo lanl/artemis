@@ -14,15 +14,19 @@
 // Artemis includes
 #include "drag.hpp"
 #include "artemis.hpp"
+#include "drag_impl.hpp"
 #include "geometry/geometry.hpp"
 #include "utils/eos/eos.hpp"
 
 using ArtemisUtils::EOS;
 namespace Drag {
+
 //----------------------------------------------------------------------------------------
 //! \fn  StateDescriptor Drag::Initialize
 //! \brief Adds intialization function for damping package
-std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
+std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
+                                            const ArtemisUtils::Constants &constants,
+                                            Packages_t &packages) {
   auto drag = std::make_shared<StateDescriptor>("drag");
   Params &params = drag->AllParams();
 
@@ -81,6 +85,17 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     params.Add("stopping_time_params", StoppingTimeParams("dust/stopping_time", pin));
   }
 
+  // Coupling::full — Chapman-Cowling N-fluid coupling
+  if (type == Coupling::full) {
+    PARTHENON_REQUIRE(do_gas, "drag type full requires at least one gas species");
+    PARTHENON_REQUIRE(pin->GetOrAddInteger("gas", "nspecies", 1) > 1,
+                      "drag type full requires gas.nspecies > 1");
+    PARTHENON_REQUIRE(pin->DoesBlockExist("drag/full"),
+                      "drag type full requires a [drag/full] input block");
+    const auto gas_mu = packages.Get("gas")->Param<ParArray1D<Real>>("mu");
+    params.Add("full_coupling_params", FullCouplingParams(pin, constants, gas_mu));
+  }
+
   return drag;
 }
 
@@ -96,7 +111,7 @@ TaskStatus DragSource(MeshData<Real> *md, const Real time, const Real dt) {
   // Extract artemis parameters
   auto &artemis_pkg = pm->packages.Get("artemis");
   const bool do_gas = artemis_pkg->template Param<bool>("do_gas");
-  const bool do_dust = artemis_pkg->template Param<bool>("do_gas");
+  const bool do_dust = artemis_pkg->template Param<bool>("do_dust");
 
   // Extract drag parameters
   auto &drag_pkg = pm->packages.Get("drag");
@@ -109,7 +124,7 @@ TaskStatus DragSource(MeshData<Real> *md, const Real time, const Real dt) {
     if (do_gas && gas_self_par.damp_to_visc) {
       auto &gas_pkg = pm->packages.Get("gas");
       const auto &dp = gas_pkg->template Param<Diffusion::DiffCoeffParams>("visc_params");
-      const auto &eos_d = gas_pkg->template Param<EOS>("eos_d");
+      const auto &eos_d = gas_pkg->template Param<ParArray1D<EOS>>("eos_d");
       if (dp.type == Diffusion::DiffType::viscosity_plaw) {
         return SelfDragSourceImpl<Diffusion::DiffType::viscosity_plaw, GEOM>(
             md, time, dt, dp, eos_d, gas_self_par, dust_self_par);
@@ -121,14 +136,14 @@ TaskStatus DragSource(MeshData<Real> *md, const Real time, const Real dt) {
       }
     } else {
       Diffusion::DiffCoeffParams dp;
-      EOS eos_d;
+      ParArray1D<EOS> eos_d;
       return SelfDragSourceImpl<Diffusion::DiffType::null, GEOM>(
           md, time, dt, dp, eos_d, gas_self_par, dust_self_par);
     }
   } else if (ctype == Coupling::simple_dust) {
     auto &gas_pkg = pm->packages.Get("gas");
     auto &dust_pkg = pm->packages.Get("dust");
-    const auto &eos_d = gas_pkg->template Param<EOS>("eos_d");
+    const auto &eos_d = gas_pkg->template Param<ParArray1D<EOS>>("eos_d");
     const auto stop_par =
         drag_pkg->template Param<StoppingTimeParams>("stopping_time_params");
     if (gas_self_par.damp_to_visc) {
@@ -166,10 +181,47 @@ TaskStatus DragSource(MeshData<Real> *md, const Real time, const Real dt) {
             md, time, dt, dp, eos_d, gas_self_par, dust_self_par, stop_par);
       }
     }
+  } else if (ctype == Coupling::full) {
+    // Chapman-Cowling implicit coupling for N gas species.
+    // ApplyClosure assembles and solves the per-cell coupling matrix.
+    return ApplyClosure<GEOM>(md, dt);
   } else {
     PARTHENON_FAIL("Invalid drag model!");
+    return TaskStatus::complete;
   }
   return TaskStatus::complete;
+}
+
+template <Coordinates GEOM>
+TaskStatus ApplyClosure(MeshData<Real> *md, const Real dt) {
+  PARTHENON_INSTRUMENT
+  using parthenon::MakePackDescriptor;
+  using TE = parthenon::TopologicalElement;
+  auto pm = md->GetParentPointer();
+  auto &resolved_pkgs = pm->resolved_packages;
+
+  // Packing and indexing
+  static auto desc = MakePackDescriptor<gas::cons::density>(resolved_pkgs.get());
+  auto vmesh = desc.GetPack(md);
+
+  int nmax;
+  parthenon::par_reduce(
+      DEFAULT_LOOP_PATTERN, "MaxSize", DevExecSpace(), 0, md->NumBlocks() - 1,
+      KOKKOS_LAMBDA(const int b, int &lmax) {
+        lmax = std::max(lmax, vmesh.GetSize(b, gas::cons::density()));
+      },
+      Kokkos::Max<int>(nmax));
+
+  // nothing to do
+  if (nmax == 1) return TaskStatus::complete;
+
+  // Special cases
+  if (nmax == 2) {
+    return CoupleTwoFluids<GEOM>(md, dt);
+  }
+
+  // General case
+  return CoupleNFluids<GEOM>(md, nmax, dt);
 }
 
 //----------------------------------------------------------------------------------------
@@ -182,5 +234,19 @@ template TaskStatus DragSource<G::spherical1D>(MD *md, const Real tt, const Real
 template TaskStatus DragSource<G::spherical2D>(MD *md, const Real tt, const Real dt);
 template TaskStatus DragSource<G::spherical3D>(MD *md, const Real tt, const Real dt);
 template TaskStatus DragSource<G::axisymmetric>(MD *md, const Real tt, const Real dt);
+
+template TaskStatus CoupleTwoFluids<G::cartesian>(MD *md, const Real dt);
+template TaskStatus CoupleTwoFluids<G::cylindrical>(MD *md, const Real dt);
+template TaskStatus CoupleTwoFluids<G::spherical1D>(MD *md, const Real dt);
+template TaskStatus CoupleTwoFluids<G::spherical2D>(MD *md, const Real dt);
+template TaskStatus CoupleTwoFluids<G::spherical3D>(MD *md, const Real dt);
+template TaskStatus CoupleTwoFluids<G::axisymmetric>(MD *md, const Real dt);
+
+template TaskStatus CoupleNFluids<G::cartesian>(MD *md, const int nmax, const Real dt);
+template TaskStatus CoupleNFluids<G::cylindrical>(MD *md, const int nmax, const Real dt);
+template TaskStatus CoupleNFluids<G::spherical1D>(MD *md, const int nmax, const Real dt);
+template TaskStatus CoupleNFluids<G::spherical2D>(MD *md, const int nmax, const Real dt);
+template TaskStatus CoupleNFluids<G::spherical3D>(MD *md, const int nmax, const Real dt);
+template TaskStatus CoupleNFluids<G::axisymmetric>(MD *md, const int nmax, const Real dt);
 
 } // namespace Drag

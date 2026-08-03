@@ -19,6 +19,10 @@
   url = https://github.com/lanl/jaybenne.git
   ignore = dirty
 [submodule "external/Catch2"]
-  path = external/Catch2
-  url = https://github.com/catchorg/Catch2.git
+	path = external/Catch2
+	url = https://github.com/catchorg/Catch2.git
+  ignore = dirty
+[submodule "external/kokkos-kernels"]
+	path = external/kokkos-kernels
+	url = https://github.com/kokkos/kokkos-kernels
   ignore = dirty

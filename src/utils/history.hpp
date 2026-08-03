@@ -13,6 +13,8 @@
 #ifndef UTILS_HISTORY_HPP_
 #define UTILS_HISTORY_HPP_
 
+#include <vector>
+
 // Artemis includes
 #include "artemis.hpp"
 #include "geometry/geometry.hpp"

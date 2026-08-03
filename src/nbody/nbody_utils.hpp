@@ -21,6 +21,7 @@
 #include <fstream>
 #include <iostream>
 #include <unistd.h> // for dup and dup2 on Unix-like systems
+#include <vector>
 
 // REBOUND includes
 extern "C" {

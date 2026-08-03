@@ -190,13 +190,12 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
     packages.Add(Radiation::Initialize(pin.get(), constants, do_imc));
     // Select between Jaybenne IMC or Moments
     if (do_imc) {
-      auto eos_h_arr =
-          packages.Get("gas")->Param<parthenon::ParArray1D<ArtemisUtils::EOS>>("eos_h");
-      auto opacity_h =
-          packages.Get("gas")->Param<parthenon::ParArray1D<MeanOpacity>>("opacity_h");
-      auto scattering_h =
-          packages.Get("gas")->Param<parthenon::ParArray1D<MeanScattering>>(
-              "scattering_h");
+      using EOSHostArray = parthenon::HostArray1D<ArtemisUtils::EOS>;
+      using OpacityHostArray = parthenon::HostArray1D<MeanOpacity>;
+      using ScatteringHostArray = parthenon::HostArray1D<MeanScattering>;
+      auto eos_h_arr = packages.Get("gas")->Param<EOSHostArray>("eos_h");
+      auto opacity_h = packages.Get("gas")->Param<OpacityHostArray>("opacity_h");
+      auto scattering_h = packages.Get("gas")->Param<ScatteringHostArray>("scattering_h");
       packages.Add(jaybenne::Initialize(pin.get(), opacity_h(0), scattering_h(0),
                                         eos_h_arr(0), "radiation/imc"));
       PARTHENON_REQUIRE(coords == Coordinates::cartesian,

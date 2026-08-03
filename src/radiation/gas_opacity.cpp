@@ -27,6 +27,10 @@ void InitGasOpacity(ParameterInput *pin, const ArtemisUtils::Units &units,
   // Get frequency type (it should already be set in radiation Initialization)
   const auto frequency_type = params.Get<FrequencyType>("frequency_type");
 
+  // TODO: read this (and consolidate gray/multigroup modes?)
+  const std::vector<Real> gray_bounds = {1.e12, 3.e20};
+  const int NG = static_cast<int>(gray_bounds.size()) - 1;
+
   // Absorption opacity model
   std::string opacity_model_name =
       pin->GetOrAddString("gas/opacity/absorption", "opacity_model", "constant");
@@ -57,7 +61,8 @@ void InitGasOpacity(ParameterInput *pin, const ArtemisUtils::Units &units,
       opacity =
           singularity::photons::MeanNonCGSUnits<singularity::photons::MeanOpacityBase>(
               singularity::photons::MeanOpacityBase(model, lRhoMin_a, lRhoMax_a, NRho_a,
-                                                    lTMin_a, lTMax_a, NT_a),
+                                                    lTMin_a, lTMax_a, NT_a, gray_bounds,
+                                                    NG),
               time, mass, length, temp);
       if (frequency_type == FrequencyType::multigroup) {
         mg_opacity = singularity::photons::NonCGSUnits<singularity::photons::Gray>(
@@ -69,7 +74,8 @@ void InitGasOpacity(ParameterInput *pin, const ArtemisUtils::Units &units,
       opacity =
           singularity::photons::MeanNonCGSUnits<singularity::photons::MeanOpacityBase>(
               singularity::photons::MeanOpacityBase(model, lRhoMin_a, lRhoMax_a, NRho_a,
-                                                    lTMin_a, lTMax_a, NT_a),
+                                                    lTMin_a, lTMax_a, NT_a, gray_bounds,
+                                                    NG),
               time, mass, length, temp);
       if (frequency_type == FrequencyType::multigroup) {
         mg_opacity = singularity::photons::NonCGSUnits<singularity::photons::Gray>(
@@ -84,7 +90,8 @@ void InitGasOpacity(ParameterInput *pin, const ArtemisUtils::Units &units,
       opacity =
           singularity::photons::MeanNonCGSUnits<singularity::photons::MeanOpacityBase>(
               singularity::photons::MeanOpacityBase(model, lRhoMin_a, lRhoMax_a, NRho_a,
-                                                    lTMin_a, lTMax_a, NT_a),
+                                                    lTMin_a, lTMax_a, NT_a, gray_bounds,
+                                                    NG),
               time, mass, length, temp);
       if (frequency_type == FrequencyType::multigroup) {
         mg_opacity = singularity::photons::NonCGSUnits<singularity::photons::PowerLaw>(
@@ -119,9 +126,10 @@ void InitGasOpacity(ParameterInput *pin, const ArtemisUtils::Units &units,
   if (scattering_model_name == "none") {
     auto smodel = GrayS(0.0, 1.0);
     scattering =
-        singularity::photons::MeanNonCGSUnitsS<singularity::photons::MeanSOpacityCGS>(
-            singularity::photons::MeanSOpacityCGS(smodel, lRhoMin_s, lRhoMax_s, NRho_s,
-                                                  lTMin_s, lTMax_s, NT_s),
+        singularity::photons::MeanNonCGSUnitsS<singularity::photons::MeanSOpacityBase>(
+            singularity::photons::MeanSOpacityBase(smodel, lRhoMin_s, lRhoMax_s, NRho_s,
+                                                   lTMin_s, lTMax_s, NT_s, gray_bounds,
+                                                   NG),
             time, mass, length, temp);
     if (frequency_type == FrequencyType::multigroup) {
       mg_scattering = singularity::photons::NonCGSUnitsS<singularity::photons::GrayS>(
@@ -131,9 +139,10 @@ void InitGasOpacity(ParameterInput *pin, const ArtemisUtils::Units &units,
     const Real kappa_s = pin->GetOrAddReal("gas/opacity/scattering", "kappa_s", 0.0);
     auto smodel = GrayS(kappa_s, 1.0);
     scattering =
-        singularity::photons::MeanNonCGSUnitsS<singularity::photons::MeanSOpacityCGS>(
-            singularity::photons::MeanSOpacityCGS(smodel, lRhoMin_s, lRhoMax_s, NRho_s,
-                                                  lTMin_s, lTMax_s, NT_s),
+        singularity::photons::MeanNonCGSUnitsS<singularity::photons::MeanSOpacityBase>(
+            singularity::photons::MeanSOpacityBase(smodel, lRhoMin_s, lRhoMax_s, NRho_s,
+                                                   lTMin_s, lTMax_s, NT_s, gray_bounds,
+                                                   NG),
             time, mass, length, temp);
     if (frequency_type == FrequencyType::multigroup) {
       mg_scattering = singularity::photons::NonCGSUnitsS<singularity::photons::GrayS>(

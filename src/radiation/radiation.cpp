@@ -94,7 +94,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   // incorporate frequency type for gas opacity initialization
   params.Add("frequency_type", frequency_type);
 
-  // Initialize gas opacity
+  // Initialize gas opacity models
   Gas::InitGasOpacity(pin, units, params);
 
   // Enroll in tstart/tstop machinery
@@ -139,8 +139,8 @@ TaskStatus SetOpacities(MeshData<Real> *md) {
         Real &aa = vmesh(b, rad::opac::absorption(), k, j, i);
         Real &ss = vmesh(b, rad::opac::scattering(), k, j, i);
 
-        aa = opacity_d.AbsorptionCoefficient(rho, temp);
-        ss = scattering_d.RosselandMeanTotalScatteringCoefficient(rho, temp);
+        aa = opacity_d.AbsorptionCoefficient(rho, temp, 0);
+        ss = scattering_d.ScatteringCoefficient(rho, temp, 0);
       });
 
   return TaskStatus::complete;

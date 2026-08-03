@@ -39,7 +39,7 @@ using MeanOpacity =
 
 // Reduced variant for mean scattering opacities
 using MeanScattering =
-    singularity::photons::MeanNonCGSUnitsS<singularity::photons::MeanSOpacityCGS>;
+    singularity::photons::MeanNonCGSUnitsS<singularity::photons::MeanSOpacityBase>;
 
 } // namespace ArtemisUtils
 

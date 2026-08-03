@@ -152,7 +152,8 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
     auto gas_pkg = pmb->packages.Get("gas");
     PARTHENON_REQUIRE((gas_pkg->Param<int>("nspecies") == 1),
                       "Advection pgen requires a single gas species.")
-    const auto &eos_h = gas_pkg->Param<ParArray1D<ArtemisUtils::EOS>>("eos_h");
+    const auto &eos_h =
+        gas_pkg->Param<parthenon::HostArray1D<ArtemisUtils::EOS>>("eos_h");
     av.p0 = pin->GetOrAddReal("problem", "pres", 0.6); // 1/gamma
     av.sie = ArtemisUtils::EofPR(eos_h(0), av.p0, av.d0);
   }

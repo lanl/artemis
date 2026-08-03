@@ -301,7 +301,8 @@ inline void InitDiskParams(MeshBlock *pmb, ParameterInput *pin) {
     disk_params.l0 = pin->GetOrAddReal("problem", "l0", 0.0);
     disk_params.dust_to_gas = pin->GetOrAddReal("problem", "dust_to_gas", 0.01);
     disk_params.temp_soft2 = pin->GetOrAddReal("problem", "temp_soft", 0.0);
-    const auto &eos_h = gas_pkg->Param<ParArray1D<ArtemisUtils::EOS>>("eos_h");
+    const auto &eos_h =
+        gas_pkg->Param<parthenon::HostArray1D<ArtemisUtils::EOS>>("eos_h");
     const Real p0 = disk_params.rho0 *
                     SQR(disk_params.h0 * disk_params.r0 * disk_params.Omega0) /
                     disk_params.Gamma;

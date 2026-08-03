@@ -92,7 +92,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   dcv.omk = pin->GetOrAddReal("problem", "om0", 1.0);
 
   auto gas_pkg = pmb->packages.Get("gas");
-  const auto &eos_h = gas_pkg->template Param<ParArray1D<EOS>>("eos_h");
+  const auto &eos_h = gas_pkg->template Param<parthenon::HostArray1D<EOS>>("eos_h");
 
   // Extract adiabatic index and H0
   dcv.h0 = pin->GetOrAddReal("problem", "h0", 0.05);

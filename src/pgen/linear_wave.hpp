@@ -196,14 +196,14 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto gas_pkg = pmb->packages.Get("gas");
   PARTHENON_REQUIRE((gas_pkg->Param<int>("nspecies") == 1),
                     "linear wave pgen requires a single gas species.")
-  const auto &eos_h = gas_pkg->Param<parthenon::HostArray1D<ArtemisUtils::EOS>>("eos_h");
+  const auto &eos_h = gas_pkg->Param<std::vector<ArtemisUtils::EOS>>("eos_h");
 
   lwv.v1_0 = lwv.vflow;
   lwv.d0 = pin->GetOrAddReal("problem", "rho", 1.0);
   lwv.p0 = pin->GetOrAddReal("problem", "pres", 0.6); // 1/gamma
 
-  lwv.sie = ArtemisUtils::EofPR(eos_h(0), lwv.p0, lwv.d0);
-  const Real bmod = eos_h(0).BulkModulusFromDensityInternalEnergy(lwv.d0, lwv.sie);
+  lwv.sie = ArtemisUtils::EofPR(eos_h[0], lwv.p0, lwv.d0);
+  const Real bmod = eos_h[0].BulkModulusFromDensityInternalEnergy(lwv.d0, lwv.sie);
   lwv.cs = std::sqrt(bmod / lwv.d0);
 
   // Compute eigenvectors in hydrodynamics

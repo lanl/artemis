@@ -141,16 +141,16 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
     params.Add("amu", constants.GetAMUCode());
     params.Add("Rgas", constants.GetKBCode() / (constants.GetAMUCode() * mu_v[0]));
     ParArray1D<EOS> eos_device("eos_d", nspecies);
-    auto eos_host = eos_device.GetHostMirror();
+    std::vector<EOS> eos_host(nspecies);
     auto eos_device_host = eos_device.GetHostMirror();
     for (int n = 0; n < nspecies; ++n) {
-      eos_host(n) = singularity::UnitSystem<singularity::IdealGas>(
+      eos_host[n] = singularity::UnitSystem<singularity::IdealGas>(
           singularity::IdealGas(gamma_v[n] - 1.,
                                 cv_v[n] * units.GetSpecificHeatCodeToPhysical()),
           singularity::eos_units_init::LengthTimeUnitsInit(),
           units.GetTimePhysicalToCode(), units.GetMassPhysicalToCode(),
           units.GetLengthPhysicalToCode(), units.GetTemperaturePhysicalToCode());
-      eos_device_host(n) = eos_host(n).GetOnDevice();
+      eos_device_host(n) = eos_host[n].GetOnDevice();
     }
     eos_device.DeepCopy(eos_device_host);
     params.Add("eos_h", eos_host);
@@ -166,15 +166,15 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
       std::vector<std::string> filenames(nspecies, "");
       pin->GetOrAddVector<std::string>(block_name, "eos_file", filenames);
       ParArray1D<EOS> eos_device("eos_d", nspecies);
-      auto eos_host = eos_device.GetHostMirror();
+      std::vector<EOS> eos_host(nspecies);
       auto eos_device_host = eos_device.GetHostMirror();
       for (int n = 0; n < nspecies; ++n) {
-        eos_host(n) = singularity::UnitSystem<ArtemisEOS::IdealHHe>(
+        eos_host[n] = singularity::UnitSystem<ArtemisEOS::IdealHHe>(
             ArtemisEOS::IdealHHe(filenames[n]),
             singularity::eos_units_init::LengthTimeUnitsInit(),
             units.GetTimePhysicalToCode(), units.GetMassPhysicalToCode(),
             units.GetLengthPhysicalToCode(), units.GetTemperaturePhysicalToCode());
-        eos_device_host(n) = eos_host(n).GetOnDevice();
+        eos_device_host(n) = eos_host[n].GetOnDevice();
       }
       eos_device.DeepCopy(eos_device_host);
       std::vector<Real> mu_default(nspecies, 1.);
@@ -210,18 +210,18 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
                         "y must have nspecies entries");
 
       ParArray1D<EOS> eos_device("eos_d", nspecies);
-      auto eos_host = eos_device.GetHostMirror();
+      std::vector<EOS> eos_host(nspecies);
       auto eos_device_host = eos_device.GetHostMirror();
       for (int n = 0; n < nspecies; ++n) {
         ArtemisEOS::IdealHHe eos_base(X_v[n], Y_v[n], ltmin, ltmax, nt, ldmin, ldmax, nd,
                                       save_to_file, true);
         eos_base.SetFloors(siefloor, 0.0, dfloor, 0.0);
 
-        eos_host(n) = singularity::UnitSystem<ArtemisEOS::IdealHHe>(
+        eos_host[n] = singularity::UnitSystem<ArtemisEOS::IdealHHe>(
             std::move(eos_base), singularity::eos_units_init::LengthTimeUnitsInit(),
             units.GetTimePhysicalToCode(), units.GetMassPhysicalToCode(),
             units.GetLengthPhysicalToCode(), units.GetTemperaturePhysicalToCode());
-        eos_device_host(n) = eos_host(n).GetOnDevice();
+        eos_device_host(n) = eos_host[n].GetOnDevice();
       }
       eos_device.DeepCopy(eos_device_host);
       auto mu_v =
@@ -247,15 +247,15 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
     PARTHENON_REQUIRE(filenames.size() == static_cast<size_t>(nspecies),
                       "eos_file must have nspecies entries");
     ParArray1D<EOS> eos_device("eos_d", nspecies);
-    auto eos_host = eos_device.GetHostMirror();
+    std::vector<EOS> eos_host(nspecies);
     auto eos_device_host = eos_device.GetHostMirror();
     for (int n = 0; n < nspecies; ++n) {
-      eos_host(n) = singularity::UnitSystem<singularity::SpinerEOSDependsRhoSie>(
+      eos_host[n] = singularity::UnitSystem<singularity::SpinerEOSDependsRhoSie>(
           singularity::SpinerEOSDependsRhoSie(filenames[n], matid[n]),
           singularity::eos_units_init::LengthTimeUnitsInit(),
           units.GetTimePhysicalToCode(), units.GetMassPhysicalToCode(),
           units.GetLengthPhysicalToCode(), units.GetTemperaturePhysicalToCode());
-      eos_device_host(n) = eos_host(n).GetOnDevice();
+      eos_device_host(n) = eos_host[n].GetOnDevice();
     }
     eos_device.DeepCopy(eos_device_host);
     std::vector<Real> mu_default(nspecies, 1.);
@@ -280,15 +280,15 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
     PARTHENON_REQUIRE(filenames.size() == static_cast<size_t>(nspecies),
                       "eos_file must have nspecies entries");
     ParArray1D<EOS> eos_device("eos_d", nspecies);
-    auto eos_host = eos_device.GetHostMirror();
+    std::vector<EOS> eos_host(nspecies);
     auto eos_device_host = eos_device.GetHostMirror();
     for (int n = 0; n < nspecies; ++n) {
-      eos_host(n) = singularity::UnitSystem<singularity::SpinerEOSDependsRhoT>(
+      eos_host[n] = singularity::UnitSystem<singularity::SpinerEOSDependsRhoT>(
           singularity::SpinerEOSDependsRhoT(filenames[n], matid[n]),
           singularity::eos_units_init::LengthTimeUnitsInit(),
           units.GetTimePhysicalToCode(), units.GetMassPhysicalToCode(),
           units.GetLengthPhysicalToCode(), units.GetTemperaturePhysicalToCode());
-      eos_device_host(n) = eos_host(n).GetOnDevice();
+      eos_device_host(n) = eos_host[n].GetOnDevice();
     }
     eos_device.DeepCopy(eos_device_host);
     std::vector<Real> mu_default(nspecies, 1.);
@@ -388,11 +388,11 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
     }
   }
   ParArray1D<ArtemisUtils::MeanOpacity> opacity_device("opacity_d", nspecies);
-  auto opacity_host = opacity_device.GetHostMirror();
+  std::vector<ArtemisUtils::MeanOpacity> opacity_host(nspecies);
   auto opacity_device_host = opacity_device.GetHostMirror();
   for (int n = 0; n < nspecies; ++n) {
-    opacity_host(n) = opacity;
-    opacity_device_host(n) = opacity_host(n).GetOnDevice();
+    opacity_host[n] = opacity;
+    opacity_device_host(n) = opacity_host[n].GetOnDevice();
   }
   opacity_device.DeepCopy(opacity_device_host);
   params.Add("opacity_h", opacity_host);
@@ -431,11 +431,11 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   }
 
   ParArray1D<ArtemisUtils::MeanScattering> scattering_device("scattering_d", nspecies);
-  auto scattering_host = scattering_device.GetHostMirror();
+  std::vector<ArtemisUtils::MeanScattering> scattering_host(nspecies);
   auto scattering_device_host = scattering_device.GetHostMirror();
   for (int n = 0; n < nspecies; ++n) {
-    scattering_host(n) = scattering;
-    scattering_device_host(n) = scattering_host(n).GetOnDevice();
+    scattering_host[n] = scattering;
+    scattering_device_host(n) = scattering_host[n].GetOnDevice();
   }
   scattering_device.DeepCopy(scattering_device_host);
   params.Add("scattering_h", scattering_host);

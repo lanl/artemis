@@ -45,11 +45,11 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   }
   const int nspecies = pin->GetOrAddInteger("gas", "nspecies", 1);
   ParArray1D<ArtemisUtils::Opacity> opacity_device("opacity_d", nspecies);
-  auto opacity_host = opacity_device.GetHostMirror();
+  std::vector<ArtemisUtils::Opacity> opacity_host(nspecies);
   auto opacity_device_host = opacity_device.GetHostMirror();
   for (int n = 0; n < nspecies; ++n) {
-    opacity_host(n) = opacity;
-    opacity_device_host(n) = opacity_host(n).GetOnDevice();
+    opacity_host[n] = opacity;
+    opacity_device_host(n) = opacity_host[n].GetOnDevice();
   }
   opacity_device.DeepCopy(opacity_device_host);
   params.Add("opacity_h", opacity_host);

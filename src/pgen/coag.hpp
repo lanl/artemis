@@ -92,7 +92,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   dcv.omk = pin->GetOrAddReal("problem", "om0", 1.0);
 
   auto gas_pkg = pmb->packages.Get("gas");
-  const auto &eos_h = gas_pkg->template Param<parthenon::HostArray1D<EOS>>("eos_h");
+  const auto &eos_h = gas_pkg->template Param<std::vector<EOS>>("eos_h");
 
   // Extract adiabatic index and H0
   dcv.h0 = pin->GetOrAddReal("problem", "h0", 0.05);
@@ -100,7 +100,7 @@ inline void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   // Extract fluid state vector
   const Real gdens = dcv.rho0;
   const Real pres = gdens * SQR(dcv.h0 * dcv.omk);
-  const Real gsie = ArtemisUtils::EofPR(eos_h(0), pres, gdens);
+  const Real gsie = ArtemisUtils::EofPR(eos_h[0], pres, gdens);
 
   // Using MRN distribution for the initial dust setup
   ParArray1D<Real> dust_size = dust_pkg->template Param<ParArray1D<Real>>("sizes");

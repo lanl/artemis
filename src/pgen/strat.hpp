@@ -84,7 +84,7 @@ inline void InitStratParams(MeshBlock *pmb, ParameterInput *pin) {
     strat_params.do_dust = params.Get<bool>("do_dust");
 
     auto &gas_pkg = pmb->packages.Get("gas");
-    const auto &eos_h = gas_pkg->Param<parthenon::HostArray1D<EOS>>("eos_h");
+    const auto &eos_h = gas_pkg->Param<std::vector<EOS>>("eos_h");
     auto &constants = artemis_pkg->Param<ArtemisUtils::Constants>("constants");
     strat_params.dfloor = gas_pkg->Param<Real>("dfloor");
     strat_params.siefloor = gas_pkg->Param<Real>("siefloor");
@@ -93,7 +93,7 @@ inline void InitStratParams(MeshBlock *pmb, ParameterInput *pin) {
     strat_params.pres0 =
         strat_params.rho0 * SQR(strat_params.h * strat_params.r0 * strat_params.Om0);
     strat_params.temp0 =
-        ArtemisUtils::TofPR(eos_h(0), strat_params.pres0, strat_params.rho0);
+        ArtemisUtils::TofPR(eos_h[0], strat_params.pres0, strat_params.rho0);
 
     strat_params.do_imc = params.Get<bool>("do_imc");
     strat_params.do_moment = params.Get<bool>("do_moment");

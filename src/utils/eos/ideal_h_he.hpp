@@ -13,6 +13,8 @@
 #ifndef UTILS_EOS_IDEAL_H_HE_HPP_
 #define UTILS_EOS_IDEAL_H_HE_HPP_
 
+#include <vector>
+
 #include <cstdio>
 #ifdef SPINER_USE_HDF
 #include <hdf5.h>

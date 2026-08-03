@@ -14,9 +14,11 @@
 // This closely follows the implementation in Stammler and Birnstiel (2022) ApJ 935:35
 //========================================================================================
 
+#include <vector>
+
 // Artemis includes
-#include "dust/coagulation/coagulation.hpp"
 #include "artemis.hpp"
+#include "dust/coagulation/coagulation.hpp"
 #include "dust/dust.hpp"
 #include "geometry/geometry.hpp"
 #include "utils/artemis_utils.hpp"

@@ -13,6 +13,8 @@
 #ifndef DRAG_DRAG_HPP_
 #define DRAG_DRAG_HPP_
 
+#include <vector>
+
 // Parthenon includes
 #include <parthenon/package.hpp>
 

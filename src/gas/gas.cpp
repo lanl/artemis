@@ -13,6 +13,7 @@
 
 // C++ headers
 #include <limits>
+#include <vector>
 
 // Artemis includes
 #include "artemis.hpp"

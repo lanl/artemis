@@ -11,6 +11,8 @@
 // the public, perform publicly and display publicly, and to permit others to do so.
 //========================================================================================
 
+#include <vector>
+
 // Parthenon includes
 #include <bvals/boundary_conditions_generic.hpp>
 #include <coordinates/coordinates.hpp>

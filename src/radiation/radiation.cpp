@@ -11,10 +11,12 @@
 // the public, perform publicly and display publicly, and to permit others to do so.
 //========================================================================================
 
+#include <vector>
+
 // Artemis includes
-#include "radiation.hpp"
 #include "artemis.hpp"
 #include "geometry/geometry.hpp"
+#include "radiation.hpp"
 #include "utils/artemis_utils.hpp"
 #include "utils/eos/eos.hpp"
 #include "utils/opacity/opacity.hpp"

@@ -12,6 +12,9 @@
 //========================================================================================
 
 // C++ headers
+#include <vector>
+
+// Artemis headers
 #include "artemis_utils.hpp"
 #include "nbody/nbody_utils.hpp"
 #include "units.hpp"

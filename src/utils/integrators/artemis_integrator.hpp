@@ -13,6 +13,8 @@
 #ifndef UTILS_INTEGRATORS_ARTEMIS_INTEGRATOR_HPP_
 #define UTILS_INTEGRATORS_ARTEMIS_INTEGRATOR_HPP_
 
+#include <vector>
+
 // Parthenon includes
 #include <parthenon/package.hpp>
 

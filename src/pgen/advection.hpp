@@ -33,6 +33,7 @@
 #include <limits>
 #include <sstream>
 #include <string>
+#include <vector>
 
 // Artemis headers
 #include "artemis.hpp"

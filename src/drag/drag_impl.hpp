@@ -52,8 +52,9 @@ KOKKOS_FORCEINLINE_FUNCTION void ApplyEnergyFloor(const Real rho, const Real sie
 //! \brief Implementation for self drag
 template <Diffusion::DiffType DTYP, Coordinates GEOM>
 TaskStatus SelfDragSourceImpl(MeshData<Real> *md, const Real time, const Real dt,
-                              const Diffusion::DiffCoeffParams &dp, const EOS &eos_d,
-                              const SelfDragParams &gasp, const SelfDragParams &dustp) {
+                              const Diffusion::DiffCoeffParams &dp,
+                              const ParArray1D<EOS> &eos_d, const SelfDragParams &gasp,
+                              const SelfDragParams &dustp) {
   PARTHENON_INSTRUMENT
   using TE = parthenon::TopologicalElement;
   auto pm = md->GetParentPointer();
@@ -159,7 +160,7 @@ TaskStatus SelfDragSourceImpl(MeshData<Real> *md, const Real time, const Real dt
 
             // Get diffusion coefficient
             Diffusion::DiffusionCoeff<DTYP, GEOM, Fluid::gas> dcoeff;
-            const Real mu = dcoeff.Get(dp, coords, xv, dens, sieg, eos_d);
+            const Real mu = dcoeff.Get(dp, coords, xv, dens, sieg, eos_d(n));
             const Real vR = -1.5 * mu / (xcyl[0] * dens);
             const Real vg[3] = {mom1 / (hx[0] * dens), mom2 / (hx[1] * dens),
                                 mom3 / (hx[2] * dens)};
@@ -232,8 +233,9 @@ TaskStatus SelfDragSourceImpl(MeshData<Real> *md, const Real time, const Real dt
 //! \brief Implementation for simple drag
 template <Diffusion::DiffType DTYP, DragModel DRAG, Coordinates GEOM>
 TaskStatus SimpleDragSourceImpl(MeshData<Real> *md, const Real time, const Real dt,
-                                const Diffusion::DiffCoeffParams &dp, const EOS &eos_d,
-                                const SelfDragParams &gasp, const SelfDragParams &dustp,
+                                const Diffusion::DiffCoeffParams &dp,
+                                const ParArray1D<EOS> &eos_d, const SelfDragParams &gasp,
+                                const SelfDragParams &dustp,
                                 const StoppingTimeParams &tp) {
   PARTHENON_INSTRUMENT
   using TE = parthenon::TopologicalElement;
@@ -346,7 +348,7 @@ TaskStatus SimpleDragSourceImpl(MeshData<Real> *md, const Real time, const Real 
 
         // Target gas velocity
         Diffusion::DiffusionCoeff<DTYP, GEOM, Fluid::gas> dcoeff;
-        const Real mu = dcoeff.Get(dp, coords, xv, dg, sieg, eos_d);
+        const Real mu = dcoeff.Get(dp, coords, xv, dg, sieg, eos_d(0));
         const Real vR = -1.5 * mu / (xcyl[0] * dg);
         const std::array<Real, 3> vt{ex1[0] * vR, ex2[0] * vR, ex3[0] * vR};
 
@@ -354,7 +356,7 @@ TaskStatus SimpleDragSourceImpl(MeshData<Real> *md, const Real time, const Real 
         [[maybe_unused]] auto &grain_density_ = grain_density;
         [[maybe_unused]] Real vth = Null<Real>();
         if constexpr (DRAG == DragModel::stokes) {
-          const Real gm1 = eos_d.GruneisenParamFromDensityInternalEnergy(dg, sieg);
+          const Real gm1 = eos_d(0).GruneisenParamFromDensityInternalEnergy(dg, sieg);
           vth = std::sqrt(8.0 / M_PI * gm1 * sieg);
         }
 
@@ -467,7 +469,7 @@ TaskStatus CoupleTwoFluids(MeshData<Real> *md, const Real dt) {
 
   // Extract gas package and params
   auto &gas_pkg = pm->packages.Get("gas");
-  const auto eos_d = gas_pkg->template Param<ParArray1D<EOS>>("eos_d");
+  const auto &eos_d = gas_pkg->template Param<ParArray1D<EOS>>("eos_d");
   const auto dflr_gas = gas_pkg->template Param<Real>("dfloor");
   const auto sieflr_gas = gas_pkg->template Param<Real>("siefloor");
   const auto de_switch = gas_pkg->template Param<Real>("de_switch");
@@ -620,7 +622,7 @@ TaskStatus CoupleNFluids(MeshData<Real> *md, const int nmax, const Real dt) {
 
   // Extract gas package and params
   auto &gas_pkg = pm->packages.Get("gas");
-  const auto eos_d = gas_pkg->template Param<ParArray1D<EOS>>("eos_d");
+  const auto &eos_d = gas_pkg->template Param<ParArray1D<EOS>>("eos_d");
   const auto dflr_gas = gas_pkg->template Param<Real>("dfloor");
   const auto sieflr_gas = gas_pkg->template Param<Real>("siefloor");
   const auto de_switch = gas_pkg->template Param<Real>("de_switch");

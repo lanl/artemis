@@ -124,26 +124,26 @@ TaskStatus DragSource(MeshData<Real> *md, const Real time, const Real dt) {
     if (do_gas && gas_self_par.damp_to_visc) {
       auto &gas_pkg = pm->packages.Get("gas");
       const auto &dp = gas_pkg->template Param<Diffusion::DiffCoeffParams>("visc_params");
-      const auto eos_d = gas_pkg->template Param<ParArray1D<EOS>>("eos_d");
+      const auto &eos_d = gas_pkg->template Param<ParArray1D<EOS>>("eos_d");
       if (dp.type == Diffusion::DiffType::viscosity_plaw) {
         return SelfDragSourceImpl<Diffusion::DiffType::viscosity_plaw, GEOM>(
-            md, time, dt, dp, eos_d(0), gas_self_par, dust_self_par);
+            md, time, dt, dp, eos_d, gas_self_par, dust_self_par);
       } else if (dp.type == Diffusion::DiffType::viscosity_alpha) {
         return SelfDragSourceImpl<Diffusion::DiffType::viscosity_alpha, GEOM>(
-            md, time, dt, dp, eos_d(0), gas_self_par, dust_self_par);
+            md, time, dt, dp, eos_d, gas_self_par, dust_self_par);
       } else {
         PARTHENON_FAIL("The chosen viscosity model does not work with damping");
       }
     } else {
       Diffusion::DiffCoeffParams dp;
-      EOS eos_d;
+      ParArray1D<EOS> eos_d;
       return SelfDragSourceImpl<Diffusion::DiffType::null, GEOM>(
           md, time, dt, dp, eos_d, gas_self_par, dust_self_par);
     }
   } else if (ctype == Coupling::simple_dust) {
     auto &gas_pkg = pm->packages.Get("gas");
     auto &dust_pkg = pm->packages.Get("dust");
-    const auto eos_d = gas_pkg->template Param<ParArray1D<EOS>>("eos_d");
+    const auto &eos_d = gas_pkg->template Param<ParArray1D<EOS>>("eos_d");
     const auto stop_par =
         drag_pkg->template Param<StoppingTimeParams>("stopping_time_params");
     if (gas_self_par.damp_to_visc) {
@@ -152,21 +152,21 @@ TaskStatus DragSource(MeshData<Real> *md, const Real time, const Real dt) {
         if (stop_par.model == DragModel::constant) {
           return SimpleDragSourceImpl<Diffusion::DiffType::viscosity_plaw,
                                       DragModel::constant, GEOM>(
-              md, time, dt, dp, eos_d(0), gas_self_par, dust_self_par, stop_par);
+              md, time, dt, dp, eos_d, gas_self_par, dust_self_par, stop_par);
         } else if (stop_par.model == DragModel::stokes) {
           return SimpleDragSourceImpl<Diffusion::DiffType::viscosity_plaw,
                                       DragModel::stokes, GEOM>(
-              md, time, dt, dp, eos_d(0), gas_self_par, dust_self_par, stop_par);
+              md, time, dt, dp, eos_d, gas_self_par, dust_self_par, stop_par);
         }
       } else if (dp.type == Diffusion::DiffType::viscosity_alpha) {
         if (stop_par.model == DragModel::constant) {
           return SimpleDragSourceImpl<Diffusion::DiffType::viscosity_alpha,
                                       DragModel::constant, GEOM>(
-              md, time, dt, dp, eos_d(0), gas_self_par, dust_self_par, stop_par);
+              md, time, dt, dp, eos_d, gas_self_par, dust_self_par, stop_par);
         } else if (stop_par.model == DragModel::stokes) {
           return SimpleDragSourceImpl<Diffusion::DiffType::viscosity_alpha,
                                       DragModel::stokes, GEOM>(
-              md, time, dt, dp, eos_d(0), gas_self_par, dust_self_par, stop_par);
+              md, time, dt, dp, eos_d, gas_self_par, dust_self_par, stop_par);
         }
       } else {
         PARTHENON_FAIL("The chosen viscosity model does not work with damping");
@@ -175,10 +175,10 @@ TaskStatus DragSource(MeshData<Real> *md, const Real time, const Real dt) {
       Diffusion::DiffCoeffParams dp;
       if (stop_par.model == DragModel::constant) {
         return SimpleDragSourceImpl<Diffusion::DiffType::null, DragModel::constant, GEOM>(
-            md, time, dt, dp, eos_d(0), gas_self_par, dust_self_par, stop_par);
+            md, time, dt, dp, eos_d, gas_self_par, dust_self_par, stop_par);
       } else if (stop_par.model == DragModel::stokes) {
         return SimpleDragSourceImpl<Diffusion::DiffType::null, DragModel::stokes, GEOM>(
-            md, time, dt, dp, eos_d(0), gas_self_par, dust_self_par, stop_par);
+            md, time, dt, dp, eos_d, gas_self_par, dust_self_par, stop_par);
       }
     }
   } else if (ctype == Coupling::full) {

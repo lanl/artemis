@@ -28,7 +28,8 @@ void InitGasOpacity(ParameterInput *pin, const ArtemisUtils::Units &units,
   const auto frequency_type = params.Get<FrequencyType>("frequency_type");
 
   // TODO: read this (and consolidate gray/multigroup modes?)
-  const std::vector<Real> gray_bounds = {1.e12, 3.e20};
+  // hard-coded numbers in Hz
+  const std::vector<Real> gray_bounds = {time * 1.e12, time * 3.e20};
   const int NG = static_cast<int>(gray_bounds.size()) - 1;
 
   // Absorption opacity model

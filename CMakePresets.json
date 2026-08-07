@@ -58,7 +58,7 @@
       }
     },
     {
-      "name": "darwin-mi250-debug",
+      "name": "darwin-amd-debug",
       "cacheVariables": {
         "CMAKE_MAKE_PROGRAM": "$env{MAKE_PROGRAM}",
         "CMAKE_BUILD_TYPE": "Debug",
@@ -71,7 +71,7 @@
       }
     },
     {
-      "name": "darwin-mi250-release",
+      "name": "darwin-amd-release",
       "cacheVariables": {
         "CMAKE_MAKE_PROGRAM": "$env{MAKE_PROGRAM}",
         "CMAKE_BUILD_TYPE": "Release",

@@ -115,8 +115,8 @@ if __name__ == "__main__":
                 f"--job-name={job_name}",
                 f"--output={os.path.join(output_dir, job_name)}_%j.out",
                 f"--error={os.path.join(output_dir, job_name)}_%j.out",
-                "--partition=mi250",
-                "--time=04:00:00",
+                "--partition=shared-gpu-amd-mi250",
+                "--time=02:00:00",
                 "--wrap",
                 f"python3 {sys.argv[0]} {args.pr_number} --submission --output_dir {output_dir}",
             ]

@@ -53,7 +53,7 @@ else # Catch-all for Darwin
         PARTITION="darwin-skylake-gold"
     elif [[ $SLURM_JOB_PARTITION == "volta-x86" ]]; then
         PARTITION="darwin-volta-x86"
-    elif [[ $SLURM_JOB_PARTITION == "mi250" ]]; then
+    elif [[ $SLURM_JOB_PARTITION == "shared-gpu-amd-mi250" ]]; then
         PARTITION="darwin-mi250"
     fi
 fi
@@ -177,7 +177,7 @@ elif [[ $PARTITION == "darwin-mi250" ]]; then
     module load cmake/3.26.3
     module list
     export GCC_ROOT="$(dirname "$(dirname "$(readlink -f "$(command -v g++)")")")"
-    export ARTEMIS_SUITE=darwin-mi250
+    export ARTEMIS_SUITE=darwin-amd
     echo "...setup SUCCEEDED"
 elif [[ $PARTITION == "venado-gh" ]]; then
     module unload cray-libsci

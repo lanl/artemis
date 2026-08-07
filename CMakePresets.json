@@ -65,6 +65,7 @@
         "Kokkos_ENABLE_DEBUG_BOUNDS_CHECK": "ON",
         "CMAKE_C_COMPILER": "amdclang",
         "CMAKE_CXX_COMPILER": "amdclang++",
+        "CMAKE_CXX_FLAGS": "--gcc-toolchain=$env{GCC_ROOT}",
         "ARTEMIS_ENABLE_HIP": "ON",
         "Kokkos_ARCH_AMD_GFX90A": "ON"
       }
@@ -76,6 +77,7 @@
         "CMAKE_BUILD_TYPE": "Release",
         "CMAKE_C_COMPILER": "amdclang",
         "CMAKE_CXX_COMPILER": "amdclang++",
+        "CMAKE_CXX_FLAGS": "--gcc-toolchain=$env{GCC_ROOT}",
         "ARTEMIS_ENABLE_HIP": "ON",
         "Kokkos_ARCH_AMD_GFX90A": "ON"
       }

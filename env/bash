@@ -45,6 +45,7 @@ else # Catch-all for Darwin
         echo "Supported partitions are"
         echo "  skylake-gold"
         echo "  volta-x86"
+        echo "  mi250"
         PARTITION="darwin-fe"
     elif [[ $SLURM_JOB_PARTITION == "power9-rhel7" ]]; then
         PARTITION="darwin-power9-rhel7"
@@ -52,6 +53,8 @@ else # Catch-all for Darwin
         PARTITION="darwin-skylake-gold"
     elif [[ $SLURM_JOB_PARTITION == "volta-x86" ]]; then
         PARTITION="darwin-volta-x86"
+    elif [[ $SLURM_JOB_PARTITION == "mi250" ]]; then
+        PARTITION="darwin-mi250"
     fi
 fi
 
@@ -162,6 +165,20 @@ elif [[ $PARTITION == "darwin-volta-x86" ]]; then
     module load cmake/3.26.3
     module list
     export ARTEMIS_SUITE=darwin-gpu
+    echo "...setup SUCCEEDED"
+elif [[ $PARTITION == "darwin-mi250" ]]; then
+    module purge
+    module load clang/12.0.1
+    module load rocm
+    module load openmpi
+    module load gcc/12.2.0
+    module load hdf5/1.12.2
+    module load miniconda3/py311_23.11.0
+    source /usr/projects/jovian/dependencies/python/volta-x86-py311/bin/activate
+    shorten_prompt
+    module load cmake/3.26.3
+    module list
+    export ARTEMIS_SUITE=darwin-mi250
     echo "...setup SUCCEEDED"
 elif [[ $PARTITION == "venado-gh" ]]; then
     module unload cray-libsci

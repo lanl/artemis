@@ -69,7 +69,7 @@ jobs:
           mkdir -p build
           cd build
           cmake --preset=cpu-release ../
-          make -j
+          make -j 4
           ctest -L unit --output-on-failure
 
   regression-tests:
@@ -97,7 +97,7 @@ jobs:
           mkdir -p build
           cd build
           cmake --preset=cpu-release ../../
-          make -j
+          make -j 4
           cd ..
           python3 run_tests.py regression.suite \
             --save_build \

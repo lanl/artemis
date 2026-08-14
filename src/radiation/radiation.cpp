@@ -79,8 +79,6 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
     for (int n = 0; n < nspecies; ++n)
       fluidids.push_back(n);
 
-    // Control field for sparse gas fields
-
     // Absorption and scattering opacity
     Metadata m = Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy,
                            MetadataRadiation, MetadataOperatorSplit});
@@ -94,12 +92,13 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   // incorporate frequency type for gas opacity initialization
   params.Add("frequency_type", frequency_type);
 
+  std::string radblock_name = (do_imc ? "radiation/imc" : "radiation/moment");
+
   // Initialize gas opacity models
-  Gas::InitGasOpacity(pin, units, params);
+  Gas::InitGasOpacity(pin, units, params, radblock_name);
 
   // Enroll in tstart/tstop machinery
-  ArtemisUtils::AddPackageTimeParams(
-      params, (do_imc) ? "radiation/imc" : "radiation/moment", pin);
+  ArtemisUtils::AddPackageTimeParams(params, radblock_name, pin);
   return radiation;
 }
 
@@ -113,6 +112,10 @@ TaskStatus SetOpacities(MeshData<Real> *md) {
   auto &resolved_pkgs = pm->resolved_packages;
   auto &gas_pkg = pm->packages.Get("gas");
   auto &rad_pkg = pm->packages.Get("radiation");
+
+  // do not populate gray fields in MG
+  const auto frequency_type = rad_pkg->Param<FrequencyType>("frequency_type");
+  if (frequency_type == FrequencyType::multigroup) return TaskStatus::complete;
 
   EOS eos_d = gas_pkg->template Param<EOS>("eos_d");
   MeanOpacity opacity_d = rad_pkg->template Param<MeanOpacity>("opacity_d");

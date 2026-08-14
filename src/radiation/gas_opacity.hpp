@@ -21,8 +21,8 @@
 #include <parthenon/package.hpp>
 
 namespace Gas {
-void InitGasOpacity(ParameterInput *pin, const ArtemisUtils::Units &units,
-                    Params &params);
+void InitGasOpacity(ParameterInput *pin, const ArtemisUtils::Units &units, Params &params,
+                    const std::string &radblock_name);
 } // namespace Gas
 
 #endif // RADIATION_GAS_OPACITY_HPP_

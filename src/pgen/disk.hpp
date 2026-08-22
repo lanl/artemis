@@ -113,12 +113,10 @@ struct State {
 };
 
 //----------------------------------------------------------------------------------------
-//! \fn Real DenProfile
-//! \brief Computes density profile at cylindrical R and z
+//! \fn Real MidplaneDensity
+//! \brief Computes the disk midplane density at cylindrical radius R
 KOKKOS_INLINE_FUNCTION
-Real DenProfile(struct DiskParams pgen, const Real R, const Real z) {
-  const Real r = std::sqrt(R * R + z * z);
-  const Real h = pgen.h0 * std::pow(R / pgen.r0, pgen.flare);
+Real MidplaneDensity(struct DiskParams pgen, const Real R) {
   const Real sig0 = pgen.rho0; // / (std::sqrt(2.0 * M_PI) * pgen.h0 * pgen.r0);
   const Real exp_fac =
       (pgen.rexp == 0.) ? 1. : std::exp(-std::pow(R / pgen.rexp, pgen.exp_pow));
@@ -127,14 +125,79 @@ Real DenProfile(struct DiskParams pgen, const Real R, const Real z) {
       (1. - pgen.l0 * std::sqrt(pgen.r0 / R)) * // correction for an inner binary
       (pgen.dens_min / pgen.rho0 +              // The inner cavity
        (1. - pgen.dens_min / pgen.rho0) * std::exp(-std::pow(pgen.rcav / R, 12.0))) *
-      exp_fac;                                // the outer cutoff
+      exp_fac; // the outer cutoff
+  return std::max(pgen.dens_min, dmid);
+}
+
+//----------------------------------------------------------------------------------------
+//! \fn Real MidplaneTemperature
+//! \brief Computes the disk midplane temperature at cylindrical radius R
+KOKKOS_INLINE_FUNCTION
+Real MidplaneTemperature(struct DiskParams pgen, const Real R) {
+  const Real H = R * pgen.h0 * std::pow(R / pgen.r0, pgen.flare);
+  const Real ir1 = 1.0 / std::sqrt(R * R + pgen.temp_soft2);
+  const Real omk2 = SQR(pgen.Omega0) * ir1 * ir1 * ir1;
+  // c_iso^2 = P/rho = kb/mu T = Omk^2 H^2
+  return omk2 * H * H / (pgen.kbmu * pgen.Gamma);
+}
+
+//----------------------------------------------------------------------------------------
+//! \fn Real VerticalPressureDrop
+//! \brief Specific enthalpy difference between rho_mid and rho_mid * x
+KOKKOS_INLINE_FUNCTION
+Real VerticalPressureDrop(struct DiskParams pgen, const Real t0, const Real dmid,
+                          const Real x) {
+  const Real gminus1 = pgen.Gamma - 1.0;
+  const Real rad_exponent = 4.0 * gminus1;
+  const Real prad0 = pgen.ar * SQR(SQR(t0)) / 3.0;
+  Real drop = pgen.Gamma * pgen.kbmu * t0 * (1.0 - std::pow(x, gminus1)) / gminus1;
+  if (rad_exponent == 1.0) {
+    drop += prad0 / dmid * std::log(1.0 / x);
+  } else {
+    drop += prad0 / dmid * rad_exponent * (1.0 - std::pow(x, rad_exponent - 1.0)) /
+            (rad_exponent - 1.0);
+  }
+  return drop;
+}
+
+//----------------------------------------------------------------------------------------
+//! \fn Real DenProfile
+//! \brief Computes density profile at cylindrical R and z
+KOKKOS_INLINE_FUNCTION
+Real DenProfile(struct DiskParams pgen, const Real R, const Real z) {
+  const Real r = std::sqrt(R * R + z * z);
+  const Real h = pgen.h0 * std::pow(R / pgen.r0, pgen.flare);
+  const Real dmid = MidplaneDensity(pgen, R);
   const Real sint = (r == 0.0) ? 1.0 : R / r; // TODO(ADM): should it be 1?
   const Real efac = (1. - sint) / (h * h);
   if (pgen.Gamma == 1.) return std::max(pgen.dens_min, dmid * std::exp(-efac));
+
   // sint <= h^2/(gamma-1), efac*(g-1) = 1 - eps
   const Real pfac = 1. - (pgen.Gamma - 1) * efac;
-  return std::max(pgen.dens_min,
-                  dmid * std::pow(pfac + Fuzz<Real>(), 1. / (pgen.Gamma - 1)));
+  if (!pgen.do_moment) {
+    return std::max(pgen.dens_min,
+                    dmid * std::pow(pfac + Fuzz<Real>(), 1. / (pgen.Gamma - 1)));
+  }
+
+  // Solve the barotropic vertical hydrostatic balance including Prad = Erad / 3,
+  // where Erad = ar T^4 and T = T0 (rho / rho_mid)^(Gamma - 1).
+  const Real t0 = std::max(pgen.temp_min, MidplaneTemperature(pgen, R));
+  const Real target = pgen.Gamma * pgen.kbmu * t0 * efac;
+  const Real xmin = pgen.dens_min / dmid;
+
+  if (VerticalPressureDrop(pgen, t0, dmid, xmin) <= target) return pgen.dens_min;
+
+  Real xlo = xmin;
+  Real xhi = 1.0;
+  for (int n = 0; n < 32; ++n) {
+    const Real xmid = 0.5 * (xlo + xhi);
+    if (VerticalPressureDrop(pgen, t0, dmid, xmid) > target) {
+      xlo = xmid;
+    } else {
+      xhi = xmid;
+    }
+  }
+  return dmid * 0.5 * (xlo + xhi);
 }
 
 //----------------------------------------------------------------------------------------
@@ -145,12 +208,8 @@ Real TempProfile(struct DiskParams pgen, const Real R, const Real z) {
   // P = K rho^Gamma
   // T = T0 (rho/rho0)^(Gamma-1)
   const Real rho = DenProfile(pgen, R, z);
-  const Real rho0 = DenProfile(pgen, R, 0.0);
-  const Real H = R * pgen.h0 * std::pow(R / pgen.r0, pgen.flare);
-  const Real ir1 = 1.0 / std::sqrt(R * R + pgen.temp_soft2);
-  const Real omk2 = SQR(pgen.Omega0) * ir1 * ir1 * ir1;
-  // c_iso^2 = P/rho = kb/mu T = Omk^2 H^2
-  const Real T0 = omk2 * H * H / (pgen.kbmu * pgen.Gamma);
+  const Real rho0 = MidplaneDensity(pgen, R);
+  const Real T0 = MidplaneTemperature(pgen, R);
   return std::max(pgen.temp_min, T0 * std::pow(rho / rho0, pgen.Gamma - 1.0));
 }
 
@@ -162,6 +221,20 @@ Real PresProfile(struct DiskParams pgen, const EOS &eos, const Real tf, const Re
                  const Real z) {
   const Real df = DenProfile(pgen, R, z);
   return std::max(pgen.pres_min, eos.PressureFromDensityTemperature(df, tf));
+}
+
+//----------------------------------------------------------------------------------------
+//! \fn Real TotalPresProfile
+//! \brief Computes the total initial pressure, including moments-radiation pressure
+KOKKOS_INLINE_FUNCTION
+Real TotalPresProfile(struct DiskParams pgen, const EOS &eos, const Real tf, const Real R,
+                      const Real z) {
+  Real pres = PresProfile(pgen, eos, tf, R, z);
+  if (pgen.do_moment) {
+    const Real erad = pgen.ar * SQR(SQR(tf));
+    pres += erad / 3.0;
+  }
+  return pres;
 }
 
 //----------------------------------------------------------------------------------------
@@ -216,10 +289,10 @@ KOKKOS_INLINE_FUNCTION State ComputeDiskProfile(
   const Real tp = TempProfile(pgen, rtp, xcyl[2]);
   const Real tm = TempProfile(pgen, rtm, xcyl[2]);
 
-  // Note that pressure calls density and needs the true cylindrical radius
-  const Real pres = PresProfile(pgen, eos_d, res.gtemp, xcyl[0], xcyl[2]);
-  const Real dpdr = (PresProfile(pgen, eos_d, tp, xcyl[0] + dxr, xcyl[2]) -
-                     PresProfile(pgen, eos_d, tm, xcyl[0] - dxr, xcyl[2])) /
+  // Pressure calls density and needs the true cylindrical radius. Moments radiation is
+  // initialized in thermal equilibrium, so its initial pressure is Erad / 3.
+  const Real dpdr = (TotalPresProfile(pgen, eos_d, tp, xcyl[0] + dxr, xcyl[2]) -
+                     TotalPresProfile(pgen, eos_d, tm, xcyl[0] - dxr, xcyl[2])) /
                     (2. * dxr);
   // Set v_phi to centrifugal equilibrium
   //   vp^2/R = grad(p) + vk^2/R

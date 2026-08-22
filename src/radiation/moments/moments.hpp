@@ -44,7 +44,8 @@ template <Coordinates GEOM>
 void InitMesh(parthenon::Mesh *pmesh);
 //----------------------------------------------------------------------------------------
 //! \fn Real Moments::EstimateTimeStepMesh
-//! \brief Not enrolled in parthenon's determination for global dt
+//! \brief Not enrolled in parthenon's determination for global dt if doing operator split
+//! radiation
 template <Coordinates GEOM>
 Real EstimateTimeStepMesh(MeshData<Real> *md) {
   PARTHENON_INSTRUMENT

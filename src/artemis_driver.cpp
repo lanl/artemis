@@ -89,12 +89,12 @@ ArtemisDriver<GEOM>::ArtemisDriver(ParameterInput *pin, ApplicationInput *app_in
   do_moment_unsplit = false;
   do_moment_split = false;
   if (do_moment) {
-    auto rad_int = pin->GetOrAddString("radiation/moment", "integrator", "rk2");
-    PARTHENON_REQUIRE(((rad_int == "rk1") || (rad_int == "rk2") || (rad_int == "rk3")),
-                      "radiation/integrator must be rk1,rk2, or rk3.")
     do_moment_split = pin->GetOrAddBoolean("radiation/moment", "split", true);
     do_moment_unsplit = !do_moment_split;
     if (do_moment_split) {
+      auto rad_int = pin->GetOrAddString("radiation/moment", "integrator", "rk2");
+      PARTHENON_REQUIRE(((rad_int == "rk1") || (rad_int == "rk2") || (rad_int == "rk3")),
+                        "radiation/integrator must be rk1,rk2, or rk3.")
       rad_integrator = std::make_unique<Integrator_t>(rad_int);
     }
   }

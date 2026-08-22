@@ -112,10 +112,10 @@ radiation:
       _type: bool
       _description: "When dynamically initializing the radiation field, scale a T^4 by min(1, tau), where tau is the optical depth of the cell"
       _default: "true"
-    substep:
+    split:
       _type: bool
-      _description: "Enable radiation subcycling"
-      _default: false
+      _description: "Operator-split the moment update and subcycle it at the radiation CFL, so the global timestep is not limited by the (reduced) speed of light. Disable for fully-coupled, unsplit second-order integration at the radiation-limited timestep."
+      _default: true
   imc:
     _description: "IMC radiation model from the Jaybenne library"
     _type: node

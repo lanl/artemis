@@ -120,8 +120,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   params.Add("inner_iteration_tol",
              pin->GetOrAddReal("radiation/moment", "inner_iteration_tol", 1e-10));
 
-  const bool substep = pin->GetOrAddBoolean("radiation/moment", "substep", false);
-  if (!substep) {
+  const bool split = pin->GetOrAddBoolean("radiation/moment", "split", true);
+  if (!split) {
     if (coords == Coordinates::cartesian) {
       moments->EstimateTimestepMesh = EstimateTimeStepMesh<Coordinates::cartesian>;
     } else if (coords == Coordinates::spherical1D) {
@@ -156,9 +156,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   std::string control_field = rad::cons::energy::name();
 
   auto mflags_cons = [&MetadataMoments, &MetadataOperatorSplit,
-                      &substep](const int size) {
+                      &split](const int size) {
     if (size == 1) {
-      if (substep) {
+      if (split) {
         return Metadata({Metadata::Cell, Metadata::Conserved, Metadata::Independent,
                          Metadata::WithFluxes, Metadata::Sparse, MetadataMoments,
                          MetadataOperatorSplit});
@@ -169,7 +169,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
       }
 
     } else {
-      if (substep) {
+      if (split) {
         return Metadata({Metadata::Cell, Metadata::Vector, Metadata::Conserved,
                          Metadata::Independent, Metadata::WithFluxes, Metadata::Sparse,
                          MetadataMoments, MetadataOperatorSplit},
@@ -184,9 +184,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   };
 
   auto mflags_prim = [&MetadataMoments, &MetadataOperatorSplit,
-                      &substep](const int size) {
+                      &split](const int size) {
     if (size == 1) {
-      if (substep) {
+      if (split) {
         return Metadata({Metadata::Cell, Metadata::Derived, Metadata::Intensive,
                          Metadata::OneCopy, Metadata::FillGhost, Metadata::Sparse,
                          MetadataMoments, MetadataOperatorSplit});
@@ -196,7 +196,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
       }
 
     } else {
-      if (substep) {
+      if (split) {
         return Metadata({Metadata::Cell, Metadata::Derived, Metadata::Intensive,
                          Metadata::OneCopy, Metadata::FillGhost, Metadata::Sparse,
                          MetadataMoments, MetadataOperatorSplit},
@@ -208,8 +208,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
       }
     }
   };
-  auto mflags_prim_withflux = [&MetadataMoments, &MetadataOperatorSplit, &substep]() {
-    if (substep) {
+  auto mflags_prim_withflux = [&MetadataMoments, &MetadataOperatorSplit, &split]() {
+    if (split) {
       return Metadata({Metadata::Cell, Metadata::Derived, Metadata::Intensive,
                        Metadata::WithFluxes, Metadata::Sparse, MetadataMoments,
                        MetadataOperatorSplit});

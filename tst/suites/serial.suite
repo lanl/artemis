@@ -23,5 +23,6 @@ diffusion/alpha_disk
 drag/drag
 radiation/rad_shock
 radiation/rad_shock_cgs
+radiation/raytrace
 radiation/thermalization
 coagulation/coagulation

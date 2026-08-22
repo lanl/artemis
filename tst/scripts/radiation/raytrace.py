@@ -1,5 +1,5 @@
 # ========================================================================================
-#  (C) (or copyright) 2023-2025. Triad National Security, LLC. All rights reserved.
+#  (C) (or copyright) 2026. Triad National Security, LLC. All rights reserved.
 #
 #  This program was produced under U.S. Government contract 89233218CNA000001 for Los
 #  Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -13,27 +13,6 @@
 
 # Regression test for the implicit radiation-matter coupling solver, exercised on the
 # ray-traced disk problem (inputs/radiation/raytrace.in).
-#
-# The matter-coupling operator (src/radiation/moments/matter_coupling.hpp) is designed to
-# conserve reduced-speed-of-light total energy in every cell:
-#
-#     dE_gas_internal + dE_gas_kinetic + (c / chat) dE_radiation = Q,
-#
-# where Q is the raytraced energy deposited in the cell over the step.  This test checks
-# that identity globally, using the injected ray energy as the (first-principles)
-# reference -- there are no calibrated "signature" constants.
-#
-# Hydrodynamics and gravity remain on (the disk pgen requires the gravity package).  The
-# budget is closed over a single short step and summed over the whole domain: gas and
-# radiation transport are conservative flux divergences, so their interior contributions
-# telescope and only the (small) flux through the domain boundary survives.  Gravity and
-# coordinate-source work are O(dt^2) for the near-equilibrium disk (radial gravity,
-# azimuthal velocity), while the deposited ray energy is O(dt).  These residual channels,
-# not the coupling law, set the achievable tolerance.
-#
-# The test is run twice on the same input file: once with the operator-split, subcycled
-# moment update (radiation/moment/split) and once on the unsplit path, so both coupling
-# paths are covered.
 
 # Modules
 import logging
@@ -82,8 +61,9 @@ def _scalar(dataset):
     if field.ndim == 5 and field.shape[1] == 1:
         field = field[:, 0, ...]
     if field.ndim != 4:
-        raise ValueError("Expected a four-dimensional scalar field, got {}".format(
-            field.shape))
+        raise ValueError(
+            "Expected a four-dimensional scalar field, got {}".format(field.shape)
+        )
     return field
 
 
@@ -97,9 +77,7 @@ def _cell_volumes(xf, yf, zf):
     polar = np.cos(yf[:, :-1]) - np.cos(yf[:, 1:])
     azimuthal = zf[:, 1:] - zf[:, :-1]
     return (
-        azimuthal[:, :, None, None]
-        * polar[:, None, :, None]
-        * radial[:, None, None, :]
+        azimuthal[:, :, None, None] * polar[:, None, :, None] * radial[:, None, None, :]
     )
 
 
@@ -280,7 +258,9 @@ def _analyze_one(file_id):
     ax1.set_xscale("log")
     ax1.set_yscale("log")
     ax1.set_xlabel(r"injected $\int Q \, dV$ (per cell)")
-    ax1.set_ylabel(r"coupled $\int (\Delta E_g + (c/\hat{c})\Delta E_r)\, dV$ (per cell)")
+    ax1.set_ylabel(
+        r"coupled $\int (\Delta E_g + (c/\hat{c})\Delta E_r)\, dV$ (per cell)"
+    )
     ax1.set_title(
         "{}: global residual = {:.2e} (thr {:.0e})".format(
             file_id, budget_residual, _thr_budget
@@ -297,8 +277,12 @@ def _analyze_one(file_id):
     logger.info(
         "[{}] coupling budget: injected={:.16e}, coupled={:.16e}, relative "
         "residual={:.16e}, max|F|/E={:.16e}, max|v|/c={:.16e}.".format(
-            file_id, injected, coupled, budget_residual, max_reduced_flux,
-            max_velocity_fraction
+            file_id,
+            injected,
+            coupled,
+            budget_residual,
+            max_reduced_flux,
+            max_velocity_fraction,
         )
     )
     return status

@@ -651,7 +651,10 @@ KOKKOS_INLINE_FUNCTION bool EvaluateCouplingInnerScalarResidual(
   Real cd = 0.0;
   Real Eeq = E;
   ComputeCouplingEnergyCoefficients(sigp, sigs, g, g2, beta2, bdbdp, bdf, ca, cb, cd);
-  ComputeCouplingEquilibriumEnergy(E0, B, ca, cb, cd, Eeq);
+  // A degenerate equilibrium linearization (1 + ca <= 0) has no well-defined
+  // radiation-energy root; report the state as inadmissible rather than letting
+  // the seed Eeq = E read as a zero source residual (false convergence).
+  if (!ComputeCouplingEquilibriumEnergy(E0, B, ca, cb, cd, Eeq)) return false;
 
   // Compare two independently constructed radiation energies:
   //   E:   exact total-energy conservation,
@@ -1176,7 +1179,14 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
             ComputeCouplingEnergyCoefficients(sigp, sigs, g, g2, beta2, bdbdp, bdf, ca,
                                               cb, cd);
             Real Eeq_inner = E;
-            ComputeCouplingEquilibriumEnergy(E0, B, ca, cb, cd, Eeq_inner);
+            // A degenerate equilibrium linearization leaves the seed
+            // Eeq_inner = E, which would read as a zero source residual. Abandon
+            // the quasi-Newton sweep (with a large error so it is not accepted)
+            // and fall through to the bracketed scalar inner solve below.
+            if (!ComputeCouplingEquilibriumEnergy(E0, B, ca, cb, cd, Eeq_inner)) {
+              inner_err = Big();
+              break;
+            }
 
             // Retain the original residuals only to form the quasi-Newton
             // search direction.  Use the conservation/equilibrium form below
@@ -1244,8 +1254,8 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
               ComputeCouplingEnergyCoefficients(sigp_trial, sigs_trial, g, g2, beta2,
                                                 bdbdp, bdf, ca_trial, cb_trial, cd_trial);
               Real Eeq_trial = Etrial;
-              ComputeCouplingEquilibriumEnergy(E0, Btrial, ca_trial, cb_trial, cd_trial,
-                                               Eeq_trial);
+              const bool eq_ok_trial = ComputeCouplingEquilibriumEnergy(
+                  E0, Btrial, ca_trial, cb_trial, cd_trial, Eeq_trial);
               const Real conservation_trial =
                   (ke - ke0) + (eint_trial - eg0) + c / chat * (Etrial - E0) - Q;
               const Real source_trial = Etrial - Eeq_trial;
@@ -1255,9 +1265,14 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
                            std::max(std::abs(Q),
                                     std::max(c / chat * (std::abs(E0) + std::abs(Etrial)),
                                              std::abs(ke - ke0)))));
+              // Reject a trial whose equilibrium linearization is degenerate:
+              // its source residual is undefined, so it must never win the line
+              // search.
               const Real trial_err =
-                  std::max(std::abs(conservation_trial) / escale_trial,
-                           c / chat * std::abs(source_trial) / escale_trial);
+                  eq_ok_trial
+                      ? std::max(std::abs(conservation_trial) / escale_trial,
+                                 c / chat * std::abs(source_trial) / escale_trial)
+                      : Big();
               if (trial_err < best_trial_err) {
                 best_trial_err = trial_err;
                 best_trial_E = Etrial;
@@ -1434,7 +1449,8 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
           ComputeCouplingEnergyCoefficients(sigp_energy, sigs_out, g_out, g2_out,
                                             beta2_out, bdbdp_out, bdf_out, ca_out, cb_out,
                                             cd_out);
-          ComputeCouplingEquilibriumEnergy(E0, B, ca_out, cb_out, cd_out, Eeq_out);
+          const bool eq_ok_out =
+              ComputeCouplingEquilibriumEnergy(E0, B, ca_out, cb_out, cd_out, Eeq_out);
           const Real conservation_residual = dEg + dEk + c / chat * dEr - Q;
           const Real source_residual = E - Eeq_out;
 
@@ -1479,8 +1495,11 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
           // resolve.
           outer_err =
               std::max(energy_residual, std::max(flux_residual, realizability_residual));
-          solve_valid = solve_valid && sigp_energy >= 0.0 && sigs_out >= 0.0 &&
-                        sigp_flux_out >= 0.0;
+          // eq_ok_out guards the source residual: a degenerate equilibrium makes
+          // source_residual (E - Eeq_out) spuriously zero, so this iterate must
+          // not be recorded as complete/converged below.
+          solve_valid = solve_valid && eq_ok_out && sigp_energy >= 0.0 &&
+                        sigs_out >= 0.0 && sigp_flux_out >= 0.0;
           if (!solve_valid) break;
 
           have_complete_iterate = true;

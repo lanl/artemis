@@ -1043,8 +1043,7 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
         // zero-opacity problem.
         const Real eg_state = v0(b, gas::cons::internal_energy(), k, j, i);
         const Real eint0 = std::max(0.0, eg_state / dens);
-        const Real T_state =
-            eos_d.TemperatureFromDensityInternalEnergy(dens, eint0);
+        const Real T_state = eos_d.TemperatureFromDensityInternalEnergy(dens, eint0);
         const bool initial_material_floor_active = T_state < tfloor;
         Real T = std::max(tfloor, T_state);
         Real eg0 = dens * eos_d.InternalEnergyFromDensityTemperature(dens, T);
@@ -1269,10 +1268,9 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
               // its source residual is undefined, so it must never win the line
               // search.
               const Real trial_err =
-                  eq_ok_trial
-                      ? std::max(std::abs(conservation_trial) / escale_trial,
-                                 c / chat * std::abs(source_trial) / escale_trial)
-                      : Big();
+                  eq_ok_trial ? std::max(std::abs(conservation_trial) / escale_trial,
+                                         c / chat * std::abs(source_trial) / escale_trial)
+                              : Big();
               if (trial_err < best_trial_err) {
                 best_trial_err = trial_err;
                 best_trial_E = Etrial;

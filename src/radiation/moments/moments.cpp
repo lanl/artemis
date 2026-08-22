@@ -155,8 +155,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   // Control field for sparse radiation fields
   std::string control_field = rad::cons::energy::name();
 
-  auto mflags_cons = [&MetadataMoments, &MetadataOperatorSplit,
-                      &split](const int size) {
+  auto mflags_cons = [&MetadataMoments, &MetadataOperatorSplit, &split](const int size) {
     if (size == 1) {
       if (split) {
         return Metadata({Metadata::Cell, Metadata::Conserved, Metadata::Independent,
@@ -183,8 +182,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
     }
   };
 
-  auto mflags_prim = [&MetadataMoments, &MetadataOperatorSplit,
-                      &split](const int size) {
+  auto mflags_prim = [&MetadataMoments, &MetadataOperatorSplit, &split](const int size) {
     if (size == 1) {
       if (split) {
         return Metadata({Metadata::Cell, Metadata::Derived, Metadata::Intensive,

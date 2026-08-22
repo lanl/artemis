@@ -166,3 +166,15 @@ Internal generators
 The remaining problem generators are mainly used for testing. Descriptions of their ``<problem>`` block parameters can be found in :ref:`parameters`.
 
 
+Creating new problem generators
+-------------------------------
+
+Creating a new problem generator in |code| is relatively straightforward and can be done in a few steps:
+
+ * A new header file should be written in the ``src/pgen`` folder.
+ * That header file should be included in ``src/pgen/pgen.hpp`` and added to the ``if*else`` selection in ``ProblemGenerator``.
+ * If the new pgen needs to initialize a persistent parameter block, a call to the init routine should be included in the ``InitMeshBlockData`` function in ``src/pgen/pgen.hpp`` file.
+ * If functions defined in the new pgen need to be enrolled with |code| or ``parthenon``, those should be added to the ``ProblemModifier`` routine in ``src/pgen/problem_modifier.hpp``. 
+   Examples include special boundary conditions, ``UserWorkAfterLoop``, and operator split task collections or unsplit tasks for the main hydro driver. 
+   See the examples in ``src/pgen/problem_modifier.hpp`` for how to register these different types of functions.
+

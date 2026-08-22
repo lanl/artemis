@@ -10,6 +10,7 @@
 // license in this material to reproduce, prepare derivative works, distribute copies to
 // the public, perform publicly and display publicly, and to permit others to do so.
 //========================================================================================
+
 #ifndef ARTEMIS_ARTEMIS_HPP_
 #define ARTEMIS_ARTEMIS_HPP_
 
@@ -143,9 +144,6 @@ using BYTE = uint8_t;
 using BYTE = char;
 #endif
 
-// TaskCollection function pointer for operator split tasks
-using TaskCollectionFnPtr = TaskCollection (*)(Mesh *pm, const Real time, const Real dt);
-
 // Constants that enumerate...
 // ...Coordinate systems
 enum class Coordinates {
@@ -239,6 +237,7 @@ inline int ProblemDimension(parthenon::ParameterInput *pin) {
 // Custom AMR criteria
 namespace artemis {
 extern std::function<AmrTag(MeshBlockData<Real> *mbd)> ProblemCheckRefinementBlock;
+
 } // namespace artemis
 
 #endif // ARTEMIS_ARTEMIS_HPP_

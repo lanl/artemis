@@ -58,11 +58,37 @@
       }
     },
     {
+      "name": "darwin-amd-debug",
+      "cacheVariables": {
+        "CMAKE_MAKE_PROGRAM": "$env{MAKE_PROGRAM}",
+        "CMAKE_BUILD_TYPE": "Debug",
+        "Kokkos_ENABLE_DEBUG_BOUNDS_CHECK": "ON",
+        "CMAKE_C_COMPILER": "amdclang",
+        "CMAKE_CXX_COMPILER": "amdclang++",
+        "CMAKE_CXX_FLAGS": "--gcc-toolchain=$env{GCC_ROOT}",
+        "ARTEMIS_ENABLE_HIP": "ON",
+        "Kokkos_ARCH_AMD_GFX90A": "ON"
+      }
+    },
+    {
+      "name": "darwin-amd-release",
+      "cacheVariables": {
+        "CMAKE_MAKE_PROGRAM": "$env{MAKE_PROGRAM}",
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_C_COMPILER": "amdclang",
+        "CMAKE_CXX_COMPILER": "amdclang++",
+        "CMAKE_CXX_FLAGS": "--gcc-toolchain=$env{GCC_ROOT}",
+        "ARTEMIS_ENABLE_HIP": "ON",
+        "Kokkos_ARCH_AMD_GFX90A": "ON"
+      }
+    },
+    {
       "name": "chicoma-cpu-debug",
       "cacheVariables": {
         "CMAKE_MAKE_PROGRAM": "$env{MAKE_PROGRAM}",
         "CMAKE_BUILD_TYPE": "Debug",
         "Kokkos_ENABLE_DEBUG_BOUNDS_CHECK": "ON",
+        "CMAKE_C_COMPILER": "cc",
         "CMAKE_CXX_COMPILER": "CC",
         "HDF5_INCLUDE_DIR": "$env{HDF5_ROOT}/include",
         "HDF5_INCLUDE_DIRS": "$env{HDF5_ROOT}/include",
@@ -75,6 +101,7 @@
       "cacheVariables": {
         "CMAKE_MAKE_PROGRAM": "$env{MAKE_PROGRAM}",
         "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "CMAKE_C_COMPILER": "cc",
         "CMAKE_CXX_COMPILER": "CC",
         "HDF5_INCLUDE_DIR": "$env{HDF5_ROOT}/include",
         "HDF5_INCLUDE_DIRS": "$env{HDF5_ROOT}/include",

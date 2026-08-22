@@ -1031,22 +1031,21 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
         constexpr Real atmosphere_floor_factor = 100.0;
         const bool numerical_atmosphere = dens_raw <= atmosphere_floor_factor * dflr;
 
-        // Note(AMD): There is some floating point difference between the
-        // internal energy used to compute the temperature and the internal
-        // energy obtained from that temperature: T =
-        // eos_d.TemperatureFromDensityInternalEnergy(dens, eg/dens); eg
-        // /= dens * eos_d.InternalEnergyFromDensityTemperature(dens,T)
-        //
-        // Because of this, zero opacity problems will not result in zero change
-        // as expected. Thus, we recalculate the internal and total energies
-        // from the temperature. This does not affect energy conservation
-        // because at the end of the step we update the energy with an
-        // increment.
-        const Real eint0 =
-            std::max(0.0, v0(b, gas::cons::internal_energy(), k, j, i) / dens);
-        Real T =
-            std::max(tfloor, eos_d.TemperatureFromDensityInternalEnergy(dens, eint0));
+        // Use the EOS-reconstructed energy as the nonlinear-solve reference,
+        // but retain the original conserved energy for the final commit. In
+        // particular, eg0 includes the material-temperature floor, so applying
+        // only the solver increment to the original state would silently omit
+        // that floor correction. Preserve the previous increment-only behavior
+        // when the floor is inactive so an EOS round trip cannot perturb a
+        // zero-opacity problem.
+        const Real eg_state = v0(b, gas::cons::internal_energy(), k, j, i);
+        const Real eint0 = std::max(0.0, eg_state / dens);
+        const Real T_state =
+            eos_d.TemperatureFromDensityInternalEnergy(dens, eint0);
+        const bool initial_material_floor_active = T_state < tfloor;
+        Real T = std::max(tfloor, T_state);
         Real eg0 = dens * eos_d.InternalEnergyFromDensityTemperature(dens, T);
+        const Real eg_floor_delta = initial_material_floor_active ? eg0 - eg_state : 0.0;
         Real B = std::max(Bfloor_phys, arad * SQR(SQR(T)));
 
         const auto vb = RotatingFrame::BackgroundVelocity<GEOM>(
@@ -1090,8 +1089,9 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
         const std::array<Real, 3> beta0{v[0] / c, v[1] / c, v[2] / c};
         const Real beta20 = SQR(beta0[0]) + SQR(beta0[1]) + SQR(beta0[2]);
         if (beta20 >= 1.0) {
-          v0(b, gas::cons::internal_energy(), k, j, i) += Q * eref;
-          v0(b, gas::cons::total_energy(), k, j, i) += Q * eref;
+          const Real delta_eg_state = eg_floor_delta + Q * eref;
+          v0(b, gas::cons::internal_energy(), k, j, i) += delta_eg_state;
+          v0(b, gas::cons::total_energy(), k, j, i) += delta_eg_state;
           v0(b, rad::cons::energy(), k, j, i) = E0 * eref;
           v0(b, rad::cons::flux(0), k, j, i) = Fr0[0] * hx[0] * fref;
           v0(b, rad::cons::flux(1), k, j, i) = Fr0[1] * hx[1] * fref;
@@ -1672,9 +1672,11 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
           PARTHENON_FAIL("Outer not converged");
         }
 
-        // Update state vector (both gas and radiation)
-        v0(b, gas::cons::internal_energy(), k, j, i) += dEg * eref;
-        v0(b, gas::cons::total_energy(), k, j, i) += (dEg + dEk) * eref;
+        // Include the material-floor correction in both internal and total
+        // energy. Away from the floor this reduces to the original dEg update.
+        const Real delta_eg_state = eg_floor_delta + dEg * eref;
+        v0(b, gas::cons::internal_energy(), k, j, i) += delta_eg_state;
+        v0(b, gas::cons::total_energy(), k, j, i) += delta_eg_state + dEk * eref;
         v0(b, rad::cons::energy(), k, j, i) = (E0 + dEr) * eref;
         v0(b, gas::cons::momentum(0), k, j, i) += dv[0] * dens * hx[0];
         v0(b, gas::cons::momentum(1), k, j, i) += dv[1] * dens * hx[1];

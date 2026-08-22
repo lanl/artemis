@@ -251,8 +251,7 @@ TaskStatus CheckCompletion(MeshData<Real> *md) {
 
   auto &rt_pkg = pm->packages.Get("raytrace");
   auto x1max = rt_pkg->Param<Real>("x1max");
-  const Real x1tol =
-      32.0 * std::numeric_limits<Real>::epsilon() * std::max(1.0, std::abs(x1max));
+  const Real x1tol = RoundoffTol(32.0, std::max(1.0, std::abs(x1max)));
 
   int num_unfinished = 0;
   parthenon::par_reduce(

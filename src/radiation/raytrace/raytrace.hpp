@@ -95,8 +95,8 @@ TaskStatus PushParticlesImpl(MeshData<Real> *md, const geometry::CoordParams &cp
   const int ngh = parthenon::Globals::nghost;
 
   const Real rmin = (LOGR) ? std::exp(x1min) : x1min;
-  const Real x1tol = 32.0 * std::numeric_limits<Real>::epsilon() *
-                     std::max(1.0, std::max(std::abs(x1min), std::abs(x1max)));
+  const Real x1tol =
+      RoundoffTol(32.0, std::max(1.0, std::max(std::abs(x1min), std::abs(x1max))));
 
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "TransportPhotons", DevExecSpace(), 0, nparticles_per_pack,

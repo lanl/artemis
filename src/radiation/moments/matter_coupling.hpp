@@ -34,6 +34,18 @@ using ArtemisUtils::VNorm;
 
 namespace Moments {
 
+// Round-off headroom, in ULPs, for the floating-point comparisons in the
+// coupling solve. These are engineering margins ordered by how derived the
+// compared quantity is (more operations / larger c/chat amplification -> more
+// headroom), not formal error bounds. Naming them keeps equivalent comparisons
+// from drifting apart.
+constexpr Real kFloorSlopUlps = 128.0;     // value vs its efloor / Bfloor
+constexpr Real kRealizabilityUlps = 256.0; // |F| <= E realizability
+constexpr Real kFloorActiveUlps = 256.0;   // "sitting on the floor" detection
+constexpr Real kSolveFloorUlps = 64.0;     // smallest resolvable nonlinear tol / step
+constexpr Real kNegligibleUlps = 8.0;      // bracket width / iterate change deemed done
+constexpr Real kFdStepFloorUlps = 32.0;    // floor on the finite-difference step
+
 KOKKOS_INLINE_FUNCTION void
 ComputeCouplingEnergyCoefficients(const Real sigp, const Real sigs, const Real g,
                                   const Real g2, const Real beta2, const Real bdbdp,
@@ -152,12 +164,12 @@ KOKKOS_INLINE_FUNCTION bool EvaluateCouplingMomentumEnergyResidualBeta(
   dEk = c / chat * (-beta0_dot_delta_F + 0.5 * mu * delta_F2);
   E = E0 + chat / c * (Q - dEg - dEk);
   const Real floor_slop =
-      128.0 * Eps() * std::max(1.0, std::max(std::abs(E0), std::abs(E)));
+      RoundoffTol(kFloorSlopUlps, std::max(1.0, std::max(std::abs(E0), std::abs(E))));
   if (E < efloor - floor_slop || E <= 0.0) return false;
   E = std::max(E, efloor);
 
   const Real fmag = VNorm(F);
-  const Real realizability_slop = 256.0 * Eps() * std::max(1.0, E);
+  const Real realizability_slop = RoundoffTol(kRealizabilityUlps, std::max(1.0, E));
   if (fmag > E + realizability_slop) return false;
 
   const Real g2 = 1.0 / (1.0 - beta2);
@@ -203,7 +215,7 @@ KOKKOS_INLINE_FUNCTION bool SolveCouplingMomentumEnergyBeta(
     std::array<Real, 3> &F, Real &E, Real &dEk, Real &momentum_error, int &iterations) {
   const Real mu = eref / (dens * c * chat);
 
-  const Real solve_tol = std::max(tolerance, 64.0 * Eps());
+  const Real solve_tol = std::max(tolerance, RoundoffTol(kSolveFloorUlps));
   constexpr int max_iterations = 32;
   constexpr int max_line_search = 20;
   const Real fd_factor = std::pow(Eps(), 1.0 / 3.0);
@@ -237,8 +249,8 @@ KOKKOS_INLINE_FUNCTION bool SolveCouplingMomentumEnergyBeta(
     Real J[3][3]{{0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}};
     bool jacobian_valid = true;
     for (int col = 0; col < 3; ++col) {
-      const Real h =
-          std::max(32.0 * Eps(), fd_factor * std::max(1.0e-3, std::abs(beta[col])));
+      const Real h = std::max(RoundoffTol(kFdStepFloorUlps),
+                              fd_factor * std::max(1.0e-3, std::abs(beta[col])));
       auto beta_plus = beta;
       auto beta_minus = beta;
       beta_plus[col] += h;
@@ -393,12 +405,12 @@ KOKKOS_INLINE_FUNCTION bool EvaluateCouplingMomentumEnergyResidualFlux(
   dEk = c / chat * (-beta0_dot_delta_F + 0.5 * mu * delta_F2);
   E = E0 + chat / c * (Q - dEg - dEk);
   const Real floor_slop =
-      128.0 * Eps() * std::max(1.0, std::max(std::abs(E0), std::abs(E)));
+      RoundoffTol(kFloorSlopUlps, std::max(1.0, std::max(std::abs(E0), std::abs(E))));
   if (E < efloor - floor_slop || E <= 0.0) return false;
   E = std::max(E, efloor);
 
   const Real fmag = VNorm(F);
-  const Real realizability_slop = 256.0 * Eps() * std::max(1.0, E);
+  const Real realizability_slop = RoundoffTol(kRealizabilityUlps, std::max(1.0, E));
   if (fmag > E + realizability_slop) return false;
 
   const Real g2 = 1.0 / (1.0 - beta2);
@@ -443,7 +455,7 @@ KOKKOS_INLINE_FUNCTION bool SolveCouplingMomentumEnergyFlux(
     const Real energy_floor_scale, const Real tolerance, std::array<Real, 3> &beta,
     std::array<Real, 3> &F, Real &E, Real &dEk, Real &momentum_error, int &iterations) {
   const Real mu = eref / (dens * c * chat);
-  const Real solve_tol = std::max(tolerance, 64.0 * Eps());
+  const Real solve_tol = std::max(tolerance, RoundoffTol(kSolveFloorUlps));
   constexpr int max_iterations = 32;
   constexpr int max_line_search = 20;
   const Real fd_factor = std::pow(Eps(), 1.0 / 3.0);
@@ -483,7 +495,8 @@ KOKKOS_INLINE_FUNCTION bool SolveCouplingMomentumEnergyFlux(
       // F is normalized by the local energy reference and can be much smaller
       // than unity. An absolute O(epsilon) perturbation would then be larger
       // than the correction implied by the requested relative residual.
-      const Real h = std::max(64.0 * Eps() * variable_scale, fd_factor * variable_scale);
+      const Real h = std::max(RoundoffTol(kSolveFloorUlps, variable_scale),
+                              fd_factor * variable_scale);
       auto Fplus = F;
       auto Fminus = F;
       Fplus[col] += h;
@@ -535,7 +548,7 @@ KOKKOS_INLINE_FUNCTION bool SolveCouplingMomentumEnergyFlux(
     // state_scale includes the radiation floor. Do not impose a unit-scale
     // absolute cutoff here: for E << 1 it can reject a resolvable correction
     // before the normalized momentum residual reaches its tolerance.
-    if (step_mag <= 64.0 * Eps() * state_scale) break;
+    if (step_mag <= RoundoffTol(kSolveFloorUlps, state_scale)) break;
     if (step_mag > 0.25 * state_scale) {
       const Real scale = 0.25 * state_scale / step_mag;
       for (int d = 0; d < 3; ++d)
@@ -636,7 +649,7 @@ KOKKOS_INLINE_FUNCTION bool EvaluateCouplingInnerScalarResidual(
   //   dEg + dEk + (c/chat) dEr = Q.
   E = E0 + chat / c * (Q - dEk - (eg - eg0));
   const Real floor_slop =
-      64.0 * Eps() * std::max(1.0, std::max(std::abs(E0), std::abs(E)));
+      RoundoffTol(kFloorSlopUlps, std::max(1.0, std::max(std::abs(E0), std::abs(E))));
   if (E < efloor - floor_slop) return false;
   E = std::max(E, efloor);
 
@@ -887,14 +900,14 @@ KOKKOS_INLINE_FUNCTION bool SolveCouplingInnerScalar(
 
       const Real width_scale =
           std::max(energy_floor_scale, std::abs(bracket_lo) + std::abs(bracket_hi));
-      if ((bracket_hi - bracket_lo) / width_scale <= 8.0 * Eps()) break;
+      if ((bracket_hi - bracket_lo) / width_scale <= RoundoffTol(kNegligibleUlps)) break;
     }
   }
 
   E = best_E;
   B = best_B;
   inner_err = best_error;
-  const Real attainable_tolerance = std::max(tolerance, 32.0 * Eps());
+  const Real attainable_tolerance = std::max(tolerance, RoundoffTol(kSolveFloorUlps));
   return inner_err <= attainable_tolerance;
 }
 
@@ -953,7 +966,7 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
   const auto inner_max = moments_pkg->template Param<int>("inner_iteration_max");
   const auto outer_tol = moments_pkg->template Param<Real>("outer_iteration_tol");
   const auto inner_tol = moments_pkg->template Param<Real>("inner_iteration_tol");
-  const Real nonlinear_roundoff_tol = 64.0 * Eps();
+  const Real nonlinear_roundoff_tol = RoundoffTol(kSolveFloorUlps);
   const auto fatal_if_unconverged =
       moments_pkg->template Param<bool>("fatal_if_unconverged");
 
@@ -1355,7 +1368,7 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
                 predictor_change =
                     std::max(predictor_change, std::abs(beta_pred[d] - v[d] / c));
               }
-              if (predictor_change > 8.0 * Eps()) {
+              if (predictor_change > RoundoffTol(kNegligibleUlps)) {
                 E = Epred;
                 F = Fpred;
                 dEk = dEkpred;
@@ -1522,7 +1535,7 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
         // energy-only solve below with momentum frozen, rather than repeatedly
         // applying a radiation drag whose kinetic-energy work cannot be paid by
         // either the gas or radiation field.
-        const Real floor_active_tol = 256.0 * Eps();
+        const Real floor_active_tol = RoundoffTol(kFloorActiveUlps);
         const bool material_floor_active =
             B <= Bfloor * (1.0 + floor_active_tol) + Fuzz();
         const bool radiation_floor_active =

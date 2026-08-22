@@ -203,6 +203,16 @@ KOKKOS_FORCEINLINE_FUNCTION constexpr auto Fuzz() {
   }
   return 1e-99;
 }
+// Round-off tolerance: `ulps` multiples of machine epsilon, scaled to the
+// magnitude of the quantity being compared (default scale 1). Centralizes the
+// `N * Eps() * scale` guards used to compare floating-point values that carry a
+// few ULP of accumulated error. `ulps` is a small headroom factor, not a
+// physical threshold.
+template <typename T = Real>
+KOKKOS_FORCEINLINE_FUNCTION constexpr auto RoundoffTol(const T ulps,
+                                                       const T scale = T(1)) {
+  return ulps * Eps<T>() * scale;
+}
 
 // Initialization nulls
 static const std::string snull = "UNINITIALIZED STRING";

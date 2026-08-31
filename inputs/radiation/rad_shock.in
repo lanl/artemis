@@ -92,6 +92,11 @@ opacity_model = powerlaw  # absorption opacity model
 coef_kappa_a = 577.0      # kappa_a,0 constant (must be passed in cgs)
 rho_exp = -1.0            # dens exponent for opacity powerlaw
 temp_exp = 0.0            # temp exponent for opacity powerlaw
+#-- claude suggestions:
+lRhoMin = -0.5
+lRhoMax = 1.7
+lTMin = 5.5
+lTMax = 7.5
 
 # <radiation/moment>
 # cfl = 0.3
@@ -108,6 +113,10 @@ temp_exp = 0.0            # temp exponent for opacity powerlaw
 <radiation/imc>
 num_particles = 100000  # particle resolution
 use_ddmc = false        # use DDMC?
+frequency_type = gray #multigroup
+#n_nubins = 16
+#numin = 1.e15
+#numax = 1.e19
 
 <problem>
 rhol = 5.69      # density (left)

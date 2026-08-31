@@ -114,3 +114,4 @@ use_ddmc = false          # use DDMC?
 cutoff = 1.0e-6           # default is 1.0e-6
 emit_temp_threshold = 1.2e4 # from ryan, 1.1e4 is background
 #min_swarm_occupancy = 0.5
+frequency_type = gray

@@ -386,6 +386,7 @@ void InitMesh(parthenon::Mesh *pmesh) {
   PARTHENON_INSTRUMENT
   auto &moments_pkg = pmesh->packages.Get("moments");
   auto &gas_pkg = pmesh->packages.Get("gas");
+  auto &rad_pkg = pmesh->packages.Get("radiation");
 
   const Real arad = moments_pkg->Param<Real>("arad");
   const bool use_opac = moments_pkg->Param<bool>("use_opac");
@@ -410,7 +411,7 @@ void InitMesh(parthenon::Mesh *pmesh) {
             "coord_params");
 
     if (use_opac) {
-      const auto &opac_d = gas_pkg->Param<MeanOpacity>("opacity_d");
+      const auto &opac_d = rad_pkg->Param<MeanOpacity>("opacity_d");
       const bool multi_d = pmesh->ndim >= 2;
       const bool three_d = pmesh->ndim == 3;
       parthenon::par_for(
@@ -426,7 +427,7 @@ void InitMesh(parthenon::Mesh *pmesh) {
             if (multi_d) dx_min = std::min(dx_min, dx[1]);
             if (three_d) dx_min = std::min(dx_min, dx[2]);
             const Real tau =
-                std::min(1.0, dx_min * opac_d.RosselandMeanAbsorptionCoefficient(rho, T));
+                std::min(1.0, dx_min * opac_d.AbsorptionCoefficient(rho, T, 0));
             const Real Erad = tau * arad * SQR(SQR(T));
             vmesh(b, rad::cons::energy(0), k, j, i) = Erad;
             vmesh(b, rad::prim::energy(0), k, j, i) = Erad;

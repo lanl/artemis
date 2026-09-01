@@ -86,12 +86,6 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   params.Add("fatal_if_unconverged",
              pin->GetOrAddBoolean("radiation/moment", "fatal_if_unconverged", true));
 
-  // how to handle the matter coupling:
-  // full_coupling = false only does a loop over energy coupling
-  // full_coupling = true also does an outer loop over momentum coupling
-  params.Add("full_coupling",
-             pin->GetOrAddBoolean("radiation/moment", "full_coupling", true));
-
   // Radiation constants (including chat for Moments)
   // NOTE(@pdmullen): These are also stored in top level radiation package...
   const Real light = constants.GetCCode();
@@ -109,7 +103,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   params.Add("tfloor", tfloor * units.GetTemperaturePhysicalToCode());
 
   params.Add("use_opac",
-             pin->GetOrAddBoolean("radiation/moments", "init_with_opac", true));
+             pin->GetOrAddBoolean("radiation/moment", "init_with_opac", true));
 
   // Number of radiation species
   const int nspecies = pin->GetOrAddInteger("radiation/moment", "nspecies", 1);
@@ -125,6 +119,25 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
              pin->GetOrAddReal("radiation/moment", "outer_iteration_tol", 1e-10));
   params.Add("inner_iteration_tol",
              pin->GetOrAddReal("radiation/moment", "inner_iteration_tol", 1e-10));
+
+  const bool split = pin->GetOrAddBoolean("radiation/moment", "split", true);
+  if (!split) {
+    if (coords == Coordinates::cartesian) {
+      moments->EstimateTimestepMesh = EstimateTimeStepMesh<Coordinates::cartesian>;
+    } else if (coords == Coordinates::spherical1D) {
+      moments->EstimateTimestepMesh = EstimateTimeStepMesh<Coordinates::spherical1D>;
+    } else if (coords == Coordinates::spherical2D) {
+      moments->EstimateTimestepMesh = EstimateTimeStepMesh<Coordinates::spherical2D>;
+    } else if (coords == Coordinates::spherical3D) {
+      moments->EstimateTimestepMesh = EstimateTimeStepMesh<Coordinates::spherical3D>;
+    } else if (coords == Coordinates::cylindrical) {
+      moments->EstimateTimestepMesh = EstimateTimeStepMesh<Coordinates::cylindrical>;
+    } else if (coords == Coordinates::axisymmetric) {
+      moments->EstimateTimestepMesh = EstimateTimeStepMesh<Coordinates::axisymmetric>;
+    } else {
+      PARTHENON_FAIL("Invalid artemis/coordinate system!");
+    }
+  }
 
   // Number of radiation "species" (i.e., groups)
   std::vector<int> fluidids;
@@ -142,27 +155,83 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   // Control field for sparse radiation fields
   std::string control_field = rad::cons::energy::name();
 
-  // Conserved Energy Density
-  Metadata m = Metadata({Metadata::Cell, Metadata::Conserved, Metadata::Independent,
+  auto mflags_cons = [&MetadataMoments, &MetadataOperatorSplit, &split](const int size) {
+    if (size == 1) {
+      if (split) {
+        return Metadata({Metadata::Cell, Metadata::Conserved, Metadata::Independent,
                          Metadata::WithFluxes, Metadata::Sparse, MetadataMoments,
                          MetadataOperatorSplit});
+      } else {
+
+        return Metadata({Metadata::Cell, Metadata::Conserved, Metadata::Independent,
+                         Metadata::WithFluxes, Metadata::Sparse});
+      }
+
+    } else {
+      if (split) {
+        return Metadata({Metadata::Cell, Metadata::Vector, Metadata::Conserved,
+                         Metadata::Independent, Metadata::WithFluxes, Metadata::Sparse,
+                         MetadataMoments, MetadataOperatorSplit},
+                        std::vector<int>({size}));
+      } else {
+
+        return Metadata({Metadata::Cell, Metadata::Vector, Metadata::Conserved,
+                         Metadata::Independent, Metadata::WithFluxes, Metadata::Sparse},
+                        std::vector<int>({size}));
+      }
+    }
+  };
+
+  auto mflags_prim = [&MetadataMoments, &MetadataOperatorSplit, &split](const int size) {
+    if (size == 1) {
+      if (split) {
+        return Metadata({Metadata::Cell, Metadata::Derived, Metadata::Intensive,
+                         Metadata::OneCopy, Metadata::FillGhost, Metadata::Sparse,
+                         MetadataMoments, MetadataOperatorSplit});
+      } else {
+        return Metadata({Metadata::Cell, Metadata::Derived, Metadata::Intensive,
+                         Metadata::OneCopy, Metadata::FillGhost, Metadata::Sparse});
+      }
+
+    } else {
+      if (split) {
+        return Metadata({Metadata::Cell, Metadata::Derived, Metadata::Intensive,
+                         Metadata::OneCopy, Metadata::FillGhost, Metadata::Sparse,
+                         MetadataMoments, MetadataOperatorSplit},
+                        std::vector<int>({size}));
+      } else {
+        return Metadata({Metadata::Cell, Metadata::Derived, Metadata::Intensive,
+                         Metadata::OneCopy, Metadata::FillGhost, Metadata::Sparse},
+                        std::vector<int>({size}));
+      }
+    }
+  };
+  auto mflags_prim_withflux = [&MetadataMoments, &MetadataOperatorSplit, &split]() {
+    if (split) {
+      return Metadata({Metadata::Cell, Metadata::Derived, Metadata::Intensive,
+                       Metadata::WithFluxes, Metadata::Sparse, MetadataMoments,
+                       MetadataOperatorSplit});
+    } else {
+      return Metadata({Metadata::Cell, Metadata::Derived, Metadata::Intensive,
+                       Metadata::WithFluxes, Metadata::Sparse});
+    }
+  };
+
+  // Conserved Energy Density
+  Metadata m = mflags_cons(1);
+
   ArtemisUtils::EnrollArtemisRefinementOps(m, coords, log);
   m.SetSparseThresholds(0.0, 0.0, 0.0);
   moments->AddSparsePool<rad::cons::energy>(m, control_field, fluidids);
 
   // Conserved Flux
-  m = Metadata({Metadata::Cell, Metadata::Vector, Metadata::Conserved,
-                Metadata::Independent, Metadata::WithFluxes, Metadata::Sparse,
-                MetadataMoments, MetadataOperatorSplit},
-               std::vector<int>({3}));
+  m = mflags_cons(3);
   ArtemisUtils::EnrollArtemisRefinementOps(m, coords, log);
   m.SetSparseThresholds(0.0, 0.0, 0.0);
   moments->AddSparsePool<rad::cons::flux>(m, control_field, fluidids);
 
   // Primitive Energy Density
-  m = Metadata({Metadata::Cell, Metadata::Derived, Metadata::Intensive, Metadata::OneCopy,
-                Metadata::FillGhost, Metadata::Sparse, MetadataMoments,
-                MetadataOperatorSplit});
+  m = mflags_prim(1);
   ArtemisUtils::EnrollArtemisRefinementOps(m, coords, log);
   m.SetSparseThresholds(0.0, 0.0, 0.0);
   moments->AddSparsePool<rad::prim::energy>(m, control_field, fluidids);
@@ -171,15 +240,14 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   m = Metadata({Metadata::Cell, Metadata::Derived, Metadata::Intensive, Metadata::OneCopy,
                 Metadata::WithFluxes, Metadata::Sparse, MetadataMoments,
                 MetadataOperatorSplit});
+  m = mflags_prim_withflux();
+
   ArtemisUtils::EnrollArtemisRefinementOps(m, coords, log);
   m.SetSparseThresholds(0.0, 0.0, 0.0);
   moments->AddSparsePool<rad::prim::pressure>(m, control_field, fluidids);
 
   // Primitive Reduced Flux
-  m = Metadata({Metadata::Cell, Metadata::Vector, Metadata::Derived, Metadata::Intensive,
-                Metadata::OneCopy, Metadata::FillGhost, Metadata::Sparse, MetadataMoments,
-                MetadataOperatorSplit},
-               std::vector<int>({3}));
+  m = mflags_prim(3);
   ArtemisUtils::EnrollArtemisRefinementOps(m, coords, log);
   m.SetSparseThresholds(0.0, 0.0, 0.0);
   moments->AddSparsePool<rad::prim::flux>(m, control_field, fluidids);
@@ -362,21 +430,12 @@ TaskStatus MatterCoupling(MeshData<Real> *u0, const Real dt) {
   // Extract moments package and params
   auto &moments_pkg = pm->packages.Get("moments");
   auto closure_type = moments_pkg->template Param<Closure>("closure_type");
-  auto full_coupling = moments_pkg->template Param<bool>("full_coupling");
 
   // Call MatterCoupling with appropriate GEOM, Fluid, and Closure type given coupling
   if (closure_type == Closure::m1) {
-    if (full_coupling) {
-      return MatterCouplingFullSingleImpl<GEOM, Closure::m1>(u0, dt);
-    } else {
-      return MatterCouplingSimpleImpl<GEOM, Closure::m1>(u0, dt);
-    }
+    return MatterCouplingFullSingleImpl<GEOM, Closure::m1>(u0, dt);
   } else if (closure_type == Closure::p1) {
-    if (full_coupling) {
-      return MatterCouplingFullSingleImpl<GEOM, Closure::p1>(u0, dt);
-    } else {
-      return MatterCouplingSimpleImpl<GEOM, Closure::p1>(u0, dt);
-    }
+    return MatterCouplingFullSingleImpl<GEOM, Closure::p1>(u0, dt);
   }
   return TaskStatus::complete;
 }

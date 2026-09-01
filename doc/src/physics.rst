@@ -934,7 +934,6 @@ A typical input block for moment-based radiation looks like:
    efloor = 1e-16
    closure = p1
    creduc = 100.0
-   full_coupling = false # simpler and faster matter-coupling
 
 
 Implict Monte Carlo

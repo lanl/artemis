@@ -1,5 +1,5 @@
 //========================================================================================
-// (C) (or copyright) 2023-2025. Triad National Security, LLC. All rights reserved.
+// (C) (or copyright) 2023-2026. Triad National Security, LLC. All rights reserved.
 //
 // This program was produced under U.S. Government contract 89233218CNA000001 for Los
 // Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -74,9 +74,9 @@ KOKKOS_FORCEINLINE_FUNCTION Real DualEnergySIE(T &vmesh, const int b, const int 
   const Real ke = 0.5 * invd * (SQR(rv1) + SQR(rv2) + SQR(rv3));
 
   // Calculate conserved representation of internal energy
-  const Real ut_sie = invd * (u_e - ke - emag);
-  const Real u_hyd = u_e - emag;
-  const bool use_total = ut_sie > invd * de_switch * u_hyd;
+  const Real ut_sie = invd * (u_e - (ke + emag));
+  const bool use_total =
+      (de_switch <= 0.0) ? (ut_sie > 0.0) : (ut_sie > invd * de_switch * u_e);
   return use_total ? ut_sie : invd * u_u;
 }
 

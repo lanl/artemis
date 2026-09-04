@@ -1,5 +1,5 @@
 //========================================================================================
-// (C) (or copyright) 2023-2025. Triad National Security, LLC. All rights reserved.
+// (C) (or copyright) 2023-2026. Triad National Security, LLC. All rights reserved.
 //
 // This program was produced under U.S. Government contract 89233218CNA000001 for Los
 // Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -520,6 +520,7 @@ TaskStatus WaveKilling(MeshData<Real> *md, const Real /* time */, const Real dt)
   auto &artemis_pkg = pm->packages.Get("artemis");
   const bool do_gas = artemis_pkg->template Param<bool>("do_gas");
   const bool do_dust = artemis_pkg->template Param<bool>("do_dust");
+  const bool do_mhd = artemis_pkg->template Param<bool>("do_mhd");
   const auto &cpars = artemis_pkg->template Param<geometry::CoordParams>("coord_params");
   const auto disk_params = artemis_pkg->template Param<DiskParams>("disk_params");
   const auto wave = artemis_pkg->template Param<WaveKillingParams>("wave_killing_params");
@@ -538,7 +539,7 @@ TaskStatus WaveKilling(MeshData<Real> *md, const Real /* time */, const Real dt)
   static auto desc =
       MakePackDescriptor<gas::cons::density, gas::cons::momentum, gas::cons::total_energy,
                          gas::cons::internal_energy, dust::cons::density,
-                         dust::cons::momentum>(resolved_pkgs.get());
+                         dust::cons::momentum, field::cell::energy>(resolved_pkgs.get());
   auto vmesh = desc.GetPack(md);
   static auto desc_g =
       MakePackDescriptor<geom::x1v, geom::x2v, geom::x3v, geom::dx1, geom::dx2, geom::dx3,
@@ -584,7 +585,10 @@ TaskStatus WaveKilling(MeshData<Real> *md, const Real /* time */, const Real dt)
             Real &eint = vmesh(b, gas::cons::internal_energy(n), k, j, i);
 
             dens = std::max(dens, dflr_gas);
-            Real sie = ArtemisUtils::DualEnergySIE(vmesh, b, n, k, j, i, de_switch, hx);
+            const Real emag =
+                (do_mhd && (n == 0)) ? vmesh(b, field::cell::energy(), k, j, i) : 0.0;
+            Real sie =
+                ArtemisUtils::DualEnergySIE(vmesh, b, n, k, j, i, de_switch, hx, emag);
             sie = std::max(sie, sieflr_gas);
 
             const Real vel[3] = {mom1 / (dens * hx[0]), mom2 / (dens * hx[1]),
@@ -611,7 +615,7 @@ TaskStatus WaveKilling(MeshData<Real> *md, const Real /* time */, const Real dt)
             mom3 = new_dens * new_vel[2] * hx[2];
             eint = new_eint;
             etot += (new_eint - old_eint) + (new_ke - old_ke);
-            etot = std::max(etot, new_eint + new_ke);
+            etot = std::max(etot, new_eint + new_ke + emag);
           }
         }
 

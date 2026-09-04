@@ -203,6 +203,49 @@ problem(gaussian_bump):
     _default: 0.0
     _description: "Background dust velocity."
 
+problem(field_loop):
+  _description: "<problem> block parameters when artemis/problem=field_loop"
+  loop_type:
+    _type: string
+    _default: "planar"
+    _description: "Field-loop geometry: planar (2D) or tilted (3D)"
+  radius:
+    _type: Real
+    _default: 0.3
+    _description: "Radius of the magnetic loop in local loop coordinates"
+  amp:
+    _type: Real
+    _default: 1.0e-3
+    _description: "Vector-potential amplitude"
+  vflow:
+    _type: Real
+    _default: 1.0
+    _description: "Advection speed along the periodic diagonal"
+  v3:
+    _type: Real
+    _default: 0.0
+    _description: "Uniform x3 velocity for the planar 2D loop"
+  rho0:
+    _type: Real
+    _default: 1.0
+    _description: "Uniform gas density"
+  p0:
+    _type: Real
+    _default: 1.0
+    _description: "Uniform gas pressure"
+  x0:
+    _type: Real
+    _default: 0.0
+    _description: "Loop-center x coordinate in local loop coordinates"
+  y0:
+    _type: Real
+    _default: 0.0
+    _description: "Loop-center y coordinate in local loop coordinates"
+  nperiod:
+    _type: Real
+    _default: 1.0
+    _description: "Number of periodic crossings to evolve"
+
 problem(linear_wave):
   _description: "<problem> block parameters when artemis/problem=linear_wave"
   wave_flag:

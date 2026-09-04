@@ -78,27 +78,9 @@ TaskStatus SetAuxillaryFields(MeshData<Real> *md) {
         const auto &hx = coords.GetScaleFactors(vg, b, k, j, i);
         Real emag = 0.0;
         if (do_mhd) {
-          const auto xv = coords.GetCellCenter(vg, b, k, j, i);
-          const auto &bnds = coords.GetBounds();
-          const Real bx =
-              ((bnds.x1[1] - xv[0]) * vmesh(b, TE::F1, field::face::B(), k, j, i) +
-               (xv[0] - bnds.x1[0]) * vmesh(b, TE::F1, field::face::B(), k, j, i + 1)) /
-              (bnds.x1[1] - bnds.x1[0]);
-          const Real by =
-              multid
-                  ? (((bnds.x2[1] - xv[1]) * vmesh(b, TE::F2, field::face::B(), k, j, i) +
-                      (xv[1] - bnds.x2[0]) *
-                          vmesh(b, TE::F2, field::face::B(), k, j + multid, i)) /
-                     (bnds.x2[1] - bnds.x2[0]))
-                  : vmesh(b, TE::F2, field::face::B(), k, j, i);
-          const Real bz =
-              threed
-                  ? (((bnds.x3[1] - xv[2]) * vmesh(b, TE::F3, field::face::B(), k, j, i) +
-                      (xv[2] - bnds.x3[0]) *
-                          vmesh(b, TE::F3, field::face::B(), k + threed, j, i)) /
-                     (bnds.x3[1] - bnds.x3[0]))
-                  : vmesh(b, TE::F3, field::face::B(), k, j, i);
-          emag = MHD::MagneticEnergyDensity(bx, by, bz, mu0_code);
+          const auto bcell =
+              MHD::FaceToCellCenteredB(coords, vmesh, vg, b, k, j, i, multid, threed);
+          emag = MHD::MagneticEnergyDensity(bcell[0], bcell[1], bcell[2], mu0_code);
         }
 
         for (int n = 0; n < vmesh.GetSize(b, gas::cons::density()); ++n) {
@@ -281,8 +263,6 @@ void ConsToPrim(MeshData<Real> *md) {
           const auto ax1 = coords.GetFaceAreaX1(vg, b, k, j, i);
           const auto ax2 = coords.GetFaceAreaX2(vg, b, k, j, i);
           const auto ax3 = coords.GetFaceAreaX3(vg, b, k, j, i);
-          const auto xv = coords.GetCellCenter(vg, b, k, j, i);
-          const auto &bnds = coords.GetBounds();
           vmesh(b, TE::CC, field::cell::divB(), k, j, i) =
               ((ax1[1] * vmesh(b, TE::F1, field::face::B(), k, j, i + 1) -
                 ax1[0] * vmesh(b, TE::F1, field::face::B(), k, j, i)) +
@@ -291,24 +271,11 @@ void ConsToPrim(MeshData<Real> *md) {
                (ax3[1] * vmesh(b, TE::F3, field::face::B(), k + threed, j, i) -
                 ax3[0] * vmesh(b, TE::F3, field::face::B(), k, j, i))) /
               vol;
-          vmesh(b, TE::CC, field::cell::B(0), k, j, i) =
-              ((bnds.x1[1] - xv[0]) * vmesh(b, TE::F1, field::face::B(), k, j, i) +
-               (xv[0] - bnds.x1[0]) * vmesh(b, TE::F1, field::face::B(), k, j, i + 1)) /
-              (bnds.x1[1] - bnds.x1[0]);
-          vmesh(b, TE::CC, field::cell::B(1), k, j, i) =
-              multid
-                  ? (((bnds.x2[1] - xv[1]) * vmesh(b, TE::F2, field::face::B(), k, j, i) +
-                      (xv[1] - bnds.x2[0]) *
-                          vmesh(b, TE::F2, field::face::B(), k, j + multid, i)) /
-                     (bnds.x2[1] - bnds.x2[0]))
-                  : vmesh(b, TE::F2, field::face::B(), k, j, i);
-          vmesh(b, TE::CC, field::cell::B(2), k, j, i) =
-              threed
-                  ? (((bnds.x3[1] - xv[2]) * vmesh(b, TE::F3, field::face::B(), k, j, i) +
-                      (xv[2] - bnds.x3[0]) *
-                          vmesh(b, TE::F3, field::face::B(), k + threed, j, i)) /
-                     (bnds.x3[1] - bnds.x3[0]))
-                  : vmesh(b, TE::F3, field::face::B(), k, j, i);
+          const auto bcell =
+              MHD::FaceToCellCenteredB(coords, vmesh, vg, b, k, j, i, multid, threed);
+          vmesh(b, TE::CC, field::cell::B(0), k, j, i) = bcell[0];
+          vmesh(b, TE::CC, field::cell::B(1), k, j, i) = bcell[1];
+          vmesh(b, TE::CC, field::cell::B(2), k, j, i) = bcell[2];
           vmesh(b, TE::CC, field::cell::energy(), k, j, i) = MHD::MagneticEnergyDensity(
               vmesh(b, TE::CC, field::cell::B(0), k, j, i),
               vmesh(b, TE::CC, field::cell::B(1), k, j, i),
@@ -326,8 +293,6 @@ void ConsToPrim(MeshData<Real> *md) {
           const auto ax1 = coords.GetFaceAreaX1(vg, b, k, j, i);
           const auto ax2 = coords.GetFaceAreaX2(vg, b, k, j, i);
           const auto ax3 = coords.GetFaceAreaX3(vg, b, k, j, i);
-          const auto xv = coords.GetCellCenter(vg, b, k, j, i);
-          const auto &bnds = coords.GetBounds();
           vmesh(b, TE::CC, field::cell::divB(), k, j, i) =
               ((ax1[1] * vmesh(b, TE::F1, field::face::B(), k, j, i + 1) -
                 ax1[0] * vmesh(b, TE::F1, field::face::B(), k, j, i)) +
@@ -336,24 +301,11 @@ void ConsToPrim(MeshData<Real> *md) {
                (ax3[1] * vmesh(b, TE::F3, field::face::B(), k + threed, j, i) -
                 ax3[0] * vmesh(b, TE::F3, field::face::B(), k, j, i))) /
               vol;
-          vmesh(b, TE::CC, field::cell::B(0), k, j, i) =
-              ((bnds.x1[1] - xv[0]) * vmesh(b, TE::F1, field::face::B(), k, j, i) +
-               (xv[0] - bnds.x1[0]) * vmesh(b, TE::F1, field::face::B(), k, j, i + 1)) /
-              (bnds.x1[1] - bnds.x1[0] + Fuzz<Real>());
-          vmesh(b, TE::CC, field::cell::B(1), k, j, i) =
-              multid
-                  ? (((bnds.x2[1] - xv[1]) * vmesh(b, TE::F2, field::face::B(), k, j, i) +
-                      (xv[1] - bnds.x2[0]) *
-                          vmesh(b, TE::F2, field::face::B(), k, j + multid, i)) /
-                     (bnds.x2[1] - bnds.x2[0] + Fuzz<Real>()))
-                  : vmesh(b, TE::F2, field::face::B(), k, j, i);
-          vmesh(b, TE::CC, field::cell::B(2), k, j, i) =
-              threed
-                  ? (((bnds.x3[1] - xv[2]) * vmesh(b, TE::F3, field::face::B(), k, j, i) +
-                      (xv[2] - bnds.x3[0]) *
-                          vmesh(b, TE::F3, field::face::B(), k + threed, j, i)) /
-                     (bnds.x3[1] - bnds.x3[0] + Fuzz<Real>()))
-                  : vmesh(b, TE::F3, field::face::B(), k, j, i);
+          const auto bcell =
+              MHD::FaceToCellCenteredB(coords, vmesh, vg, b, k, j, i, multid, threed);
+          vmesh(b, TE::CC, field::cell::B(0), k, j, i) = bcell[0];
+          vmesh(b, TE::CC, field::cell::B(1), k, j, i) = bcell[1];
+          vmesh(b, TE::CC, field::cell::B(2), k, j, i) = bcell[2];
           vmesh(b, TE::CC, field::cell::energy(), k, j, i) = MHD::MagneticEnergyDensity(
               vmesh(b, TE::CC, field::cell::B(0), k, j, i),
               vmesh(b, TE::CC, field::cell::B(1), k, j, i),
@@ -477,15 +429,9 @@ void PrimToCons(T *md) {
             const Real ke = 0.5 * w_d * (SQR(vel1) + SQR(vel2) + SQR(vel3));
             Real me = 0.0;
             if (do_mhd && (n == 0)) {
-              const Real bx = 0.5 * (vmesh(b, TE::F1, field::face::B(), k, j, i) +
-                                     vmesh(b, TE::F1, field::face::B(), k, j, i + 1));
-              const Real by =
-                  0.5 * (vmesh(b, TE::F2, field::face::B(), k, j, i) +
-                         vmesh(b, TE::F2, field::face::B(), k, j + multid, i));
-              const Real bz =
-                  0.5 * (vmesh(b, TE::F3, field::face::B(), k, j, i) +
-                         vmesh(b, TE::F3, field::face::B(), k + threed, j, i));
-              me = MHD::MagneticEnergyDensity(bx, by, bz, mu0_code);
+              const auto bcell =
+                  MHD::FaceToCellCenteredB(coords, vmesh, vg, b, k, j, i, multid, threed);
+              me = MHD::MagneticEnergyDensity(bcell[0], bcell[1], bcell[2], mu0_code);
             }
             Real &u_e = vmesh(b, gas::cons::total_energy(n), k, j, i);
             u_e = u_u + ke + me;

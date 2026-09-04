@@ -46,6 +46,37 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
                                             Packages_t &packages);
 TaskStatus AssembleEdgeEMF(MeshData<Real> *md);
 
+//----------------------------------------------------------------------------------------
+//! \brief Interpolate physical face-normal magnetic fields to the cell centroid.
+//!
+//! Face fields are area-averaged physical components. This returns a second-order
+//! cell-centered physical field by interpolating each component to the coordinate-space
+//! cell centroid.
+template <typename COORDS, typename V, typename VG>
+KOKKOS_INLINE_FUNCTION std::array<Real, 3>
+FaceToCellCenteredB(const COORDS &coords, const V &vmesh, const VG &vg, const int b,
+                    const int k, const int j, const int i, const bool multid,
+                    const bool threed) {
+  using TE = parthenon::TopologicalElement;
+  const auto xv = coords.GetCellCenter(vg, b, k, j, i);
+  const auto &bnds = coords.GetBounds();
+  const Real bx =
+      ((bnds.x1[1] - xv[0]) * vmesh(b, TE::F1, field::face::B(), k, j, i) +
+       (xv[0] - bnds.x1[0]) * vmesh(b, TE::F1, field::face::B(), k, j, i + 1)) /
+      (bnds.x1[1] - bnds.x1[0]);
+  const Real by =
+      multid ? (((bnds.x2[1] - xv[1]) * vmesh(b, TE::F2, field::face::B(), k, j, i) +
+                 (xv[1] - bnds.x2[0]) * vmesh(b, TE::F2, field::face::B(), k, j + 1, i)) /
+                (bnds.x2[1] - bnds.x2[0]))
+             : vmesh(b, TE::F2, field::face::B(), k, j, i);
+  const Real bz =
+      threed ? (((bnds.x3[1] - xv[2]) * vmesh(b, TE::F3, field::face::B(), k, j, i) +
+                 (xv[2] - bnds.x3[0]) * vmesh(b, TE::F3, field::face::B(), k + 1, j, i)) /
+                (bnds.x3[1] - bnds.x3[0]))
+             : vmesh(b, TE::F3, field::face::B(), k, j, i);
+  return {bx, by, bz};
+}
+
 template <typename T, Coordinates GEOM>
 void SetCellCenteredMagneticFields(T *md) {
   PARTHENON_INSTRUMENT
@@ -80,28 +111,11 @@ void SetCellCenteredMagneticFields(T *md) {
       vmesh.GetNBlocks() - 1, kbe.s, kbe.e, jbe.s, jbe.e, ibe.s, ibe.e,
       KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
         geometry::Coords<GEOM> coords(cpars, vmesh.GetCoordinates(b), k, j, i);
-
-        const auto xv = coords.GetCellCenter(vg, b, k, j, i);
-        const auto &bnds = coords.GetBounds();
-
-        vmesh(b, TE::CC, field::cell::B(0), k, j, i) =
-            ((bnds.x1[1] - xv[0]) * vmesh(b, TE::F1, field::face::B(), k, j, i) +
-             (xv[0] - bnds.x1[0]) * vmesh(b, TE::F1, field::face::B(), k, j, i + 1)) /
-            (bnds.x1[1] - bnds.x1[0]);
-        vmesh(b, TE::CC, field::cell::B(1), k, j, i) =
-            multid
-                ? (((bnds.x2[1] - xv[1]) * vmesh(b, TE::F2, field::face::B(), k, j, i) +
-                    (xv[1] - bnds.x2[0]) *
-                        vmesh(b, TE::F2, field::face::B(), k, j + multid, i)) /
-                   (bnds.x2[1] - bnds.x2[0]))
-                : vmesh(b, TE::F2, field::face::B(), k, j, i);
-        vmesh(b, TE::CC, field::cell::B(2), k, j, i) =
-            threed
-                ? (((bnds.x3[1] - xv[2]) * vmesh(b, TE::F3, field::face::B(), k, j, i) +
-                    (xv[2] - bnds.x3[0]) *
-                        vmesh(b, TE::F3, field::face::B(), k + threed, j, i)) /
-                   (bnds.x3[1] - bnds.x3[0]))
-                : vmesh(b, TE::F3, field::face::B(), k, j, i);
+        const auto bcell =
+            FaceToCellCenteredB(coords, vmesh, vg, b, k, j, i, multid, threed);
+        vmesh(b, TE::CC, field::cell::B(0), k, j, i) = bcell[0];
+        vmesh(b, TE::CC, field::cell::B(1), k, j, i) = bcell[1];
+        vmesh(b, TE::CC, field::cell::B(2), k, j, i) = bcell[2];
       });
 }
 

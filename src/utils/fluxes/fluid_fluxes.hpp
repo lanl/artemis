@@ -390,7 +390,7 @@ TaskStatus FluxSourceImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, CONS vcons, FAC
 
         // Add the "flux source terms"
         for (int n = 0; n < nspecies; ++n) {
-          const bool mhd = (F == Fluid::gas) && do_mhd && (n == 0);
+          const bool mhd = do_mhd && (F == Fluid::gas) && (n == 0);
           const int IMX = VI(n, 0);
           const int IMY = VI(n, 1);
           const int IMZ = VI(n, 2);

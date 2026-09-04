@@ -127,6 +127,10 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
     PARTHENON_REQUIRE(do_moment || do_imc,
                       "Radiation must have one of the moment or IMC method active!");
   }
+  if (do_mhd) {
+    PARTHENON_REQUIRE(do_gas, "MHD requires a gas material!");
+    PARTHENON_REQUIRE(update_fluxes, "MHD requires gas/update_fluxes !");
+  }
 
   // Store configuration choices in params
   artemis->AddParam("do_gas", do_gas);

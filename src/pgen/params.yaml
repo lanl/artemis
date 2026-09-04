@@ -207,7 +207,7 @@ problem(linear_wave):
   _description: "<problem> block parameters when artemis/problem=linear_wave"
   wave_flag:
     _type: int
-    _description: "Wave flag"
+    _description: "Wave flag: [0,4] for hydro or [0,6] for MHD"
   amp:
     _type: Real
     _description: "Wave amplitude"
@@ -219,6 +219,10 @@ problem(linear_wave):
     _type: Real
     _default: 1.0
     _description: "Sets new time limit to the specified number of periods"
+  along_x(1,2,3):
+    _type: bool
+    _default: "false"
+    _description: "Set the wavevector along the x(1,2,3) axis"
 
 problem(orszag_tang):
   _description: "<problem> block parameters when artemis/problem=orszag_tang"

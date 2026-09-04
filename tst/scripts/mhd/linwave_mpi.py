@@ -1,5 +1,5 @@
 # ========================================================================================
-#  (C) (or copyright) 2023-2024. Triad National Security, LLC. All rights reserved.
+#  (C) (or copyright) 2026. Triad National Security, LLC. All rights reserved.
 #
 #  This program was produced under U.S. Government contract 89233218CNA000001 for Los
 #  Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -11,19 +11,23 @@
 #  the public, perform publicly and display publicly, and to permit others to do so.
 # ========================================================================================
 
-# serial suite
+"""Four-rank wrapper for the MHD linear-wave regression."""
 
-advection/advection
-coords/blast
-disk/disk
-hydro/linwave
-mhd/brio_wu
-mhd/linwave
-self_gravity/grav_slab
-ssheet/ssheet
-diffusion/alpha_disk
-drag/drag
-radiation/rad_shock
-radiation/rad_shock_cgs
-radiation/thermalization
-coagulation/coagulation
+import importlib
+import logging
+
+import scripts.mhd.linwave as linwave
+
+logger = logging.getLogger("artemis" + __name__[7:])
+
+importlib.reload(linwave)
+linwave._nranks = 4
+linwave._file_id = "mhd_linear_wave_mpi"
+
+
+def run(**kwargs):
+    return linwave.run(**kwargs)
+
+
+def analyze():
+    return linwave.analyze()

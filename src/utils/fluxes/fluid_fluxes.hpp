@@ -471,12 +471,16 @@ TaskStatus FluxSourceImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, CONS vcons, FAC
               wdt *= ((chi - 1.) / (ff + Fuzz<Real>())) * hcchat_;
             } else if constexpr (F == Fluid::gas) {
               // Update momenta with mhd
-              const Real t1 = SQR(vp_(b, IVX, k, j, i) + rfv[0]) -
-                              (mhd ? SQR(vp_(b, field::cell::B(0), k, j, i)) / mu0 : 0.0);
-              const Real t2 = SQR(vp_(b, IVY, k, j, i) + rfv[1]) -
-                              (mhd ? SQR(vp_(b, field::cell::B(1), k, j, i)) / mu0 : 0.0);
-              const Real t3 = SQR(vp_(b, IVZ, k, j, i) + rfv[2]) -
-                              (mhd ? SQR(vp_(b, field::cell::B(2), k, j, i)) / mu0 : 0.0);
+              const Real imu0 = 1. / (mu0 * vp_(b, n, k, j, i));
+              const Real t1 =
+                  SQR(vp_(b, IVX, k, j, i) + rfv[0]) -
+                  (mhd ? SQR(vp_(b, field::cell::B(0), k, j, i)) * imu0 : 0.0);
+              const Real t2 =
+                  SQR(vp_(b, IVY, k, j, i) + rfv[1]) -
+                  (mhd ? SQR(vp_(b, field::cell::B(1), k, j, i)) * imu0 : 0.0);
+              const Real t3 =
+                  SQR(vp_(b, IVZ, k, j, i) + rfv[2]) -
+                  (mhd ? SQR(vp_(b, field::cell::B(2), k, j, i)) * imu0 : 0.0);
               vc_(b, IMX, k, j, i) +=
                   x1dep_ * wdt * (dh1[0] * t1 + dh1[1] * t2 + dh1[2] * t3);
               vc_(b, IMY, k, j, i) +=

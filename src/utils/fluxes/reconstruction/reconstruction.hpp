@@ -1,5 +1,5 @@
 //========================================================================================
-// (C) (or copyright) 2023-2025. Triad National Security, LLC. All rights reserved.
+// (C) (or copyright) 2023-2026. Triad National Security, LLC. All rights reserved.
 //
 // This program was produced under U.S. Government contract 89233218CNA000001 for Los
 // Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -110,8 +110,7 @@ post_recon(const EOS &eos, const Real dfloor, const Real siefloor, const bool do
     }
     // Replace the reconstructed B on the face in direction dir with the cons face value
     if (do_mhd) {
-      const int n = nspecies * 7 + dir - 1;
-      // or maybe TE fd = TE::F1 + (dir-1)?
+      const int n = q.GetIndex(b, field::cell::B(dir - 1));
       TE fd = (dir == 1) ? TE::F1 : ((dir == 2) ? TE::F2 : TE::F3);
       parthenon::par_for_inner(
           DEFAULT_INNER_LOOP_PATTERN, member, il, iu, [&](const int i) {

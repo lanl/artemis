@@ -1,5 +1,5 @@
 //========================================================================================
-// (C) (or copyright) 2023-2025. Triad National Security, LLC. All rights reserved.
+// (C) (or copyright) 2023-2026. Triad National Security, LLC. All rights reserved.
 //
 // This program was produced under U.S. Government contract 89233218CNA000001 for Los
 // Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -138,10 +138,14 @@ TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, FLUX vflx,
       KOKKOS_LAMBDA(parthenon::team_mbr_t mbr, const int b, const int k, const int j) {
         ScratchPad2D<Real> wl(mbr.team_scratch(scr_level), nvars, ncells1);
         ScratchPad2D<Real> wr(mbr.team_scratch(scr_level), nvars, ncells1);
+        int skip_index = -1;
+        if constexpr (F == Fluid::gas) {
+          if (do_mhd) skip_index = vp.GetIndex(b, field::cell::B(X1DIR - 1));
+        }
 
         // Reconstruct qR[i] and qL[i+1]
         Reconstruction<RECON, X1DIR, G> recon;
-        recon(mbr, cpars, b, k, j, il - 1, iu, vp, vg, wl, wr);
+        recon(mbr, cpars, b, k, j, il - 1, iu, vp, vg, skip_index, wl, wr);
         mbr.team_barrier();
 
         post_recon<F>(eos, dfloor, siefloor, do_mhd, mbr, X1DIR, b, k, j, il - 1, iu, vp,
@@ -181,6 +185,10 @@ TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, FLUX vflx,
           ScratchPad2D<Real> scr1(mbr.team_scratch(scr_level), nvars, ncells1);
           ScratchPad2D<Real> scr2(mbr.team_scratch(scr_level), nvars, ncells1);
           ScratchPad2D<Real> scr3(mbr.team_scratch(scr_level), nvars, ncells1);
+          int skip_index = -1;
+          if constexpr (F == Fluid::gas) {
+            if (do_mhd) skip_index = vp.GetIndex(b, field::cell::B(X2DIR - 1));
+          }
 
           for (int j = jl; j <= ju; ++j) {
             // Permute scratch arrays.
@@ -194,7 +202,7 @@ TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, FLUX vflx,
 
             // Reconstruct qR[j] and qL[j+1]
             Reconstruction<RECON, X2DIR, G> recon;
-            recon(mbr, cpars, b, k, j, il, iu, vp, vg, wl_jp1, wr);
+            recon(mbr, cpars, b, k, j, il, iu, vp, vg, skip_index, wl_jp1, wr);
             mbr.team_barrier();
 
             post_recon<F>(eos, dfloor, siefloor, do_mhd, mbr, X2DIR, b, k, j, il, iu, vp,
@@ -239,6 +247,10 @@ TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, FLUX vflx,
           ScratchPad2D<Real> scr1(mbr.team_scratch(scr_level), nvars, ncells1);
           ScratchPad2D<Real> scr2(mbr.team_scratch(scr_level), nvars, ncells1);
           ScratchPad2D<Real> scr3(mbr.team_scratch(scr_level), nvars, ncells1);
+          int skip_index = -1;
+          if constexpr (F == Fluid::gas) {
+            if (do_mhd) skip_index = vp.GetIndex(b, field::cell::B(X3DIR - 1));
+          }
 
           for (int k = kl; k <= ku; ++k) {
             // Permute scratch arrays.
@@ -252,7 +264,7 @@ TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, FLUX vflx,
 
             // Reconstruct qR[k] and qL[k+1]
             Reconstruction<RECON, X3DIR, G> recon;
-            recon(mbr, cpars, b, k, j, il, iu, vp, vg, wl_kp1, wr);
+            recon(mbr, cpars, b, k, j, il, iu, vp, vg, skip_index, wl_kp1, wr);
             mbr.team_barrier();
 
             post_recon<F>(eos, dfloor, siefloor, do_mhd, mbr, X3DIR, b, k, j, il, iu, vp,

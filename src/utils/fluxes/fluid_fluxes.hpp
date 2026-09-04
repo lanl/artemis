@@ -128,15 +128,10 @@ TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, FLUX vflx,
 
   // X1-Flux
   int il = ib.s, iu = ib.e + 1;
-  int jl = jb.s, ju = jb.e, kl = kb.s, ku = kb.e;
-  if constexpr (F == Fluid::gas) {
-    if (do_mhd) {
-      jl -= multi_d;
-      ju += multi_d;
-      kl -= three_d;
-      ku += three_d;
-    }
-  }
+  int jl = jb.s - ((F == Fluid::gas) && do_mhd && multi_d);
+  int ju = jb.e + ((F == Fluid::gas) && do_mhd && multi_d);
+  int kl = kb.s - ((F == Fluid::gas) && do_mhd && three_d);
+  int ku = kb.e + ((F == Fluid::gas) && do_mhd && three_d);
   parthenon::par_for_outer(
       DEFAULT_OUTER_LOOP_PATTERN, "CalculateFluxes::X1-Flux", DevExecSpace(), scr_size,
       scr_level, 0, md->NumBlocks() - 1, kl, ku, jl, ju,

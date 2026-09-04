@@ -26,6 +26,7 @@
 #include "constant.hpp"
 #include "crooked_pipe.hpp"
 #include "disk.hpp"
+#include "field_loop.hpp"
 #include "gaussian_bump.hpp"
 #include "geometry/geometry.hpp"
 #include "grav_slab.hpp"
@@ -63,6 +64,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
     constant::ProblemGenerator<T>(pmb, pin);
   } else if (name == "disk") {
     disk::ProblemGenerator<T>(pmb, pin);
+  } else if (name == "field_loop") {
+    field_loop::ProblemGenerator<T>(pmb, pin);
   } else if (name == "gaussian_bump") {
     gaussian_bump::ProblemGenerator<T>(pmb, pin);
   } else if (name == "grav_slab") {

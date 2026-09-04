@@ -69,6 +69,7 @@ set (SRC_LIST
   pgen/conduction.hpp
   pgen/constant.hpp
   pgen/disk.hpp
+  pgen/field_loop.hpp
   pgen/gaussian_bump.hpp
   pgen/grav_slab.hpp
   pgen/kh.hpp

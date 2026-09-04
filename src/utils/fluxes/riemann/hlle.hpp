@@ -188,12 +188,11 @@ struct RiemannSolver<RSolver::hlle, FLUID_TYPE, CTYPE,
             [[maybe_unused]] Real al = Null<Real>();
             [[maybe_unused]] Real ar = Null<Real>();
             if constexpr (FLUID_TYPE == Fluid::gas) {
-              // Real a = hroe - 0.5 * (SQR(wroe_ivx) + SQR(wroe_ivy) + SQR(wroe_ivz));
-              // a = (a < 0.0) ? 0.0 : sqrt(gm1 * a);
-              // Einfeldt (1988)
+              // Einfeldt (1988) Eq. 5.7
               const Real ngam = 0.5 * sqrtdl * sqrtdr * SQR(isdlpdr);
-              Real a =
-                  (qa * sqrtdl + qb * sqrtdr) * isdlpdr + ngam * SQR((wr_ivx - wl_ivx));
+              Real a = (SQR(qa) * sqrtdl + SQR(qb) * sqrtdr) * isdlpdr +
+                       ngam * SQR((wr_ivx - wl_ivx));
+              a = std::sqrt(a);
               Real sla = wroe_ivx - a;
               Real slb = wl_ivx - qa;
               Real sra = wroe_ivx + a;

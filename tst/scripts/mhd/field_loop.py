@@ -59,7 +59,9 @@ def _file_id(case, resolution):
 
 
 def _remove_outputs(file_id):
-    for path in glob.glob(os.path.join(artemis.get_data_dir(), file_id + ".out1*.phdf")):
+    for path in glob.glob(
+        os.path.join(artemis.get_data_dir(), file_id + ".out1*.phdf")
+    ):
         os.remove(path)
 
 
@@ -96,7 +98,9 @@ def run(**kwargs):
 
 
 def _snapshot(file_id, output):
-    path = os.path.join(artemis.get_data_dir(), "{}.out1.{}.phdf".format(file_id, output))
+    path = os.path.join(
+        artemis.get_data_dir(), "{}.out1.{}.phdf".format(file_id, output)
+    )
     with h5py.File(path, "r") as f:
         return {
             "density": f["gas.prim.density_0"][...],
@@ -125,7 +129,9 @@ def _metrics(initial, final, tilted):
     b_final = final["B"]
     b_magnitude = np.linalg.norm(b_initial, axis=1)
     b_scale = np.max(b_magnitude)
-    shape_error = np.mean(np.linalg.norm(b_final - b_initial, axis=1)) / np.mean(b_magnitude)
+    shape_error = np.mean(np.linalg.norm(b_final - b_initial, axis=1)) / np.mean(
+        b_magnitude
+    )
     retention = np.mean(final["magnetic_energy"]) / np.mean(initial["magnetic_energy"])
     relative_divb = np.max(np.abs(final["divB"])) * _min_cell_width(final) / b_scale
     if tilted:
@@ -161,25 +167,54 @@ def analyze():
             for name in ("density", "momentum", "total_energy"):
                 error = _conserved(initial, final, name)
                 if error > 1.0e-10:
-                    logger.warning("%s does not conserve %s: %.8e", file_id, name, error)
+                    logger.warning(
+                        "%s does not conserve %s: %.8e", file_id, name, error
+                    )
                     status = False
             metrics.append(_metrics(initial, final, case["name"] == "tilted"))
 
         coarse, fine = metrics
         if fine[0] > _max_fine_shape_error:
-            logger.warning("%s fine loop-shape error %.8e exceeds %.8e", case["name"], fine[0], _max_fine_shape_error)
+            logger.warning(
+                "%s fine loop-shape error %.8e exceeds %.8e",
+                case["name"],
+                fine[0],
+                _max_fine_shape_error,
+            )
             status = False
         if fine[0] > 0.9 * coarse[0]:
-            logger.warning("%s loop-shape error does not improve enough: %.8e -> %.8e", case["name"], coarse[0], fine[0])
+            logger.warning(
+                "%s loop-shape error does not improve enough: %.8e -> %.8e",
+                case["name"],
+                coarse[0],
+                fine[0],
+            )
             status = False
         if fine[1] < _min_fine_energy_retention or fine[1] < coarse[1]:
-            logger.warning("%s magnetic-energy retention is inadequate: %.8e -> %.8e", case["name"], coarse[1], fine[1])
+            logger.warning(
+                "%s magnetic-energy retention is inadequate: %.8e -> %.8e",
+                case["name"],
+                coarse[1],
+                fine[1],
+            )
             status = False
         for resolution, metric in zip(case["resolutions"], metrics):
             if metric[2] > _max_divb:
-                logger.warning("%s_%d relative divB %.8e exceeds %.8e", case["name"], resolution, metric[2], _max_divb)
+                logger.warning(
+                    "%s_%d relative divB %.8e exceeds %.8e",
+                    case["name"],
+                    resolution,
+                    metric[2],
+                    _max_divb,
+                )
                 status = False
             if metric[3] > _max_axial_field:
-                logger.warning("%s_%d axial field %.8e exceeds %.8e", case["name"], resolution, metric[3], _max_axial_field)
+                logger.warning(
+                    "%s_%d axial field %.8e exceeds %.8e",
+                    case["name"],
+                    resolution,
+                    metric[3],
+                    _max_axial_field,
+                )
                 status = False
     return status

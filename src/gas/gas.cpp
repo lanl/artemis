@@ -189,13 +189,16 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   params.Add("eos_type", eos_type);
 
   // Riemann solver
+  const bool do_mhd = pin->GetOrAddBoolean("physics", "mhd", false);
   RSolver riemann_solver = RSolver::null;
   const std::string riemann = pin->GetOrAddString("gas", "riemann", "hllc-general");
   if (riemann.compare("hllc-general") == 0) {
+    PARTHENON_REQUIRE(!do_mhd, "The hllc Riemann solver cannot be used with MHD.");
     riemann_solver = RSolver::hllc_general;
   } else if (riemann.compare("hllc-gamma") == 0) {
     PARTHENON_REQUIRE(eos_type == "ideal",
                       "The hllc-gamma Riemann solver requires the ideal eos.");
+    PARTHENON_REQUIRE(!do_mhd, "The hllc Riemann solver cannot be used with MHD.");
 
     riemann_solver = RSolver::hllc_gamma;
   } else if (riemann.compare("hlle") == 0) {
@@ -205,8 +208,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   } else if (riemann.compare("hlld") == 0) {
     PARTHENON_REQUIRE(eos_type == "ideal",
                       "The hlld Riemann solver requires the ideal eos.");
-    PARTHENON_REQUIRE(pin->GetOrAddBoolean("physics", "mhd", false),
-                      "The hlld Riemann solver requires MHD to be enabled.");
+    PARTHENON_REQUIRE(do_mhd, "The hlld Riemann solver requires MHD to be enabled.");
     riemann_solver = RSolver::hlld;
   } else {
     PARTHENON_FAIL("Riemann solver (gas) not recognized.");

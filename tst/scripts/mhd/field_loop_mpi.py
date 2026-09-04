@@ -1,5 +1,5 @@
 # ========================================================================================
-#  (C) (or copyright) 2023-2024. Triad National Security, LLC. All rights reserved.
+#  (C) (or copyright) 2026. Triad National Security, LLC. All rights reserved.
 #
 #  This program was produced under U.S. Government contract 89233218CNA000001 for Los
 #  Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -11,19 +11,20 @@
 #  the public, perform publicly and display publicly, and to permit others to do so.
 # ========================================================================================
 
-# parallel suite
+"""Four-rank wrapper for the field-loop advection regression."""
 
-advection/advection_mpi
-coords/blast_mpi
-disk/disk_mpi
-nbody/nbody_mpi
-hydro/linwave_mpi
-self_gravity/grav_slab_mpi
-ssheet/ssheet_mpi
-diffusion/viscous_diffusion_mpi
-diffusion/alpha_disk_mpi
-drag/drag_mpi
-mhd/brio_wu_mpi
-mhd/field_loop_mpi
-mhd/linwave_mpi
-mhd/orszag_tang_mpi
+import importlib
+
+import scripts.mhd.field_loop as field_loop
+
+importlib.reload(field_loop)
+field_loop._nranks = 4
+field_loop._file_prefix = "mhd_field_loop_mpi"
+
+
+def run(**kwargs):
+    return field_loop.run(**kwargs)
+
+
+def analyze():
+    return field_loop.analyze()

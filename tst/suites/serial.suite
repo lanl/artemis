@@ -18,6 +18,7 @@ coords/blast
 disk/disk
 hydro/linwave
 mhd/brio_wu
+mhd/field_loop
 mhd/linwave
 self_gravity/grav_slab
 ssheet/ssheet

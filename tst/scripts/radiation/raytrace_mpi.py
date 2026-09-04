@@ -1,5 +1,5 @@
 # ========================================================================================
-#  (C) (or copyright) 2023-2024. Triad National Security, LLC. All rights reserved.
+#  (C) (or copyright) 2026. Triad National Security, LLC. All rights reserved.
 #
 #  This program was produced under U.S. Government contract 89233218CNA000001 for Los
 #  Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -11,20 +11,26 @@
 #  the public, perform publicly and display publicly, and to permit others to do so.
 # ========================================================================================
 
-# serial suite
+# Regression test for the implicit radiation-matter coupling solver, exercised on the
+# ray-traced disk problem (inputs/radiation/raytrace.in).
 
-advection/advection
-coords/blast
-disk/disk
-hydro/linwave
-mhd/brio_wu
-mhd/linwave
-self_gravity/grav_slab
-ssheet/ssheet
-diffusion/alpha_disk
-drag/drag
-radiation/rad_shock
-radiation/rad_shock_cgs
-radiation/raytrace
-radiation/thermalization
-coagulation/coagulation
+# Modules
+import importlib
+import logging
+import scripts.radiation.raytrace as raytrace
+
+logger = logging.getLogger("artemis" + __name__[7:])  # set logger name
+
+importlib.reload(raytrace)
+raytrace._nranks = 8
+raytrace._file_id = "raytrace_mpi"
+
+
+# Run Artemis
+def run(**kwargs):
+    return raytrace.run(**kwargs)
+
+
+# Analyze outputs
+def analyze():
+    return raytrace.analyze()

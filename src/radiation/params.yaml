@@ -45,10 +45,6 @@ radiation:
       _type: Real
       _description: "CFL number for radiation"
       _default: 0.8
-    full_coupling:
-      _type: bool
-      _description: "If set to true, this will do a full outer iteration of momentum exchange with the material. If set to false, artemis will take one outer iteration of momentum coupling."
-      _default: true
     creduc:
       _type: Real
       _description: "Speed of light reduction factor, c_hat = c / creduc."
@@ -116,6 +112,10 @@ radiation:
       _type: bool
       _description: "When dynamically initializing the radiation field, scale a T^4 by min(1, tau), where tau is the optical depth of the cell"
       _default: "true"
+    split:
+      _type: bool
+      _description: "Operator-split the moment update and subcycle it at the radiation CFL, so the global timestep is not limited by the (reduced) speed of light. Disable for fully-coupled, unsplit second-order integration at the radiation-limited timestep."
+      _default: true
   imc:
     _description: "IMC radiation model from the Jaybenne library"
     _type: node

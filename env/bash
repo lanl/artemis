@@ -21,7 +21,7 @@ export MAKE_PROGRAM=${MAKE_PROGRAM:-make}
 
 #  Identify partitions based on  SLURM_JOB_PARTITION and HOSTNAME variables
 PARTITION="unknown"
-if [[ $HOSTNAME == ch-fe*  ||  $CLUSTER == "chicoma" ]]; then
+if [[ $HOSTNAME == ch*  ||  $CLUSTER == "chicoma" ]]; then
     if [[ $SLURM_JOB_PARTITION == *gpu* ]]; then
         PARTITION="chicoma-gpu"
     else
@@ -45,6 +45,7 @@ else # Catch-all for Darwin
         echo "Supported partitions are"
         echo "  skylake-gold"
         echo "  volta-x86"
+        echo "  mi250"
         PARTITION="darwin-fe"
     elif [[ $SLURM_JOB_PARTITION == "power9-rhel7" ]]; then
         PARTITION="darwin-power9-rhel7"
@@ -52,6 +53,8 @@ else # Catch-all for Darwin
         PARTITION="darwin-skylake-gold"
     elif [[ $SLURM_JOB_PARTITION == "volta-x86" ]]; then
         PARTITION="darwin-volta-x86"
+    elif [[ $SLURM_JOB_PARTITION == "shared-gpu-amd-mi250" ]]; then
+        PARTITION="darwin-mi250"
     fi
 fi
 
@@ -67,8 +70,6 @@ echo "Partition: $PARTITION"
 if [[ $PARTITION == "unknown" ]]; then
     echo "Partition is unknown! exiting..."
 elif [[ $PARTITION == "chicoma-gpu" ]]; then
-    module unload cray-libsci
-    module load PrgEnv-gnu
     module load cudatoolkit
     export CRAY_ACCEL_TARGET=nvidia80
     export MPICH_GPU_SUPPORT_ENABLED=1
@@ -81,11 +82,8 @@ elif [[ $PARTITION == "chicoma-gpu" ]]; then
     export ARTEMIS_SUITE=chicoma-gpu
     echo "...setup SUCCEEDED"
 elif [[ $PARTITION == "chicoma-cpu" ]]; then
-    module swap PrgEnv-cray PrgEnv-gnu
     module load cray-hdf5-parallel
     module load cray-python/3.11.5
-    module load gcc/12.3.0
-    module load cray-mpich/8.1.28
     source /usr/projects/jovian/dependencies/python/chicoma-cpu/bin/activate
     module load cmake
     export ARTEMIS_SUITE=chicoma-cpu
@@ -162,6 +160,19 @@ elif [[ $PARTITION == "darwin-volta-x86" ]]; then
     module load cmake/3.26.3
     module list
     export ARTEMIS_SUITE=darwin-gpu
+    echo "...setup SUCCEEDED"
+elif [[ $PARTITION == "darwin-mi250" ]]; then
+    module purge
+    module load openmpi/4.1.6-gcc_13.2.0
+    module load rocm
+    module load hdf5/1.12.2
+    module load miniconda3/py311_23.11.0
+    source /usr/projects/jovian/dependencies/python/volta-x86-py311/bin/activate
+    shorten_prompt
+    module load cmake/3.26.3
+    module list
+    export GCC_ROOT="$(dirname "$(dirname "$(readlink -f "$(command -v g++)")")")"
+    export ARTEMIS_SUITE=darwin-amd
     echo "...setup SUCCEEDED"
 elif [[ $PARTITION == "venado-gh" ]]; then
     module unload cray-libsci

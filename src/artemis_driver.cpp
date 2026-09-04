@@ -87,11 +87,17 @@ ArtemisDriver<GEOM>::ArtemisDriver(ParameterInput *pin, ApplicationInput *app_in
   ndim = pm->ndim;
 
   // Moments integrator
+  do_moment_unsplit = false;
+  do_moment_split = false;
   if (do_moment) {
-    auto rad_int = pin->GetOrAddString("radiation/moment", "integrator", "rk2");
-    PARTHENON_REQUIRE(((rad_int == "rk1") || (rad_int == "rk2") || (rad_int == "rk3")),
-                      "radiation/integrator must be rk1,rk2, or rk3.")
-    rad_integrator = std::make_unique<Integrator_t>(rad_int);
+    do_moment_split = pin->GetOrAddBoolean("radiation/moment", "split", true);
+    do_moment_unsplit = !do_moment_split;
+    if (do_moment_split) {
+      auto rad_int = pin->GetOrAddString("radiation/moment", "integrator", "rk2");
+      PARTHENON_REQUIRE(((rad_int == "rk1") || (rad_int == "rk2") || (rad_int == "rk3")),
+                        "radiation/integrator must be rk1,rk2, or rk3.")
+      rad_integrator = std::make_unique<Integrator_t>(rad_int);
+    }
   }
 
   // NBody integrator and initialization
@@ -157,7 +163,7 @@ TaskListStatus ArtemisDriver<GEOM>::Step() {
   }
 
   // Operator split, moments subcycling (M1 or P1)
-  if (do_moment) {
+  if (do_moment_split) {
     status = Moments::MomentsDriver<GEOM>(pmesh, tm, rad_integrator.get());
     if (status != TaskListStatus::complete) return status;
   }
@@ -192,7 +198,7 @@ void ArtemisDriver<GEOM>::PreStepTasks() {
   // set the integration timestep
   integrator->dt = tm.dt;
   if (do_nbody) nbody_integrator->dt = tm.dt;
-  if (do_moment) rad_integrator->dt = tm.dt;
+  if (do_moment_split) rad_integrator->dt = tm.dt;
 
   // Extract Base MeshData Registers
   auto &base = pmesh->mesh_data.Get();
@@ -205,7 +211,7 @@ void ArtemisDriver<GEOM>::PreStepTasks() {
   auto &u1 = pmesh->mesh_data.Add("u1", u0);
 
   // Assign registers with fields required for moments
-  if (do_moment) {
+  if (do_moment_split) {
     parthenon::Metadata::FlagCollection moments_flags, geom_flags;
     moments_flags.TakeUnion(pmesh->packages.Get("moments")->GetMetadataFlag());
     geom_flags.TakeUnion(pmesh->packages.Get("geometry")->GetMetadataFlag());
@@ -270,10 +276,13 @@ TaskCollection ArtemisDriver<GEOM>::StepTasks() {
       // Compute hydrodynamic fluxes
       // NOTE(@adempsey): 1st stage of VL2 uses piecewise constant reconstruction
       const bool do_pcm = ((stage == 1) && (integrator->GetName() == "vl2"));
-      TaskID gas_flx = none, dust_flx = none;
+      TaskID gas_flx = none, dust_flx = none, rad_flx = none;
       if (do_gas && update_fluxes)
         gas_flx = tl.AddTask(none, Gas::CalculateFluxes, u0.get(), do_pcm);
       if (do_dust) dust_flx = tl.AddTask(none, Dust::CalculateFluxes, u0.get(), do_pcm);
+      if (do_moment_unsplit) {
+        rad_flx = tl.AddTask(none, Moments::CalculateFluxes, u0.get());
+      }
 
       // Compute (gas) diffusive fluxes
       TaskID diff_flx = none;
@@ -292,15 +301,15 @@ TaskCollection ArtemisDriver<GEOM>::StepTasks() {
 
       // Communicate and set fluxes
       auto send_flx =
-          tl.AddTask(gas_flx | dust_flx | diff_flx | edge_emf,
+          tl.AddTask(gas_flx | dust_flx | rad_flx | diff_flx | edge_emf,
                      parthenon::SendBoundBufs<parthenon::BoundaryType::flxcor_send>, u0);
       auto recv_flx = tl.AddTask(start_flx_recv, parthenon::ReceiveFluxCorrections, u0);
       auto set_flx = tl.AddTask(recv_flx, parthenon::SetFluxCorrections, u0);
 
       // Apply flux divergence
       auto update =
-          tl.AddTask(gas_flx | dust_flx | set_flx, ArtemisUtils::ApplyUpdate<GEOM>,
-                     u0.get(), u1.get(), g0, g1, bdt);
+          tl.AddTask(gas_flx | dust_flx | rad_flx | set_flx,
+                     ArtemisUtils::ApplyUpdate<GEOM>, u0.get(), u1.get(), g0, g1, bdt);
       auto update_mhd = gas_flx | set_flx;
       if (do_mhd) {
         update_mhd = tl.AddTask(edge_emf | set_flx, ArtemisUtils::ApplyFaceUpdate<GEOM>,
@@ -308,10 +317,13 @@ TaskCollection ArtemisDriver<GEOM>::StepTasks() {
       }
 
       // Apply "coordinate source terms"
-      TaskID gas_coord_src = update | update_mhd, dust_coord_src = update;
+      TaskID gas_coord_src = update | update_mhd, dust_coord_src = update, rad_coord_src;
       if (do_gas)
         gas_coord_src = tl.AddTask(update | update_mhd, Gas::FluxSource, u0.get(), bdt);
       if (do_dust) dust_coord_src = tl.AddTask(update, Dust::FluxSource, u0.get(), bdt);
+      if (do_moment_unsplit) {
+        rad_coord_src = tl.AddTask(update, Moments::FluxSource, u0.get(), bdt);
+      }
 
       // Apply (gas) diffusion sources
       TaskID gas_diff_src = gas_coord_src | diff_flx | set_flx;
@@ -334,17 +346,20 @@ TaskCollection ArtemisDriver<GEOM>::StepTasks() {
             tl.AddTask(gravity_src, SelfGravity::SelfGravity<GEOM>, u0.get(), time, bdt);
       }
 
-      TaskID rt_src = self_gravity_src;
+      TaskID rad_src = self_gravity_src;
       // Note that radiation moments will handle this source term if active
-      if (do_raytrace && !do_moment) {
-        rt_src = tl.AddTask(self_gravity_src, Gas::DepositEnergy, u0.get(), bdt);
+      if (do_moment_unsplit) {
+        rad_src =
+            tl.AddTask(self_gravity_src, Moments::MatterCoupling<GEOM>, u0.get(), bdt);
+      } else if (do_raytrace && !do_moment) {
+        rad_src = tl.AddTask(self_gravity_src, Gas::DepositEnergy, u0.get(), bdt);
       }
 
       // Apply rotating frame source term
-      TaskID rframe_src = rt_src;
+      TaskID rframe_src = rad_src;
       if (do_rotating_frame || do_orbital_advection) {
         rframe_src =
-            tl.AddTask(rt_src, RotatingFrame::RotatingFrameForce, u0.get(), time, bdt);
+            tl.AddTask(rad_src, RotatingFrame::RotatingFrameForce, u0.get(), time, bdt);
       }
 
       // Apply problem-generator source terms in registration order

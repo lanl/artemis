@@ -43,6 +43,13 @@ KOKKOS_FORCEINLINE_FUNCTION Real VDot(const V1 &a, const V2 &b) {
   return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 }
 
+KOKKOS_FORCEINLINE_FUNCTION Real VNorm(const std::array<Real, 2> &v) {
+  return std::sqrt(SQR(v[0]) + SQR(v[1]));
+}
+KOKKOS_FORCEINLINE_FUNCTION Real VNorm(const std::array<Real, 3> &v) {
+  return std::sqrt(SQR(v[0]) + SQR(v[1]) + SQR(v[2]));
+}
+
 //----------------------------------------------------------------------------------------
 //! \fn Real ArtemisUtils::DualEnergySIE(vmesh, const int b, const int n, const int k,
 //!                                      const int j, const int i, const Real de_switch,

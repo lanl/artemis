@@ -1,5 +1,5 @@
 //========================================================================================
-// (C) (or copyright) 2023-2025. Triad National Security, LLC. All rights reserved.
+// (C) (or copyright) 2023-2026. Triad National Security, LLC. All rights reserved.
 //
 // This program was produced under U.S. Government contract 89233218CNA000001 for Los
 // Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -53,14 +53,17 @@ KOKKOS_FORCEINLINE_FUNCTION Real VNorm(const std::array<Real, 3> &v) {
 //----------------------------------------------------------------------------------------
 //! \fn Real ArtemisUtils::DualEnergySIE(vmesh, const int b, const int n, const int k,
 //!                                      const int j, const int i, const Real de_switch,
-//!                                      const Real hx[3])
+//!                                      const Real hx[3], const Real emag)
 //! \brief Returns appropriate specific internal energy variable based on de_switch
+//! If `de_switch <= 0`, the dual-energy switch is disabled and total-energy recovery is
+//! used whenever the recovered thermal energy is positive.
 //! NOTE(@pdmullen): Floors should be handled outside this function call
 template <typename T>
 KOKKOS_FORCEINLINE_FUNCTION Real DualEnergySIE(T &vmesh, const int b, const int n,
                                                const int k, const int j, const int i,
                                                const Real de_switch,
-                                               const std::array<Real, 3> &hx) {
+                                               const std::array<Real, 3> &hx,
+                                               const Real emag = 0.0) {
   // Extract state vector
   const Real invd = 1.0 / vmesh(b, gas::cons::density(n), k, j, i);
   const Real &rv1 = vmesh(b, gas::cons::momentum(VI(n, 0)), k, j, i) / hx[0];
@@ -71,9 +74,10 @@ KOKKOS_FORCEINLINE_FUNCTION Real DualEnergySIE(T &vmesh, const int b, const int 
   const Real ke = 0.5 * invd * (SQR(rv1) + SQR(rv2) + SQR(rv3));
 
   // Calculate conserved representation of internal energy
-  const Real ut_sie = invd * (u_e - ke);
-  const bool dual_switch = (ut_sie > invd * de_switch * u_e);
-  return (dual_switch)*ut_sie + (!dual_switch) * invd * u_u;
+  const Real ut_sie = invd * (u_e - (ke + emag));
+  const bool use_total =
+      (de_switch <= 0.0) ? (ut_sie > 0.0) : (ut_sie > invd * de_switch * u_e);
+  return use_total ? ut_sie : invd * u_u;
 }
 
 //----------------------------------------------------------------------------------------
@@ -180,8 +184,12 @@ struct SumMyArray {
 //! Defined in artemis_utils.cpp
 //! NOTE(@pdmullen): We should likely move everything above to implementation file too...
 void PrintArtemisConfiguration(Packages_t &packages);
+void PreStepDiagnosticsRemeshDivB(SimTime const &simtime, MeshData<Real> *rc);
+void PostStepDiagnosticsRemeshDivB(SimTime const &simtime, MeshData<Real> *rc);
 void EnrollArtemisRefinementOps(parthenon::Metadata &m, Coordinates coords,
                                 const bool log, const bool use_minmod_slope = true);
+void EnrollArtemisFaceRefinementOps(parthenon::Metadata &m, Coordinates coords,
+                                    const bool log, const bool use_minmod_slope = true);
 std::vector<std::vector<Real>> loadtxt(std::string fname);
 
 // 4D  outer parallel loop using Kokkos Teams

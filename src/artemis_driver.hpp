@@ -57,7 +57,7 @@ class ArtemisDriver : public EvolutionDriver {
   bool do_gravity, do_self_gravity, do_nbody, do_rotating_frame;
   bool do_orbital_advection;
   bool do_cooling, do_drag, do_viscosity, do_conduction, do_diffusion;
-  bool do_coagulation, do_raytrace;
+  bool do_coagulation, do_raytrace, do_mhd;
   bool update_fluxes;
   const bool is_restart;
 };

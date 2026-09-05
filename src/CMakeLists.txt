@@ -50,6 +50,9 @@ set (SRC_LIST
   gravity/point_mass.cpp
   gravity/uniform.cpp
 
+  mhd/mhd.cpp
+  mhd/mhd.hpp
+
   nbody/nbody.cpp
   nbody/nbody.hpp
   nbody/nbody_advance.cpp
@@ -66,6 +69,7 @@ set (SRC_LIST
   pgen/conduction.hpp
   pgen/constant.hpp
   pgen/disk.hpp
+  pgen/field_loop.hpp
   pgen/gaussian_bump.hpp
   pgen/grav_slab.hpp
   pgen/kh.hpp

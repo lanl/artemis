@@ -21,7 +21,8 @@ problem_id = linear_wave  # problem ID: basename of output filenames
 <parthenon/output1>
 variables = gas.prim.density,  &
             gas.prim.velocity, &
-            gas.prim.pressure
+            gas.prim.pressure, &
+            field.cell.B
 file_type = hdf5  # HDF5 data dump
 dt        = 0.1   # time increment between outputs
 
@@ -73,7 +74,7 @@ gamma = 1.66666666667
 
 <problem>
 nperiod   = 1       # Number of wave crossing periods to evolve simulation
-wave_flag = 3       # Wave family number ([0-4] for adiabatic hydro)
+wave_flag = 3       # Wave family number ([0-4] for hydro, [0-6] for MHD)
 amp       = 1.0e-3  # Wave Amplitude
 vflow     = 1.0     # background flow velocity
 along_x1  = false   # set to 'true' for wave along x1-axis

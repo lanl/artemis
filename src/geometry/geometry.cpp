@@ -50,6 +50,9 @@ void EnrollFields(StateDescriptor *pkg, CoordParams &cpars) {
     ADD_FIELD(geom::hx1f3);
     ADD_FIELD(geom::hx2f3);
     ADD_FIELD(geom::hx3f3);
+    ADD_FIELD(geom::hx1e1);
+    ADD_FIELD(geom::hx2e2);
+    ADD_FIELD(geom::hx3e3);
     ADD_FIELD(geom::dx1);
     ADD_FIELD(geom::dx2);
     ADD_FIELD(geom::dx3);
@@ -121,8 +124,8 @@ void InitBlockGeom(MeshBlock *pmb, ParameterInput *pin) {
       geom::dh2dx1, geom::dh3dx1, geom::dh1dx2, geom::dh2dx2, geom::dh3dx2, geom::dh1dx3,
       geom::dh2dx3, geom::dh3dx3, geom::rfw1m, geom::rfw1p, geom::rfw2m, geom::rfw2p,
       geom::rfw3m, geom::rfw3p, geom::hx1f1, geom::hx1f2, geom::hx1f3, geom::hx2f1,
-      geom::hx2f2, geom::hx2f3, geom::hx3f1, geom::hx3f2, geom::hx3f3>(
-      (pm->resolved_packages).get());
+      geom::hx2f2, geom::hx2f3, geom::hx3f1, geom::hx3f2, geom::hx3f3, geom::hx1e1,
+      geom::hx2e2, geom::hx3e3>((pm->resolved_packages).get());
   auto vg = desc_g.GetPack(md.get());
   IndexRange ib = md->GetBoundsI(IndexDomain::entire);
   IndexRange jb = md->GetBoundsJ(IndexDomain::entire);
@@ -277,6 +280,79 @@ void InitBlockGeom(MeshBlock *pmb, ParameterInput *pin) {
               Kokkos::atomic_store(&hx1f, coords.hx1(xf[0], xf[1], xf[2]));
               Kokkos::atomic_store(&hx2f, coords.hx2(xf[0], xf[1], xf[2]));
               Kokkos::atomic_store(&hx3f, coords.hx3(xf[0], xf[1], xf[2]));
+            }
+          }
+
+          {
+            auto xe = coords.EdgeCenX1(CellFace::lower, CellFace::lower);
+            Real &hx1e =
+                vg(b, geom::hx1e1())(coords.template index<geom::hx1e1>(k, j, i));
+            Kokkos::atomic_store(&hx1e, coords.hx1(xe[0], xe[1], xe[2]));
+            if (x2end) {
+              xe = coords.EdgeCenX1(CellFace::upper, CellFace::lower);
+              Real &hx1e =
+                  vg(b, geom::hx1e1())(coords.template index<geom::hx1e1>(k, j + 1, i));
+              Kokkos::atomic_store(&hx1e, coords.hx1(xe[0], xe[1], xe[2]));
+            }
+            if (x3end) {
+              xe = coords.EdgeCenX1(CellFace::lower, CellFace::upper);
+              Real &hx1e =
+                  vg(b, geom::hx1e1())(coords.template index<geom::hx1e1>(k + 1, j, i));
+              Kokkos::atomic_store(&hx1e, coords.hx1(xe[0], xe[1], xe[2]));
+            }
+            if (x2end && x3end) {
+              xe = coords.EdgeCenX1(CellFace::upper, CellFace::upper);
+              Real &hx1e = vg(b, geom::hx1e1())(
+                  coords.template index<geom::hx1e1>(k + 1, j + 1, i));
+              Kokkos::atomic_store(&hx1e, coords.hx1(xe[0], xe[1], xe[2]));
+            }
+          }
+          {
+            auto xe = coords.EdgeCenX2(CellFace::lower, CellFace::lower);
+            Real &hx2e =
+                vg(b, geom::hx2e2())(coords.template index<geom::hx2e2>(k, j, i));
+            Kokkos::atomic_store(&hx2e, coords.hx2(xe[0], xe[1], xe[2]));
+            if (x1end) {
+              xe = coords.EdgeCenX2(CellFace::upper, CellFace::lower);
+              Real &hx2e =
+                  vg(b, geom::hx2e2())(coords.template index<geom::hx2e2>(k, j, i + 1));
+              Kokkos::atomic_store(&hx2e, coords.hx2(xe[0], xe[1], xe[2]));
+            }
+            if (x3end) {
+              xe = coords.EdgeCenX2(CellFace::lower, CellFace::upper);
+              Real &hx2e =
+                  vg(b, geom::hx2e2())(coords.template index<geom::hx2e2>(k + 1, j, i));
+              Kokkos::atomic_store(&hx2e, coords.hx2(xe[0], xe[1], xe[2]));
+            }
+            if (x1end && x3end) {
+              xe = coords.EdgeCenX2(CellFace::upper, CellFace::upper);
+              Real &hx2e = vg(b, geom::hx2e2())(
+                  coords.template index<geom::hx2e2>(k + 1, j, i + 1));
+              Kokkos::atomic_store(&hx2e, coords.hx2(xe[0], xe[1], xe[2]));
+            }
+          }
+          {
+            auto xe = coords.EdgeCenX3(CellFace::lower, CellFace::lower);
+            Real &hx3e =
+                vg(b, geom::hx3e3())(coords.template index<geom::hx3e3>(k, j, i));
+            Kokkos::atomic_store(&hx3e, coords.hx3(xe[0], xe[1], xe[2]));
+            if (x1end) {
+              xe = coords.EdgeCenX3(CellFace::upper, CellFace::lower);
+              Real &hx3e =
+                  vg(b, geom::hx3e3())(coords.template index<geom::hx3e3>(k, j, i + 1));
+              Kokkos::atomic_store(&hx3e, coords.hx3(xe[0], xe[1], xe[2]));
+            }
+            if (x2end) {
+              xe = coords.EdgeCenX3(CellFace::lower, CellFace::upper);
+              Real &hx3e =
+                  vg(b, geom::hx3e3())(coords.template index<geom::hx3e3>(k, j + 1, i));
+              Kokkos::atomic_store(&hx3e, coords.hx3(xe[0], xe[1], xe[2]));
+            }
+            if (x1end && x2end) {
+              xe = coords.EdgeCenX3(CellFace::upper, CellFace::upper);
+              Real &hx3e = vg(b, geom::hx3e3())(
+                  coords.template index<geom::hx3e3>(k, j + 1, i + 1));
+              Kokkos::atomic_store(&hx3e, coords.hx3(xe[0], xe[1], xe[2]));
             }
           }
 

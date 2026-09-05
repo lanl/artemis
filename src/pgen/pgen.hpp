@@ -26,12 +26,14 @@
 #include "constant.hpp"
 #include "crooked_pipe.hpp"
 #include "disk.hpp"
+#include "field_loop.hpp"
 #include "gaussian_bump.hpp"
 #include "geometry/geometry.hpp"
 #include "grav_slab.hpp"
 #include "kh.hpp"
 #include "linear_wave.hpp"
 #include "lw.hpp"
+#include "orszag_tang.hpp"
 #include "polytrope.hpp"
 #include "rt.hpp"
 #include "shock.hpp"
@@ -62,6 +64,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
     constant::ProblemGenerator<T>(pmb, pin);
   } else if (name == "disk") {
     disk::ProblemGenerator<T>(pmb, pin);
+  } else if (name == "field_loop") {
+    field_loop::ProblemGenerator<T>(pmb, pin);
   } else if (name == "gaussian_bump") {
     gaussian_bump::ProblemGenerator<T>(pmb, pin);
   } else if (name == "grav_slab") {
@@ -70,6 +74,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
     linear_wave::ProblemGenerator<T>(pmb, pin);
   } else if (name == "lw") {
     lw::ProblemGenerator<T>(pmb, pin);
+  } else if (name == "orszag_tang") {
+    orszag_tang::ProblemGenerator<T>(pmb, pin);
   } else if (name == "polytrope") {
     polytrope::ProblemGenerator<T>(pmb, pin);
   } else if (name == "kh") {

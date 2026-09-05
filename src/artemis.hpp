@@ -97,6 +97,17 @@ PAR_VAR(grav, phi);
 PAR_VAR(grav, rhs);
 } // namespace grav
 
+namespace field {
+namespace face {
+PAR_VAR(field.face, B);
+} // namespace face
+namespace cell {
+PAR_VAR(field.cell, B);
+PAR_VAR(field.cell, energy);
+PAR_VAR(field.cell, divB);
+} // namespace cell
+} // namespace field
+
 namespace geom {
 PAR_VAR(geom, x1v);
 PAR_VAR(geom, x2v);
@@ -113,9 +124,15 @@ PAR_VAR(geom, hx3f2);
 PAR_VAR(geom, hx1f3);
 PAR_VAR(geom, hx2f3);
 PAR_VAR(geom, hx3f3);
+PAR_VAR(geom, hx1e1);
+PAR_VAR(geom, hx2e2);
+PAR_VAR(geom, hx3e3);
 PAR_VAR(geom, dx1);
 PAR_VAR(geom, dx2);
 PAR_VAR(geom, dx3);
+PAR_VAR(geom, dl1);
+PAR_VAR(geom, dl2);
+PAR_VAR(geom, dl3);
 PAR_VAR(geom, vol);
 PAR_VAR(geom, ax1);
 PAR_VAR(geom, ax2);
@@ -157,7 +174,7 @@ enum class Coordinates {
 };
 
 // ...Riemann solvers
-enum class RSolver { hllc_general, hlle, llf, hllc_gamma, null };
+enum class RSolver { hllc_general, hlle, llf, hllc_gamma, hlld, null };
 // ... Upwinding (left vs right state)
 enum class Upwind { l, r, null };
 // ...Reconstruction algorithms

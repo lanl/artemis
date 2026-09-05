@@ -70,6 +70,30 @@ ScaleMomentumFlux(parthenon::team_mbr_t const &member, const geometry::CoordPara
 }
 
 //----------------------------------------------------------------------------------------
+//! \fn  void ExtendMHDFluxBounds
+//! \brief Extends transverse flux bounds needed by constrained transport.
+template <int DIR>
+void ExtendMHDFluxBounds(const bool multi_d, const bool three_d, int &il, int &iu,
+                         int &jl, int &ju, int &kl, int &ku) {
+  if constexpr (DIR == X1DIR) {
+    jl -= multi_d;
+    ju += multi_d;
+    kl -= three_d;
+    ku += three_d;
+  } else if constexpr (DIR == X2DIR) {
+    il -= 1;
+    iu += 1;
+    kl -= three_d;
+    ku += three_d;
+  } else if constexpr (DIR == X3DIR) {
+    il -= 1;
+    iu += 1;
+    jl -= 1;
+    ju += 1;
+  }
+}
+
+//----------------------------------------------------------------------------------------
 //! \fn  TaskStatus ArtemisUtils::CalculateFluxesImpl
 //! \brief Calculate hydrodynamic fluxes from reconstructed primitive variables.
 //! NOTE(PDM): flux kernel largely borrowed from AthenaPK/Parthenon-Hydro/AthenaK
@@ -128,40 +152,46 @@ TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, FLUX vflx,
 
   // X1-Flux
   int il = ib.s, iu = ib.e + 1;
-  int jl = jb.s - ((F == Fluid::gas) && do_mhd && multi_d);
-  int ju = jb.e + ((F == Fluid::gas) && do_mhd && multi_d);
-  int kl = kb.s - ((F == Fluid::gas) && do_mhd && three_d);
-  int ku = kb.e + ((F == Fluid::gas) && do_mhd && three_d);
+  int jl = jb.s, ju = jb.e, kl = kb.s, ku = kb.e;
+  if constexpr (F == Fluid::gas) {
+    if (do_mhd) {
+      ExtendMHDFluxBounds<X1DIR>(multi_d, three_d, il, iu, jl, ju, kl, ku);
+    }
+  }
   parthenon::par_for_outer(
       DEFAULT_OUTER_LOOP_PATTERN, "CalculateFluxes::X1-Flux", DevExecSpace(), scr_size,
       scr_level, 0, md->NumBlocks() - 1, kl, ku, jl, ju,
       KOKKOS_LAMBDA(parthenon::team_mbr_t mbr, const int b, const int k, const int j) {
         ScratchPad2D<Real> wl(mbr.team_scratch(scr_level), nvars, ncells1);
         ScratchPad2D<Real> wr(mbr.team_scratch(scr_level), nvars, ncells1);
+
+        // Capture these before their use in an if constexpr branch.
+        [[maybe_unused]] auto &vp_ = vp;
+        [[maybe_unused]] const auto do_mhd_ = do_mhd;
         int skip_index = -1;
         if constexpr (F == Fluid::gas) {
-          if (do_mhd) skip_index = vp.GetIndex(b, field::cell::B(X1DIR - 1));
+          if (do_mhd_) skip_index = vp_.GetIndex(b, field::cell::B(X1DIR - 1));
         }
 
         // Reconstruct qR[i] and qL[i+1]
         Reconstruction<RECON, X1DIR, G> recon;
-        recon(mbr, cpars, b, k, j, il - 1, iu, vp, vg, skip_index, wl, wr);
+        recon(mbr, cpars, b, k, j, il - 1, iu, vp_, vg, skip_index, wl, wr);
         mbr.team_barrier();
 
-        post_recon<F>(eos, dfloor, siefloor, do_mhd, mbr, X1DIR, b, k, j, il - 1, iu, vp,
-                      vflx, wl, wr);
+        post_recon<F>(eos, dfloor, siefloor, do_mhd_, mbr, X1DIR, b, k, j, il - 1, iu,
+                      vp_, vflx, wl, wr);
         mbr.team_barrier();
 
         // Compute fluxes over[is, ie + 1]
         RiemannSolver<RIEMANN, F, C> riemann;
-        riemann(eos, c, chat, mu0_code, do_mhd, mbr, b, k, j, il, iu, X1DIR, wl, wr, vp,
+        riemann(eos, c, chat, mu0_code, do_mhd_, mbr, b, k, j, il, iu, X1DIR, wl, wr, vp_,
                 vflx, vface);
         mbr.team_barrier();
 
         // Scale X1-momentum flux by appropriate scale factor for coord system
         ScaleMomentumFlux<G, F, X1DIR>(mbr, cpars, b, k, j, il, iu, vg, vflx);
         if constexpr (F == Fluid::gas) {
-          if (do_mhd) MHD::ScaleMHDFlux<G, X1DIR>(mbr, cpars, b, k, j, il, iu, vg, vp);
+          if (do_mhd_) MHD::ScaleMHDFlux<G, X1DIR>(mbr, cpars, b, k, j, il, iu, vg, vp_);
         }
       });
 
@@ -171,10 +201,7 @@ TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, FLUX vflx,
     il = ib.s, iu = ib.e, kl = kb.s, ku = kb.e;
     if constexpr (F == Fluid::gas) {
       if (do_mhd) {
-        il -= 1;
-        iu += 1;
-        kl -= three_d;
-        ku += three_d;
+        ExtendMHDFluxBounds<X2DIR>(multi_d, three_d, il, iu, jl, ju, kl, ku);
       }
     }
     scr_size = ScratchPad2D<Real>::shmem_size(nvars, ncells1) * 3;
@@ -185,9 +212,13 @@ TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, FLUX vflx,
           ScratchPad2D<Real> scr1(mbr.team_scratch(scr_level), nvars, ncells1);
           ScratchPad2D<Real> scr2(mbr.team_scratch(scr_level), nvars, ncells1);
           ScratchPad2D<Real> scr3(mbr.team_scratch(scr_level), nvars, ncells1);
+
+          // Capture these before their use in an if constexpr branch.
+          [[maybe_unused]] auto &vp_ = vp;
+          [[maybe_unused]] const auto do_mhd_ = do_mhd;
           int skip_index = -1;
           if constexpr (F == Fluid::gas) {
-            if (do_mhd) skip_index = vp.GetIndex(b, field::cell::B(X2DIR - 1));
+            if (do_mhd_) skip_index = vp_.GetIndex(b, field::cell::B(X2DIR - 1));
           }
 
           for (int j = jl; j <= ju; ++j) {
@@ -202,25 +233,25 @@ TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, FLUX vflx,
 
             // Reconstruct qR[j] and qL[j+1]
             Reconstruction<RECON, X2DIR, G> recon;
-            recon(mbr, cpars, b, k, j, il, iu, vp, vg, skip_index, wl_jp1, wr);
+            recon(mbr, cpars, b, k, j, il, iu, vp_, vg, skip_index, wl_jp1, wr);
             mbr.team_barrier();
 
-            post_recon<F>(eos, dfloor, siefloor, do_mhd, mbr, X2DIR, b, k, j, il, iu, vp,
-                          vflx, wl_jp1, wr);
+            post_recon<F>(eos, dfloor, siefloor, do_mhd_, mbr, X2DIR, b, k, j, il, iu,
+                          vp_, vflx, wl_jp1, wr);
             mbr.team_barrier();
 
             if (j > jl) {
               // compute fluxes over [js,je+1]
               RiemannSolver<RIEMANN, F, C> riemann;
-              riemann(eos, c, chat, mu0_code, do_mhd, mbr, b, k, j, il, iu, X2DIR, wl, wr,
-                      vp, vflx, vface);
+              riemann(eos, c, chat, mu0_code, do_mhd_, mbr, b, k, j, il, iu, X2DIR, wl,
+                      wr, vp_, vflx, vface);
               mbr.team_barrier();
 
               // Scale X2-momentum flux by appropriate scale factor for coord system
               ScaleMomentumFlux<G, F, X2DIR>(mbr, cpars, b, k, j, il, iu, vg, vflx);
               if constexpr (F == Fluid::gas) {
-                if (do_mhd)
-                  MHD::ScaleMHDFlux<G, X2DIR>(mbr, cpars, b, k, j, il, iu, vg, vp);
+                if (do_mhd_)
+                  MHD::ScaleMHDFlux<G, X2DIR>(mbr, cpars, b, k, j, il, iu, vg, vp_);
               }
             }
           }
@@ -233,10 +264,7 @@ TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, FLUX vflx,
     il = ib.s, iu = ib.e, jl = jb.s, ju = jb.e;
     if constexpr (F == Fluid::gas) {
       if (do_mhd) {
-        il -= 1;
-        iu += 1;
-        jl -= 1;
-        ju += 1;
+        ExtendMHDFluxBounds<X3DIR>(multi_d, three_d, il, iu, jl, ju, kl, ku);
       }
     }
     scr_size = ScratchPad2D<Real>::shmem_size(nvars, ncells1) * 3;
@@ -247,9 +275,13 @@ TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, FLUX vflx,
           ScratchPad2D<Real> scr1(mbr.team_scratch(scr_level), nvars, ncells1);
           ScratchPad2D<Real> scr2(mbr.team_scratch(scr_level), nvars, ncells1);
           ScratchPad2D<Real> scr3(mbr.team_scratch(scr_level), nvars, ncells1);
+
+          // Capture these before their use in an if constexpr branch.
+          [[maybe_unused]] auto &vp_ = vp;
+          [[maybe_unused]] const auto do_mhd_ = do_mhd;
           int skip_index = -1;
           if constexpr (F == Fluid::gas) {
-            if (do_mhd) skip_index = vp.GetIndex(b, field::cell::B(X3DIR - 1));
+            if (do_mhd_) skip_index = vp_.GetIndex(b, field::cell::B(X3DIR - 1));
           }
 
           for (int k = kl; k <= ku; ++k) {
@@ -264,25 +296,25 @@ TaskStatus CalculateFluxesImpl(MeshData<Real> *md, PKG &pkg, PRIM vp, FLUX vflx,
 
             // Reconstruct qR[k] and qL[k+1]
             Reconstruction<RECON, X3DIR, G> recon;
-            recon(mbr, cpars, b, k, j, il, iu, vp, vg, skip_index, wl_kp1, wr);
+            recon(mbr, cpars, b, k, j, il, iu, vp_, vg, skip_index, wl_kp1, wr);
             mbr.team_barrier();
 
-            post_recon<F>(eos, dfloor, siefloor, do_mhd, mbr, X3DIR, b, k, j, il, iu, vp,
-                          vflx, wl_kp1, wr);
+            post_recon<F>(eos, dfloor, siefloor, do_mhd_, mbr, X3DIR, b, k, j, il, iu,
+                          vp_, vflx, wl_kp1, wr);
             mbr.team_barrier();
 
             // compute fluxes over [ks,ke+1]
             if (k > kl) {
               RiemannSolver<RIEMANN, F, C> riemann;
-              riemann(eos, c, chat, mu0_code, do_mhd, mbr, b, k, j, il, iu, X3DIR, wl, wr,
-                      vp, vflx, vface);
+              riemann(eos, c, chat, mu0_code, do_mhd_, mbr, b, k, j, il, iu, X3DIR, wl,
+                      wr, vp_, vflx, vface);
               mbr.team_barrier();
 
               // Scale X3-momentum flux by appropriate scale factor for coord system
               ScaleMomentumFlux<G, F, X3DIR>(mbr, cpars, b, k, j, il, iu, vg, vflx);
               if constexpr (F == Fluid::gas) {
-                if (do_mhd)
-                  MHD::ScaleMHDFlux<G, X3DIR>(mbr, cpars, b, k, j, il, iu, vg, vp);
+                if (do_mhd_)
+                  MHD::ScaleMHDFlux<G, X3DIR>(mbr, cpars, b, k, j, il, iu, vg, vp_);
               }
             }
           }

@@ -164,7 +164,8 @@ int main(int argc, char *argv[]) {
   parthenon::ParthenonManager pman;
 
   // Set up kokkos and read pin
-  auto manager_status = pman.ParthenonInitEnv(argc, argv);
+  auto manager_status = pman.ParthenonInitEnv(
+      argc, argv, {parthenon::InputParserPolicy::Auto, parthenon::RummyMode::FullLoose});
   if (manager_status == ParthenonStatus::complete) {
     pman.ParthenonFinalize();
     return 0;

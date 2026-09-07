@@ -15,6 +15,9 @@
 #include <globals.hpp>
 #include <parameter_input.hpp>
 
+#include <cctype>
+#include <set>
+
 // Artemis includes
 #include "artemis.hpp"
 #include "nbody.hpp"
@@ -49,6 +52,25 @@ std::vector<std::string> split(const std::string &str, char delim) {
     res.push_back(item);
   }
   return res;
+}
+
+bool IsDecimal(const std::string &value) {
+  return !value.empty() && std::all_of(value.begin(), value.end(), [](unsigned char c) {
+    return std::isdigit(c) != 0;
+  });
+}
+
+int ResolveParticleReference(ParameterInput *pin, const std::string &block_name,
+                             const std::string &field,
+                             const std::map<std::string, int> &particle_ids) {
+  if (!pin->DoesParameterExist(block_name, field)) return -1;
+  const std::string raw = SanitizeString(pin->GetAsUnresolvedString(block_name, field));
+  if (IsDecimal(raw)) return std::stoi(raw);
+  auto it = particle_ids.find(raw);
+  if (it != particle_ids.end()) return it->second;
+  std::stringstream msg;
+  msg << "Unknown particle reference '" << raw << "' in " << block_name << "/" << field;
+  PARTHENON_FAIL(msg);
 }
 
 //----------------------------------------------------------------------------------------
@@ -159,29 +181,29 @@ ParticleParams CreateNewParticle(Real m, Real radius, Real rs, std::string stype
 //----------------------------------------------------------------------------------------
 //! \fn  void NBody::ReadParticleBlock
 //! \brief
-void ReadParticleBlock(ParameterInput *pin, parthenon::InputBlock *pib,
+void ReadParticleBlock(ParameterInput *pin, std::string block_name,
                        ParticleParams &part) {
-  std::vector<std::string> subs = split(pib->block_name, '/');
+  std::vector<std::string> subs = split(block_name, '/');
   if (subs.size() <= 2) {
     // <nbody/particle1>
-    part.m = pin->GetReal(pib->block_name, "mass");
-    part.radius = pin->GetOrAddReal(pib->block_name, "radius", 0.0);
-    part.couple = pin->GetOrAddInteger(pib->block_name, "couple", 1);
-    part.live = pin->GetOrAddInteger(pib->block_name, "live", 0);
-    part.live_after = pin->GetOrAddReal(pib->block_name, "live_after", 0.0);
-    part.target_rad = pin->GetOrAddReal(pib->block_name, "refine_distance", 0.0);
+    part.m = pin->GetReal(block_name, "mass");
+    part.radius = pin->GetOrAddReal(block_name, "radius", 0.0);
+    part.couple = pin->GetOrAddInteger(block_name, "couple", 1);
+    part.live = pin->GetOrAddInteger(block_name, "live", 0);
+    part.live_after = pin->GetOrAddReal(block_name, "live_after", 0.0);
+    part.target_rad = pin->GetOrAddReal(block_name, "refine_distance", 0.0);
   } else {
     if (subs[2] == "soft") {
       // <nbody/particle1/soft>
-      std::string ityp = pin->GetString(pib->block_name, "type");
+      std::string ityp = pin->GetString(block_name, "type");
       if (ityp == "none") {
         part.rs = 0.0;
         part.stype = SoftType::plummer;
       } else if (ityp == "plummer") {
-        part.rs = pin->GetReal(pib->block_name, "radius");
+        part.rs = pin->GetReal(block_name, "radius");
         part.stype = SoftType::plummer;
       } else if (ityp == "spline") {
-        part.rs = pin->GetReal(pib->block_name, "radius");
+        part.rs = pin->GetReal(block_name, "radius");
         part.stype = SoftType::spline;
       } else {
         std::stringstream msg;
@@ -190,17 +212,17 @@ void ReadParticleBlock(ParameterInput *pin, parthenon::InputBlock *pib,
       }
     } else if (subs[2] == "sink") {
       // <nbody/particle1/sink>
-      part.racc = pin->GetReal(pib->block_name, "radius");
-      part.gamma = pin->GetReal(pib->block_name, "gamma");
-      part.beta = pin->GetOrAddReal(pib->block_name, "beta", 0.0);
+      part.racc = pin->GetReal(block_name, "radius");
+      part.gamma = pin->GetReal(block_name, "gamma");
+      part.beta = pin->GetOrAddReal(block_name, "beta", 0.0);
     } else if (subs[2] == "initialize") {
       // <nbody/particle1/init>
-      part.x = pin->GetOrAddReal(pib->block_name, "x", 0.0);
-      part.y = pin->GetOrAddReal(pib->block_name, "y", 0.0);
-      part.z = pin->GetOrAddReal(pib->block_name, "z", 0.0);
-      part.vx = pin->GetOrAddReal(pib->block_name, "vx", 0.0);
-      part.vy = pin->GetOrAddReal(pib->block_name, "vy", 0.0);
-      part.vz = pin->GetOrAddReal(pib->block_name, "vz", 0.0);
+      part.x = pin->GetOrAddReal(block_name, "x", 0.0);
+      part.y = pin->GetOrAddReal(block_name, "y", 0.0);
+      part.z = pin->GetOrAddReal(block_name, "z", 0.0);
+      part.vx = pin->GetOrAddReal(block_name, "vx", 0.0);
+      part.vy = pin->GetOrAddReal(block_name, "vy", 0.0);
+      part.vz = pin->GetOrAddReal(block_name, "vz", 0.0);
       part.init = 1;
     }
   }
@@ -211,49 +233,50 @@ void ReadParticleBlock(ParameterInput *pin, parthenon::InputBlock *pib,
 //----------------------------------------------------------------------------------------
 //! \fn  int NBody::ReadBinaryBlock
 //! \brief
-int ReadBinaryBlock(ParameterInput *pin, parthenon::InputBlock *pib,
-                    std::map<int, ParticleParams> &parts) {
+int ReadBinaryBlock(ParameterInput *pin, std::string block_name,
+                    std::map<int, ParticleParams> &parts,
+                    const std::map<std::string, int> &particle_ids) {
   int new_parts = 0;
-  std::vector<std::string> subs = split(pib->block_name, '/');
+  std::vector<std::string> subs = split(block_name, '/');
   if (subs.size() <= 2) {
     // <nbody/binary1>
-    Real mass = pin->GetOrAddReal(pib->block_name, "mass", -1.0);
+    Real mass = pin->GetOrAddReal(block_name, "mass", -1.0);
     struct Orbit orb = {0};
-    orb.a = pin->GetReal(pib->block_name, "a");
-    orb.e = pin->GetOrAddReal(pib->block_name, "e", 0.0);
-    orb.i = (pin->GetOrAddReal(pib->block_name, "i", 0.0) / 180.0) * M_PI;
-    orb.o = (pin->GetOrAddReal(pib->block_name, "o", 0.0) / 180.0) * M_PI;
-    orb.O = (pin->GetOrAddReal(pib->block_name, "O", 0.0) / 180.0) * M_PI;
-    orb.f = (pin->GetOrAddReal(pib->block_name, "f", 180.0) / 180.0) * M_PI;
+    orb.a = pin->GetReal(block_name, "a");
+    orb.e = pin->GetOrAddReal(block_name, "e", 0.0);
+    orb.i = (pin->GetOrAddReal(block_name, "i", 0.0) / 180.0) * M_PI;
+    orb.o = (pin->GetOrAddReal(block_name, "o", 0.0) / 180.0) * M_PI;
+    orb.O = (pin->GetOrAddReal(block_name, "O", 0.0) / 180.0) * M_PI;
+    orb.f = (pin->GetOrAddReal(block_name, "f", 180.0) / 180.0) * M_PI;
     Real Rb[3] = {Null<Real>()}, Vb[3] = {Null<Real>()};
-    Rb[0] = pin->GetOrAddReal(pib->block_name, "x", 0.0);
-    Rb[1] = pin->GetOrAddReal(pib->block_name, "y", 0.0);
-    Rb[2] = pin->GetOrAddReal(pib->block_name, "z", 0.0);
-    Vb[0] = pin->GetOrAddReal(pib->block_name, "vx", 0.0);
-    Vb[1] = pin->GetOrAddReal(pib->block_name, "vy", 0.0);
-    Vb[2] = pin->GetOrAddReal(pib->block_name, "vz", 0.0);
+    Rb[0] = pin->GetOrAddReal(block_name, "x", 0.0);
+    Rb[1] = pin->GetOrAddReal(block_name, "y", 0.0);
+    Rb[2] = pin->GetOrAddReal(block_name, "z", 0.0);
+    Vb[0] = pin->GetOrAddReal(block_name, "vx", 0.0);
+    Vb[1] = pin->GetOrAddReal(block_name, "vy", 0.0);
+    Vb[2] = pin->GetOrAddReal(block_name, "vz", 0.0);
 
     // Particles designation
-    int pp = pin->GetOrAddInteger(pib->block_name, "primary", -1);
-    int ss = pin->GetOrAddInteger(pib->block_name, "secondary", -1);
+    int pp = ResolveParticleReference(pin, block_name, "primary", particle_ids);
+    int ss = ResolveParticleReference(pin, block_name, "secondary", particle_ids);
     auto itp = parts.find(pp);
     auto its = parts.find(ss);
 
     if ((itp == parts.end()) || (its == parts.end()) || (pp == -1) || (ss == -1)) {
-      const Real qb = pin->GetReal(pib->block_name, "q");
-      const Real radius = pin->GetOrAddReal(pib->block_name, "radius", 0.0);
-      const Real rs = pin->GetOrAddReal(pib->block_name, "rsoft", 0.0);
-      const Real racc = pin->GetOrAddReal(pib->block_name, "rsink", 0.0);
-      const Real gamma = pin->GetOrAddReal(pib->block_name, "gamma", 0.0);
-      const Real beta = pin->GetOrAddReal(pib->block_name, "beta", 0.0);
-      const Real target_rad = pin->GetOrAddReal(pib->block_name, "refine_distance", 0.0);
-      const int live = pin->GetOrAddInteger(pib->block_name, "live", 0);
-      const Real live_after = pin->GetOrAddReal(pib->block_name, "live_after", 0);
-      const std::string stype = pin->GetOrAddString(pib->block_name, "stype", "spline");
-      const int couple = pin->GetOrAddInteger(pib->block_name, "couple", 0);
+      const Real qb = pin->GetReal(block_name, "q");
+      const Real radius = pin->GetOrAddReal(block_name, "radius", 0.0);
+      const Real rs = pin->GetOrAddReal(block_name, "rsoft", 0.0);
+      const Real racc = pin->GetOrAddReal(block_name, "rsink", 0.0);
+      const Real gamma = pin->GetOrAddReal(block_name, "gamma", 0.0);
+      const Real beta = pin->GetOrAddReal(block_name, "beta", 0.0);
+      const Real target_rad = pin->GetOrAddReal(block_name, "refine_distance", 0.0);
+      const int live = pin->GetOrAddInteger(block_name, "live", 0);
+      const Real live_after = pin->GetOrAddReal(block_name, "live_after", 0);
+      const std::string stype = pin->GetOrAddString(block_name, "stype", "spline");
+      const int couple = pin->GetOrAddInteger(block_name, "couple", 0);
       if (mass < 0.0) {
         std::stringstream msg;
-        msg << "mass < 0 for " << pib->block_name << ". Please set the mass.";
+        msg << "mass < 0 for " << block_name << ". Please set the mass.";
         PARTHENON_FAIL(msg);
       }
 
@@ -324,39 +347,40 @@ int ReadBinaryBlock(ParameterInput *pin, parthenon::InputBlock *pib,
 //----------------------------------------------------------------------------------------
 //! \fn  int NBody::ReadTripleBlock
 //! \brief
-int ReadTripleBlock(ParameterInput *pin, parthenon::InputBlock *pib,
-                    std::map<int, ParticleParams> &parts) {
+int ReadTripleBlock(ParameterInput *pin, std::string block_name,
+                    std::map<int, ParticleParams> &parts,
+                    const std::map<std::string, int> &particle_ids) {
   int new_parts = 0;
-  std::vector<std::string> subs = split(pib->block_name, '/');
+  std::vector<std::string> subs = split(block_name, '/');
   if (subs.size() <= 2) {
     // <nbody/triple1>
-    Real mass = pin->GetOrAddReal(pib->block_name, "mass", -1.0);
+    Real mass = pin->GetOrAddReal(block_name, "mass", -1.0);
     struct Orbit orb_o = {0};
-    orb_o.a = pin->GetReal(pib->block_name, "ao");
-    orb_o.e = pin->GetOrAddReal(pib->block_name, "eo", 0.0);
-    orb_o.i = (pin->GetOrAddReal(pib->block_name, "io", 0.0) / 180.0) * M_PI;
-    orb_o.o = (pin->GetOrAddReal(pib->block_name, "oo", 0.0) / 180.0) * M_PI;
-    orb_o.O = (pin->GetOrAddReal(pib->block_name, "Oo", 0.0) / 180.0) * M_PI;
-    orb_o.f = (pin->GetOrAddReal(pib->block_name, "fo", 180.0) / 180.0) * M_PI;
+    orb_o.a = pin->GetReal(block_name, "ao");
+    orb_o.e = pin->GetOrAddReal(block_name, "eo", 0.0);
+    orb_o.i = (pin->GetOrAddReal(block_name, "io", 0.0) / 180.0) * M_PI;
+    orb_o.o = (pin->GetOrAddReal(block_name, "oo", 0.0) / 180.0) * M_PI;
+    orb_o.O = (pin->GetOrAddReal(block_name, "Oo", 0.0) / 180.0) * M_PI;
+    orb_o.f = (pin->GetOrAddReal(block_name, "fo", 180.0) / 180.0) * M_PI;
     struct Orbit orb = {0};
-    orb.a = pin->GetReal(pib->block_name, "a");
-    orb.e = pin->GetOrAddReal(pib->block_name, "e", 0.0);
-    orb.i = (pin->GetOrAddReal(pib->block_name, "i", 0.0) / 180.) * M_PI;
-    orb.o = (pin->GetOrAddReal(pib->block_name, "o", 0.0) / 180.) * M_PI;
-    orb.O = (pin->GetOrAddReal(pib->block_name, "O", 0.0) / 180.) * M_PI;
-    orb.f = (pin->GetOrAddReal(pib->block_name, "f", 180.) / 180.) * M_PI;
+    orb.a = pin->GetReal(block_name, "a");
+    orb.e = pin->GetOrAddReal(block_name, "e", 0.0);
+    orb.i = (pin->GetOrAddReal(block_name, "i", 0.0) / 180.) * M_PI;
+    orb.o = (pin->GetOrAddReal(block_name, "o", 0.0) / 180.) * M_PI;
+    orb.O = (pin->GetOrAddReal(block_name, "O", 0.0) / 180.) * M_PI;
+    orb.f = (pin->GetOrAddReal(block_name, "f", 180.) / 180.) * M_PI;
     Real Rc[3] = {Null<Real>()}, Vc[3] = {Null<Real>()};
-    Rc[0] = pin->GetOrAddReal(pib->block_name, "x", 0.0);
-    Rc[1] = pin->GetOrAddReal(pib->block_name, "y", 0.0);
-    Rc[2] = pin->GetOrAddReal(pib->block_name, "z", 0.0);
-    Vc[0] = pin->GetOrAddReal(pib->block_name, "vx", 0.0);
-    Vc[1] = pin->GetOrAddReal(pib->block_name, "vy", 0.0);
-    Vc[2] = pin->GetOrAddReal(pib->block_name, "vz", 0.0);
+    Rc[0] = pin->GetOrAddReal(block_name, "x", 0.0);
+    Rc[1] = pin->GetOrAddReal(block_name, "y", 0.0);
+    Rc[2] = pin->GetOrAddReal(block_name, "z", 0.0);
+    Vc[0] = pin->GetOrAddReal(block_name, "vx", 0.0);
+    Vc[1] = pin->GetOrAddReal(block_name, "vy", 0.0);
+    Vc[2] = pin->GetOrAddReal(block_name, "vz", 0.0);
 
     // Particles designation
-    int pp = pin->GetOrAddInteger(pib->block_name, "primary", -1);
-    int ss = pin->GetOrAddInteger(pib->block_name, "secondary", -1);
-    int tt = pin->GetOrAddInteger(pib->block_name, "tertiary", -1);
+    int pp = ResolveParticleReference(pin, block_name, "primary", particle_ids);
+    int ss = ResolveParticleReference(pin, block_name, "secondary", particle_ids);
+    int tt = ResolveParticleReference(pin, block_name, "tertiary", particle_ids);
     auto itp = parts.find(pp);
     auto its = parts.find(ss);
     auto itt = parts.find(tt);
@@ -364,21 +388,21 @@ int ReadTripleBlock(ParameterInput *pin, parthenon::InputBlock *pib,
     if ((itp == parts.end()) || (its == parts.end()) || (itt == parts.end()) ||
         (pp == -1) || (ss == -1) || (tt == -1)) {
       // Particles don't exist, create them
-      const Real qo = pin->GetReal(pib->block_name, "qo");
-      const Real q = pin->GetReal(pib->block_name, "q");
-      const Real radius = pin->GetOrAddReal(pib->block_name, "radius", 0.0);
-      const Real rs = pin->GetOrAddReal(pib->block_name, "rsoft", 0.0);
-      const Real racc = pin->GetOrAddReal(pib->block_name, "rsink", 0.0);
-      const Real gamma = pin->GetOrAddReal(pib->block_name, "gamma", 0.0);
-      const Real beta = pin->GetOrAddReal(pib->block_name, "beta", 0.0);
-      const Real target_rad = pin->GetOrAddReal(pib->block_name, "refine_distance", 0.0);
-      const int live = pin->GetOrAddInteger(pib->block_name, "live", 0);
-      const Real live_after = pin->GetOrAddReal(pib->block_name, "live_after", 0);
-      const std::string stype = pin->GetOrAddString(pib->block_name, "stype", "spline");
-      const int couple = pin->GetOrAddInteger(pib->block_name, "couple", 0);
+      const Real qo = pin->GetReal(block_name, "qo");
+      const Real q = pin->GetReal(block_name, "q");
+      const Real radius = pin->GetOrAddReal(block_name, "radius", 0.0);
+      const Real rs = pin->GetOrAddReal(block_name, "rsoft", 0.0);
+      const Real racc = pin->GetOrAddReal(block_name, "rsink", 0.0);
+      const Real gamma = pin->GetOrAddReal(block_name, "gamma", 0.0);
+      const Real beta = pin->GetOrAddReal(block_name, "beta", 0.0);
+      const Real target_rad = pin->GetOrAddReal(block_name, "refine_distance", 0.0);
+      const int live = pin->GetOrAddInteger(block_name, "live", 0);
+      const Real live_after = pin->GetOrAddReal(block_name, "live_after", 0);
+      const std::string stype = pin->GetOrAddString(block_name, "stype", "spline");
+      const int couple = pin->GetOrAddInteger(block_name, "couple", 0);
       if (mass < 0.0) {
         std::stringstream msg;
-        msg << "mass < 0 for " << pib->block_name << ". Please set the mass.";
+        msg << "mass < 0 for " << block_name << ". Please set the mass.";
         PARTHENON_FAIL(msg);
       }
 
@@ -496,14 +520,14 @@ int ReadTripleBlock(ParameterInput *pin, parthenon::InputBlock *pib,
 //! \brief Initializes a generic N-body system from a file
 //! The input file should read:
 //! # mass  x  y  z  vx   vy   vz   sft  gamma  beta target_rad
-int ReadNBodySystemBlock(ParameterInput *pin, parthenon::InputBlock *pib,
+int ReadNBodySystemBlock(ParameterInput *pin, std::string block_name,
                          std::map<int, ParticleParams> &parts) {
-  const int couple = pin->GetOrAddInteger(pib->block_name, "couple", 1);
-  const int live = pin->GetOrAddInteger(pib->block_name, "live", 0);
-  const Real live_after = pin->GetOrAddReal(pib->block_name, "live_after", 0.0);
-  SoftType stype = ReturnSoft(pin->GetOrAddString(pib->block_name, "stype", "spline"));
+  const int couple = pin->GetOrAddInteger(block_name, "couple", 1);
+  const int live = pin->GetOrAddInteger(block_name, "live", 0);
+  const Real live_after = pin->GetOrAddReal(block_name, "live_after", 0.0);
+  SoftType stype = ReturnSoft(pin->GetOrAddString(block_name, "stype", "spline"));
 
-  std::string fname = pin->GetString(pib->block_name, "input_file");
+  std::string fname = pin->GetString(block_name, "input_file");
   std::vector<std::vector<Real>> data = ArtemisUtils::loadtxt(fname);
   const int npart = static_cast<int>(data.size());
   int count = 0;
@@ -559,14 +583,14 @@ int ReadNBodySystemBlock(ParameterInput *pin, parthenon::InputBlock *pib,
 //! # q  a   e   i  f omega   bigOm   sft gamma  beta  target_rad radius
 //!
 //! User must add the central object with a separate particle / binary / system block
-int ReadPlanetarySystemBlock(ParameterInput *pin, parthenon::InputBlock *pib,
+int ReadPlanetarySystemBlock(ParameterInput *pin, std::string block_name,
                              std::map<int, ParticleParams> &parts) {
-  const int couple = pin->GetOrAddInteger(pib->block_name, "couple", 1);
-  const int live = pin->GetOrAddInteger(pib->block_name, "live", 0);
-  const Real live_after = pin->GetOrAddReal(pib->block_name, "live_after", 0.0);
-  SoftType stype = ReturnSoft(pin->GetOrAddString(pib->block_name, "stype", "spline"));
+  const int couple = pin->GetOrAddInteger(block_name, "couple", 1);
+  const int live = pin->GetOrAddInteger(block_name, "live", 0);
+  const Real live_after = pin->GetOrAddReal(block_name, "live_after", 0.0);
+  SoftType stype = ReturnSoft(pin->GetOrAddString(block_name, "stype", "spline"));
 
-  std::string fname = pin->GetString(pib->block_name, "input_file");
+  std::string fname = pin->GetString(block_name, "input_file");
   std::vector<std::vector<Real>> data = ArtemisUtils::loadtxt(fname);
   const int npart = static_cast<int>(data.size());
   int count = 0;
@@ -649,42 +673,91 @@ int ReadPlanetarySystemBlock(ParameterInput *pin, parthenon::InputBlock *pib,
 //! or you can specify just a binary block
 std::map<int, ParticleParams> NBodySetup(ParameterInput *pin, const Real G, Real &mresc) {
   int npart = 0;
-  parthenon::InputBlock *pib = pin->pfirst_block;
   std::map<int, ParticleParams> parts;
-  while (pib != nullptr) {
-    if (pib->block_name.compare(0, 14, "nbody/particle") == 0) {
-      // Get the id first from the block_name, reading up to the second "/""
-      std::vector<std::string> subs = split(pib->block_name, '/');
-      int id = std::stoi(subs[1].substr(8));
-      // Check if we read this particle yet
-      if (parts.count(id) == 0) {
-        ParticleParams part = {0};
-        part.id = id;
-        parts[id] = part;
-        npart++;
-      }
-      ReadParticleBlock(pin, pib, parts[id]);
+  auto blocks = pin->GetBlockNamesWithPrefix("nbody/particle");
+  std::set<int> used_ids;
+  for (const auto &block_name : blocks) {
+    const auto subs = split(block_name, '/');
+    if (subs.size() != 2) continue;
+    const std::string instance = subs.back();
+    if (instance.rfind("particle", 0) == 0 && IsDecimal(instance.substr(8)))
+      used_ids.insert(std::stoi(instance.substr(8)));
+  }
+  std::map<std::string, int> particle_ids;
+  for (const auto &block_name : blocks) {
+    const auto subs = split(block_name, '/');
+    if (subs.size() != 2) continue;
+    const std::string instance = subs.back();
+    int id;
+    if (instance.rfind("particle", 0) == 0 && IsDecimal(instance.substr(8))) {
+      id = std::stoi(instance.substr(8));
+    } else {
+      id = 0;
+      while (used_ids.count(id) != 0)
+        ++id;
+      used_ids.insert(id);
     }
-    pib = pib->pnext;
+    particle_ids[instance] = id;
+    particle_ids[block_name] = id;
+    // Check if we read this particle yet
+    if (parts.count(id) == 0) {
+      ParticleParams part = {0};
+      part.id = id;
+      parts[id] = part;
+      npart++;
+    }
+    ReadParticleBlock(pin, block_name, parts[id]);
+  }
+
+  // Apply child configuration blocks using the effective parent path. Canonical
+  // metadata makes `<nbody/particle(star)>` and `<./soft>` work without
+  // requiring a `particleN` spelling.
+  for (const auto &block : pin->GetBlocks()) {
+    const auto segments = split(block.name, '/');
+    const bool legacy_child =
+        block.canonical_path.empty() && segments.size() == 3 &&
+        segments[1].rfind("particle", 0) == 0 &&
+        (segments[2] == "soft" || segments[2] == "sink" || segments[2] == "initialize");
+    if (block.canonical_path != "nbody/particle/soft" &&
+        block.canonical_path != "nbody/particle/sink" &&
+        block.canonical_path != "nbody/particle/initialize" && !legacy_child)
+      continue;
+    const auto slash = block.name.find_last_of('/');
+    if (slash == std::string::npos) continue;
+    auto parent = particle_ids.find(block.name.substr(0, slash));
+    if (parent != particle_ids.end())
+      ReadParticleBlock(pin, block.name, parts[parent->second]);
   }
 
   // Initialize particles
-  pib = pin->pfirst_block;
-  while (pib != nullptr) {
-    if (pib->block_name.compare(0, 12, "nbody/binary") == 0) {
-      int new_p = ReadBinaryBlock(pin, pib, parts);
+  // Note that it is done this way to retain input deck ordering
+  for (const auto &block : pin->GetBlocks()) {
+    const auto &block_name = block.name;
+    const bool binary =
+        block.canonical_path == "nbody/binary" ||
+        (block.canonical_path.empty() && block_name.rfind("nbody/binary", 0) == 0);
+    const bool triple =
+        block.canonical_path == "nbody/triple" ||
+        (block.canonical_path.empty() && block_name.rfind("nbody/triple", 0) == 0);
+    const bool system =
+        block.canonical_path == "nbody/system" ||
+        (block.canonical_path.empty() && block_name.rfind("nbody/system", 0) == 0);
+    const bool planet =
+        block.canonical_path == "nbody/planet" ||
+        (block.canonical_path.empty() && block_name.rfind("nbody/planet", 0) == 0);
+    if (binary) {
+      int new_p = ReadBinaryBlock(pin, block_name, parts, particle_ids);
       npart += new_p;
-    } else if (pib->block_name.compare(0, 12, "nbody/triple") == 0) {
-      int new_p = ReadTripleBlock(pin, pib, parts);
+    } else if (triple) {
+      int new_p = ReadTripleBlock(pin, block_name, parts, particle_ids);
       npart += new_p;
-    } else if (pib->block_name.compare(0, 12, "nbody/system") == 0) {
-      int new_p = ReadNBodySystemBlock(pin, pib, parts);
+    } else if (system) {
+      int new_p = ReadNBodySystemBlock(pin, block_name, parts);
       npart += new_p;
-    } else if (pib->block_name.compare(0, 12, "nbody/planet") == 0) {
-      int new_p = ReadPlanetarySystemBlock(pin, pib, parts);
+    } else if (planet) {
+      int new_p = ReadPlanetarySystemBlock(pin, block_name, parts);
       npart += new_p;
     }
-    pib = pib->pnext;
   }
 
   // Normalize so that the total mass is equal to gravity/GM and the COM is at zero
@@ -712,12 +785,6 @@ std::map<int, ParticleParams> NBodySetup(ParameterInput *pin, const Real G, Real
     parts[id].vy = p.vy - V[1];
     parts[id].vz = p.vz - V[2];
   }
-  // if (parthenon::Globals::my_rank == 0) {
-  //  std::cout << npart << " Initial Particles: " << std::endl;
-  //  for (auto const &[id, p] : parts) {
-  //    PrintParticle(id, p);
-  //  }
-  //}
 
   return parts;
 }

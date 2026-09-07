@@ -11,6 +11,8 @@
 // the public, perform publicly and display publicly, and to permit others to do so.
 //========================================================================================
 
+#include <filesystem>
+#include <fstream>
 // Parthenon includes
 #include <defs.hpp>
 #include <parthenon_manager.hpp>
@@ -137,6 +139,9 @@ int ArtemisFinalize(const DriverStatus status, const bool quick_exit,
   } else if (status == DriverStatus::timeout) {
     if (Globals::my_rank == 0) std::cout << "artemis driver timed out!" << std::endl;
     ret = 2;
+    // remove the DO-NOT-RESTART file
+    // every proc does this, so the first one wins
+    std::filesystem::remove("DO-NOT-RESTART");
   } else {
     PARTHENON_WARN("artemis driver returned with an unknown code!");
   }
@@ -173,6 +178,16 @@ int main(int argc, char *argv[]) {
     pman.ParthenonFinalize();
     return 1;
   }
+
+  // Check for restart and create the DO-NOT-RESTART file
+  if (std::filesystem::exists("DO-NOT-RESTART")) {
+    PARTHENON_REQUIRE(!Globals::is_restart,
+                      "Trying to restart but DO-NOT-RESTART file exists!");
+  } else {
+    std::ofstream file("DO-NOT-RESTART");
+    file.close();
+  }
+
   // Redefine parthenon defaults
   pman.app_input->ProcessPackages = ProcessPackages;
 

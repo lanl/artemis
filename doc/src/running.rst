@@ -220,8 +220,7 @@ Return codes
 ^^^^^^^^^^^^
 
 When using batch submissions, it is possible to set up a self-restarting job.
-The easiest way to do this is to take advantage of SLURM interrupt signals and the |code| return code.
-|code|
+The easiest way to do this is to take advantage of SLURM interrupt signals and the ``DO-NOT-RESTART` file that |code| writes.
 
 An example CPU batch submission script, ``run.sh``, would look like:
 
@@ -233,7 +232,6 @@ An example CPU batch submission script, ``run.sh``, would look like:
   #SBATCH --ntasks-per-node=128
   #SBATCH -t 16:00:00
 
-  set -o pipefail
 
   if [ ! -f name.final.rst ]; then
     echo "Starting fresh"
@@ -243,19 +241,10 @@ An example CPU batch submission script, ``run.sh``, would look like:
     srun -n $SLURM_NPROCS artemis -r name.final.rst -t 15:50:00
   fi
 
-  EXITCODE=$?
-
-  set +o pipefail
-
-  if [[ $EXITCODE -eq 2 ]]; then
+  if [[ ! -f DO-NOT-RESTART ]];
    echo "Resubmitting"
    sbatch run.sh
   fi
 
 This stops |code| 10 minutes before the job ends.
-If the simulation has completed by then, |code| will return ``0``.
-Instead if it hasn't reached its end time yet, it will return ``2``.
-And if the simulation crashed for some reason, it will return ``1``.
-If the return code is ``2``, the batch script will resubmit itself.
-
 

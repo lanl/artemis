@@ -106,6 +106,19 @@ void ProblemModifier(parthenon::ParthenonManager *pman) {
       pman->app_input->RegisterBoundaryCondition(BF::outer_x1, "viscous",
                                                  disk::DiskBoundaryVisc<G, ID::outer_x1>);
     }
+  } else if (artemis_problem == "field") {
+    pman->app_input->RegisterBoundaryCondition(BF::inner_x1, "ic",
+                                               field::FieldBoundaryIC<G, ID::inner_x1>);
+    pman->app_input->RegisterBoundaryCondition(BF::outer_x1, "ic",
+                                               field::FieldBoundaryIC<G, ID::outer_x1>);
+    pman->app_input->RegisterBoundaryCondition(BF::inner_x2, "ic",
+                                               field::FieldBoundaryIC<G, ID::inner_x2>);
+    pman->app_input->RegisterBoundaryCondition(BF::outer_x2, "ic",
+                                               field::FieldBoundaryIC<G, ID::outer_x2>);
+    pman->app_input->RegisterBoundaryCondition(BF::inner_x3, "ic",
+                                               field::FieldBoundaryIC<G, ID::inner_x3>);
+    pman->app_input->RegisterBoundaryCondition(BF::outer_x3, "ic",
+                                               field::FieldBoundaryIC<G, ID::outer_x3>);
   } else if (artemis_problem == "grav_slab") {
     pman->app_input->UserWorkAfterLoop = grav_slab::UserWorkAfterLoop<G>;
   } else if (artemis_problem == "linear_wave") {

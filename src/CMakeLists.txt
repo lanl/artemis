@@ -75,6 +75,7 @@ set (SRC_LIST
   pgen/pgen.hpp
   pgen/problem_modifier.hpp
   pgen/rt.hpp
+  pgen/field.hpp
   pgen/shock.hpp
   pgen/strat.hpp
   pgen/thermalization.hpp

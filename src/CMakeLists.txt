@@ -51,6 +51,7 @@ set (SRC_LIST
   gravity/uniform.cpp
 
   mhd/mhd.cpp
+  mhd/emf.hpp
   mhd/mhd.hpp
 
   nbody/nbody.cpp

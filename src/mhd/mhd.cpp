@@ -18,6 +18,7 @@
 #include "artemis.hpp"
 #include "geometry/geometry.hpp"
 #include "mhd.hpp"
+#include "mhd/emf.hpp"
 #include "utils/artemis_utils.hpp"
 #include "utils/history.hpp"
 #include "utils/refinement/amr_criteria.hpp"
@@ -76,7 +77,8 @@ TaskStatus AssembleEdgeEMF(MeshData<Real> *md) {
   const auto do_mhd = artemis_pkg->template Param<bool>("do_mhd");
   if (!do_mhd) return TaskStatus::complete;
 
-  static auto desc = MakePackDescriptor<field::cell::B, field::face::B>(
+  static auto desc = MakePackDescriptor<gas::prim::velocity, gas::cons::density,
+                                        field::cell::B, field::face::B>(
       resolved_pkgs.get(), {}, {parthenon::PDOpt::WithFluxes});
   static auto desc_g =
       MakePackDescriptor<geom::x1v, geom::x2v, geom::x3v, geom::dx1, geom::dx2, geom::dx3,

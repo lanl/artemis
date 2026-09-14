@@ -349,8 +349,8 @@ TaskCollection ArtemisDriver<GEOM>::StepTasks() {
       TaskID rad_src = self_gravity_src;
       // Note that radiation moments will handle this source term if active
       if (do_moment_unsplit) {
-        rad_src =
-            tl.AddTask(self_gravity_src, Moments::MatterCoupling<GEOM>, u0.get(), bdt);
+        rad_src = tl.AddTask(self_gravity_src | rad_coord_src,
+                             Moments::MatterCoupling<GEOM>, u0.get(), bdt);
       } else if (do_raytrace && !do_moment) {
         rad_src = tl.AddTask(self_gravity_src, Gas::DepositEnergy, u0.get(), bdt);
       }

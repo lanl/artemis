@@ -13,10 +13,145 @@
 
 // C++ headers
 #include "artemis_utils.hpp"
+#include "geometry/geometry.hpp"
 #include "nbody/nbody_utils.hpp"
 #include "units.hpp"
 
 namespace ArtemisUtils {
+
+namespace {
+
+template <Coordinates GEOM>
+Real ComputeLocalMaxAbsFaceDivBImpl(const BlockList_t &blocks,
+                                    const geometry::CoordParams &cpars, const int ndim) {
+  using TE = TopologicalElement;
+  constexpr int f1 = static_cast<int>(TE::F1) % 3;
+  constexpr int f2 = static_cast<int>(TE::F2) % 3;
+  constexpr int f3 = static_cast<int>(TE::F3) % 3;
+  constexpr Real tiny = 1.0e-300;
+
+  Real max_divb = 0.0;
+  for (const auto &pmb : blocks) {
+    auto &md = pmb->meshblock_data.Get();
+    if (!md->HasVariable("field.face.B")) continue;
+
+    auto var = md->GetVarPtr("field.face.B");
+    if (!var->IsAllocated()) continue;
+
+    auto b = var->data;
+    auto pco = pmb->coords;
+    const auto ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
+    const auto jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
+    const auto kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
+
+    Real block_max_divb = 0.0;
+    if (ndim == 3) {
+      parthenon::par_reduce(
+          parthenon::loop_pattern_mdrange_tag, PARTHENON_AUTO_LABEL, DevExecSpace(), kb.s,
+          kb.e, jb.s, jb.e, ib.s, ib.e,
+          KOKKOS_LAMBDA(const int k, const int j, const int i, Real &lmax_divb) {
+            geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
+            const Real vol = coords.Volume();
+            const auto ax1 = coords.GetFaceAreaX1();
+            const auto ax2 = coords.GetFaceAreaX2();
+            const auto ax3 = coords.GetFaceAreaX3();
+            const Real divb = ((ax1[1] * b(f1, 0, 0, 0, k, j, i + 1) -
+                                ax1[0] * b(f1, 0, 0, 0, k, j, i)) +
+                               (ax2[1] * b(f2, 0, 0, 0, k, j + 1, i) -
+                                ax2[0] * b(f2, 0, 0, 0, k, j, i)) +
+                               (ax3[1] * b(f3, 0, 0, 0, k + 1, j, i) -
+                                ax3[0] * b(f3, 0, 0, 0, k, j, i))) /
+                              (vol + tiny);
+            const Real abs_divb = fabs(divb);
+            if (abs_divb > lmax_divb) lmax_divb = abs_divb;
+          },
+          Kokkos::Max<Real>(block_max_divb));
+    } else if (ndim == 2) {
+      const int k = kb.s;
+      parthenon::par_reduce(
+          parthenon::loop_pattern_mdrange_tag, PARTHENON_AUTO_LABEL, DevExecSpace(), jb.s,
+          jb.e, ib.s, ib.e,
+          KOKKOS_LAMBDA(const int j, const int i, Real &lmax_divb) {
+            geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
+            const Real vol = coords.Volume();
+            const auto ax1 = coords.GetFaceAreaX1();
+            const auto ax2 = coords.GetFaceAreaX2();
+            const Real divb = ((ax1[1] * b(f1, 0, 0, 0, k, j, i + 1) -
+                                ax1[0] * b(f1, 0, 0, 0, k, j, i)) +
+                               (ax2[1] * b(f2, 0, 0, 0, k, j + 1, i) -
+                                ax2[0] * b(f2, 0, 0, 0, k, j, i))) /
+                              (vol + tiny);
+            const Real abs_divb = fabs(divb);
+            if (abs_divb > lmax_divb) lmax_divb = abs_divb;
+          },
+          Kokkos::Max<Real>(block_max_divb));
+    } else {
+      const int k = kb.s;
+      const int j = jb.s;
+      parthenon::par_reduce(
+          parthenon::loop_pattern_flatrange_tag, PARTHENON_AUTO_LABEL, DevExecSpace(),
+          ib.s, ib.e,
+          KOKKOS_LAMBDA(const int i, Real &lmax_divb) {
+            geometry::Coords<GEOM> coords(cpars, pco, k, j, i);
+            const Real vol = coords.Volume();
+            const auto ax1 = coords.GetFaceAreaX1();
+            const Real divb = (ax1[1] * b(f1, 0, 0, 0, k, j, i + 1) -
+                               ax1[0] * b(f1, 0, 0, 0, k, j, i)) /
+                              (vol + tiny);
+            const Real abs_divb = fabs(divb);
+            if (abs_divb > lmax_divb) lmax_divb = abs_divb;
+          },
+          Kokkos::Max<Real>(block_max_divb));
+    }
+
+    max_divb = std::max(max_divb, block_max_divb);
+  }
+
+  return max_divb;
+}
+
+void PrintMeshMaxAbsDivB(Mesh *pm, const char *label) {
+  auto artemis = pm->packages.Get("artemis");
+  if (!artemis->Param<bool>("do_mhd")) return;
+
+  const auto coords = artemis->Param<Coordinates>("coords");
+  const auto &cpars = artemis->Param<geometry::CoordParams>("coord_params");
+  const int ndim = artemis->Param<int>("ndim");
+
+  Real max_divb = 0.0;
+  if (coords == Coordinates::cartesian) {
+    max_divb = ComputeLocalMaxAbsFaceDivBImpl<Coordinates::cartesian>(pm->block_list,
+                                                                      cpars, ndim);
+  } else if (coords == Coordinates::spherical1D) {
+    max_divb = ComputeLocalMaxAbsFaceDivBImpl<Coordinates::spherical1D>(pm->block_list,
+                                                                        cpars, ndim);
+  } else if (coords == Coordinates::spherical2D) {
+    max_divb = ComputeLocalMaxAbsFaceDivBImpl<Coordinates::spherical2D>(pm->block_list,
+                                                                        cpars, ndim);
+  } else if (coords == Coordinates::spherical3D) {
+    max_divb = ComputeLocalMaxAbsFaceDivBImpl<Coordinates::spherical3D>(pm->block_list,
+                                                                        cpars, ndim);
+  } else if (coords == Coordinates::cylindrical) {
+    max_divb = ComputeLocalMaxAbsFaceDivBImpl<Coordinates::cylindrical>(pm->block_list,
+                                                                        cpars, ndim);
+  } else if (coords == Coordinates::axisymmetric) {
+    max_divb = ComputeLocalMaxAbsFaceDivBImpl<Coordinates::axisymmetric>(pm->block_list,
+                                                                         cpars, ndim);
+  } else {
+    PARTHENON_FAIL("Invalid Artemis coordinate system for divB diagnostic.");
+  }
+
+#ifdef MPI_PARALLEL
+  PARTHENON_MPI_CHECK(MPI_Allreduce(MPI_IN_PLACE, &max_divb, 1, MPI_PARTHENON_REAL,
+                                    MPI_MAX, MPI_COMM_WORLD));
+#endif
+  if (parthenon::Globals::my_rank == 0 && max_divb > 0.0) {
+    std::cout << "AMR remesh: max |divB| [" << label << "] = " << std::scientific
+              << max_divb << std::defaultfloat << std::endl;
+  }
+}
+
+} // namespace
 
 //----------------------------------------------------------------------------------------
 //! \fn void ArtemisUtils::PrintArtemisConfiguration
@@ -90,6 +225,17 @@ void PrintArtemisConfiguration(Packages_t &packages) {
     printf("=======================================================\n\n");
     // clang-format on
   }
+}
+
+void PreStepDiagnosticsRemeshDivB(SimTime const &simtime, MeshData<Real> *rc) {
+  auto pm = rc->GetMeshPointer();
+  if ((simtime.ncycle > 0) && pm->modified) {
+    PrintMeshMaxAbsDivB(pm, "post-remesh");
+  }
+}
+
+void PostStepDiagnosticsRemeshDivB(SimTime const &, MeshData<Real> *rc) {
+  PrintMeshMaxAbsDivB(rc->GetMeshPointer(), "pre-remesh");
 }
 
 //----------------------------------------------------------------------------------------
@@ -215,6 +361,158 @@ void EnrollArtemisRefinementOps(parthenon::Metadata &m, Coordinates coords,
         m.RegisterRefinementOps<
             ArtemisUtils::ProlongateShared<G::axisymmetric, false, false>,
             ArtemisUtils::RestrictAverage<G::axisymmetric, false>>();
+      }
+    }
+  } else {
+    PARTHENON_FAIL("Invalid artemis/coordinate system!");
+  }
+}
+
+//----------------------------------------------------------------------------------------
+//! \fn void ArtemisUtils::EnrollArtemisFaceRefinementOps
+//! \brief Registers custom face-centered prolongation and restriction operators.
+void EnrollArtemisFaceRefinementOps(parthenon::Metadata &m, Coordinates coords,
+                                    const bool log, const bool use_minmod_slope) {
+  typedef Coordinates G;
+
+  if (coords == G::cartesian) {
+    if (use_minmod_slope) {
+      m.RegisterRefinementOps<ArtemisUtils::ProlongateShared<G::cartesian, false, true>,
+                              ArtemisUtils::RestrictAverage<G::cartesian, false>,
+                              ArtemisUtils::ProlongateTothAndRoe<G::cartesian, false>>();
+    } else {
+      m.RegisterRefinementOps<ArtemisUtils::ProlongateShared<G::cartesian, false, false>,
+                              ArtemisUtils::RestrictAverage<G::cartesian, false>,
+                              ArtemisUtils::ProlongateTothAndRoe<G::cartesian, false>>();
+    }
+  } else if (coords == G::spherical1D) {
+    if (log) {
+      if (use_minmod_slope) {
+        m.RegisterRefinementOps<
+            ArtemisUtils::ProlongateShared<G::spherical1D, true, true>,
+            ArtemisUtils::RestrictAverage<G::spherical1D, true>,
+            ArtemisUtils::ProlongateTothAndRoe<G::spherical1D, true>>();
+      } else {
+        m.RegisterRefinementOps<
+            ArtemisUtils::ProlongateShared<G::spherical1D, true, false>,
+            ArtemisUtils::RestrictAverage<G::spherical1D, true>,
+            ArtemisUtils::ProlongateTothAndRoe<G::spherical1D, true>>();
+      }
+    } else {
+      if (use_minmod_slope) {
+        m.RegisterRefinementOps<
+            ArtemisUtils::ProlongateShared<G::spherical1D, false, true>,
+            ArtemisUtils::RestrictAverage<G::spherical1D, false>,
+            ArtemisUtils::ProlongateTothAndRoe<G::spherical1D, false>>();
+      } else {
+        m.RegisterRefinementOps<
+            ArtemisUtils::ProlongateShared<G::spherical1D, false, false>,
+            ArtemisUtils::RestrictAverage<G::spherical1D, false>,
+            ArtemisUtils::ProlongateTothAndRoe<G::spherical1D, false>>();
+      }
+    }
+  } else if (coords == G::spherical2D) {
+    if (log) {
+      if (use_minmod_slope) {
+        m.RegisterRefinementOps<
+            ArtemisUtils::ProlongateShared<G::spherical2D, true, true>,
+            ArtemisUtils::RestrictAverage<G::spherical2D, true>,
+            ArtemisUtils::ProlongateTothAndRoe<G::spherical2D, true>>();
+      } else {
+        m.RegisterRefinementOps<
+            ArtemisUtils::ProlongateShared<G::spherical2D, true, false>,
+            ArtemisUtils::RestrictAverage<G::spherical2D, true>,
+            ArtemisUtils::ProlongateTothAndRoe<G::spherical2D, true>>();
+      }
+    } else {
+      if (use_minmod_slope) {
+        m.RegisterRefinementOps<
+            ArtemisUtils::ProlongateShared<G::spherical2D, false, true>,
+            ArtemisUtils::RestrictAverage<G::spherical2D, false>,
+            ArtemisUtils::ProlongateTothAndRoe<G::spherical2D, false>>();
+      } else {
+        m.RegisterRefinementOps<
+            ArtemisUtils::ProlongateShared<G::spherical2D, false, false>,
+            ArtemisUtils::RestrictAverage<G::spherical2D, false>,
+            ArtemisUtils::ProlongateTothAndRoe<G::spherical2D, false>>();
+      }
+    }
+  } else if (coords == G::spherical3D) {
+    if (log) {
+      if (use_minmod_slope) {
+        m.RegisterRefinementOps<
+            ArtemisUtils::ProlongateShared<G::spherical3D, true, true>,
+            ArtemisUtils::RestrictAverage<G::spherical3D, true>,
+            ArtemisUtils::ProlongateTothAndRoe<G::spherical3D, true>>();
+      } else {
+        m.RegisterRefinementOps<
+            ArtemisUtils::ProlongateShared<G::spherical3D, true, false>,
+            ArtemisUtils::RestrictAverage<G::spherical3D, true>,
+            ArtemisUtils::ProlongateTothAndRoe<G::spherical3D, true>>();
+      }
+    } else {
+      if (use_minmod_slope) {
+        m.RegisterRefinementOps<
+            ArtemisUtils::ProlongateShared<G::spherical3D, false, true>,
+            ArtemisUtils::RestrictAverage<G::spherical3D, false>,
+            ArtemisUtils::ProlongateTothAndRoe<G::spherical3D, false>>();
+      } else {
+        m.RegisterRefinementOps<
+            ArtemisUtils::ProlongateShared<G::spherical3D, false, false>,
+            ArtemisUtils::RestrictAverage<G::spherical3D, false>,
+            ArtemisUtils::ProlongateTothAndRoe<G::spherical3D, false>>();
+      }
+    }
+  } else if (coords == G::cylindrical) {
+    if (log) {
+      if (use_minmod_slope) {
+        m.RegisterRefinementOps<
+            ArtemisUtils::ProlongateShared<G::cylindrical, true, true>,
+            ArtemisUtils::RestrictAverage<G::cylindrical, true>,
+            ArtemisUtils::ProlongateTothAndRoe<G::cylindrical, true>>();
+      } else {
+        m.RegisterRefinementOps<
+            ArtemisUtils::ProlongateShared<G::cylindrical, true, false>,
+            ArtemisUtils::RestrictAverage<G::cylindrical, true>,
+            ArtemisUtils::ProlongateTothAndRoe<G::cylindrical, true>>();
+      }
+    } else {
+      if (use_minmod_slope) {
+        m.RegisterRefinementOps<
+            ArtemisUtils::ProlongateShared<G::cylindrical, false, true>,
+            ArtemisUtils::RestrictAverage<G::cylindrical, false>,
+            ArtemisUtils::ProlongateTothAndRoe<G::cylindrical, false>>();
+      } else {
+        m.RegisterRefinementOps<
+            ArtemisUtils::ProlongateShared<G::cylindrical, false, false>,
+            ArtemisUtils::RestrictAverage<G::cylindrical, false>,
+            ArtemisUtils::ProlongateTothAndRoe<G::cylindrical, false>>();
+      }
+    }
+  } else if (coords == G::axisymmetric) {
+    if (log) {
+      if (use_minmod_slope) {
+        m.RegisterRefinementOps<
+            ArtemisUtils::ProlongateShared<G::axisymmetric, true, true>,
+            ArtemisUtils::RestrictAverage<G::axisymmetric, true>,
+            ArtemisUtils::ProlongateTothAndRoe<G::axisymmetric, true>>();
+      } else {
+        m.RegisterRefinementOps<
+            ArtemisUtils::ProlongateShared<G::axisymmetric, true, false>,
+            ArtemisUtils::RestrictAverage<G::axisymmetric, true>,
+            ArtemisUtils::ProlongateTothAndRoe<G::axisymmetric, true>>();
+      }
+    } else {
+      if (use_minmod_slope) {
+        m.RegisterRefinementOps<
+            ArtemisUtils::ProlongateShared<G::axisymmetric, false, true>,
+            ArtemisUtils::RestrictAverage<G::axisymmetric, false>,
+            ArtemisUtils::ProlongateTothAndRoe<G::axisymmetric, false>>();
+      } else {
+        m.RegisterRefinementOps<
+            ArtemisUtils::ProlongateShared<G::axisymmetric, false, false>,
+            ArtemisUtils::RestrictAverage<G::axisymmetric, false>,
+            ArtemisUtils::ProlongateTothAndRoe<G::axisymmetric, false>>();
       }
     }
   } else {

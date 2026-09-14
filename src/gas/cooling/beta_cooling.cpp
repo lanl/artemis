@@ -46,6 +46,7 @@ TaskStatus BetaCooling(MeshData<Real> *md, const Real time, const Real dt) {
   auto &resolved_pkgs = pm->resolved_packages;
 
   // Extract gas package and params
+  const bool do_mhd = pm->packages.Get("artemis")->template Param<bool>("do_mhd");
   auto &gas_pkg = pm->packages.Get("gas");
   const auto &eos_d = gas_pkg->template Param<EOS>("eos_d");
   const auto de_switch = gas_pkg->template Param<Real>("de_switch");
@@ -66,8 +67,8 @@ TaskStatus BetaCooling(MeshData<Real> *md, const Real time, const Real dt) {
 
   // Packing and indexing
   static auto desc = MakePackDescriptor<gas::cons::momentum, gas::cons::total_energy,
-                                        gas::cons::internal_energy, gas::cons::density>(
-      resolved_pkgs.get());
+                                        gas::cons::internal_energy, gas::cons::density,
+                                        field::cell::energy>(resolved_pkgs.get());
   auto vmesh = desc.GetPack(md);
   static auto desc_g = MakePackDescriptor<geom::x1v, geom::x2v, geom::x3v, geom::hx1v,
                                           geom::hx2v, geom::hx3v>(resolved_pkgs.get());
@@ -126,7 +127,10 @@ TaskStatus BetaCooling(MeshData<Real> *md, const Real time, const Real dt) {
           dens = (dfloor)*dens + (!dfloor) * dflr_gas;
 
           // Compute SIE via dual energy formalism and apply floor
-          Real sie = ArtemisUtils::DualEnergySIE(vmesh, b, n, k, j, i, de_switch, hx);
+          const Real emag =
+              (do_mhd && (n == 0)) ? vmesh(b, field::cell::energy(), k, j, i) : 0.0;
+          Real sie =
+              ArtemisUtils::DualEnergySIE(vmesh, b, n, k, j, i, de_switch, hx, emag);
           const Real efloor = (sie > sieflr_gas);
           sie = (efloor)*sie + (!efloor) * sieflr_gas;
 

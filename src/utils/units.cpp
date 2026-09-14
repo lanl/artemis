@@ -22,6 +22,7 @@ constexpr Real Year = 31536000;
 constexpr Real parsec = 3.0857e18;
 constexpr Real Rjup = 6.991100e6;
 constexpr Real Mjup = 1.8982e30;
+constexpr Real mu0_cgs_amp = 4.0e-2 * M_PI;
 
 //----------------------------------------------------------------------------------------
 //! \class Units
@@ -42,6 +43,7 @@ Units::Units(ParameterInput *pin, std::shared_ptr<StateDescriptor> pkg) {
     time_ = 1.;
     mass_ = 1.;
     temp_ = 1.;
+    current_ = 1.;
   } else {
     std::string unit_conversion =
         pin->GetOrAddString("artemis", "unit_conversion", "base");
@@ -50,11 +52,13 @@ Units::Units(ParameterInput *pin, std::shared_ptr<StateDescriptor> pkg) {
       time_ = pin->GetOrAddReal("artemis", "time", 1.);
       mass_ = pin->GetOrAddReal("artemis", "mass", 1.);
       temp_ = pin->GetOrAddReal("artemis", "temperature", 1.);
+      current_ = pin->GetOrAddReal("artemis", "current", 1.);
     } else if (unit_conversion == "ppd") {
       length_ = AU;
       mass_ = Msolar;
       time_ = Year / (2. * M_PI);
       temp_ = 1.0;
+      current_ = 1.0;
     } else {
       PARTHENON_FAIL("Unit conversion not recognized! Choices are [base, ppd]");
     }
@@ -62,6 +66,7 @@ Units::Units(ParameterInput *pin, std::shared_ptr<StateDescriptor> pkg) {
 
   // Remaining conversion factors
   energy_ = std::pow(length_, 2) * mass_ * std::pow(time_, -2);
+  energy_density_ = energy_ * std::pow(length_, -3);
   number_density_ = std::pow(length_, -3);
 
   // Store everything necessary in params for usage in analysis
@@ -70,6 +75,9 @@ Units::Units(ParameterInput *pin, std::shared_ptr<StateDescriptor> pkg) {
   pkg->AddParam("time", time_);
   pkg->AddParam("mass", mass_);
   pkg->AddParam("temp", temp_);
+  pkg->AddParam("current", current_);
+  pkg->AddParam("energy_density", energy_density_);
+  pkg->AddParam("magnetic_field", GetMagneticFieldCodeToPhysical());
 }
 
 //----------------------------------------------------------------------------------------
@@ -90,6 +98,7 @@ Constants::Constants(Units &units) {
     pc_ = 1.;
     Year_ = 1.;
     Rsolar_ = 1.;
+    mu0_ = 1.;
   } else if (units.GetPhysicalUnits() == PhysicalUnits::cgs) {
     parthenon::constants::PhysicalConstants<parthenon::constants::CGS> pc;
     G_ = pc.gravitational_constant;
@@ -106,6 +115,7 @@ Constants::Constants(Units &units) {
     pc_ = parsec;
     Year_ = Year;
     Rsolar_ = Rsolar;
+    mu0_ = mu0_cgs_amp;
   } else {
     PARTHENON_FAIL("Unknown unit system");
   }
@@ -114,6 +124,7 @@ Constants::Constants(Units &units) {
   const Real time = units.GetTimeCodeToPhysical();
   const Real mass = units.GetMassCodeToPhysical();
   const Real temp = units.GetTemperatureCodeToPhysical();
+  const Real current = units.GetCurrentCodeToPhysical();
   const Real energy = mass * std::pow(length / time, 2);
 
   // Convert constants to code units
@@ -131,6 +142,7 @@ Constants::Constants(Units &units) {
   pc_code_ = pc_ / length;
   Year_code_ = Year_ / time;
   Rsolar_code_ = Rsolar_ / length;
+  mu0_code_ = mu0_ * SQR(current) * SQR(time) / (mass * length);
 }
 
 } // namespace ArtemisUtils

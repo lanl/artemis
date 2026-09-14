@@ -189,19 +189,27 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
   params.Add("eos_type", eos_type);
 
   // Riemann solver
+  const bool do_mhd = pin->GetOrAddBoolean("physics", "mhd", false);
   RSolver riemann_solver = RSolver::null;
   const std::string riemann = pin->GetOrAddString("gas", "riemann", "hllc-general");
   if (riemann.compare("hllc-general") == 0) {
+    PARTHENON_REQUIRE(!do_mhd, "The hllc Riemann solver cannot be used with MHD.");
     riemann_solver = RSolver::hllc_general;
   } else if (riemann.compare("hllc-gamma") == 0) {
     PARTHENON_REQUIRE(eos_type == "ideal",
                       "The hllc-gamma Riemann solver requires the ideal eos.");
+    PARTHENON_REQUIRE(!do_mhd, "The hllc Riemann solver cannot be used with MHD.");
 
     riemann_solver = RSolver::hllc_gamma;
   } else if (riemann.compare("hlle") == 0) {
     riemann_solver = RSolver::hlle;
   } else if (riemann.compare("llf") == 0) {
     riemann_solver = RSolver::llf;
+  } else if (riemann.compare("hlld") == 0) {
+    PARTHENON_REQUIRE(eos_type == "ideal",
+                      "The hlld Riemann solver requires the ideal eos.");
+    PARTHENON_REQUIRE(do_mhd, "The hlld Riemann solver requires MHD to be enabled.");
+    riemann_solver = RSolver::hlld;
   } else {
     PARTHENON_FAIL("Riemann solver (gas) not recognized.");
   }
@@ -544,9 +552,14 @@ Real EstimateTimestepMesh(MeshData<Real> *md) {
   auto &params = gas_pkg->AllParams();
   auto eos_d = params.template Get<EOS>("eos_d");
 
+  auto &artemis_pkg = pm->packages.Get("artemis");
+  const bool do_mhd = artemis_pkg->template Param<bool>("do_mhd");
+  const Real mu0_code =
+      do_mhd ? pm->packages.Get("mhd")->template Param<Real>("mu0_code") : 1.0;
+
   static auto desc =
       MakePackDescriptor<gas::prim::density, gas::prim::velocity, gas::prim::sie,
-                         gas::prim::bmod>(resolved_pkgs.get());
+                         gas::prim::bmod, field::cell::B>(resolved_pkgs.get());
   auto vmesh = desc.GetPack(md);
   static auto desc_g =
       MakePackDescriptor<geom::dx1, geom::dx2, geom::dx3>(resolved_pkgs.get());
@@ -570,11 +583,23 @@ Real EstimateTimestepMesh(MeshData<Real> *md) {
         for (int n = 0; n < vmesh.GetSize(b, gas::prim::density()); ++n) {
           const Real &dens = vmesh(b, gas::prim::density(n), k, j, i);
           const Real &bulk = vmesh(b, gas::prim::bmod(n), k, j, i);
-          const Real cs = std::sqrt(bulk / dens);
+
+          // NOTE(AMD): This is an upper bound on the fast magnetosonic speed.
+          //            It is much cheaper to compute since we would need to compute
+          //            the fast magnetosonic speed at each face of the zone to do it more
+          //            accurately.
+          Real b2 = 0.0;
+          if (do_mhd) {
+            b2 += SQR(vmesh(b, TE::CC, field::cell::B(0), k, j, i)) +
+                  SQR(vmesh(b, TE::CC, field::cell::B(1), k, j, i)) +
+                  SQR(vmesh(b, TE::CC, field::cell::B(2), k, j, i));
+          }
+          const Real ss = std::sqrt((bulk + b2 / mu0_code) / dens);
+
           Real denom = 0.0;
           for (int d = 0; d < ndim; d++) {
             denom +=
-                (std::abs(vmesh(b, gas::prim::velocity(VI(n, d)), k, j, i)) + cs) / dx[d];
+                (std::abs(vmesh(b, gas::prim::velocity(VI(n, d)), k, j, i)) + ss) / dx[d];
           }
           ldt = std::min(ldt, 1.0 / denom);
         }
@@ -630,12 +655,14 @@ TaskStatus CalculateFluxes(MeshData<Real> *md, const bool pcm) {
 
   static auto desc_prim =
       parthenon::MakePackDescriptor<gas::prim::density, gas::prim::velocity,
-                                    gas::prim::pressure, gas::prim::sie, gas::prim::bmod>(
+                                    gas::prim::pressure, gas::prim::sie, gas::prim::bmod,
+                                    field::cell::B, field::cell::energy>(
           resolved_pkgs.get(), {}, {parthenon::PDOpt::WithFluxes});
   static auto desc_flux =
       parthenon::MakePackDescriptor<gas::cons::density, gas::cons::momentum,
-                                    gas::cons::total_energy, gas::cons::internal_energy>(
-          resolved_pkgs.get(), {}, {parthenon::PDOpt::WithFluxes});
+                                    gas::cons::total_energy, gas::cons::internal_energy,
+                                    field::face::B>(resolved_pkgs.get(), {},
+                                                    {parthenon::PDOpt::WithFluxes});
   static auto desc_face =
       parthenon::MakePackDescriptor<gas::face::velocity>(resolved_pkgs.get());
   static auto desc_g =
@@ -663,7 +690,8 @@ TaskStatus FluxSource(MeshData<Real> *md, const Real dt) {
 
   static auto desc_prim =
       parthenon::MakePackDescriptor<gas::prim::density, gas::prim::velocity,
-                                    gas::prim::pressure>(resolved_pkgs.get(), {},
+                                    gas::prim::pressure, field::cell::B,
+                                    field::cell::energy>(resolved_pkgs.get(), {},
                                                          {parthenon::PDOpt::WithFluxes});
   static auto desc_cons =
       parthenon::MakePackDescriptor<gas::cons::momentum, gas::cons::internal_energy>(

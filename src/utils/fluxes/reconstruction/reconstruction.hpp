@@ -1,5 +1,5 @@
 //========================================================================================
-// (C) (or copyright) 2023-2025. Triad National Security, LLC. All rights reserved.
+// (C) (or copyright) 2023-2026. Triad National Security, LLC. All rights reserved.
 //
 // This program was produced under U.S. Government contract 89233218CNA000001 for Los
 // Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -47,12 +47,13 @@ struct ReconGradient {
 //! \class  TaskStatus ArtemisUtils::post_recon
 //! \brief Utility to apply floors, make thermodynamically consistent, or zero radiation
 //! fluxes when near ~round-off
-template <Fluid F, typename V>
+template <Fluid F, typename V, typename VC>
 KOKKOS_INLINE_FUNCTION void
-post_recon(const EOS &eos, const Real dfloor, const Real siefloor,
+post_recon(const EOS &eos, const Real dfloor, const Real siefloor, const bool do_mhd,
            parthenon::team_mbr_t const &member, const int dir, const int b, const int k,
-           const int j, const int il, const int iu, const V &q,
+           const int j, const int il, const int iu, const V &q, const VC &qc,
            parthenon::ScratchPad2D<Real> &ql, parthenon::ScratchPad2D<Real> &qr) {
+  using TE = parthenon::TopologicalElement;
   if constexpr (F == Fluid::radiation) {
     const int nspecies = q.GetSize(b, rad::prim::energy());
     for (int n = 0; n < nspecies; ++n) {
@@ -106,6 +107,17 @@ post_recon(const EOS &eos, const Real dfloor, const Real siefloor,
                                    bR = eos.BulkModulusFromDensityInternalEnergy(dR, eR);
                                  }
                                });
+    }
+    // Replace the reconstructed B on the face in direction dir with the cons face value
+    if (do_mhd) {
+      const int n = q.GetIndex(b, field::cell::B(dir - 1));
+      TE fd = (dir == 1) ? TE::F1 : ((dir == 2) ? TE::F2 : TE::F3);
+      parthenon::par_for_inner(
+          DEFAULT_INNER_LOOP_PATTERN, member, il, iu, [&](const int i) {
+            const int ipl = i + (dir == 1);
+            ql(n, ipl) = qc(b, fd, field::face::B(), k + (dir == 3), j + (dir == 2), ipl);
+            qr(n, i) = qc(b, fd, field::face::B(), k, j, i);
+          });
     }
   }
 }

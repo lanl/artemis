@@ -15,6 +15,7 @@
 #include "fill_derived.hpp"
 #include "artemis.hpp"
 #include "geometry/geometry.hpp"
+#include "mhd/mhd.hpp"
 #include "radiation/moments/moments.hpp"
 #include "utils/artemis_utils.hpp"
 #include "utils/eos/eos.hpp"
@@ -23,6 +24,7 @@ using ArtemisUtils::EOS;
 using ArtemisUtils::VI;
 
 namespace ArtemisDerived {
+
 //----------------------------------------------------------------------------------------
 //! \fn TaskStatus ArtemisDerived::SetAuxillaryFields(MeshData<Real> *md)
 //! \brief Sets auxillary fields over IndexDomain::interior after an integration stage
@@ -31,13 +33,17 @@ template <Coordinates GEOM>
 TaskStatus SetAuxillaryFields(MeshData<Real> *md) {
   PARTHENON_INSTRUMENT
   using parthenon::MakePackDescriptor;
+  using TE = parthenon::TopologicalElement;
   auto pm = md->GetParentPointer();
   auto &resolved_pkgs = pm->resolved_packages;
 
   // Return immediately if not evolving gas hydrodynamics
   auto &artemis_pkg = pm->packages.Get("artemis");
   const bool do_gas = artemis_pkg->template Param<bool>("do_gas");
+  const bool do_mhd = artemis_pkg->template Param<bool>("do_mhd");
   if (!(do_gas)) return TaskStatus::complete;
+  const Real mu0_code =
+      do_mhd ? pm->packages.Get("mhd")->template Param<Real>("mu0_code") : 1.0;
 
   // Extract gas parameters
   const Real dflr_gas = pm->packages.Get("gas").get()->template Param<Real>("dfloor");
@@ -47,14 +53,17 @@ TaskStatus SetAuxillaryFields(MeshData<Real> *md) {
   // Packing and indexing
   static auto desc =
       MakePackDescriptor<gas::cons::density, gas::cons::momentum, gas::cons::total_energy,
-                         gas::cons::internal_energy>(resolved_pkgs.get());
+                         gas::cons::internal_energy, field::face::B>(resolved_pkgs.get());
   auto vmesh = desc.GetPack(md);
-  static auto desc_g =
-      MakePackDescriptor<geom::hx1v, geom::hx2v, geom::hx3v>(resolved_pkgs.get());
+  static auto desc_g = MakePackDescriptor<geom::x1v, geom::x2v, geom::x3v, geom::hx1v,
+                                          geom::hx2v, geom::hx3v>(resolved_pkgs.get());
   auto vg = desc_g.GetPack(md);
   IndexRange ib = md->GetBoundsI(IndexDomain::interior);
   IndexRange jb = md->GetBoundsJ(IndexDomain::interior);
   IndexRange kb = md->GetBoundsK(IndexDomain::interior);
+  const int ndim = pm->ndim;
+  const int multid = ndim >= 2;
+  const int threed = ndim == 3;
 
   const auto &cpars = artemis_pkg->template Param<geometry::CoordParams>("coord_params");
 
@@ -67,6 +76,12 @@ TaskStatus SetAuxillaryFields(MeshData<Real> *md) {
         geometry::Coords<GEOM> coords(cpars, vmesh.GetCoordinates(b), k, j, i);
 
         const auto &hx = coords.GetScaleFactors(vg, b, k, j, i);
+        Real emag = 0.0;
+        if (do_mhd) {
+          const auto bcell =
+              MHD::FaceToCellCenteredB(coords, vmesh, vg, b, k, j, i, multid, threed);
+          emag = MHD::MagneticEnergyDensity(bcell[0], bcell[1], bcell[2], mu0_code);
+        }
 
         for (int n = 0; n < vmesh.GetSize(b, gas::cons::density()); ++n) {
           // Extract state vector
@@ -78,7 +93,9 @@ TaskStatus SetAuxillaryFields(MeshData<Real> *md) {
           u_d = (dfloor)*u_d + (!dfloor) * dflr_gas;
 
           // Compute SIE via dual energy formalism and apply floor
-          Real sie = ArtemisUtils::DualEnergySIE(vmesh, b, n, k, j, i, de_switch, hx);
+          const Real species_emag = (do_mhd && (n == 0)) ? emag : 0.0;
+          Real sie = ArtemisUtils::DualEnergySIE(vmesh, b, n, k, j, i, de_switch, hx,
+                                                 species_emag);
           const Real efloor = (sie > sieflr_gas);
           sie = (efloor)*sie + (!efloor) * sieflr_gas;
 
@@ -105,6 +122,9 @@ void ConsToPrim(MeshData<Real> *md) {
   const bool do_gas = artemis_pkg->template Param<bool>("do_gas");
   const bool do_dust = artemis_pkg->template Param<bool>("do_dust");
   const bool do_rad = artemis_pkg->template Param<bool>("do_moment");
+  const bool do_mhd = artemis_pkg->template Param<bool>("do_mhd");
+  const Real mu0_code =
+      do_mhd ? pm->packages.Get("mhd")->template Param<Real>("mu0_code") : 1.0;
 
   // Extract gas parameters
   Real dflr_gas = Null<Real>(), sieflr_gas = Null<Real>();
@@ -134,15 +154,25 @@ void ConsToPrim(MeshData<Real> *md) {
       gas::cons::density, gas::cons::momentum, gas::cons::internal_energy,
       gas::prim::density, gas::prim::velocity, gas::prim::sie, dust::cons::density,
       dust::cons::momentum, dust::prim::density, dust::prim::velocity, rad::cons::energy,
-      rad::cons::flux, rad::prim::energy, rad::prim::flux>(resolved_pkgs.get());
+      rad::cons::flux, rad::prim::energy, rad::prim::flux, field::face::B, field::cell::B,
+      field::cell::energy, field::cell::divB>(resolved_pkgs.get());
   auto vmesh = desc.GetPack(md);
-  static auto desc_g = MakePackDescriptor<geom::x1v, geom::x2v, geom::x3v, geom::hx1v,
-                                          geom::hx2v, geom::hx3v>(resolved_pkgs.get());
+  static auto desc_g =
+      MakePackDescriptor<geom::x1v, geom::x2v, geom::x3v, geom::hx1v, geom::hx2v,
+                         geom::hx3v, geom::vol, geom::ax1, geom::ax2, geom::ax3>(
+          resolved_pkgs.get());
   auto vg = desc_g.GetPack(md);
   const int nblocks = md->NumBlocks();
   IndexRange ib = md->GetBoundsI(IndexDomain::interior);
   IndexRange jb = md->GetBoundsJ(IndexDomain::interior);
   IndexRange kb = md->GetBoundsK(IndexDomain::interior);
+  IndexRange ibe = md->GetBoundsI(IndexDomain::entire);
+  IndexRange jbe = md->GetBoundsJ(IndexDomain::entire);
+  IndexRange kbe = md->GetBoundsK(IndexDomain::entire);
+
+  const int ndim = pm->ndim;
+  const int multid = ndim >= 2;
+  const int threed = ndim == 3;
 
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "ConsToPrim", parthenon::DevExecSpace(), 0,
@@ -156,21 +186,25 @@ void ConsToPrim(MeshData<Real> *md) {
         if (do_gas) {
           for (int n = 0; n < vmesh.GetSize(b, gas::prim::density()); ++n) {
             // Set primitive density and apply floor
-            const Real u_d = vmesh(b, gas::cons::density(n), k, j, i);
+            const Real u_d = vmesh(b, TE::CC, gas::cons::density(n), k, j, i);
             const bool dfloor = (u_d > dflr_gas);
-            Real &w_d = vmesh(b, gas::prim::density(n), k, j, i);
+            Real &w_d = vmesh(b, TE::CC, gas::prim::density(n), k, j, i);
             w_d = (dfloor)*u_d + (!dfloor) * dflr_gas;
 
             // Set primitive velocity
-            Real &vel1 = vmesh(b, gas::prim::velocity(VI(n, 0)), k, j, i);
-            Real &vel2 = vmesh(b, gas::prim::velocity(VI(n, 1)), k, j, i);
-            Real &vel3 = vmesh(b, gas::prim::velocity(VI(n, 2)), k, j, i);
-            vel1 = vmesh(b, gas::cons::momentum(VI(n, 0)), k, j, i) / (w_d * hx[0]);
-            vel2 = vmesh(b, gas::cons::momentum(VI(n, 1)), k, j, i) / (w_d * hx[1]);
-            vel3 = vmesh(b, gas::cons::momentum(VI(n, 2)), k, j, i) / (w_d * hx[2]);
+            Real &vel1 = vmesh(b, TE::CC, gas::prim::velocity(VI(n, 0)), k, j, i);
+            Real &vel2 = vmesh(b, TE::CC, gas::prim::velocity(VI(n, 1)), k, j, i);
+            Real &vel3 = vmesh(b, TE::CC, gas::prim::velocity(VI(n, 2)), k, j, i);
+            vel1 =
+                vmesh(b, TE::CC, gas::cons::momentum(VI(n, 0)), k, j, i) / (w_d * hx[0]);
+            vel2 =
+                vmesh(b, TE::CC, gas::cons::momentum(VI(n, 1)), k, j, i) / (w_d * hx[1]);
+            vel3 =
+                vmesh(b, TE::CC, gas::cons::momentum(VI(n, 2)), k, j, i) / (w_d * hx[2]);
 
             // Set primitive specific internal energy and apply floor
-            const Real w_s = vmesh(b, gas::cons::internal_energy(n), k, j, i) / w_d;
+            const Real w_s =
+                vmesh(b, TE::CC, gas::cons::internal_energy(n), k, j, i) / w_d;
             const bool siefloor = (w_s > sieflr_gas);
             vmesh(b, gas::prim::sie(n), k, j, i) =
                 (siefloor)*w_s + (!siefloor) * sieflr_gas;
@@ -180,18 +214,21 @@ void ConsToPrim(MeshData<Real> *md) {
         if (do_dust) {
           for (int n = 0; n < vmesh.GetSize(b, dust::prim::density()); ++n) {
             // Set primitive density
-            const Real u_d = vmesh(b, dust::cons::density(n), k, j, i);
+            const Real u_d = vmesh(b, TE::CC, dust::cons::density(n), k, j, i);
             const bool dfloor = (u_d > dflr_dust);
-            Real &w_d = vmesh(b, dust::prim::density(n), k, j, i);
+            Real &w_d = vmesh(b, TE::CC, dust::prim::density(n), k, j, i);
             w_d = (dfloor)*u_d + (u_d <= dflr_dust) * dflr_dust;
 
             // Set primitive velocity
-            Real &vel1 = vmesh(b, dust::prim::velocity(VI(n, 0)), k, j, i);
-            Real &vel2 = vmesh(b, dust::prim::velocity(VI(n, 1)), k, j, i);
-            Real &vel3 = vmesh(b, dust::prim::velocity(VI(n, 2)), k, j, i);
-            vel1 = vmesh(b, dust::cons::momentum(VI(n, 0)), k, j, i) / (w_d * hx[0]);
-            vel2 = vmesh(b, dust::cons::momentum(VI(n, 1)), k, j, i) / (w_d * hx[1]);
-            vel3 = vmesh(b, dust::cons::momentum(VI(n, 2)), k, j, i) / (w_d * hx[2]);
+            Real &vel1 = vmesh(b, TE::CC, dust::prim::velocity(VI(n, 0)), k, j, i);
+            Real &vel2 = vmesh(b, TE::CC, dust::prim::velocity(VI(n, 1)), k, j, i);
+            Real &vel3 = vmesh(b, TE::CC, dust::prim::velocity(VI(n, 2)), k, j, i);
+            vel1 =
+                vmesh(b, TE::CC, dust::cons::momentum(VI(n, 0)), k, j, i) / (w_d * hx[0]);
+            vel2 =
+                vmesh(b, TE::CC, dust::cons::momentum(VI(n, 1)), k, j, i) / (w_d * hx[1]);
+            vel3 =
+                vmesh(b, TE::CC, dust::cons::momentum(VI(n, 2)), k, j, i) / (w_d * hx[2]);
           }
         }
 
@@ -206,19 +243,75 @@ void ConsToPrim(MeshData<Real> *md) {
             // Set primitive radiation flux
             const Real cer = c * w_er;
             const std::array<Real, 3> conv = {cer * hx[0], cer * hx[1], cer * hx[2]};
-            const Real hfx1 = vmesh(b, rad::cons::flux(VI(n, 0)), k, j, i) / conv[0];
-            const Real hfx2 = vmesh(b, rad::cons::flux(VI(n, 1)), k, j, i) / conv[1];
-            const Real hfx3 = vmesh(b, rad::cons::flux(VI(n, 2)), k, j, i) / conv[2];
+            const Real hfx1 =
+                vmesh(b, TE::CC, rad::cons::flux(VI(n, 0)), k, j, i) / conv[0];
+            const Real hfx2 =
+                vmesh(b, TE::CC, rad::cons::flux(VI(n, 1)), k, j, i) / conv[1];
+            const Real hfx3 =
+                vmesh(b, TE::CC, rad::cons::flux(VI(n, 2)), k, j, i) / conv[2];
             const auto fx = Moments::NormalizeFlux(hfx1, hfx2, hfx3);
-            vmesh(b, rad::cons::flux(VI(n, 0)), k, j, i) = fx[0] * conv[0];
-            vmesh(b, rad::cons::flux(VI(n, 1)), k, j, i) = fx[1] * conv[1];
-            vmesh(b, rad::cons::flux(VI(n, 2)), k, j, i) = fx[2] * conv[2];
-            vmesh(b, rad::prim::flux(VI(n, 0)), k, j, i) = fx[0];
-            vmesh(b, rad::prim::flux(VI(n, 1)), k, j, i) = fx[1];
-            vmesh(b, rad::prim::flux(VI(n, 2)), k, j, i) = fx[2];
+            vmesh(b, TE::CC, rad::cons::flux(VI(n, 0)), k, j, i) = fx[0] * conv[0];
+            vmesh(b, TE::CC, rad::cons::flux(VI(n, 1)), k, j, i) = fx[1] * conv[1];
+            vmesh(b, TE::CC, rad::cons::flux(VI(n, 2)), k, j, i) = fx[2] * conv[2];
+            vmesh(b, TE::CC, rad::prim::flux(VI(n, 0)), k, j, i) = fx[0];
+            vmesh(b, TE::CC, rad::prim::flux(VI(n, 1)), k, j, i) = fx[1];
+            vmesh(b, TE::CC, rad::prim::flux(VI(n, 2)), k, j, i) = fx[2];
           }
         }
+        if (do_mhd) {
+          const Real vol = coords.GetVolume(vg, b, k, j, i);
+          const auto ax1 = coords.GetFaceAreaX1(vg, b, k, j, i);
+          const auto ax2 = coords.GetFaceAreaX2(vg, b, k, j, i);
+          const auto ax3 = coords.GetFaceAreaX3(vg, b, k, j, i);
+          vmesh(b, TE::CC, field::cell::divB(), k, j, i) =
+              ((ax1[1] * vmesh(b, TE::F1, field::face::B(), k, j, i + 1) -
+                ax1[0] * vmesh(b, TE::F1, field::face::B(), k, j, i)) +
+               (ax2[1] * vmesh(b, TE::F2, field::face::B(), k, j + multid, i) -
+                ax2[0] * vmesh(b, TE::F2, field::face::B(), k, j, i)) +
+               (ax3[1] * vmesh(b, TE::F3, field::face::B(), k + threed, j, i) -
+                ax3[0] * vmesh(b, TE::F3, field::face::B(), k, j, i))) /
+              vol;
+          const auto bcell =
+              MHD::FaceToCellCenteredB(coords, vmesh, vg, b, k, j, i, multid, threed);
+          vmesh(b, TE::CC, field::cell::B(0), k, j, i) = bcell[0];
+          vmesh(b, TE::CC, field::cell::B(1), k, j, i) = bcell[1];
+          vmesh(b, TE::CC, field::cell::B(2), k, j, i) = bcell[2];
+          vmesh(b, TE::CC, field::cell::energy(), k, j, i) = MHD::MagneticEnergyDensity(
+              vmesh(b, TE::CC, field::cell::B(0), k, j, i),
+              vmesh(b, TE::CC, field::cell::B(1), k, j, i),
+              vmesh(b, TE::CC, field::cell::B(2), k, j, i), mu0_code);
+        }
       });
+
+  if (do_mhd) {
+    parthenon::par_for(
+        DEFAULT_LOOP_PATTERN, "ConsToPrim::MHDGhost", parthenon::DevExecSpace(), 0,
+        md->NumBlocks() - 1, kbe.s, kbe.e, jbe.s, jbe.e, ibe.s, ibe.e,
+        KOKKOS_LAMBDA(const int &b, const int &k, const int &j, const int &i) {
+          geometry::Coords<GEOM> coords(cpars, vmesh.GetCoordinates(b), k, j, i);
+          const Real vol = coords.GetVolume(vg, b, k, j, i);
+          const auto ax1 = coords.GetFaceAreaX1(vg, b, k, j, i);
+          const auto ax2 = coords.GetFaceAreaX2(vg, b, k, j, i);
+          const auto ax3 = coords.GetFaceAreaX3(vg, b, k, j, i);
+          vmesh(b, TE::CC, field::cell::divB(), k, j, i) =
+              ((ax1[1] * vmesh(b, TE::F1, field::face::B(), k, j, i + 1) -
+                ax1[0] * vmesh(b, TE::F1, field::face::B(), k, j, i)) +
+               (ax2[1] * vmesh(b, TE::F2, field::face::B(), k, j + multid, i) -
+                ax2[0] * vmesh(b, TE::F2, field::face::B(), k, j, i)) +
+               (ax3[1] * vmesh(b, TE::F3, field::face::B(), k + threed, j, i) -
+                ax3[0] * vmesh(b, TE::F3, field::face::B(), k, j, i))) /
+              vol;
+          const auto bcell =
+              MHD::FaceToCellCenteredB(coords, vmesh, vg, b, k, j, i, multid, threed);
+          vmesh(b, TE::CC, field::cell::B(0), k, j, i) = bcell[0];
+          vmesh(b, TE::CC, field::cell::B(1), k, j, i) = bcell[1];
+          vmesh(b, TE::CC, field::cell::B(2), k, j, i) = bcell[2];
+          vmesh(b, TE::CC, field::cell::energy(), k, j, i) = MHD::MagneticEnergyDensity(
+              vmesh(b, TE::CC, field::cell::B(0), k, j, i),
+              vmesh(b, TE::CC, field::cell::B(1), k, j, i),
+              vmesh(b, TE::CC, field::cell::B(2), k, j, i), mu0_code);
+        });
+  }
 }
 
 //----------------------------------------------------------------------------------------
@@ -228,6 +321,7 @@ template <typename T, Coordinates GEOM>
 void PrimToCons(T *md) {
   PARTHENON_INSTRUMENT
   using parthenon::MakePackDescriptor;
+  using TE = parthenon::TopologicalElement;
   auto pm = md->GetParentPointer();
   auto &resolved_pkgs = pm->resolved_packages;
 
@@ -235,7 +329,10 @@ void PrimToCons(T *md) {
   auto &artemis_pkg = pm->packages.Get("artemis");
   const bool do_gas = artemis_pkg->template Param<bool>("do_gas");
   const bool do_dust = artemis_pkg->template Param<bool>("do_dust");
+  const bool do_mhd = artemis_pkg->template Param<bool>("do_mhd");
   const bool do_rad = artemis_pkg->template Param<bool>("do_moment");
+  const Real mu0_code =
+      do_mhd ? pm->packages.Get("mhd")->template Param<Real>("mu0_code") : 1.0;
 
   // Extract gas parameters
   Real dflr_gas = Null<Real>();
@@ -272,7 +369,8 @@ void PrimToCons(T *md) {
                          gas::prim::bmod, gas::prim::temperature, dust::cons::density,
                          dust::cons::momentum, dust::prim::density, dust::prim::velocity,
                          rad::cons::energy, rad::cons::flux, rad::prim::energy,
-                         rad::prim::flux, rad::prim::pressure>(resolved_pkgs.get());
+                         rad::prim::flux, rad::prim::pressure, field::face::B>(
+          resolved_pkgs.get());
   auto vmesh = desc.GetPack(md);
   static auto desc_g = MakePackDescriptor<geom::x1v, geom::x2v, geom::x3v, geom::hx1v,
                                           geom::hx2v, geom::hx3v>(resolved_pkgs.get());
@@ -280,6 +378,9 @@ void PrimToCons(T *md) {
   IndexRange ibe = md->GetBoundsI(IndexDomain::entire);
   IndexRange jbe = md->GetBoundsJ(IndexDomain::entire);
   IndexRange kbe = md->GetBoundsK(IndexDomain::entire);
+  const int ndim = md->GetMeshPointer()->ndim;
+  const int multid = ndim >= 2;
+  const int threed = ndim == 3;
 
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "PrimToCons", parthenon::DevExecSpace(), 0,
@@ -326,8 +427,14 @@ void PrimToCons(T *md) {
 
             // Sync conserved total energy
             const Real ke = 0.5 * w_d * (SQR(vel1) + SQR(vel2) + SQR(vel3));
+            Real me = 0.0;
+            if (do_mhd && (n == 0)) {
+              const auto bcell =
+                  MHD::FaceToCellCenteredB(coords, vmesh, vg, b, k, j, i, multid, threed);
+              me = MHD::MagneticEnergyDensity(bcell[0], bcell[1], bcell[2], mu0_code);
+            }
             Real &u_e = vmesh(b, gas::cons::total_energy(n), k, j, i);
-            u_e = u_u + ke;
+            u_e = u_u + ke + me;
           }
         }
 
@@ -392,6 +499,7 @@ template <Coordinates GEOM>
 void PostInitialization(MeshBlock *pmb, ParameterInput *pin) {
   PARTHENON_INSTRUMENT
   auto &md = pmb->meshblock_data.Get();
+  MHD::SetCellCenteredMagneticFields<MeshBlockData<Real>, GEOM>(md.get());
   PrimToCons<MeshBlockData<Real>, GEOM>(md.get());
 }
 

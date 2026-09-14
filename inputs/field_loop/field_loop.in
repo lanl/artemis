@@ -1,0 +1,92 @@
+# ========================================================================================
+#  (C) (or copyright) 2026. Triad National Security, LLC. All rights reserved.
+#
+#  This program was produced under U.S. Government contract 89233218CNA000001 for Los
+#  Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
+#  for the U.S. Department of Energy/National Nuclear Security Administration. All rights
+#  in the program are reserved by Triad National Security, LLC, and the U.S. Department
+#  of Energy/National Nuclear Security Administration. The Government is granted for
+#  itself and others acting on its behalf a nonexclusive, paid-up, irrevocable worldwide
+#  license in this material to reproduce, prepare derivative works, distribute copies to
+#  the public, perform publicly and display publicly, and to permit others to do so.
+# ========================================================================================
+
+<artemis>
+problem = field_loop
+coordinates = cartesian
+
+<parthenon/job>
+problem_id = field_loop
+
+<parthenon/output1>
+variables = gas.prim.density,      &
+            gas.prim.velocity,     &
+            gas.prim.pressure,     &
+            gas.cons.momentum,     &
+            gas.cons.total_energy, &
+            field.cell.B,          &
+            field.cell.energy,     &
+            field.cell.divB
+file_type = hdf5
+dt = 100.0
+
+<parthenon/time>
+nlim = -1
+tlim = -1.0
+integrator = rk2
+ncycle_out = 100
+
+<parthenon/mesh>
+nghost = 2
+refinement = none
+numlevel = 1
+
+nx1 = 64
+x1min = -1.0
+x1max = 1.0
+ix1_bc = periodic
+ox1_bc = periodic
+
+nx2 = 32
+x2min = -0.5
+x2max = 0.5
+ix2_bc = periodic
+ox2_bc = periodic
+
+nx3 = 1
+x3min = -0.5
+x3max = 0.5
+ix3_bc = periodic
+ox3_bc = periodic
+
+<parthenon/meshblock>
+nx1 = 16
+nx2 = 16
+nx3 = 1
+
+<physics>
+gas = true
+mhd = true
+dust = false
+
+<gas>
+cfl = 0.4
+reconstruct = plm
+riemann = hlld
+dfloor = 1.0e-10
+siefloor = 1.0e-10
+
+<gas/eos/ideal>
+gamma = 1.66666666667
+
+<problem>
+loop_type = planar
+radius = 0.3
+amp = 1.0e-3
+vflow = 1.0
+v3 = 1.0
+rho0 = 1.0
+p0 = 1.0
+x0 = 0.0
+y0 = 0.0
+nperiod = 1.0

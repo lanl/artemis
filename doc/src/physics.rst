@@ -81,6 +81,63 @@ An example that triggers refinement when the gas density is larger than ``10.0``
    deref_thr = 0.02
 
 
+MHD
+"""
+
+Ideal magnetohydrodynamics is enabled by setting ``mhd = true`` in the ``<physics>`` block.
+When MHD is active, |code| evolves a face-centered magnetic field using constrained transport (CT).
+This keeps the magnetic update tied to the divergence-preserving CT representation.
+
+At minimum, an MHD run should enable both gas and MHD:
+
+::
+
+   <physics>
+   gas = true
+   mhd = true
+
+If there are multiple gas species defined, only the first species couples to the magnetic field, i.e., its total energy contains the magnetic energy and only its velocity induces an electric fied.
+Magnetic fluxes are computed through the gas Riemann solver selected in ``<gas>``.
+The available solver choices are:
+
+* ``llf``
+* ``hlle``
+* ``hlld``
+
+The ``hlld`` solver is the most specialized MHD option currently available.
+An example input block that enables MHD is,
+
+::
+
+   <physics>
+   gas = true
+   mhd = true
+
+   <gas>
+   riemann = hlle
+   reconstruct = plm
+
+   <gas/eos/ideal>
+   gamma = 1.4
+
+In dimensional runs, magnetic quantities use the same unit-conversion system as the rest of the code.
+When ``artemis/physical_units = cgs`` and ``artemis/unit_conversion = base``, the base-unit specification now includes electrical current:
+
+::
+
+   <artemis>
+   physical_units = cgs
+   unit_conversion = base
+   length = 1.0
+   time = 1.0
+   mass = 1.0
+   temperature = 1.0
+   current = 1.0
+
+The ``current`` parameter is used together with length, time, and mass to derive the magnetic-field conversion and the code-unit value of :math:`\mu_0`.
+In ``scalefree`` runs, these conversions reduce to unity.
+
+
 Gasses support several microphysics models including `Cooling`_, `Viscosity`_, and `Conduction`_.
 These are controlled by adding additional nodes under the ``<gas>`` node, e.g., ``<gas/viscosity>``.
 We describe each of these below.

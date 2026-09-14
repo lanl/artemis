@@ -26,3 +26,7 @@ diffusion/viscous_diffusion_mpi
 diffusion/alpha_disk_mpi
 diffusion/thermal_diffusion_mpi
 drag/drag_mpi
+mhd/brio_wu_mpi
+mhd/field_loop_mpi
+mhd/linwave_mpi
+mhd/orszag_tang_mpi

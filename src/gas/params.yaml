@@ -76,6 +76,9 @@ gas:
     hlle:
       _type: opt
       _description: "HLLE"
+    hlld:
+      _type: opt
+      _description: "HLLD for ideal-MHD problems with the ideal EOS."
     hllc-general:
       _type: opt
       _description: "HLLC for a general EOS."

@@ -203,11 +203,54 @@ problem(gaussian_bump):
     _default: 0.0
     _description: "Background dust velocity."
 
+problem(field_loop):
+  _description: "<problem> block parameters when artemis/problem=field_loop"
+  loop_type:
+    _type: string
+    _default: "planar"
+    _description: "Field-loop geometry: planar (2D) or tilted (3D)"
+  radius:
+    _type: Real
+    _default: 0.3
+    _description: "Radius of the magnetic loop in local loop coordinates"
+  amp:
+    _type: Real
+    _default: 1.0e-3
+    _description: "Vector-potential amplitude"
+  vflow:
+    _type: Real
+    _default: 1.0
+    _description: "Advection speed along the periodic diagonal"
+  v3:
+    _type: Real
+    _default: 0.0
+    _description: "Uniform x3 velocity for the planar 2D loop"
+  rho0:
+    _type: Real
+    _default: 1.0
+    _description: "Uniform gas density"
+  p0:
+    _type: Real
+    _default: 1.0
+    _description: "Uniform gas pressure"
+  x0:
+    _type: Real
+    _default: 0.0
+    _description: "Loop-center x coordinate in local loop coordinates"
+  y0:
+    _type: Real
+    _default: 0.0
+    _description: "Loop-center y coordinate in local loop coordinates"
+  nperiod:
+    _type: Real
+    _default: 1.0
+    _description: "Number of periodic crossings to evolve"
+
 problem(linear_wave):
   _description: "<problem> block parameters when artemis/problem=linear_wave"
   wave_flag:
     _type: int
-    _description: "Wave flag"
+    _description: "Wave flag: [0,4] for hydro or [0,6] for MHD"
   amp:
     _type: Real
     _description: "Wave amplitude"
@@ -222,7 +265,26 @@ problem(linear_wave):
   along_x(1,2,3):
     _type: bool
     _default: "false"
-    _description: "Wavevctor along x(1,2,3) axis"
+    _description: "Set the wavevector along the x(1,2,3) axis"
+
+problem(orszag_tang):
+  _description: "<problem> block parameters when artemis/problem=orszag_tang"
+  rho0:
+    _type: Real
+    _default: 25.0 / (36.0 * pi)
+    _description: "Uniform background density"
+  p0:
+    _type: Real
+    _default: 5.0 / (12.0 * pi)
+    _description: "Uniform background gas pressure"
+  v0:
+    _type: Real
+    _default: 1.0
+    _description: "Velocity amplitude for the vortex pattern"
+  b0:
+    _type: Real
+    _default: 1.0 / sqrt(4.0 * pi)
+    _description: "Magnetic-field amplitude for the standard Orszag-Tang pattern"
 
 problem(shock):
   _description: "<problem> block parameters when artemis/problem=shock"
@@ -237,7 +299,11 @@ problem(shock):
   tl:
     _type: Real
     _default: 0.6
-    _description: "Temperature (left)."
+    _description: "Temperature (left). Used when pl < 0."
+  pl:
+    _type: Real
+    _default: -1.0
+    _description: "Pressure (left). If >= 0, overrides tl."
   rhor:
     _type: Real
     _default: 2.285714
@@ -249,7 +315,31 @@ problem(shock):
   tr:
     _type: Real
     _default: 1.246875
-    _description: "Temperature (right)."
+    _description: "Temperature (right). Used when pr < 0."
+  pr:
+    _type: Real
+    _default: -1.0
+    _description: "Pressure (right). If >= 0, overrides tr."
+  bx:
+    _type: Real
+    _default: 0.0
+    _description: "Uniform normal magnetic field Bx."
+  byl:
+    _type: Real
+    _default: 0.0
+    _description: "Left transverse magnetic field By."
+  byr:
+    _type: Real
+    _default: 0.0
+    _description: "Right transverse magnetic field By."
+  bzl:
+    _type: Real
+    _default: 0.0
+    _description: "Left transverse magnetic field Bz."
+  bzr:
+    _type: Real
+    _default: 0.0
+    _description: "Right transverse magnetic field Bz."
   xdisc:
     _type: Real
     _default: 0.0005

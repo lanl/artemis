@@ -43,7 +43,7 @@ constexpr bool is_x1dep() {
           std::is_same_v<VAR, geom::dh2dx1> || std::is_same_v<VAR, geom::rfw1m> ||
           std::is_same_v<VAR, geom::rfw1p>) ||
          std::is_same_v<VAR, geom::hx2f1> || std::is_same_v<VAR, geom::hx2f2> ||
-         std::is_same_v<VAR, geom::hx2f3>;
+         std::is_same_v<VAR, geom::hx2e2> || std::is_same_v<VAR, geom::hx2f3>;
 }
 template <class VAR>
 constexpr bool is_x2dep() {

@@ -59,6 +59,11 @@ class Units {
   }
 
   KOKKOS_INLINE_FUNCTION
+  Real GetCurrentCodeToPhysical() const { return current_; }
+  KOKKOS_INLINE_FUNCTION
+  Real GetCurrentPhysicalToCode() const { return 1. / GetCurrentCodeToPhysical(); }
+
+  KOKKOS_INLINE_FUNCTION
   Real GetSpeedCodeToPhysical() const { return length_ / time_; }
   KOKKOS_INLINE_FUNCTION
   Real GetSpeedPhysicalToCode() const { return 1. / GetSpeedCodeToPhysical(); }
@@ -76,12 +81,24 @@ class Units {
   }
 
   KOKKOS_INLINE_FUNCTION
-  Real GetEnergyDensityCodeToPhysical() const {
-    return 1. / GetNumberDensityCodeToPhysical();
-  }
+  Real GetEnergyDensityCodeToPhysical() const { return energy_density_; }
   KOKKOS_INLINE_FUNCTION
   Real GetEnergyDensityPhysicalToCode() const {
     return 1. / GetEnergyDensityCodeToPhysical();
+  }
+
+  KOKKOS_INLINE_FUNCTION
+  Real GetMu0CodeToPhysical() const {
+    return mass_ * length_ / (SQR(current_) * SQR(time_));
+  }
+  KOKKOS_INLINE_FUNCTION
+  Real GetMu0PhysicalToCode() const { return 1. / GetMu0CodeToPhysical(); }
+
+  KOKKOS_INLINE_FUNCTION
+  Real GetMagneticFieldCodeToPhysical() const { return mass_ / (current_ * SQR(time_)); }
+  KOKKOS_INLINE_FUNCTION
+  Real GetMagneticFieldPhysicalToCode() const {
+    return 1. / GetMagneticFieldCodeToPhysical();
   }
 
   KOKKOS_INLINE_FUNCTION
@@ -120,8 +137,10 @@ class Units {
   Real time_;
   Real mass_;
   Real temp_;
+  Real current_;
 
   Real energy_;
+  Real energy_density_;
   Real number_density_;
 
   PhysicalUnits physical_units_;
@@ -190,6 +209,11 @@ class Constants {
   KOKKOS_INLINE_FUNCTION
   Real GetYearCode() const { return Year_code_; }
 
+  KOKKOS_INLINE_FUNCTION
+  Real GetMu0Physical() const { return mu0_; }
+  KOKKOS_INLINE_FUNCTION
+  Real GetMu0Code() const { return mu0_code_; }
+
  private:
   // Physical constants in physical units
   Real G_;      // Gravitational constant
@@ -206,6 +230,7 @@ class Constants {
   Real pc_;     // Parsec
   Real Year_;   // Year
   Real Rsolar_; // Solar radius
+  Real mu0_;    // Magnetic constant used for B^2/(2 mu0)
 
   // Physical constants in code units
   Real G_code_;
@@ -222,6 +247,7 @@ class Constants {
   Real pc_code_;
   Real Year_code_;
   Real Rsolar_code_;
+  Real mu0_code_;
 };
 
 } // namespace ArtemisUtils

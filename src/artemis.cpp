@@ -21,6 +21,7 @@
 #include "gas/gas.hpp"
 #include "geometry/geometry.hpp"
 #include "gravity/gravity.hpp"
+#include "mhd/mhd.hpp"
 #include "nbody/nbody.hpp"
 #include "radiation/moments/moments.hpp"
 #include "radiation/radiation.hpp"
@@ -102,6 +103,7 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   const bool do_radiation = pin->GetOrAddBoolean("physics", "radiation", false);
   const bool do_coagulation = pin->GetOrAddBoolean("physics", "coagulation", false);
   const bool do_raytrace = pin->GetOrAddBoolean("physics", "raytrace", false);
+  const bool do_mhd = pin->GetOrAddBoolean("physics", "mhd", false);
   const bool do_orbital_advection =
       pin->GetOrAddBoolean("physics", "orbital_advection", false);
 
@@ -125,6 +127,10 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
     PARTHENON_REQUIRE(do_moment || do_imc,
                       "Radiation must have one of the moment or IMC method active!");
   }
+  if (do_mhd) {
+    PARTHENON_REQUIRE(do_gas, "MHD requires a gas material!");
+    PARTHENON_REQUIRE(update_fluxes, "MHD requires gas/update_fluxes !");
+  }
 
   // Store configuration choices in params
   artemis->AddParam("do_gas", do_gas);
@@ -144,6 +150,7 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   artemis->AddParam("do_moment", do_moment);
   artemis->AddParam("do_orbital_advection", do_orbital_advection);
   artemis->AddParam("do_raytrace", do_raytrace);
+  artemis->AddParam("do_mhd", do_mhd);
   artemis->AddParam("update_fluxes", update_fluxes);
 
   // Set coordinate system
@@ -152,6 +159,7 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   Coordinates coords = geometry::CoordSelect(sys, ndim);
   artemis->AddParam("coords", coords);
   artemis->AddParam("coord_sys", sys);
+  artemis->AddParam("ndim", ndim);
 
   geometry::CoordParams cpars(pin.get());
   artemis->AddParam("coord_params", cpars);
@@ -202,6 +210,12 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
     }
   }
   if (do_raytrace) packages.Add(RT::Initialize(pin.get(), units, constants));
+  if (do_mhd) packages.Add(MHD::Initialize(pin.get(), units, constants, packages));
+
+  if (do_mhd && pin->GetOrAddBoolean("mhd", "monitor_divb", false)) {
+    artemis->PreStepDiagnosticsMesh = ArtemisUtils::PreStepDiagnosticsRemeshDivB;
+    artemis->PostStepDiagnosticsMesh = ArtemisUtils::PostStepDiagnosticsRemeshDivB;
+  }
 
   // Assign geometry-specific FillDerived functions
   if (do_gas || do_dust) {

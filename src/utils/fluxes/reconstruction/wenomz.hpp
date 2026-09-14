@@ -1,5 +1,5 @@
 //========================================================================================
-// (C) (or copyright) 2023-2024. Triad National Security, LLC. All rights reserved.
+// (C) (or copyright) 2023-2026. Triad National Security, LLC. All rights reserved.
 //
 // This program was produced under U.S. Government contract 89233218CNA000001 for Los
 // Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -93,9 +93,10 @@ struct Reconstruction<ReconstructionMethod::wenomz, X1DIR, GEOM> {
   KOKKOS_INLINE_FUNCTION void
   operator()(parthenon::team_mbr_t const &member, const geometry::CoordParams &cpars,
              const int b, const int k, const int j, const int il, const int iu,
-             const V1 &q, const V2 &vg, parthenon::ScratchPad2D<Real> &ql,
-             parthenon::ScratchPad2D<Real> &qr) const {
+             const V1 &q, const V2 &vg, const int skip_index,
+             parthenon::ScratchPad2D<Real> &ql, parthenon::ScratchPad2D<Real> &qr) const {
     for (int n = q.GetLowerBound(b); n <= q.GetUpperBound(b); ++n) {
+      if (n == skip_index) continue;
       parthenon::par_for_inner(
           DEFAULT_INNER_LOOP_PATTERN, member, il, iu, [&](const int i) {
             WENOMZ5(q(b, n, k, j, i - 2), q(b, n, k, j, i - 1), q(b, n, k, j, i),
@@ -114,9 +115,11 @@ struct Reconstruction<ReconstructionMethod::wenomz, X2DIR, GEOM> {
   KOKKOS_INLINE_FUNCTION void
   operator()(parthenon::team_mbr_t const &member, const geometry::CoordParams &cpars,
              const int b, const int k, const int j, const int il, const int iu,
-             const V1 &q, const V2 &vg, parthenon::ScratchPad2D<Real> &ql_jp1,
+             const V1 &q, const V2 &vg, const int skip_index,
+             parthenon::ScratchPad2D<Real> &ql_jp1,
              parthenon::ScratchPad2D<Real> &qr_j) const {
     for (int n = q.GetLowerBound(b); n <= q.GetUpperBound(b); ++n) {
+      if (n == skip_index) continue;
       parthenon::par_for_inner(
           DEFAULT_INNER_LOOP_PATTERN, member, il, iu, [&](const int i) {
             WENOMZ5(q(b, n, k, j - 2, i), q(b, n, k, j - 1, i), q(b, n, k, j, i),
@@ -135,9 +138,11 @@ struct Reconstruction<ReconstructionMethod::wenomz, X3DIR, GEOM> {
   KOKKOS_INLINE_FUNCTION void
   operator()(parthenon::team_mbr_t const &member, const geometry::CoordParams &cpars,
              const int b, const int k, const int j, const int il, const int iu,
-             const V1 &q, const V2 &vg, parthenon::ScratchPad2D<Real> &ql_kp1,
+             const V1 &q, const V2 &vg, const int skip_index,
+             parthenon::ScratchPad2D<Real> &ql_kp1,
              parthenon::ScratchPad2D<Real> &qr_k) const {
     for (int n = q.GetLowerBound(b); n <= q.GetUpperBound(b); ++n) {
+      if (n == skip_index) continue;
       parthenon::par_for_inner(
           DEFAULT_INNER_LOOP_PATTERN, member, il, iu, [&](const int i) {
             WENOMZ5(q(b, n, k - 2, j, i), q(b, n, k - 1, j, i), q(b, n, k, j, i),

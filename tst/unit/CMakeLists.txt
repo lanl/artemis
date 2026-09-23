@@ -35,7 +35,8 @@ function(add_unit_test TEST_NAME TEST_SOURCE)
   
   # Discover and add tests to CTest
   catch_discover_tests(${TEST_NAME}
-    PROPERTIES LABELS "unit")
+    PROPERTIES LABELS "unit"
+    DISCOVERY_MODE PRE_TEST)
 endfunction()
 
 # Include Catch2's module for test discovery

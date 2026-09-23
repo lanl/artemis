@@ -19,17 +19,19 @@ physical_units = cgs
 unit_conversion = ppd
 
 <parthenon/job>
-problem_id = disk  # problem ID: basename of output filenames
+problem_id = raytrace  # problem ID: basename of output filenames
 
 <parthenon/output1>
 variables = gas.prim.density,  &
             gas.prim.velocity, &
+            gas.prim.temperature, &
             gas.prim.pressure, &
             rad.prim.energy, &
             rad.prim.flux, &
             gas.src.energy
 file_type = hdf5   # HDF5 data dump
-dt        = 0.01   # time increment between outputs
+dt = 4.0e-2        # dump the initial and post-step states (single-step test)
+#dn = 1
 swarms = star
 swarm_variables = star.swarm_position.x, &
                   star.swarm_position.y, &
@@ -37,8 +39,8 @@ swarm_variables = star.swarm_position.x, &
 
 
 <parthenon/time>
-nlim       = -1        # cycle limit
-tlim       = 62.8      # time limit
+nlim       = 1         # cycle limit (single coupling step for the regression test)
+tlim       = 4.0e-2    # time limit
 integrator = rk2       # time integration algorithm
 ncycle_out = 1         # interval for stdout summary info
 ncycle_out_mesh = 100  # interval for stdout summary info
@@ -47,13 +49,13 @@ ncycle_out_mesh = 100  # interval for stdout summary info
 refinement = static
 nghost = 2
 
-nx1    = 256                 # Number of zones in X1-direction
+nx1    = 128                  # Number of zones in X1-direction
 x1min  = -1.2 #=log(0.3)   # minimum value of X1
 x1max  = 1.72 #=log(5.6)   # maximum value of X1
 ix1_bc = extrap              # Inner-X1 boundary condition flag
 ox1_bc = extrap              # Outer-X1 boundary condition flag
 
-nx2    = 256                 # Number of zones in X2-direction
+nx2    = 64                  # Number of zones in X2-direction
 x2min  = 1.059856161608513   # minimum value of X2
 x2max  = 2.081736491981280   # maximum value of X2
 ix2_bc = extrap              # Inner-X2 boundary condition flag
@@ -66,12 +68,12 @@ ix3_bc = periodic            # Inner-X3 boundary condition flag
 ox3_bc = periodic            # Outer-X3 boundary condition flag
 
 <parthenon/meshblock>
-nx1 = 64  # Number of cells in each MeshBlock, X1-dir
-nx2 = 64  # Number of cells in each MeshBlock, X2-dir
+nx1 = 16  # Number of cells in each MeshBlock, X1-dir
+nx2 = 16  # Number of cells in each MeshBlock, X2-dir
 nx3 = 1   # Number of cells in each MeshBlock, X3-dir
 
 <parthenon/static_refinement1>
-level = 1
+level = 2
 x1min = 0.0 #1.0
 x1max = 0.69 #2.0
 x2min = 1.2707963267948965 
@@ -106,7 +108,7 @@ temperature_cgs = 5000.
 <gas/opacity/absorption>
 opacity_model = powerlaw  # absorption opacity model
 coef_kappa_a = 577.0      # kappa_a,0 constant (must be passed in cgs)
-rho_exp = -1.0            # dens exponent for opacity powerlaw
+rho_exp = 0.0            # dens exponent for opacity powerlaw
 temp_exp = 0.0            # temp exponent for opacity powerlaw
 
 
@@ -117,10 +119,11 @@ riemann = hlle
 efloor = 1e-16
 closure = m1
 creduc = 1000
-#inner_iteration_tol = 1e-8
-#inner_iteration_max = 1000
-full_coupling = true
-fatal_if_unconverged = false
+fatal_if_unconverged = true    # fail loudly if the coupling solve does not converge
+inner_iteration_tol = 1.0e-12  # drive the solver hard so the budget residual is physical
+outer_iteration_tol = 1.0e-12
+inner_iteration_max = 400
+outer_iteration_max = 100
 
 
 <rotating_frame>

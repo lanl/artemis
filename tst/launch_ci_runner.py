@@ -152,6 +152,12 @@ if __name__ == "__main__":
 
     subprocess.run(run_cmd)
 
+    run_cmd = ["./darwin_amd_ci.py", str(args.pr_number)]
+    if args.output_dir:
+        run_cmd.append("--output_dir=" + str(args.output_dir))
+
+    subprocess.run(run_cmd)
+
     run_cmd = ["./darwin_gpu_ci.py", str(args.pr_number)]
     if args.output_dir:
         run_cmd.append("--output_dir=" + str(args.output_dir))

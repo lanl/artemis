@@ -84,7 +84,7 @@ post_recon(const EOS &eos, const Real dfloor, const Real siefloor,
                                  Real &dL = ql(IDN, ipl);
                                  Real &pL = ql(IPR, ipl);
                                  Real &eL = ql(ISE, ipl);
-                                 Real &bL = qr(IBL, ipl);
+                                 Real &bL = ql(IBL, ipl);
                                  Real &dR = qr(IDN, i);
                                  Real &pR = qr(IPR, i);
                                  Real &eR = qr(ISE, i);

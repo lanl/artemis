@@ -1183,7 +1183,8 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
             const Real Cv = dens * eos_d.SpecificHeatFromDensityTemperature(dens, T);
             const Real fleck = FleckFactor(arad, T, Cv);
 
-            const Real sigp = chat * dt * opac_d.PlanckGroupAbsorptionCoefficient(dens, T, 0);
+            const Real sigp =
+                chat * dt * opac_d.PlanckGroupAbsorptionCoefficient(dens, T, 0);
             const Real sigs =
                 chat * dt * scat_d.RosselandGroupScatteringCoefficient(dens, T, 0);
             Real ca = 0.0;
@@ -1259,8 +1260,7 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
               const Real sigp_trial =
                   chat * dt * opac_d.PlanckGroupAbsorptionCoefficient(dens, Ttrial, 0);
               const Real sigs_trial =
-                  chat * dt *
-                  scat_d.RosselandGroupScatteringCoefficient(dens, Ttrial, 0);
+                  chat * dt * scat_d.RosselandGroupScatteringCoefficient(dens, Ttrial, 0);
               Real ca_trial = 0.0;
               Real cb_trial = 0.0;
               Real cd_trial = 0.0;

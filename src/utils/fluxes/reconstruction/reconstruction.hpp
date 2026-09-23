@@ -117,11 +117,11 @@ post_recon(const EOS &eos, const Real dfloor, const Real siefloor,
                                  const int ipl = i + (dir == 1);
                                  Real &dL = ql(IDN, ipl);
                                  Real &dR = qr(IDN, i);
-				 
+
                                  // Floor everything
                                  dL = std::max(dL, dfloor);
                                  dR = std::max(dR, dfloor);
-			       });
+                               });
     }
   }
 }

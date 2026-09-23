@@ -449,8 +449,8 @@ void ConvertToVolumeDensity(const parthenon::team_mbr_t &mbr, const int &nm1,
                             const ScratchPad1D<Real> &dustdens,
                             const ParArray1D<Real> &mass_grid, const Real &dfloor) {
   parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, mbr, 0, nm1, [&](const int i) {
-    const bool flg_dfloor  = (dustdens(i) > dfloor / mass_grid(i));
-    dustdens(i) *= (flg_dfloor) * mass_grid(i);
+    const bool flg_dfloor = (dustdens(i) > dfloor / mass_grid(i));
+    dustdens(i) *= (flg_dfloor)*mass_grid(i);
   });
   mbr.team_barrier();
 }

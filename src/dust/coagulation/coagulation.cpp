@@ -164,7 +164,7 @@ TaskListStatus CoagulationDriver(Mesh *pm, parthenon::SimTime &tm) {
 
   // Determine if executing coagulation this cycle...
   if ((tm.ncycle + 1) % nstep_coag != 0) {
-    //reset the dust density to floor value above active_maxSize
+    // reset the dust density to floor value above active_maxSize
     return TaskListStatus::complete;
   }
 
@@ -358,8 +358,8 @@ TaskStatus CoagulationStep(MeshData<Real> *md, const Real time, const Real dt) {
               stime(n) = st0 * dust_size(n) * length0;
 
               // Calculate rhod, vel
-              const bool gtf = ( (vmesh(b, dust::prim::density(n), k, j, i) > dfloor)
-				 && (n <= (*active_nm)) );
+              const bool gtf = ((vmesh(b, dust::prim::density(n), k, j, i) > dfloor) &&
+                                (n <= (*active_nm)));
               rhod(n) = gtf * vmesh(b, dust::prim::density(n), k, j, i) * rho0;
               for (int d = 0; d < nvel; d++) {
                 const auto vidx = d + nvel * n;
@@ -384,13 +384,15 @@ TaskStatus CoagulationStep(MeshData<Real> *md, const Real time, const Real dt) {
         parthenon::par_for_inner(
             DEFAULT_INNER_LOOP_PATTERN, mbr, 0, nm - 1, [&](const int n) {
               const bool gt0 = (rhod(n) > 0.0);
-              vmesh(b, dust::cons::density(n), k, j, i) = gt0 * (rhod(n) / rho0) + (!gt0) * dfloor;
+              vmesh(b, dust::cons::density(n), k, j, i) =
+                  gt0 * (rhod(n) / rho0) + (!gt0) * dfloor;
               for (int d = 0; d < nvel; d++) {
                 const auto vidx = d + nvel * n;
-		const Real vel1 = (gt0 * vel(vidx) +
-				   (!gt0) * vmesh(b, dust::prim::velocity(VI(n, d)), k, j, i));
+                const Real vel1 =
+                    (gt0 * vel(vidx) +
+                     (!gt0) * vmesh(b, dust::prim::velocity(VI(n, d)), k, j, i));
                 vmesh(b, dust::cons::momentum(VI(n, d)), k, j, i) =
-                    vmesh(b, dust::cons::density(n), k, j, i) * vel1 / vel0 * hx[d] ;
+                    vmesh(b, dust::cons::density(n), k, j, i) * vel1 / vel0 * hx[d];
               }
             });
 
@@ -401,8 +403,8 @@ TaskStatus CoagulationStep(MeshData<Real> *md, const Real time, const Real dt) {
     Real mass_d1 = Null<Real>();
     int max_size1 = Null<int>();
     CoagulationDiagnostics<GEOM>(md, vmesh, cpars, dfloor, mass_d1, max_size1);
-    if (Globals::my_rank == 0) printf(" after coag: maxsize = %d, total_dust=%e \n",
-				      max_size1, mass_d1);
+    if (Globals::my_rank == 0)
+      printf(" after coag: maxsize = %d, total_dust=%e \n", max_size1, mass_d1);
     *active_nm = max_size1;
     WriteCoagulationDiagnostics(md, time, dt, max_size1, max_size0, mass_d1, mass_d0);
   }

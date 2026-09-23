@@ -85,6 +85,7 @@ kappa_a = 2.0
 <radiation/imc>
 num_particles = 200000
 use_ddmc = true
+frequency_type = gray
 
 # <radiation/moment>
 # cfl = 0.3

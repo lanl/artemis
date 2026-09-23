@@ -183,6 +183,9 @@ enum class ArtemisBC {
 // Tensor indexing (currently used in radiation moments)
 enum TensIdx { X11 = 0, X22 = 1, X33 = 2, X23 = 3, X13 = 4, X12 = 5 };
 
+// Radiation solver frequency type enum
+enum class FrequencyType { gray, multigroup };
+
 // Floating point limits
 template <typename T = Real>
 KOKKOS_FORCEINLINE_FUNCTION constexpr auto Big() {

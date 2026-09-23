@@ -656,9 +656,9 @@ KOKKOS_INLINE_FUNCTION bool EvaluateCouplingInnerScalarResidual(
   const Real eint = eg * eref / dens;
   const Real T = std::max(tfloor, eos.TemperatureFromDensityInternalEnergy(dens, eint));
   B = std::max(Bfloor, arad * SQR(SQR(T)) / eref);
-  const Real sigp = chat * dt * opacity.PlanckMeanAbsorptionCoefficient(dens, T);
+  const Real sigp = chat * dt * opacity.PlanckGroupAbsorptionCoefficient(dens, T, 0);
   const Real sigs =
-      chat * dt * scattering.RosselandMeanTotalScatteringCoefficient(dens, T);
+      chat * dt * scattering.RosselandGroupScatteringCoefficient(dens, T, 0);
   Real ca = 0.0;
   Real cb = 0.0;
   Real cd = 0.0;
@@ -923,7 +923,7 @@ KOKKOS_INLINE_FUNCTION bool EvaluateCouplingEnergyOnlyResidual(
   const Real eint = eg * eref / dens;
   const Real T = std::max(tfloor, eos.TemperatureFromDensityInternalEnergy(dens, eint));
   B = arad * SQR(SQR(T)) / eref;
-  const Real sigp = chat * dt * opacity.PlanckMeanAbsorptionCoefficient(dens, T);
+  const Real sigp = chat * dt * opacity.PlanckGroupAbsorptionCoefficient(dens, T, 0);
 
   // This fallback intentionally retains only thermal absorption/emission.
   // Scattering energy exchange is work associated with the momentum source,
@@ -949,9 +949,10 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
 
   // Extract gas package and params
   auto &gas_pkg = pm->packages.Get("gas");
+  auto &rad_pkg = pm->packages.Get("radiation");
   auto eos_d = gas_pkg->template Param<EOS>("eos_d");
-  auto opac_d = gas_pkg->template Param<MeanOpacity>("opacity_d");
-  auto scat_d = gas_pkg->template Param<MeanScattering>("scattering_d");
+  auto opac_d = rad_pkg->template Param<MeanOpacity>("opacity_d");
+  auto scat_d = rad_pkg->template Param<MeanScattering>("scattering_d");
   auto dflr = gas_pkg->template Param<Real>("dfloor");
 
   // Extract radiation package and params
@@ -1182,9 +1183,10 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
             const Real Cv = dens * eos_d.SpecificHeatFromDensityTemperature(dens, T);
             const Real fleck = FleckFactor(arad, T, Cv);
 
-            const Real sigp = chat * dt * opac_d.PlanckMeanAbsorptionCoefficient(dens, T);
+            const Real sigp =
+                chat * dt * opac_d.PlanckGroupAbsorptionCoefficient(dens, T, 0);
             const Real sigs =
-                chat * dt * scat_d.RosselandMeanTotalScatteringCoefficient(dens, T);
+                chat * dt * scat_d.RosselandGroupScatteringCoefficient(dens, T, 0);
             Real ca = 0.0;
             Real cb = 0.0;
             Real cd = 0.0;
@@ -1256,10 +1258,9 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
               const Real eint_trial =
                   dens * eos_d.InternalEnergyFromDensityTemperature(dens, Ttrial) / eref;
               const Real sigp_trial =
-                  chat * dt * opac_d.PlanckMeanAbsorptionCoefficient(dens, Ttrial);
+                  chat * dt * opac_d.PlanckGroupAbsorptionCoefficient(dens, Ttrial, 0);
               const Real sigs_trial =
-                  chat * dt *
-                  scat_d.RosselandMeanTotalScatteringCoefficient(dens, Ttrial);
+                  chat * dt * scat_d.RosselandGroupScatteringCoefficient(dens, Ttrial, 0);
               Real ca_trial = 0.0;
               Real cb_trial = 0.0;
               Real cd_trial = 0.0;
@@ -1343,9 +1344,9 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
                 dens * eos_d.InternalEnergyFromDensityTemperature(dens, Tpred) / eref;
             const Real dEg_pred = eg_pred - eg0;
             const Real sigp_pred =
-                chat * dt * opac_d.RosselandMeanAbsorptionCoefficient(dens, Tpred);
+                chat * dt * opac_d.RosselandGroupAbsorptionCoefficient(dens, Tpred, 0);
             const Real sigs_pred =
-                chat * dt * scat_d.RosselandMeanTotalScatteringCoefficient(dens, Tpred);
+                chat * dt * scat_d.RosselandGroupScatteringCoefficient(dens, Tpred, 0);
             std::array<Real, 3> beta_pred{v[0] / c, v[1] / c, v[2] / c};
             std::array<Real, 3> Fpred = F;
             Real Epred = E;
@@ -1391,9 +1392,9 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
           dEg = eg - eg0;
 
           const Real sigp_flux =
-              chat * dt * opac_d.RosselandMeanAbsorptionCoefficient(dens, T);
+              chat * dt * opac_d.RosselandGroupAbsorptionCoefficient(dens, T, 0);
           const Real sigs_flux =
-              chat * dt * scat_d.RosselandMeanTotalScatteringCoefficient(dens, T);
+              chat * dt * scat_d.RosselandGroupScatteringCoefficient(dens, T, 0);
 
           // Solve the radiation-flux source equation together with gas
           // pseudo-momentum conservation and reduced-c total-energy
@@ -1450,9 +1451,9 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
               dens * eos_d.InternalEnergyFromDensityTemperature(dens, T) / eref;
           dEg = eg_out - eg0;
           const Real sigp_energy =
-              chat * dt * opac_d.PlanckMeanAbsorptionCoefficient(dens, T);
+              chat * dt * opac_d.PlanckGroupAbsorptionCoefficient(dens, T, 0);
           const Real sigs_out =
-              chat * dt * scat_d.RosselandMeanTotalScatteringCoefficient(dens, T);
+              chat * dt * scat_d.RosselandGroupScatteringCoefficient(dens, T, 0);
           Real ca_out = 0.0;
           Real cb_out = 0.0;
           Real cd_out = 0.0;
@@ -1466,7 +1467,7 @@ TaskStatus MatterCouplingFullSingleImpl(MeshData<Real> *u0, const Real dt) {
           const Real source_residual = E - Eeq_out;
 
           const Real sigp_flux_out =
-              chat * dt * opac_d.RosselandMeanAbsorptionCoefficient(dens, T);
+              chat * dt * opac_d.RosselandGroupAbsorptionCoefficient(dens, T, 0);
           const Real sigf_flux_out = sigp_flux_out + sigs_out;
           const Real a_out = g_out * sigf_flux_out;
           const Real b_out = 2.0 * g2_out * g_out * sigs_out;

@@ -79,6 +79,8 @@ set (SRC_LIST
   pgen/strat.hpp
   pgen/thermalization.hpp
 
+  radiation/gas_opacity.cpp
+  radiation/gas_opacity.hpp
   radiation/radiation.cpp
   radiation/radiation.hpp
   radiation/imc/imc_driver.cpp

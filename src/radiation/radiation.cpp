@@ -14,6 +14,7 @@
 // Artemis includes
 #include "radiation.hpp"
 #include "artemis.hpp"
+#include "gas_opacity.hpp"
 #include "geometry/geometry.hpp"
 #include "utils/artemis_utils.hpp"
 #include "utils/eos/eos.hpp"
@@ -29,8 +30,10 @@ namespace Radiation {
 //! \fn  StateDescriptor Radiation::Initialize
 //! \brief Adds intialization function for radiation package
 //! NOTE(@pdmullen): ...to become a top-level package for radiation utils commmon to impl
-std::shared_ptr<StateDescriptor>
-Initialize(ParameterInput *pin, ArtemisUtils::Constants &constants, const bool do_imc) {
+std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
+                                            ArtemisUtils::Units &units,
+                                            ArtemisUtils::Constants &constants,
+                                            const bool do_imc) {
   auto radiation = std::make_shared<StateDescriptor>("radiation");
   Params &params = radiation->AllParams();
 
@@ -55,8 +58,19 @@ Initialize(ParameterInput *pin, ArtemisUtils::Constants &constants, const bool d
     params.Add("chat", light);
   }
 
+  // frequency type (assume gray unless set below)
+  FrequencyType frequency_type = FrequencyType::gray;
+
   // Add derived radiation fields expected by Jaybenne
   if (do_imc) {
+    // Get multigroup indicator
+    std::string frequency_type_name = pin->GetString("radiation/imc", "frequency_type");
+    if (frequency_type_name == "multigroup") {
+      frequency_type = FrequencyType::multigroup;
+    } else {
+      PARTHENON_REQUIRE(frequency_type_name == "gray",
+                        "Supported frequency_type are gray or multigroup!");
+    }
     // Number of radiation species (i.e., groups)
     const int nspecies = pin->GetOrAddInteger("radiation/imc", "nspecies", 1);
     params.Add("nspecies", nspecies);
@@ -65,18 +79,26 @@ Initialize(ParameterInput *pin, ArtemisUtils::Constants &constants, const bool d
     for (int n = 0; n < nspecies; ++n)
       fluidids.push_back(n);
 
-    // Control field for sparse gas fields
-
     // Absorption and scattering opacity
     Metadata m = Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy,
                            MetadataRadiation, MetadataOperatorSplit});
     radiation->AddField<rad::opac::absorption>(m);
     radiation->AddField<rad::opac::scattering>(m);
+  } else {
+    // TODO: extend MG frequency_type option to moments
+    frequency_type = FrequencyType::gray;
   }
 
+  // incorporate frequency type for gas opacity initialization
+  params.Add("frequency_type", frequency_type);
+
+  std::string radblock_name = (do_imc ? "radiation/imc" : "radiation/moment");
+
+  // Initialize gas opacity models
+  Gas::InitGasOpacity(pin, units, params, radblock_name);
+
   // Enroll in tstart/tstop machinery
-  ArtemisUtils::AddPackageTimeParams(
-      params, (do_imc) ? "radiation/imc" : "radiation/moment", pin);
+  ArtemisUtils::AddPackageTimeParams(params, radblock_name, pin);
   return radiation;
 }
 
@@ -89,10 +111,15 @@ TaskStatus SetOpacities(MeshData<Real> *md) {
   auto pm = md->GetParentPointer();
   auto &resolved_pkgs = pm->resolved_packages;
   auto &gas_pkg = pm->packages.Get("gas");
+  auto &rad_pkg = pm->packages.Get("radiation");
+
+  // do not populate gray fields in MG
+  const auto frequency_type = rad_pkg->Param<FrequencyType>("frequency_type");
+  if (frequency_type == FrequencyType::multigroup) return TaskStatus::complete;
 
   EOS eos_d = gas_pkg->template Param<EOS>("eos_d");
-  MeanOpacity opacity_d = gas_pkg->template Param<MeanOpacity>("opacity_d");
-  MeanScattering scattering_d = gas_pkg->template Param<MeanScattering>("scattering_d");
+  MeanOpacity opacity_d = rad_pkg->template Param<MeanOpacity>("opacity_d");
+  MeanScattering scattering_d = rad_pkg->template Param<MeanScattering>("scattering_d");
 
   // Packing and indexing
   // TODO(): Will eventually incorporate other fluids
@@ -115,8 +142,8 @@ TaskStatus SetOpacities(MeshData<Real> *md) {
         Real &aa = vmesh(b, rad::opac::absorption(), k, j, i);
         Real &ss = vmesh(b, rad::opac::scattering(), k, j, i);
 
-        aa = opacity_d.AbsorptionCoefficient(rho, temp);
-        ss = scattering_d.RosselandMeanTotalScatteringCoefficient(rho, temp);
+        aa = opacity_d.AbsorptionCoefficient(rho, temp, 0);
+        ss = scattering_d.ScatteringCoefficient(rho, temp, 0);
       });
 
   return TaskStatus::complete;

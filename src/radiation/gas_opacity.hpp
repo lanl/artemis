@@ -1,5 +1,5 @@
 //========================================================================================
-// (C) (or copyright) 2025. Triad National Security, LLC. All rights reserved.
+// (C) (or copyright) 2026. Triad National Security, LLC. All rights reserved.
 //
 // This program was produced under U.S. Government contract 89233218CNA000001 for Los
 // Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -10,22 +10,19 @@
 // license in this material to reproduce, prepare derivative works, distribute copies to
 // the public, perform publicly and display publicly, and to permit others to do so.
 //========================================================================================
-#ifndef RADIATION_RADIATION_HPP_
-#define RADIATION_RADIATION_HPP_
+#ifndef RADIATION_GAS_OPACITY_HPP_
+#define RADIATION_GAS_OPACITY_HPP_
 
-#include "artemis.hpp"
+// Artemis includes
 #include "utils/units.hpp"
 
-namespace Radiation {
+// Parthenon includes
+#include <parthenon/driver.hpp>
+#include <parthenon/package.hpp>
 
-std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin,
-                                            ArtemisUtils::Units &units,
-                                            ArtemisUtils::Constants &constants,
-                                            const bool do_imc);
+namespace Gas {
+void InitGasOpacity(ParameterInput *pin, const ArtemisUtils::Units &units, Params &params,
+                    const std::string &radblock_name);
+} // namespace Gas
 
-TaskStatus SetOpacities(MeshData<Real> *md);
-TaskCollection UpdateRadiationFields(Mesh *pmesh);
-
-} // namespace Radiation
-
-#endif // RADIATION_RADIATION_HPP_
+#endif // RADIATION_GAS_OPACITY_HPP_

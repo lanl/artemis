@@ -30,6 +30,7 @@ using Opacity = singularity::photons::impl::Variant<
 // Reduced scattering variant for this codebase
 using Scattering = singularity::photons::impl::S_Variant<
     singularity::photons::NonCGSUnitsS<singularity::photons::GrayS>,
+    singularity::photons::NonCGSUnitsS<singularity::photons::PowerLawS>,
     singularity::photons::NonCGSUnitsS<singularity::photons::ThomsonS>>;
 
 // Reduced variant for mean absorption opacities
@@ -38,7 +39,7 @@ using MeanOpacity =
 
 // Reduced variant for mean scattering opacities
 using MeanScattering =
-    singularity::photons::MeanNonCGSUnitsS<singularity::photons::MeanSOpacityCGS>;
+    singularity::photons::MeanNonCGSUnitsS<singularity::photons::MeanSOpacityBase>;
 
 } // namespace ArtemisUtils
 

@@ -185,12 +185,13 @@ Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   // Operator split radiation
   if (do_radiation) {
     // Top-level radiation package
-    packages.Add(Radiation::Initialize(pin.get(), constants, do_imc));
+    packages.Add(Radiation::Initialize(pin.get(), units, constants, do_imc));
     // Select between Jaybenne IMC or Moments
     if (do_imc) {
       auto eos_h = packages.Get("gas")->Param<EOS>("eos_h");
-      auto opacity_h = packages.Get("gas")->Param<MeanOpacity>("opacity_h");
-      auto scattering_h = packages.Get("gas")->Param<MeanScattering>("scattering_h");
+      auto opacity_h = packages.Get("radiation")->Param<MeanOpacity>("opacity_h");
+      auto scattering_h =
+          packages.Get("radiation")->Param<MeanScattering>("scattering_h");
       packages.Add(jaybenne::Initialize(pin.get(), opacity_h, scattering_h, eos_h,
                                         "radiation/imc"));
       PARTHENON_REQUIRE(coords == Coordinates::cartesian,

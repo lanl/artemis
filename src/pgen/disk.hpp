@@ -894,7 +894,7 @@ void DiskBoundaryVisc(std::shared_ptr<MeshBlockData<Real>> &mbd, bool coarse) {
                                   ArtemisUtils::VDot(dvcyl, ex3)};
 
             // Set extrapolated values
-	    v(0, dust::prim::density(n), k, j, i) = rhod;
+            v(0, dust::prim::density(n), k, j, i) = rhod;
             v(0, dust::prim::velocity(VI(n, ix1)), k, j, i) = dvel[ix1];
             v(0, dust::prim::velocity(VI(n, ix2)), k, j, i) = dvel[ix2];
             v(0, dust::prim::velocity(VI(n, ix3)), k, j, i) = dvel[ix3];

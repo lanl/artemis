@@ -350,7 +350,7 @@ void PrimToCons(T *md) {
             mom1 = w_d * vel1 * hx[0];
             mom2 = w_d * vel2 * hx[1];
             mom3 = w_d * vel3 * hx[2];
-         }
+          }
         }
 
         if (do_rad) {

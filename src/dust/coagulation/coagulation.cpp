@@ -395,7 +395,6 @@ TaskStatus CoagulationStep(MeshData<Real> *md, const Real time, const Real dt) {
                     vmesh(b, dust::cons::density(n), k, j, i) * vel1 / vel0 * hx[d];
               }
             });
-
       });
 
   // Global reduction of sizes (max) and dust mass (sum) after coagulation

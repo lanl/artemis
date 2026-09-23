@@ -17,6 +17,7 @@
 // Artemis includes
 #include "dust/coagulation/coagulation.hpp"
 #include "artemis.hpp"
+#include "drag/drag.hpp"
 #include "dust/dust.hpp"
 #include "geometry/geometry.hpp"
 #include "utils/artemis_utils.hpp"
@@ -137,6 +138,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin, Params &gas_par
   // Remaining parameters for coagulation package
   params.Add("nstep_coag", pin->GetOrAddInteger("dust/coagulation", "nstep_coag", 50));
   params.Add("dt_coag", 0.0, Params::Mutability::Restart);
+  params.Add("active_nm", dcpars.nm - 1, Params::Mutability::Restart);
   params.Add("coag_alpha", pin->GetOrAddReal("dust/coagulation", "coag_alpha", 1.e-3));
   params.Add("coag_scr_level",
              pin->GetOrAddInteger("dust/coagulation", "coag_scr_level", 0));
@@ -161,7 +163,10 @@ TaskListStatus CoagulationDriver(Mesh *pm, parthenon::SimTime &tm) {
   *dt_coag += tm.dt;
 
   // Determine if executing coagulation this cycle...
-  if ((tm.ncycle + 1) % nstep_coag != 0) return TaskListStatus::complete;
+  if ((tm.ncycle + 1) % nstep_coag != 0) {
+    // reset the dust density to floor value above active_maxSize
+    return TaskListStatus::complete;
+  }
 
   // ...and if so, compute/report time, dt, and cycle for coagulation and reset dt_coag
   const Real ltime = tm.time + tm.dt - (*dt_coag);
@@ -223,12 +228,22 @@ TaskStatus CoagulationStep(MeshData<Real> *md, const Real time, const Real dt) {
   // Extract EOS
   auto &gas_pkg = pm->packages.Get("gas");
   auto eos_d = gas_pkg->template Param<EOS>("eos_d");
+  const Real de_switch = gas_pkg->template Param<Real>("de_switch");
+  const Real dflr_gas = gas_pkg->template Param<Real>("dfloor");
+  const Real sieflr_gas = gas_pkg->template Param<Real>("siefloor");
 
   // Extract dust params
   auto &dust_pkg = pm->packages.Get("dust");
   const int &nspecies = dust_pkg->template Param<int>("nspecies");
   const auto &dust_size = dust_pkg->template Param<ParArray1D<Real>>("sizes");
   const Real &dfloor = dust_pkg->template Param<Real>("dfloor");
+  const auto grain_density = dust_pkg->template Param<Real>("grain_density");
+
+  // Extract stopping time parameter
+  // auto &drag_pkg = pm->packages.Get("drag");
+  // const auto stop_par =
+  //   drag_pkg->template Param<Drag::StoppingTimeParams>("stopping_time_params");
+  // const Real x1power = stop_par.x1_power;
 
   // Extract coagulation params
   auto &coag_pkg = pm->packages.Get("coagulation");
@@ -237,8 +252,10 @@ TaskStatus CoagulationStep(MeshData<Real> *md, const Real time, const Real dt) {
       coag_pkg->template Param<Dust::Coagulation::CoagArrays>("coag_arrs");
   auto &rate = coag_pkg->template Param<Dust::Coagulation::RateParams>("rate_pars");
   const Real alpha = coag_pkg->template Param<Real>("coag_alpha");
+  auto *active_nm = coag_pkg->MutableParam<int>("active_nm");
   const bool surface = coag.coord;
-  const int nvel = surface ? 2 : 3;
+  // const int nvel = surface ? 2 : 3;
+  const int nvel = 3;
   const int scr_level = coag_pkg->template Param<int>("coag_scr_level");
   const bool info_out_flag = coag_pkg->template Param<bool>("coag_info_out");
 
@@ -275,11 +292,13 @@ TaskStatus CoagulationStep(MeshData<Real> *md, const Real time, const Real dt) {
   }
 
   // Coagulation
-  size_t isize = (5 + nvel + (coag.integrator == 3 && coag.mom_coag)) * nspecies;
+  size_t isize = (6 + nvel + (coag.integrator == 3 && coag.mom_coag)) * nspecies;
   size_t scr_size = ScratchPad1D<Real>::shmem_size(isize);
+  size_t scr_size1 = ScratchPad1D<Real>::shmem_size(2 * nspecies * nspecies);
   ArtemisUtils::par_for_outer(
       DEFAULT_OUTER_LOOP_PATTERN, "Dust::Coagulation", parthenon::DevExecSpace(),
-      scr_size, scr_level, 0, md->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      scr_size, scr_level, scr_size1, 0, md->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e,
+      ib.s, ib.e,
       KOKKOS_LAMBDA(parthenon::team_mbr_t mbr, const int b, const int k, const int j,
                     const int i) {
         // Allocate scratch
@@ -287,10 +306,15 @@ TaskStatus CoagulationStep(MeshData<Real> *md, const Real time, const Real dt) {
         ScratchPad1D<Real> rhod(mbr.team_scratch(scr_level), nspecies);
         ScratchPad1D<Real> vel(mbr.team_scratch(scr_level), nvel * nspecies);
         ScratchPad1D<Real> source(mbr.team_scratch(scr_level), nspecies);
+        ScratchPad1D<Real> As(mbr.team_scratch(scr_level), nspecies);
         ScratchPad1D<Real> Q(mbr.team_scratch(scr_level), nspecies);
         ScratchPad1D<Real> nQs(mbr.team_scratch(scr_level), nspecies);
         ScratchPad1D<Real> Q2(mbr.team_scratch(scr_level),
                               (coag.integrator == 3 && coag.mom_coag) * nspecies);
+
+        // scratch for coaglation and fragmentation rate
+        ScratchPad1D<Real> fett_t(mbr.team_scratch(1), nspecies * nspecies);
+        ScratchPad1D<Real> fett_l(mbr.team_scratch(1), nspecies * nspecies);
 
         // Actual npecies this block reported by SparsePack
         const int nm = vmesh.GetSize(b, dust::prim::density());
@@ -301,14 +325,22 @@ TaskStatus CoagulationStep(MeshData<Real> *md, const Real time, const Real dt) {
         const auto &xv = coords.GetCellCenter();
         const auto &xcyl = coords.ConvertToCyl(xv);
         const Real irad = coag.const_omega ? 1.0 : 1.0 / xcyl[0]; // cylindrical
-        const Real omega1 = irad * std::sqrt(irad) / time0;       // code-units
+        const Real omega1 = irad * Kokkos::sqrt(irad) / time0;    // code-units
 
         // Extract gas state vector
-        const Real &gdens = vmesh(b, gas::prim::density(0), k, j, i);
-        const Real &gsie = vmesh(b, gas::prim::sie(0), k, j, i);
+        Real &gdens = vmesh(b, gas::prim::density(0), k, j, i);
+        // Apply density floor
+        const bool flg_dfloor = (gdens > dflr_gas);
+        gdens = (flg_dfloor)*gdens + (!flg_dfloor) * dflr_gas;
+
+        Real &gsie = vmesh(b, gas::prim::sie(0), k, j, i);
+        const Real efloor = (gsie > sieflr_gas);
+        gsie = (efloor)*gsie + (!efloor) * sieflr_gas;
+
         const Real kT = eos_d.TemperatureFromDensityInternalEnergy(gdens, gsie);
         const Real &gbulk = eos_d.BulkModulusFromDensityInternalEnergy(gdens, gsie);
-        const Real cs1 = std::sqrt(gbulk / gdens) * vel0;
+        const Real cs1 = Kokkos::sqrt(gbulk / gdens) * vel0;
+
         const Real gdens1 = gdens * rho0;
         const Real kT1 = kT * kT0;
         const StateParams kernel{gdens1, alpha, cs1, kT1, omega1, nvel};
@@ -319,14 +351,15 @@ TaskStatus CoagulationStep(MeshData<Real> *md, const Real time, const Real dt) {
 
         // Set stopping times, rhod, and veld in scratch memory
         const Real st0 = surface ? (0.5 * M_PI * coag.rho_p / gdens1 / omega1)
-                                 : (std::sqrt(M_PI / 8.0) * coag.rho_p / gdens1 / cs1);
+                                 : (Kokkos::sqrt(M_PI / 8.0) * coag.rho_p / gdens1 / cs1);
         parthenon::par_for_inner(
             DEFAULT_INNER_LOOP_PATTERN, mbr, 0, nm - 1, [&](const int n) {
               // Calculate the stopping time
               stime(n) = st0 * dust_size(n) * length0;
 
               // Calculate rhod, vel
-              const bool gtf = vmesh(b, dust::prim::density(n), k, j, i) > dfloor;
+              const bool gtf = ((vmesh(b, dust::prim::density(n), k, j, i) > dfloor) &&
+                                (n <= (*active_nm)));
               rhod(n) = gtf * vmesh(b, dust::prim::density(n), k, j, i) * rho0;
               for (int d = 0; d < nvel; d++) {
                 const auto vidx = d + nvel * n;
@@ -341,17 +374,25 @@ TaskStatus CoagulationStep(MeshData<Real> *md, const Real time, const Real dt) {
         // NOTE(@pdmullen): ncall could be stored or reduced (see 0a5d72b)
         const int ncall = Coagulation::CoagulationOneCell(
             mbr, surface, time1, dt_sync, kernel, rhod, stime, vel, nvel, Q, nQs, coag,
-            coag_arrays, rate, source, Q2);
+            As, coag_arrays, rate, source, Q2, fett_t, fett_l, i);
 
+        // if (Globals::my_rank == 0) { //debug info
+        //   printf("coag1d: %d %g %g %g %g\n", i, xcyl[0], rhod(0), rhod(1), rhod(2));
+        //   if (i==ib.s) printf("ncall= %d\n", ncall);
+        // }
         // Update dust density and momentum after coagulation
         parthenon::par_for_inner(
             DEFAULT_INNER_LOOP_PATTERN, mbr, 0, nm - 1, [&](const int n) {
               const bool gt0 = (rhod(n) > 0.0);
-              vmesh(b, dust::cons::density(n), k, j, i) = gt0 * (rhod(n) / rho0);
+              vmesh(b, dust::cons::density(n), k, j, i) =
+                  gt0 * (rhod(n) / rho0) + (!gt0) * dfloor;
               for (int d = 0; d < nvel; d++) {
                 const auto vidx = d + nvel * n;
+                const Real vel1 =
+                    (gt0 * vel(vidx) +
+                     (!gt0) * vmesh(b, dust::prim::velocity(VI(n, d)), k, j, i));
                 vmesh(b, dust::cons::momentum(VI(n, d)), k, j, i) =
-                    gt0 * rhod(n) * vel(vidx) * hx[d] / (rho0 * vel0);
+                    vmesh(b, dust::cons::density(n), k, j, i) * vel1 / vel0 * hx[d];
               }
             });
       });
@@ -361,61 +402,13 @@ TaskStatus CoagulationStep(MeshData<Real> *md, const Real time, const Real dt) {
     Real mass_d1 = Null<Real>();
     int max_size1 = Null<int>();
     CoagulationDiagnostics<GEOM>(md, vmesh, cpars, dfloor, mass_d1, max_size1);
+    if (Globals::my_rank == 0)
+      printf(" after coag: maxsize = %d, total_dust=%e \n", max_size1, mass_d1);
+    *active_nm = max_size1;
     WriteCoagulationDiagnostics(md, time, dt, max_size1, max_size0, mass_d1, mass_d0);
   }
 
   return TaskStatus::complete;
-}
-
-//----------------------------------------------------------------------------------------
-//! \fn  void Dust::Coagulation::PreCoagulationDiagnostics
-//  \brief Gather pre-coagulation diagnostics
-template <Coordinates GEOM>
-void CoagulationDiagnostics(MeshData<Real> *md, DiagPack_t &vmesh,
-                            const geometry::CoordParams &cpars, const Real &dfloor,
-                            Real &mass_d, int &max_size) {
-  // Indexing
-  IndexRange ib = md->GetBoundsI(IndexDomain::interior);
-  IndexRange jb = md->GetBoundsJ(IndexDomain::interior);
-  IndexRange kb = md->GetBoundsK(IndexDomain::interior);
-
-  // Reduction
-  Real lmass_d = 0.0;
-  int lmax_size = 1;
-
-  parthenon::par_reduce(
-      parthenon::loop_pattern_mdrange_tag, "coag::diag", DevExecSpace(), 0,
-      md->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
-      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, Real &lsum,
-                    int &lmax) {
-        geometry::Coords<GEOM> coords(cpars, vmesh.GetCoordinates(b), k, j, i);
-        const Real &vol = coords.Volume();
-
-        // Sum over nspecies
-        for (int n = 0; n < vmesh.GetSize(b, dust::cons::density()); ++n) {
-          lsum += vmesh(b, dust::cons::density(n), k, j, i) * vol;
-        }
-
-        // Max
-        for (int n = vmesh.GetSize(b, dust::cons::density()) - 1; n >= 0; --n) {
-          const Real &dens_d = vmesh(b, dust::cons::density(n), k, j, i);
-          if (dens_d > dfloor) {
-            lmax = std::max(lmax, n);
-            break;
-          }
-        }
-      },
-      Kokkos::Sum<Real>(lmass_d), Kokkos::Max<int>(lmax_size));
-  Kokkos::fence();
-
-#ifdef MPI_PARALLEL
-  // Sum over all processors
-  MPI_Allreduce(MPI_IN_PLACE, &lmax_size, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
-  MPI_Allreduce(MPI_IN_PLACE, &lmass_d, 1, MPI_PARTHENON_REAL, MPI_SUM, MPI_COMM_WORLD);
-#endif // MPI_PARALLEL
-
-  mass_d = lmass_d;
-  max_size = lmax_size;
 }
 
 //----------------------------------------------------------------------------------------
@@ -484,7 +477,7 @@ void InitializeArray(const int nm, int &pgrid, const Real &rho_p, const Real &ch
       0, nm - 1, KOKKOS_LAMBDA(const int i) {
         Real phi_sum = 0.0;
         for (int j = 0; j <= i; j++) {
-          coag3d(cidx::Pij, j, i) = std::pow(mass_grid(j), frag_slope);
+          coag3d(cidx::Pij, j, i) = Kokkos::pow(mass_grid(j), frag_slope);
           phi_sum += coag3d(cidx::Pij, j, i);
         }
         for (int j = 0; j <= i; j++) {
@@ -498,7 +491,7 @@ void InitializeArray(const int nm, int &pgrid, const Real &rho_p, const Real &ch
               chi * mass_grid(j) / (mass_grid(i) * (1.0 - 1. / a));
         }
 
-        int i1 = std::max(0, i - pgrid);
+        int i1 = Kokkos::max(0, i - pgrid);
         for (int j = i1; j <= i; j++) {
           idx_largest(i, j) = i;
           coag3d(cidx::Aij, i, j) = (mass_grid(i) + mass_grid(j));
@@ -541,7 +534,7 @@ void InitializeArray(const int nm, int &pgrid, const Real &rho_p, const Real &ch
         Real combined_mass = mass_grid(i) + mass_grid(j);
         if (combined_mass < mass_grid(nm - 1)) {
           int kk = 0;
-          for (int k = std::max(i, j); k < nm - 1; k++) {
+          for (int k = Kokkos::max(i, j); k < nm - 1; k++) {
             if (combined_mass >= mass_grid(k) && combined_mass < mass_grid(k + 1)) {
               kk = k;
               break;
@@ -603,18 +596,18 @@ template TaskStatus CoagulationStep<G::spherical2D>(MD *md, const Real t, const 
 template TaskStatus CoagulationStep<G::spherical3D>(MD *md, const Real t, const Real dt);
 template TaskStatus CoagulationStep<G::axisymmetric>(MD *md, const Real t, const Real dt);
 // clang-format off
-template void CoagulationDiagnostics<G::cartesian>(
-    MD *md, DiagPack_t &vmesh, const CP &c, const Real &d, Real &massd, int &maxsize);
-template void CoagulationDiagnostics<G::cylindrical>(
-    MD *md, DiagPack_t &vmesh, const CP &c, const Real &d, Real &massd, int &maxsize);
-template void CoagulationDiagnostics<G::spherical1D>(
-    MD *md, DiagPack_t &vmesh, const CP &c, const Real &d, Real &massd, int &maxsize);
-template void CoagulationDiagnostics<G::spherical2D>(
-    MD *md, DiagPack_t &vmesh, const CP &c, const Real &d, Real &massd, int &maxsize);
-template void CoagulationDiagnostics<G::spherical3D>(
-    MD *md, DiagPack_t &vmesh, const CP &c, const Real &d, Real &massd, int &maxsize);
-template void CoagulationDiagnostics<G::axisymmetric>(
-    MD *md, DiagPack_t &vmesh, const CP &c, const Real &d, Real &massd, int &maxsize);
+// template void CoagulationDiagnostics<G::cartesian>(
+//     MD *md, DiagPack_t &vmesh, const CP &c, const Real &d, Real &massd, int &maxsize);
+// template void CoagulationDiagnostics<G::cylindrical>(
+//     MD *md, DiagPack_t &vmesh, const CP &c, const Real &d, Real &massd, int &maxsize);
+// template void CoagulationDiagnostics<G::spherical1D>(
+//     MD *md, DiagPack_t &vmesh, const CP &c, const Real &d, Real &massd, int &maxsize);
+// template void CoagulationDiagnostics<G::spherical2D>(
+//     MD *md, DiagPack_t &vmesh, const CP &c, const Real &d, Real &massd, int &maxsize);
+// template void CoagulationDiagnostics<G::spherical3D>(
+//     MD *md, DiagPack_t &vmesh, const CP &c, const Real &d, Real &massd, int &maxsize);
+// template void CoagulationDiagnostics<G::axisymmetric>(
+//     MD *md, DiagPack_t &vmesh, const CP &c, const Real &d, Real &massd, int &maxsize);
 // clang-format on
 
 } // namespace Coagulation

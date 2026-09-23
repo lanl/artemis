@@ -107,6 +107,22 @@ post_recon(const EOS &eos, const Real dfloor, const Real siefloor,
                                  }
                                });
     }
+  } else if constexpr (F == Fluid::dust) {
+    // Make sure the reconstructed states make sense
+    const int nspecies = q.GetSize(b, dust::prim::density());
+    for (int n = 0; n < nspecies; ++n) {
+      const int IDN = n;
+      parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, member, il, iu,
+                               [&](const int i) {
+                                 const int ipl = i + (dir == 1);
+                                 Real &dL = ql(IDN, ipl);
+                                 Real &dR = qr(IDN, i);
+
+                                 // Floor everything
+                                 dL = std::max(dL, dfloor);
+                                 dR = std::max(dR, dfloor);
+                               });
+    }
   }
 }
 

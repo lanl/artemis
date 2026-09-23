@@ -188,9 +188,10 @@ std::vector<std::vector<Real>> loadtxt(std::string fname);
 template <typename Function>
 inline void par_for_outer(OuterLoopPatternTeams, const std::string &name,
                           DevExecSpace exec_space, size_t scratch_size_in_bytes,
-                          const int scratch_level, const int nl, const int nu,
-                          const int kl, const int ku, const int jl, const int ju,
-                          const int il, const int iu, const Function &function) {
+                          const int scratch_level, size_t scratch1_size_in_bytes,
+                          const int nl, const int nu, const int kl, const int ku,
+                          const int jl, const int ju, const int il, const int iu,
+                          const Function &function) {
   const int Nn = nu - nl + 1;
   const int Nk = ku - kl + 1;
   const int Nj = ju - jl + 1;
@@ -200,11 +201,11 @@ inline void par_for_outer(OuterLoopPatternTeams, const std::string &name,
   const int NnNkNjNi = Nn * Nk * Nj * Ni;
 
   team_policy policy(exec_space, NnNkNjNi, Kokkos::AUTO);
+  policy.set_scratch_size(scratch_level, Kokkos::PerTeam(scratch_size_in_bytes));
+  policy.set_scratch_size(1, Kokkos::PerTeam(scratch1_size_in_bytes));
 
   Kokkos::parallel_for(
-      name,
-      policy.set_scratch_size(scratch_level, Kokkos::PerTeam(scratch_size_in_bytes)),
-      KOKKOS_LAMBDA(team_mbr_t team_member) {
+      name, policy, KOKKOS_LAMBDA(team_mbr_t team_member) {
         int n = team_member.league_rank() / NkNjNi;
         int k = (team_member.league_rank() - n * NkNjNi) / NjNi;
         int j = (team_member.league_rank() - n * NkNjNi - k * NjNi) / Ni;
